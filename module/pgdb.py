@@ -176,6 +176,9 @@ class pgdbCursor:
 		self.description = None
 		self.rowcount = -1
 
+	def arraysize(self, size):
+		self.arraysize = size
+
 	def execute(self, operation, params = None):
 		# "The parameters may also be specified as list of
 		# tuples to e.g. insert multiple rows in a single
@@ -234,7 +237,7 @@ class pgdbCursor:
 	def fetchall(self):
 		return self.fetchmany(-1, 0)
 
-	def fetchmany(self, size = None, keep = 1):
+	def fetchmany(self, size = None, keep = 0):
 		if size == None:
 			size = self.arraysize
 		if keep == 1:
