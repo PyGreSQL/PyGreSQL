@@ -40,7 +40,9 @@
 #define PyObject_Del(op) PyMem_DEL((op))
 #endif
 
-static PyObject *PGError;
+static PyObject *Error, *Warning, *InterfaceError,
+	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
+	*IntegrityError, *DataError, *NotSupportedError;
 static const char *PyPgVersion = "3.5 (beta)";
 
 /* taken from fileobject.c */
@@ -206,7 +208,7 @@ check_cnx_obj(pgobject * self)
 {
 	if (!self->valid)
 	{
-		PyErr_SetString(PGError, "connection has been closed");
+		PyErr_SetString(IntegrityError, "connection has been closed");
 		return 0;
 	}
 	return 1;
@@ -222,7 +224,7 @@ check_lo_obj(pglargeobject * self, int level)
 
 	if (!self->lo_oid)
 	{
-		PyErr_SetString(PGError, "object is not valid (null oid).");
+		PyErr_SetString(IntegrityError, "object is not valid (null oid).");
 		return 0;
 	}
 
@@ -254,19 +256,19 @@ check_source_obj(pgsourceobject * self, int level)
 {
 	if (!self->valid)
 	{
-		PyErr_SetString(PGError, "object has been closed");
+		PyErr_SetString(IntegrityError, "object has been closed");
 		return 0;
 	}
 
 	if ((level & CHECK_RESULT) && self->last_result == NULL)
 	{
-		PyErr_SetString(PGError, "no result.");
+		PyErr_SetString(DatabaseError, "no result.");
 		return 0;
 	}
 
 	if ((level & CHECK_DQL) && self->result_type != RESULT_DQL)
 	{
-		PyErr_SetString(PGError, "last query did not return tuples.");
+		PyErr_SetString(DatabaseError, "last query did not return tuples.");
 		return 0;
 	}
 
@@ -409,6 +411,10 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 	if (!check_source_obj(self, CHECK_CNX))
 		return NULL;
 
+	/* make sure that the connection object is valid */
+	if (!self->pgcnx->cnx)
+		return NULL;
+
 	/* get query args */
 	if (!PyArg_ParseTuple(args, "s", &query))
 	{
@@ -469,10 +475,10 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 		case PGRES_BAD_RESPONSE:
 		case PGRES_FATAL_ERROR:
 		case PGRES_NONFATAL_ERROR:
-			PyErr_SetString(PGError, PQerrorMessage(self->pgcnx->cnx));
+			PyErr_SetString(ProgrammingError, PQerrorMessage(self->pgcnx->cnx));
 			break;
 		default:
-			PyErr_SetString(PGError, "internal error: "
+			PyErr_SetString(InternalError, "internal error: "
 							"unknown result status.");
 			break;
 	}
@@ -819,28 +825,28 @@ pgsource_field(pgsourceobject * self, PyObject * args)
 
 /* query object methods */
 static PyMethodDef pgsource_methods[] = {
-	{"close", (PyCFunction) pgsource_close, 1,
-	pgsource_close__doc__},
-	{"execute", (PyCFunction) pgsource_execute, 1,
-	pgsource_execute__doc__},
-	{"oidstatus", (PyCFunction) pgsource_oidstatus, 1,
-	pgsource_oidstatus__doc__},
-	{"fetch", (PyCFunction) pgsource_fetch, 1,
-	pgsource_fetch__doc__},
-	{"movefirst", (PyCFunction) pgsource_movefirst, 1,
-	pgsource_movefirst__doc__},
-	{"movelast", (PyCFunction) pgsource_movelast, 1,
-	pgsource_movelast__doc__},
-	{"movenext", (PyCFunction) pgsource_movenext, 1,
-	pgsource_movenext__doc__},
-	{"moveprev", (PyCFunction) pgsource_moveprev, 1,
-	pgsource_moveprev__doc__},
-	{"field", (PyCFunction) pgsource_field, 1,
-	pgsource_field__doc__},
-	{"fieldinfo", (PyCFunction) pgsource_fieldinfo, 1,
-	pgsource_fieldinfo__doc__},
-	{"listinfo", (PyCFunction) pgsource_listinfo, 1,
-	pgsource_listinfo__doc__},
+	{"close", (PyCFunction) pgsource_close, METH_VARARGS,
+			pgsource_close__doc__},
+	{"execute", (PyCFunction) pgsource_execute, METH_VARARGS,
+			pgsource_execute__doc__},
+	{"oidstatus", (PyCFunction) pgsource_oidstatus, METH_VARARGS,
+			pgsource_oidstatus__doc__},
+	{"fetch", (PyCFunction) pgsource_fetch, METH_VARARGS,
+			pgsource_fetch__doc__},
+	{"movefirst", (PyCFunction) pgsource_movefirst, METH_VARARGS,
+			pgsource_movefirst__doc__},
+	{"movelast", (PyCFunction) pgsource_movelast, METH_VARARGS,
+			pgsource_movelast__doc__},
+	{"movenext", (PyCFunction) pgsource_movenext, METH_VARARGS,
+			pgsource_movenext__doc__},
+	{"moveprev", (PyCFunction) pgsource_moveprev, METH_VARARGS,
+			pgsource_moveprev__doc__},
+	{"field", (PyCFunction) pgsource_field, METH_VARARGS,
+			pgsource_field__doc__},
+	{"fieldinfo", (PyCFunction) pgsource_fieldinfo, METH_VARARGS,
+			pgsource_fieldinfo__doc__},
+	{"listinfo", (PyCFunction) pgsource_listinfo, METH_VARARGS,
+			pgsource_listinfo__doc__},
 	{NULL, NULL}
 };
 
@@ -1340,15 +1346,15 @@ pglarge_unlink(pglargeobject * self, PyObject * args)
 
 /* large object methods */
 static struct PyMethodDef pglarge_methods[] = {
-	{"open", (PyCFunction) pglarge_open, 1, pglarge_open__doc__},
-	{"close", (PyCFunction) pglarge_close, 1, pglarge_close__doc__},
-	{"read", (PyCFunction) pglarge_read, 1, pglarge_read__doc__},
-	{"write", (PyCFunction) pglarge_write, 1, pglarge_write__doc__},
-	{"seek", (PyCFunction) pglarge_lseek, 1, pglarge_seek__doc__},
-	{"size", (PyCFunction) pglarge_size, 1, pglarge_size__doc__},
-	{"tell", (PyCFunction) pglarge_tell, 1, pglarge_tell__doc__},
-	{"export", (PyCFunction) pglarge_export, 1, pglarge_export__doc__},
-	{"unlink", (PyCFunction) pglarge_unlink, 1, pglarge_unlink__doc__},
+	{"open", (PyCFunction) pglarge_open, METH_VARARGS, pglarge_open__doc__},
+	{"close", (PyCFunction) pglarge_close, METH_VARARGS, pglarge_close__doc__},
+	{"read", (PyCFunction) pglarge_read, METH_VARARGS, pglarge_read__doc__},
+	{"write", (PyCFunction) pglarge_write, METH_VARARGS, pglarge_write__doc__},
+	{"seek", (PyCFunction) pglarge_lseek, METH_VARARGS, pglarge_seek__doc__},
+	{"size", (PyCFunction) pglarge_size, METH_VARARGS, pglarge_size__doc__},
+	{"tell", (PyCFunction) pglarge_tell, METH_VARARGS, pglarge_tell__doc__},
+	{"export",(PyCFunction) pglarge_export,METH_VARARGS,pglarge_export__doc__},
+	{"unlink",(PyCFunction) pglarge_unlink,METH_VARARGS,pglarge_unlink__doc__},
 	{NULL, NULL}
 };
 
@@ -1543,7 +1549,7 @@ pgconnect(pgobject * self, PyObject * args, PyObject * dict)
 
 	if (PQstatus(npgobj->cnx) == CONNECTION_BAD)
 	{
-		PyErr_SetString(PGError, PQerrorMessage(npgobj->cnx));
+		PyErr_SetString(InternalError, PQerrorMessage(npgobj->cnx));
 		Py_XDECREF(npgobj);
 		return NULL;
 	}
@@ -1579,9 +1585,14 @@ pg_close(pgobject * self, PyObject * args)
 		return NULL;
 	}
 
-	if (self->cnx)
-		PQfinish(self->cnx);
+	/* connection object cannot already be closed */
+	if (!self->cnx)
+	{
+		PyErr_SetString(InternalError, "Connection already closed");
+		return NULL;
+	}
 
+	PQfinish(self->cnx);
 	self->cnx = NULL;
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -2168,7 +2179,7 @@ pg_query(pgobject * self, PyObject * args)
 			case PGRES_BAD_RESPONSE:
 			case PGRES_FATAL_ERROR:
 			case PGRES_NONFATAL_ERROR:
-				PyErr_SetString(PGError, PQerrorMessage(self->cnx));
+				PyErr_SetString(ProgrammingError, PQerrorMessage(self->cnx));
 				break;
 			case PGRES_COMMAND_OK:		/* could be an INSERT */
 				if (oid == InvalidOid)	/* nope */
@@ -2185,7 +2196,7 @@ pg_query(pgobject * self, PyObject * args)
 				Py_INCREF(Py_None);
 				return Py_None;
 			default:
-				PyErr_SetString(PGError, "internal error: "
+				PyErr_SetString(InternalError, "internal error: "
 								"unknown result status.");
 				break;
 		}
@@ -2468,14 +2479,12 @@ pg_inserttable(pgobject * self, PyObject * args)
 						temp = PyString_AS_STRING(item);
 						while (*temp && bufsiz)
 						{
-						     if (*temp == '\\'
-						      || *temp == '\t'
-						      || *temp == '\n')
-						     {
-						        *bufpt++='\\'; --bufsiz;
-						        if (!bufsiz) break;
-						     }
-						     *bufpt++=*temp++; --bufsiz;
+							if (*temp == '\\' || *temp == '\t' || *temp == '\n')
+							{
+								*bufpt++='\\'; --bufsiz;
+								if (!bufsiz) break;
+							}
+							*bufpt++=*temp++; --bufsiz;
 						}
 					}
 					else if (PyInt_Check(item))
@@ -2589,7 +2598,7 @@ pg_locreate(pgobject * self, PyObject * args)
 	lo_oid = lo_creat(self->cnx, mode);
 	if (lo_oid == 0)
 	{
-		PyErr_SetString(PGError, "can't create large object.");
+		PyErr_SetString(OperationalError, "can't create large object.");
 		return NULL;
 	}
 
@@ -2651,7 +2660,7 @@ pg_loimport(pgobject * self, PyObject * args)
 	lo_oid = lo_import(self->cnx, name);
 	if (lo_oid == 0)
 	{
-		PyErr_SetString(PGError, "can't create large object.");
+		PyErr_SetString(OperationalError, "can't create large object.");
 		return NULL;
 	}
 
@@ -2661,13 +2670,15 @@ pg_loimport(pgobject * self, PyObject * args)
 
 /* connection object methods */
 static struct PyMethodDef pgobj_methods[] = {
-	{"source", (PyCFunction) pg_source, 1, pg_source__doc__},
-	{"query", (PyCFunction) pg_query, 1, pg_query__doc__},
-	{"reset", (PyCFunction) pg_reset, 1, pg_reset__doc__},
-	{"close", (PyCFunction) pg_close, 1, pg_close__doc__},
-	{"fileno", (PyCFunction) pg_fileno, 1, pg_fileno__doc__},
-	{"getnotify", (PyCFunction) pg_getnotify, 1, pg_getnotify__doc__},
-	{"inserttable", (PyCFunction) pg_inserttable, 1, pg_inserttable__doc__},
+	{"source", (PyCFunction) pg_source, METH_VARARGS, pg_source__doc__},
+	{"query", (PyCFunction) pg_query, METH_VARARGS, pg_query__doc__},
+	{"reset", (PyCFunction) pg_reset, METH_VARARGS, pg_reset__doc__},
+	{"close", (PyCFunction) pg_close, METH_VARARGS, pg_close__doc__},
+	{"fileno", (PyCFunction) pg_fileno, METH_VARARGS, pg_fileno__doc__},
+	{"getnotify", (PyCFunction) pg_getnotify, METH_VARARGS,
+			pg_getnotify__doc__},
+	{"inserttable", (PyCFunction) pg_inserttable, METH_VARARGS,
+			pg_inserttable__doc__},
 
 #ifdef DIRECT_ACCESS
 	{"putline", (PyCFunction) pg_putline, 1, pg_putline__doc__},
@@ -2693,7 +2704,9 @@ pg_getattr(pgobject * self, char *name)
 	 * attributes that don't require a live connection and unless someone
 	 * has an urgent need, this will have to do
 	 */
-	if (!self->cnx)
+
+	/* first exception - close which returns a different error */
+	if (strcmp(name, "close") && !self->cnx)
 	{
 		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
@@ -2784,12 +2797,18 @@ staticforward PyTypeObject PgType = {
 
 /* query object methods */
 static struct PyMethodDef pgquery_methods[] = {
-	{"getresult", (PyCFunction) pgquery_getresult, 1, pgquery_getresult__doc__},
-	{"dictresult", (PyCFunction) pgquery_dictresult, 1, pgquery_dictresult__doc__},
-	{"fieldname", (PyCFunction) pgquery_fieldname, 1, pgquery_fieldname__doc__},
-	{"fieldnum", (PyCFunction) pgquery_fieldnum, 1, pgquery_fieldnum__doc__},
-	{"listfields", (PyCFunction) pgquery_listfields, 1, pgquery_listfields__doc__},
-	{"ntuples", (PyCFunction) pgquery_ntuples, 1, pgquery_ntuples__doc__},
+	{"getresult", (PyCFunction) pgquery_getresult, METH_VARARGS,
+			pgquery_getresult__doc__},
+	{"dictresult", (PyCFunction) pgquery_dictresult, METH_VARARGS,
+			pgquery_dictresult__doc__},
+	{"fieldname", (PyCFunction) pgquery_fieldname, METH_VARARGS,
+			 pgquery_fieldname__doc__},
+	{"fieldnum", (PyCFunction) pgquery_fieldnum, METH_VARARGS,
+			pgquery_fieldnum__doc__},
+	{"listfields", (PyCFunction) pgquery_listfields, METH_VARARGS,
+			pgquery_listfields__doc__},
+	{"ntuples", (PyCFunction) pgquery_ntuples, METH_VARARGS,
+			pgquery_ntuples__doc__},
 	{NULL, NULL}
 };
 
@@ -3174,22 +3193,23 @@ pgsetdefport(PyObject * self, PyObject * args)
 /* List of functions defined in the module */
 
 static struct PyMethodDef pg_methods[] = {
-	{"connect", (PyCFunction) pgconnect, 3, connect__doc__},
+	{"connect", (PyCFunction) pgconnect, METH_VARARGS|METH_KEYWORDS,
+			connect__doc__},
 
 #ifdef DEFAULT_VARS
-	{"get_defhost", pggetdefhost, 1, getdefhost__doc__},
-	{"set_defhost", pgsetdefhost, 1, setdefhost__doc__},
-	{"get_defbase", pggetdefbase, 1, getdefbase__doc__},
-	{"set_defbase", pgsetdefbase, 1, setdefbase__doc__},
-	{"get_defopt", pggetdefopt, 1, getdefopt__doc__},
-	{"set_defopt", pgsetdefopt, 1, setdefopt__doc__},
-	{"get_deftty", pggetdeftty, 1, getdeftty__doc__},
-	{"set_deftty", pgsetdeftty, 1, setdeftty__doc__},
-	{"get_defport", pggetdefport, 1, getdefport__doc__},
-	{"set_defport", pgsetdefport, 1, setdefport__doc__},
-	{"get_defuser", pggetdefuser, 1, getdefuser__doc__},
-	{"set_defuser", pgsetdefuser, 1, setdefuser__doc__},
-	{"set_defpasswd", pgsetdefpasswd, 1, setdefpasswd__doc__},
+	{"get_defhost", pggetdefhost, METH_VARARGS, getdefhost__doc__},
+	{"set_defhost", pgsetdefhost, METH_VARARGS, setdefhost__doc__},
+	{"get_defbase", pggetdefbase, METH_VARARGS, getdefbase__doc__},
+	{"set_defbase", pgsetdefbase, METH_VARARGS, setdefbase__doc__},
+	{"get_defopt", pggetdefopt, METH_VARARGS, getdefopt__doc__},
+	{"set_defopt", pgsetdefopt, METH_VARARGS, setdefopt__doc__},
+	{"get_deftty", pggetdeftty, METH_VARARGS, getdeftty__doc__},
+	{"set_deftty", pgsetdeftty, METH_VARARGS, setdeftty__doc__},
+	{"get_defport", pggetdefport, METH_VARARGS, getdefport__doc__},
+	{"set_defport", pgsetdefport, METH_VARARGS, setdefport__doc__},
+	{"get_defuser", pggetdefuser, METH_VARARGS, getdefuser__doc__},
+	{"set_defuser", pgsetdefuser, METH_VARARGS, setdefuser__doc__},
+	{"set_defpasswd", pgsetdefpasswd, METH_VARARGS, setdefpasswd__doc__},
 #endif   /* DEFAULT_VARS */
 	{NULL, NULL}				/* sentinel */
 };
@@ -3212,9 +3232,40 @@ init_pg(void)
 	mod = Py_InitModule4("_pg", pg_methods, pg__doc__, NULL, PYTHON_API_VERSION);
 	dict = PyModule_GetDict(mod);
 
-	/* Add some symbolic constants to the module */
-	PGError = PyString_FromString("_pg.error");
-	PyDict_SetItemString(dict, "error", PGError);
+	/* Exceptions as defined by DB-API 2.0 */
+	Error = PyErr_NewException("pg.error", PyExc_StandardError, NULL);
+	PyDict_SetItemString(dict, "Error", Error);
+
+	Warning = PyErr_NewException("pg.Warning", PyExc_StandardError, NULL);
+	PyDict_SetItemString(dict, "Warning", Warning);
+
+	InterfaceError = PyErr_NewException("pg.InterfaceError", Error, NULL);
+	PyDict_SetItemString(dict, "InterfaceError", InterfaceError);
+
+	DatabaseError = PyErr_NewException("pg.DatabaseError", Error, NULL);
+	PyDict_SetItemString(dict, "DatabaseError", DatabaseError);
+
+	InternalError = PyErr_NewException("pg.InternalError", DatabaseError, NULL);
+	PyDict_SetItemString(dict, "InternalError", InternalError);
+
+	OperationalError =
+		PyErr_NewException("pg.OperationalError", DatabaseError, NULL);
+	PyDict_SetItemString(dict, "OperationalError", OperationalError);
+
+	ProgrammingError =
+		PyErr_NewException("pg.ProgrammingError", DatabaseError, NULL);
+	PyDict_SetItemString(dict, "ProgrammingError", ProgrammingError);
+
+	IntegrityError =
+		PyErr_NewException("pg.IntegrityError", DatabaseError, NULL);
+	PyDict_SetItemString(dict, "IntegrityError", IntegrityError);
+
+	DataError = PyErr_NewException("pg.DataError", DatabaseError, NULL);
+	PyDict_SetItemString(dict, "DataError", DataError);
+
+	NotSupportedError =
+		PyErr_NewException("pg.NotSupportedError", DatabaseError, NULL);
+	PyDict_SetItemString(dict, "NotSupportedError", NotSupportedError);
 
 	/* Make the version available */
 	v = PyString_FromString(PyPgVersion);

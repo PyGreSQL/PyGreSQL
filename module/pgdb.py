@@ -53,11 +53,11 @@
 
 """
 
-import _pg
 import string
-import exceptions
 import types
 import time
+
+from _pg import *
 
 # Marc-Andre is changing where DateTime goes.  This handles it either way.
 try: from mx import DateTime
@@ -73,38 +73,6 @@ threadsafety = 1
 
 # this module use extended python format codes
 paramstyle = 'pyformat'
-
-### exception hierarchy
-
-class Warning(StandardError):
-	pass
-
-class Error(StandardError):
-	pass
-
-class InterfaceError(Error):
-	pass
-
-class DatabaseError(Error):
-	pass
-
-class DataError(DatabaseError):
-	pass
-
-class OperationalError(DatabaseError):
-	pass
-
-class IntegrityError(DatabaseError):
-	pass
-
-class InternalError(DatabaseError):
-	pass
-
-class ProgrammingError(DatabaseError):
-	pass
-
-class NotSupportedError(DatabaseError):
-	pass
 
 ### internal type handling class
 class pgdbTypeCache:
@@ -209,13 +177,13 @@ class pgdbCursor:
 				else:
 					self.rowcount = -1
 
-		except _pg.error, msg:
+		except Error, msg:
 			raise DatabaseError, "error '%s' in '%s'" % ( msg, sql )
 		except:
 			raise OperationalError, "internal error in '%s'" % sql
 
 		# then initialize result raw count and description
-		if self.__source.resulttype == _pg.RESULT_DQL:
+		if self.__source.resulttype == RESULT_DQL:
 			self.rowcount = self.__source.ntuples
 			d = []
 			for typ in self.__source.listinfo():
@@ -247,7 +215,7 @@ class pgdbCursor:
 			self.arraysize = size
 
 		try: res = self.__source.fetch(size)
-		except _pg.error, e: raise DatabaseError, str(e)
+		except Error, e: raise DatabaseError, str(e)
 
 		result = []
 		for r in res:
@@ -272,8 +240,8 @@ class pgdbCursor:
 
 
 try:
-  _quote = _pg.quote_fast
-  _quoteparams = _pg.quoteparams_fast
+  _quote = quote_fast
+  _quoteparams = quoteparams_fast
 except (NameError, AttributeError):
   def _quote(x):
 	  if type(x) == DateTime.DateTimeType:
@@ -348,6 +316,7 @@ class pgdbCnx:
 ### module interface
 
 # connects to a database
+_connect_ = connect
 def connect(dsn = None, user = None, password = None, host = None, database = None):
 	# first get params from DSN
 	dbport = -1
@@ -390,7 +359,7 @@ def connect(dsn = None, user = None, password = None, host = None, database = No
 		dbuser = None
 
 	# open the connection
-	cnx = _pg.connect(dbbase, dbhost, dbport, dbopt,
+	cnx = _connect_(dbbase, dbhost, dbport, dbopt,
 		dbtty, dbuser, dbpasswd)
 	return pgdbCnx(cnx)
 
