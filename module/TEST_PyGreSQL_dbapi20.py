@@ -1,15 +1,21 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.2 2004-12-08 21:16:39 darcy Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.3 2005-01-08 14:46:24 darcy Exp $
 
 import dbapi20
 import unittest
 import pgdb
 import popen2
 
+# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
+# get our information from that.  Otherwise we use the defaults.
+dbname = 'dbapi20_test'
+dbhost = None
+dbport = 5432
+
 class test_Psycopg(dbapi20.DatabaseAPI20Test):
     driver = pgdb
     connect_args = ()
-    connect_kw_args = {'dsn': ':dbapi20_test'}
+    connect_kw_args = {'dsn': ':' + dbname}
 
     lower_func = 'lower' # For stored procedure test
 
