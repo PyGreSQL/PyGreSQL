@@ -1,4 +1,4 @@
-# $Id: pgdb.py,v 1.25 2004-12-08 21:14:31 darcy Exp $
+# $Id: pgdb.py,v 1.26 2004-12-14 18:36:46 darcy Exp $
 
 """ pgdb - DB-SIG compliant module for PygreSQL.
 
@@ -140,11 +140,13 @@ class pgdbCursor:
 		self.description = None
 		self.rowcount = -1
 		self.arraysize = 1
+		self.lastrowid = None
 
 	def close(self):
 		self.__source.close()
 		self.description = None
 		self.rowcount = -1
+		self.lastrowid = None
 
 	def arraysize(self, size):
 		self.arraysize = size
@@ -181,6 +183,8 @@ class pgdbCursor:
 
 		except Error, msg:
 			raise DatabaseError, "error '%s' in '%s'" % ( msg, sql )
+		except Exception, err:
+			raise OperationalError, "internal error in '%s': %s" % (sql,err)
 		except:
 			raise OperationalError, "internal error in '%s'" % sql
 
@@ -196,9 +200,11 @@ class pgdbCursor:
 				desc = typ[1:2]+self.__cache.getdescr(typ[2])
 				d.append(desc)
 			self.description = d
+			self.lastrowid = self.__source.oidstatus()
 		else:
 			self.rowcount = totrows
 			self.description = None
+			self.lastrowid = self.__source.oidstatus()
 
 	def fetchone(self):
 		res = self.fetchmany(1, 0)
