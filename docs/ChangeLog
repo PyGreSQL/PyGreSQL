@@ -2,8 +2,22 @@ PyGreSQL changelog.
 ===================
 
 This software is copyright (c) 1995, Pascal Andre (andre@via.ecp.fr)
-Further copyright 1997, 1998 and 1999 by D'Arcy J.M. Cain (darcy@druid.net)
+Further copyright 1997 to 2003 by D'Arcy J.M. Cain (darcy@druid.net)
 See file README for copyright information.
+
+Version 3.4
+  Some cleanups and fixes.  This is the first version where PyGreSQL is
+  moved back out of the PostgreSQL tree.  A lot of the changes mentioned
+  below were actually made while in the PostgreSQL tree since their last
+  release.
+  - Allow for larger integer returns
+  - Return proper strings for true and false
+  - Cleanup convenience method creation
+  - Enhance debugging method
+  - Add reopen method
+  - Allow programs to preload field names for speedup
+  - Move OID handling so that it returns long instead of int
+  - Miscellaneous cleanups and formatting
 
 Version 3.3
   A few cleanups.  Mostly there was some confusion about the latest version

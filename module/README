@@ -201,7 +201,7 @@ The home sites of the different packages are:
 
   - Python:     http://www.python.org/
   - PosgreSQL:  http://www.PostgreSQL.org/
-  - PyGreSQL:   http://www.druid.net/pygresql/
+  - PyGreSQL:   http://www.PyGreSQL.org/
 
 A Linux RPM can be picked up from
 ftp://ftp.druid.net/pub/distrib/pygresql.i386.rpm.  A NetBSD package thould
@@ -251,6 +251,8 @@ The C module needs to be cleaned up and redundant code merged.
 The DB-API module needs to be documented.
 
 The fetch method should use real cursors.
+
+The programming documentation has to be moved back here or into a new file.
 
 
 4. Future directions

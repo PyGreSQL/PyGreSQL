@@ -41,7 +41,7 @@
 #endif
 
 static PyObject *PGError;
-static const char *PyPgVersion = "3.4 (beta)";
+static const char *PyPgVersion = "3.4";
 
 /* taken from fileobject.c */
 #define BUF(v) PyString_AS_STRING((PyStringObject *)(v))

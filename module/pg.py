@@ -48,7 +48,7 @@ class DB:
 	def __init__(self, *args, **kw):
 		self.db = apply(connect, args, kw)
 
-		# Create convience methods, in a way that is still overridable
+		# Create convenience methods, in a way that is still overridable
 		# (members are not copied because they are actually functions)
 		for e in self.db.__methods__:
 			setattr(self, e, getattr(self.db, e))
@@ -56,14 +56,11 @@ class DB:
 		self.__attnames = {}
 		self.__pkeys = {}
 		self.__args = args, kw
-		self.debug = None	# For debugging scripts, set to output format
-							# that takes a single string arg.  For example
-							# in a CGI set to "%s<BR>"
-
-		# this is an aid to debugging by putting the program name into
-		# the PostgreSQL log if turned on in PostgreSQL's config
-		# left off by default
-		##self.query("SELECT 'Start PyGreSQL program: %s'" % sys.argv[0])
+		self.debug = None	# For debugging scripts, this can be set to a
+							# string format specification (e.g. in a CGI
+							# set to "%s<BR>",) to a function which takes
+							# a string argument or a file object to write
+							# debug statements to.
 
 	def _do_debug(self, s):
 		if not self.debug: return

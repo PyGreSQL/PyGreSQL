@@ -36,11 +36,11 @@ else:
 	data_files = []
 
 setup (name = "PyGreSQL",
-	version = "3.3",
+	version = "3.4",
 	description = "Python PostgreSQL Interfaces",
 	author = "D'Arcy J. M. Cain",
-	author_email = "darcy@druid.net",
-	url = "http://www.druid.net/pygresql/",
+	author_email = "darcy@PyGreSQL.org",
+	url = "http://www.pygresql.org/",
 	licence = "Python",
 
 	py_modules = ['pg', 'pgdb'],

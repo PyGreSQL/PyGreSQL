@@ -1,11 +1,11 @@
-# $Header: /usr/cvs/Public/pygresql/module/GNUmakefile,v 1.16 2003-03-21 17:18:34 petere Exp $
+# $Header: /usr/cvs/Public/pygresql/module/GNUmakefile,v 1.17 2003-12-22 13:20:59 darcy Exp $
 
 subdir = src/interfaces/python
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 NAME = _pgmodule
-SO_MAJOR_VERSION = 2
+SO_MAJOR_VERSION = 3
 SO_MINOR_VERSION = 4
 OBJS = pgmodule.o
 SHLIB_LINK = $(libpq)
