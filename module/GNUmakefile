@@ -1,13 +1,11 @@
-# $Header: /usr/cvs/Public/pygresql/module/GNUmakefile,v 1.18 2004-12-08 21:16:08 darcy Exp $
-# $Id: GNUmakefile,v 1.18 2004-12-08 21:16:08 darcy Exp $
+# $Header: /usr/cvs/Public/pygresql/module/GNUmakefile,v 1.19 2005-01-11 12:13:38 darcy Exp $
+# $Id: GNUmakefile,v 1.19 2005-01-11 12:13:38 darcy Exp $
 
 subdir = src/interfaces/python
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 NAME = _pgmodule
-SO_MAJOR_VERSION = 3
-SO_MINOR_VERSION = 4
 OBJS = pgmodule.o
 SHLIB_LINK = $(libpq)
 ifeq ($(PORTNAME), cygwin)

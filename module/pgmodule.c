@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.55 2004-12-14 17:22:50 darcy Exp $
+ * $Id: pgmodule.c,v 1.56 2005-01-11 12:13:38 darcy Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -44,7 +44,8 @@
 static PyObject *Error, *Warning, *InterfaceError,
 	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
 	*IntegrityError, *DataError, *NotSupportedError;
-static const char *PyPgVersion = "3.6 (beta)";
+
+static const char *PyPgVersion = "3.6.1";
 
 /* taken from fileobject.c */
 #define BUF(v) PyString_AS_STRING((PyStringObject *)(v))
