@@ -51,7 +51,7 @@ class DB:
 		# Create convenience methods, in a way that is still overridable
 		# (members are not copied because they are actually functions)
 		for e in self.db.__methods__:
-			if e != "close":	# close is wrapped separately
+			if e not in ("close", "query"):	# These are wrapped separately
 				setattr(self, e, getattr(self.db, e))
 
 		self.__attnames = {}
