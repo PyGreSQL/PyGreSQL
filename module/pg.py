@@ -40,7 +40,7 @@ def _quote(d, t):
 	if t in ('inet', 'cidr') and d == '': return "NULL"
 
 	return "'%s'" % string.strip(re.sub("'", "''", \
-							 re.sub("\\\\", "\\\\\\\\", "%s" % d)))
+							re.sub("\\\\", "\\\\\\\\", "%s" % d)))
 
 class DB:
 	"""This class wraps the pg connection type"""
@@ -258,16 +258,15 @@ class DB:
 	# Update always works on the oid which get returns if available
 	# otherwise use the primary key.  Fail if neither.
 	def update(self, cl, a):
-		self.pkey(cl)		# make sure we have a self.__pkeys dictionary
-
 		foid = 'oid_%s' % cl
 		if a.has_key(foid):
 			where = "oid = %s" % a[foid]
-		elif self.__pkeys.has_key(cl) and a.has_key(self.__pkeys[cl]):
-			where = "%s = '%s'" % (self.__pkeys[cl], a[self.__pkeys[cl]])
 		else:
-			raise ProgrammingError, \
+			try: pk = self.pkeys(cl)
+			except: raise ProgrammingError, \
 					"Update needs primary key or oid as %s" % foid
+
+			where = "%s = '%s'" % (pk, a[pk])
 
 		v = []
 		k = 0
