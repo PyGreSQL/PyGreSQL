@@ -46,12 +46,13 @@ class DB:
 	"""This class wraps the pg connection type"""
 
 	def __init__(self, *args, **kw):
-		self.db = apply(connect, args, kw)
+		self.db = connect(*args, **kw)
 
 		# Create convenience methods, in a way that is still overridable
 		# (members are not copied because they are actually functions)
 		for e in self.db.__methods__:
-			setattr(self, e, getattr(self.db, e))
+			if e != "close":	# close is wrapped separately
+				setattr(self, e, getattr(self.db, e))
 
 		self.__attnames = {}
 		self.__pkeys = {}
@@ -76,8 +77,8 @@ class DB:
 	# in case we need another connection to the same database
 	# note that we can still reopen a database that we have closed
 	def reopen(self):
-		if self.db: self.db.close()
-		try: self.db = apply(connect, self.__args[0], self.__args[1])
+		if self.db: self.close()
+		try: self.db = connect(*self.__args[0], **self.__args[1])
 		except:
 			self.db = None
 			raise
