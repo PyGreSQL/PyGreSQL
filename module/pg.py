@@ -1,6 +1,6 @@
 # pg.py
 # Written by D'Arcy J.M. Cain
-# $Id: pg.py,v 1.27 2004-12-03 13:57:44 darcy Exp $
+# $Id: pg.py,v 1.28 2005-01-08 15:04:35 darcy Exp $
 
 # This library implements some basic database management stuff.  It
 # includes the pg module and builds on it.  This is known as the
@@ -148,16 +148,27 @@ class DB:
 		if self.__attnames.has_key(cl):
 			return self.__attnames[cl]
 
+		# check for schema name
+		if cl.find('.') == -1:
+			schema = 'public'
+			table = cl
+		else:
+			try: schema, table = cl.split('.')
+			except ValueError, err:
+				raise ProgrammingError('Invalid class %s' % cl)
+
 		query = """SELECT pg_attribute.attname, pg_type.typname
-					FROM pg_class, pg_attribute, pg_type
+					FROM pg_class, pg_attribute, pg_type, pg_namespace
 					WHERE pg_class.relname = '%s' AND
+						pg_namespace.nspname = '%s' AND
 						pg_attribute.attnum > 0 AND
 						pg_attribute.attrelid = pg_class.oid AND
 						pg_attribute.atttypid = pg_type.oid AND
-						pg_attribute.attisdropped = 'f'"""
+						pg_class.relnamespace = pg_namespace.oid AND
+						pg_attribute.attisdropped = 'f'""" % (table, schema)
 
 		l = {}
-		for attname, typname in self.db.query(query % cl).getresult():
+		for attname, typname in self.db.query(query).getresult():
 			if re.match("^interval", typname):
 				l[attname] = 'date'
 			elif re.match("^int", typname):
