@@ -91,6 +91,12 @@ const char *__movename[5] =
 #define NO_SNPRINTF 1
 #endif
 
+/* In 7.4 PQfreeNotify was deprecated and PQfreemem is used instead.  A
+   macro exists in 7.4 for backwards compatibility. */
+#ifndef PQfreeNotify	/* must be earlier than 7.4 */
+#define PQfreemem PQfreeNotify
+#endif
+
 /* --------------------------------------------------------------------- */
 
 /* MODULE GLOBAL VARIABLES */
