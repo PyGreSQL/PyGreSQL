@@ -42,7 +42,7 @@ else:
 	data_files = []
 
 setup (name = "PyGreSQL",
-	version = "3.4",
+	version = "3.5",
 	description = "Python PostgreSQL Interfaces",
 	author = "D'Arcy J. M. Cain",
 	author_email = "darcy@PyGreSQL.org",

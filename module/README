@@ -1,11 +1,11 @@
 
-PyGreSQL - v3.3: PostgreSQL module for Python
+PyGreSQL - v3.5: PostgreSQL module for Python
 ==============================================
 
 0. Copyright notice
 ===================
 
-  PyGreSQL, version 3.3
+  PyGreSQL, version 3.5
   A Python interface for PostgreSQL database.
   Written by D'Arcy J.M. Cain, darcy@druid.net<BR>
   Based heavily on code written by Pascal Andre, andre@chimay.via.ecp.fr.
