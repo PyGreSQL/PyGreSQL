@@ -41,7 +41,7 @@
 #endif
 
 static PyObject *PGError;
-static const char *PyPgVersion = "3.4";
+static const char *PyPgVersion = "3.5 (beta)";
 
 /* taken from fileobject.c */
 #define BUF(v) PyString_AS_STRING((PyStringObject *)(v))
@@ -1818,7 +1818,7 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 						break;
 
 					case 2:
-						val = PyLong_FromLong(strtol(s, NULL, 10));
+						val = PyLong_FromLongLong(strtoll(s, NULL, 10));
 						break;
 
 					case 3:
@@ -1940,7 +1940,7 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 						break;
 
 					case 2:
-						val = PyLong_FromLong(strtol(s, NULL, 10));
+						val = PyLong_FromLongLong(strtoll(s, NULL, 10));
 						break;
 
 					case 3:
