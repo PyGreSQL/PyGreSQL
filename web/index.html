@@ -1,5 +1,5 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<!-- $Id: index.html,v 1.11 2004-12-13 21:08:35 darcy Exp $ -->
+<!-- $Id: index.html,v 1.12 2004-12-13 21:13:47 darcy Exp $ -->
 
 <HTML>
  <HEAD>
@@ -21,6 +21,7 @@
      <DIV ID="menu-title">
       <A HREF="#copyright" title="">Copyright notice</A><BR>
       <A HREF="#intro" title="">Introduction</A><BR>
+      <A HREF="#changes3.6" title="">Important changes for 3.6</A><BR>
       <A HREF="#changes3.5" title="">Important changes for 3.5</A><BR>
       <A HREF="#changes3.4" title="">Important changes for 3.4</A><BR>
       <A HREF="#changes3.3" title="">Important changes for 3.3</A><BR>
@@ -43,7 +44,7 @@
     <DIV ID="Content">
       <A NAME="copyright"></A>
       <H2>Copyright notice</H2>
-      PyGreSQL, version 3.5<BR>
+      PyGreSQL, version 3.6<BR>
       a Python interface for PostgreSQL database.<BR>
       Written by D'Arcy J.M. Cain, darcy@PyGreSQL.org<BR>
       Based heavily on code written by Pascal ANDRE,
@@ -118,6 +119,20 @@
       This release fixes a few bugs, adds a few minor features and makes a
       few speedups in the code.
       </P>
+
+      <A NAME="changes3.6"></A>
+      <H2>Important changes for 3.6</H2>
+
+      <UL>
+        <LI>Better DB-API 2.0 compliance</LI>
+        <LI>Exception hierarchy moved into C module and made available to
+          both APIs</LI>
+        <LI>Fix error in update method that caused false exceptions</LI>
+        <LI>Moved to standard exception hierarchy in classic API</LI>
+        <LI>Added new method to get transaction state</LI>
+        <LI>Use proper Python constants where appropriate</LI>
+        <LI>Bug fixes and cleanups</LI>
+      </UL>
 
       <A NAME="changes3.5"></A>
       <H2>Important changes for 3.5</H2>
@@ -359,7 +374,7 @@
 
     <P>
     Created and Maintained by D'Arcy J.M. Cain &lt;darcy@PyGreSQL.org&gt; -
-    Last Update: 19 September 2004<BR>
+    Last Update: 13 December 2004<BR>
     If you have any comments, <A HREF="mailto:darcy@PyGreSQL.org">Send mail</A>
     to me.
     <BR><BR>
