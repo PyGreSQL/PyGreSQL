@@ -1,3 +1,4 @@
+# $Id: PyGreSQL.spec,v 1.2 2004-12-08 21:16:08 darcy Exp $
 %define version 3.0
 %define release pre20000310
 %define name PyGreSQL

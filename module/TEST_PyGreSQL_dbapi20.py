@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.2 2004-12-08 21:16:39 darcy Exp $
+
 import dbapi20
 import unittest
 import pgdb
