@@ -43,7 +43,7 @@
 static PyObject *Error, *Warning, *InterfaceError,
 	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
 	*IntegrityError, *DataError, *NotSupportedError;
-static const char *PyPgVersion = "3.5 (beta)";
+static const char *PyPgVersion = "3.6 (beta)";
 
 /* taken from fileobject.c */
 #define BUF(v) PyString_AS_STRING((PyStringObject *)(v))
@@ -2571,7 +2571,33 @@ pg_inserttable(pgobject * self, PyObject * args)
 	return Py_None;
 }
 
+#ifdef PQfreeNotify	/* must be 7.4 or later */
+/* get transaction state */
+static char pg_transaction__doc__[] =
+"Returns the current transaction status.";
 
+static PyObject *
+pg_transaction(pgobject * self, PyObject * args)
+{
+	if (!self->cnx)
+	{
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		return NULL;
+	}
+
+	/* checks args */
+	if (!PyArg_ParseTuple(args, ""))
+	{
+		PyErr_SetString(PyExc_SyntaxError,
+						"method transaction() takes no parameters.");
+		return NULL;
+	}
+
+	return PyInt_FromLong(PQtransactionStatus(self->cnx));
+}
+#endif
+
+#ifdef LARGE_OBJECTS
 /* creates large object */
 static char pg_locreate__doc__[] =
 "locreate() -- creates a new large object in the database.";
@@ -2666,6 +2692,7 @@ pg_loimport(pgobject * self, PyObject * args)
 
 	return (PyObject *) pglarge_new(self, lo_oid);
 }
+#endif   /* LARGE_OBJECTS */
 
 
 /* connection object methods */
@@ -2679,6 +2706,10 @@ static struct PyMethodDef pgobj_methods[] = {
 			pg_getnotify__doc__},
 	{"inserttable", (PyCFunction) pg_inserttable, METH_VARARGS,
 			pg_inserttable__doc__},
+#ifdef PQfreeNotify	/* must be 7.4 or later */
+	{"transaction", (PyCFunction) pg_transaction, METH_VARARGS,
+			pg_transaction__doc__},
+#endif
 
 #ifdef DIRECT_ACCESS
 	{"putline", (PyCFunction) pg_putline, 1, pg_putline__doc__},
@@ -3278,6 +3309,15 @@ init_pg(void)
 	PyDict_SetItemString(dict, "RESULT_DML", PyInt_FromLong(RESULT_DML));
 	PyDict_SetItemString(dict, "RESULT_DDL", PyInt_FromLong(RESULT_DDL));
 	PyDict_SetItemString(dict, "RESULT_DQL", PyInt_FromLong(RESULT_DQL));
+
+#ifdef PQfreeNotify	/* must be 7.4 or later */
+	/* transaction states */
+	PyDict_SetItemString(dict,"TRANS_IDLE",PyInt_FromLong(PQTRANS_IDLE));
+	PyDict_SetItemString(dict,"TRANS_ACTIVE",PyInt_FromLong(PQTRANS_ACTIVE));
+	PyDict_SetItemString(dict,"TRANS_INTRANS",PyInt_FromLong(PQTRANS_INTRANS));
+	PyDict_SetItemString(dict,"TRANS_INERROR",PyInt_FromLong(PQTRANS_INERROR));
+	PyDict_SetItemString(dict,"TRANS_UNKNOWN",PyInt_FromLong(PQTRANS_UNKNOWN));
+#endif
 
 #ifdef LARGE_OBJECTS
 	/* create mode for large objects */
