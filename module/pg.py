@@ -1,6 +1,6 @@
 # pg.py
 # Written by D'Arcy J.M. Cain
-# $Id: pg.py,v 1.26 2004-11-19 12:43:04 darcy Exp $
+# $Id: pg.py,v 1.27 2004-12-03 13:57:44 darcy Exp $
 
 # This library implements some basic database management stuff.  It
 # includes the pg module and builds on it.  This is known as the
@@ -159,10 +159,8 @@ class DB:
 		l = {}
 		for attname, typname in self.db.query(query % cl).getresult():
 			if re.match("^interval", typname):
-				l[attname] = 'text'
-			if re.match("^interval", typname):
 				l[attname] = 'date'
-			if re.match("^int", typname):
+			elif re.match("^int", typname):
 				l[attname] = 'int'
 			elif re.match("^oid", typname):
 				l[attname] = 'int'
