@@ -53,21 +53,37 @@ class DB:
 		for e in self.db.__methods__:
 			setattr(self, e, getattr(self.db, e))
 
-		self.__attnames__ = {}
-		self.__pkeys__ = {}
+		self.__attnames = {}
+		self.__pkeys = {}
+		self.__args = args, kw
 		self.debug = None	# For debugging scripts, set to output format
 							# that takes a single string arg.  For example
 							# in a CGI set to "%s<BR>"
 
 		# this is an aid to debugging by putting the program name into
 		# the PostgreSQL log if turned on in PostgreSQL's config
-		self.query("SELECT 'Start PyGreSQL program: %s'" % sys.argv[0])
+		# left off by default
+		##self.query("SELECT 'Start PyGreSQL program: %s'" % sys.argv[0])
 
 	def _do_debug(self, s):
 		if not self.debug: return
 		if type(self.debug) == StringType: print self.debug % s
 		if type(self.debug) == FunctionType: self.debug(s)
 		if type(self.debug) == FileType: print >> self.debug, s
+
+	# wrap close so we can track state
+	def close(self,):
+		self.db.close()
+		self.db = None
+
+	# in case we need another connection to the same database
+	# note that we can still reopen a database that we have closed
+	def reopen(self):
+		if self.db: self.db.close()
+		try: self.db = apply(connect, self.__args[0], self.__args[1])
+		except:
+			self.db = None
+			raise
 
 	# wrap query for debugging
 	def query(self, qstr):
@@ -78,17 +94,17 @@ class DB:
 		"""This method returns the primary key of a class.  If newpkey
 			is set and is set and is not a dictionary then set that
 			value as the primary key of the class.  If it is a dictionary
-			then replace the __pkeys__ dictionary with it."""
+			then replace the __pkeys dictionary with it."""
 		# Get all the primary keys at once
 		if type(newpkey) == DictType:
-			self.__pkeys__ = newpkey
+			self.__pkeys = newpkey
 			return
 
 		if newpkey:
-			self.__pkeys__[cl] = newpkey
+			self.__pkeys[cl] = newpkey
 			return newpkey
 
-		if self.__pkeys__ == {}:
+		if self.__pkeys == {}:
 			for rel, att in self.db.query("""SELECT
 							pg_class.relname, pg_attribute.attname
 						FROM pg_class, pg_attribute, pg_index
@@ -97,10 +113,10 @@ class DB:
 							pg_index.indkey[0] = pg_attribute.attnum AND 
 							pg_index.indisprimary = 't' AND
 							pg_attribute.attisdropped = 'f'""").getresult():
-				self.__pkeys__[rel] = att
+				self.__pkeys[rel] = att
 
 		# will raise an exception if primary key doesn't exist
-		return self.__pkeys__[cl]
+		return self.__pkeys[cl]
 
 	def get_databases(self):
 		l = []
@@ -123,14 +139,14 @@ class DB:
 			will become the new attribute names dictionary."""
 
 		if type(newattnames) == DictType:
-			self.__attnames__ = newattnames
+			self.__attnames = newattnames
 			return
 		elif newattnames:
 			raise error, "If supplied, newattnames must be a dictionary"
 
 		# May as well cache them
-		if self.__attnames__.has_key(cl):
-			return self.__attnames__[cl]
+		if self.__attnames.has_key(cl):
+			return self.__attnames[cl]
 
 		query = """SELECT pg_attribute.attname, pg_type.typname
 					FROM pg_class, pg_attribute, pg_type
@@ -168,8 +184,8 @@ class DB:
 				l[attname] = 'text'
 
 		l['oid'] = 'int'				# every table has this
-		self.__attnames__[cl] = l		# cache it
-		return self.__attnames__[cl]
+		self.__attnames[cl] = l		# cache it
+		return self.__attnames[cl]
 
 	# return a tuple from a database
 	def get(self, cl, arg, keyname = None, view = 0):
@@ -244,13 +260,13 @@ class DB:
 	# Update always works on the oid which get returns if available
 	# otherwise use the primary key.  Fail if neither.
 	def update(self, cl, a):
-		self.pkey(cl)		# make sure we have a self.__pkeys__ dictionary
+		self.pkey(cl)		# make sure we have a self.__pkeys dictionary
 
 		foid = 'oid_%s' % cl
 		if a.has_key(foid):
 			where = "oid = %s" % a[foid]
-		elif self.__pkeys__.has_key(cl) and a.has_key(self.__pkeys__[cl]):
-			where = "%s = '%s'" % (self.__pkeys__[cl], a[self.__pkeys__[cl]])
+		elif self.__pkeys.has_key(cl) and a.has_key(self.__pkeys[cl]):
+			where = "%s = '%s'" % (self.__pkeys[cl], a[self.__pkeys[cl]])
 		else:
 			raise error, "Update needs primary key or oid as %s" % foid
 
