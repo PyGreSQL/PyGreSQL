@@ -140,7 +140,8 @@ class DB:
 			self.__attnames = newattnames
 			return
 		elif newattnames:
-			raise error, "If supplied, newattnames must be a dictionary"
+			raise ProgrammingError, \
+					"If supplied, newattnames must be a dictionary"
 
 		# May as well cache them
 		if self.__attnames.has_key(cl):
@@ -222,7 +223,7 @@ class DB:
 		self._do_debug(q)
 		res = self.db.query(q).dictresult()
 		if res == []:
-			raise error, \
+			raise DatabaseError, \
 				"No such record in %s where %s is %s" % \
 								(cl, keyname, _quote(k, fnames[keyname]))
 			return None
@@ -243,13 +244,10 @@ class DB:
 				l.append(_quote(a[f], fnames[f]))
 				n.append(f)
 
-		try:
-			q = "INSERT INTO %s (%s) VALUES (%s)" % \
-				(cl, string.join(n, ','), string.join(l, ','))
-			self._do_debug(q)
-			a['oid_%s' % cl] = self.db.query(q)
-		except:
-			raise error, "Error inserting into %s: %s" % (cl, sys.exc_value)
+		q = "INSERT INTO %s (%s) VALUES (%s)" % \
+			(cl, string.join(n, ','), string.join(l, ','))
+		self._do_debug(q)
+		a['oid_%s' % cl] = self.db.query(q)
 
 		# reload the dictionary to catch things modified by engine
 		# note that get() changes 'oid' below to oid_table
@@ -268,7 +266,8 @@ class DB:
 		elif self.__pkeys.has_key(cl) and a.has_key(self.__pkeys[cl]):
 			where = "%s = '%s'" % (self.__pkeys[cl], a[self.__pkeys[cl]])
 		else:
-			raise error, "Update needs primary key or oid as %s" % foid
+			raise ProgrammingError, \
+					"Update needs primary key or oid as %s" % foid
 
 		v = []
 		k = 0
@@ -281,13 +280,9 @@ class DB:
 		if v == []:
 			return None
 
-		try:
-			q = "UPDATE %s SET %s WHERE %s" % \
-							(cl, string.join(v, ','), where)
-			self._do_debug(q)
-			self.db.query(q)
-		except:
-			raise error, "Can't update %s: %s" % (cl, sys.exc_value)
+		q = "UPDATE %s SET %s WHERE %s" % (cl, string.join(v, ','), where)
+		self._do_debug(q)
+		self.db.query(q)
 
 		# reload the dictionary to catch things modified by engine
 		if a.has_key(foid):
@@ -311,12 +306,7 @@ class DB:
 	# one day we will be testing that the record to be deleted
 	# isn't referenced somewhere (or else PostgreSQL will)
 	def delete(self, cl, a):
-		try:
-			q = "DELETE FROM %s WHERE oid = %s" % (cl, a['oid_%s' % cl])
-			self._do_debug(q)
-			self.db.query(q)
-		except:
-			raise error, "Can't delete %s: %s" % (cl, sys.exc_value)
-
-		return None
+		q = "DELETE FROM %s WHERE oid = %s" % (cl, a['oid_%s' % cl])
+		self._do_debug(q)
+		self.db.query(q)
 
