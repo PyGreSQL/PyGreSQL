@@ -1,7 +1,7 @@
 #! /bin/sh
 
 BETA=NO
-VERSION=3.6.1
+VERSION=3.6.2
 
 # small safety test
 if [ ! -f module/pgmodule.c ]

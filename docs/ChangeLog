@@ -5,6 +5,9 @@ This software is copyright (c) 1995, Pascal Andre (andre@via.ecp.fr)
 Further copyright 1997 to 2003 by D'Arcy J.M. Cain (darcy@druid.net)
 See file README for copyright information.
 
+Version 3.6.2
+  - Further fixes to namespace handling
+
 Version 3.6.1
   - Fix namespace handling
 
