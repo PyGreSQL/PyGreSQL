@@ -1,0 +1,136 @@
+body {
+	background-color: #fff;
+	margin:10px 10px; padding:10px;
+	text-align:justify;
+	font-family: Arial, Verdana, Helvetica, sans-serif;
+	font-size: 11px;
+}
+a {
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: underline;
+}
+
+blockquote {
+	padding: 0.5em;
+	background-color: #ffe;
+	border: 1px solid #000000; 
+	text-align: justify;
+}     
+table {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 11px;
+}
+h2 {
+	padding-top: 2px;
+	color: #000066;
+	font-weight: bold;
+}
+
+ul {
+line-height: 1.5em;
+margin-left: 2em;
+padding: 0;
+}
+
+.content {
+	padding-top: 2px;
+	padding-left: 1em;
+	font-size: 10px;
+}
+.date {
+	padding-top: 2px;
+	color: #999;
+	padding-left: 1em;
+	font-size: 9px;
+	letter-spacing: 2pt;
+}
+
+.menu-title {
+	padding-top: 0px;
+	font-size: 11px;
+	font-weight: bold;
+	text-decoration: underline;
+	letter-spacing: 0pt;
+}
+
+.copyright {
+	padding-top: 5px;
+	font-size: 9px;
+	color : #333;
+	text-align:center;
+}
+#title
+{
+	position: absolute;
+	top:0px;
+        left:16px;
+        font-size: 36px;
+        font-style: italic;
+        letter-spacing:5px;
+        color:#6d6d6d;
+	z-index:600;
+}
+#version
+{
+	position: absolute;
+	top:42px;
+        left:64px;
+        font-style: italic;
+        letter-spacing:5px;
+        color:#000000;
+	z-index:610;
+}
+#headerBanner
+{
+	position:absolute;
+	padding-top:0px;
+	padding-bottom:0px;
+	text-align:center;
+	top:27px;
+	left:0px;
+	width:100%;
+	height:30px;
+	background:#ccd4e2;
+	z-index:550;
+	border: 1px #999 solid;
+}
+#headerTitle
+{
+	position:absolute;
+	text-align:center;
+	fontsize:14px;
+	font-weight: bold;
+	letter-spacing:4px;
+	color:000066;
+	top:39px;
+        right:5%;
+	z-index:560;
+}
+
+#Menu {
+	padding:5px;
+	background-color:#f2f3f9;
+	border:1px solid #333;
+	line-height: 15px;
+	float: left;
+	height: auto;
+	margin-top : 50px;
+	text-align : left;
+}
+#Header {
+	border-bottom:1px solid #333;
+}
+
+#Main {
+	margin-top : 35px;
+	padding-left: 180px;	
+}
+
+#Content {
+	padding:10px;
+	border-left: 1px dashed #555;
+	border-bottom: 1px dashed #555;
+	height: auto;
+}
