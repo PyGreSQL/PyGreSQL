@@ -112,6 +112,10 @@ class DB:
 							pg_index.indisprimary = 't' AND
 							pg_attribute.attisdropped = 'f'""").getresult():
 				self.__pkeys[rel] = att
+		# Give it one more chance in case it was added after we started
+		elif not self.__pkeys.has_key(cl):
+			self.__pkeys = {}
+			return self.pkey(cl)
 
 		# will raise an exception if primary key doesn't exist
 		return self.__pkeys[cl]
