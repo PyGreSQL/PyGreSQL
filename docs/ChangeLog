@@ -5,6 +5,14 @@ This software is copyright (c) 1995, Pascal Andre (andre@via.ecp.fr)
 Further copyright 1997 to 2003 by D'Arcy J.M. Cain (darcy@druid.net)
 See file README for copyright information.
 
+Version 3.5
+  fixes and enhancements.
+  - Add interval to list of data types
+  - fix up method wrapping especially close()
+  - retry pkeys once if table missing in case it was just added
+  - wrap query method separately to handle debug better
+  - use isinstance instead of type
+
 Version 3.4
   Some cleanups and fixes.  This is the first version where PyGreSQL is
   moved back out of the PostgreSQL tree.  A lot of the changes mentioned

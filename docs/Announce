@@ -1,14 +1,14 @@
 
-Announce: Release of PyGreSQL version 3.4
+Announce: Release of PyGreSQL version 3.5
 =========================================
 
-PyGreSQL v3.4 has been released.
+PyGreSQL v3.5 has been released.
 It is available at: ftp://ftp.druid.net/pub/distrib/PyGreSQL.tgz.  If
 you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.              
 
 From March 1 2001 the PyGreSQL development has moved into the PostgreSQL
-development tree.  Starting with this release it has been moved back to
+development tree.  Starting with the last release it has been moved back to
 a separate project.  We are also now joined by the PoPy team and future
 versions will have a merged version of the two systems.
 
@@ -32,7 +32,7 @@ PostgreSQL features from a Python script.
 
 This release fixes a few bugs, adds a few minor features and makes a
 few speedups in the code.  It works with Python version 2.3 and PostgreSQL
-version 7.3.x
+version 7.3 and up.
 
 See the other changes below or in the Changelog file.
 
@@ -43,6 +43,13 @@ code for Python 1.5 and PostgreSQL 6.2.1.  While I was at it I upgraded
 the code to use full ANSI style prototypes and changed the order of
 arguments to connect.  Later versions are fixes and enhancements to that.
 The latest version of PyGreSQL works with Python 1.5.2 and PostgreSQL 7.0.x
+
+Important changes from PyGreSQL 3.4 to PyGreSQL 3.5
+  - Add interval to list of data types
+  - fix up method wrapping especially close()
+  - retry pkeys once if table missing in case it was just added
+  - wrap query method separately to handle debug better
+  - use isinstance instead of type
 
 Important changes from PyGreSQL 3.3 to PyGreSQL 3.4
   - Moved back out of PostgreSQL tree

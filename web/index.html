@@ -11,7 +11,7 @@
  <BODY>
  <BR />
   <DIV ID="title">PyGreSQL</DIV>
-  <DIV ID="version">Version 3.4</DIV>
+  <DIV ID="version">Version 3.5</DIV>
   <DIV ID="headerBanner"></DIV>
   <DIV ID="headerTitle">:: PostgreSQL module for Python ::</DIV>
 
@@ -19,6 +19,7 @@
      <DIV ID="menu-title">
       <A HREF="#copyright" title="">Copyright notice</A><BR>
       <A HREF="#intro" title="">Introduction</A><BR>
+      <A HREF="#changes3.5" title="">Important changes for 3.5</A><BR>
       <A HREF="#changes3.4" title="">Important changes for 3.4</A><BR>
       <A HREF="#changes3.3" title="">Important changes for 3.3</A><BR>
       <A HREF="#changes3.2" title="">Important changes for 3.2</A><BR>
@@ -40,7 +41,7 @@
     <DIV ID="Content">
       <A NAME="copyright"></A>
       <H2>Copyright notice</H2>
-      PyGreSQL, version 3.4<BR>
+      PyGreSQL, version 3.5<BR>
       a Python interface for PostgreSQL database.<BR>
       Written by D'Arcy J.M. Cain, darcy@PyGreSQL.org<BR>
       Based heavily on code written by Pascal ANDRE,
@@ -108,13 +109,24 @@
       code for Python 1.5 and PostgreSQL 6.4.2.  While I was at it I upgraded
       the code to use full ANSI style prototypes and changed the order of
       arguments to connect.  Version 2.1 is fixes and enhancements to that.
-      The current version works with PostgreSQL 7.3.4.
+      The current version works with PostgreSQL 7.3 and up.
       </P>
 
       <P>
       This release fixes a few bugs, adds a few minor features and makes a
       few speedups in the code.
       </P>
+
+      <A NAME="changes3.5"></A>
+      <H2>Important changes for 3.5</H2>
+
+      <UL>
+        <LI>Add interval to list of data types</LI>
+        <LI>fix up method wrapping especially close()</LI>
+        <LI>retry pkeys once if table missing in case it was just added</LI>
+        <LI>wrap query method separately to handle debug better</LI>
+        <LI>use isinstance instead of type</LI>
+        <LI>Miscellaneous cleanups and formatting</LI>
 
       <A NAME="changes3.4"></A>
       <H2>Important changes for 3.4</H2>
