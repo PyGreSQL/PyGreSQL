@@ -2150,7 +2150,7 @@ pg_query(pgobject * self, PyObject * args)
 	/* checks result status */
 	if ((status = PQresultStatus(result)) != PGRES_TUPLES_OK)
 	{
-		Oid			oid;
+		Oid			oid = PQoidValue(result);
 
 		PQclear(result);
 
@@ -2165,7 +2165,7 @@ pg_query(pgobject * self, PyObject * args)
 				PyErr_SetString(PGError, PQerrorMessage(self->cnx));
 				break;
 			case PGRES_COMMAND_OK:		/* could be an INSERT */
-				if ((oid = PQoidValue(result)) == InvalidOid)	/* nope */
+				if (oid == InvalidOid)	/* nope */
 				{
 					Py_INCREF(Py_None);
 					return Py_None;
