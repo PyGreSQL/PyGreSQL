@@ -65,9 +65,9 @@ class DB:
 
 	def _do_debug(self, s):
 		if not self.debug: return
-		if type(self.debug) == StringType: print self.debug % s
-		if type(self.debug) == FunctionType: self.debug(s)
-		if type(self.debug) == FileType: print >> self.debug, s
+		if isinstance(self.debug, StringType): print self.debug % s
+		if isinstance(self.debug, FunctionType): self.debug(s)
+		if isinstance(self.debug, FileType): print >> self.debug, s
 
 	# wrap close so we can track state
 	def close(self,):
@@ -94,7 +94,7 @@ class DB:
 			value as the primary key of the class.  If it is a dictionary
 			then replace the __pkeys dictionary with it."""
 		# Get all the primary keys at once
-		if type(newpkey) == DictType:
+		if isinstance(newpkey, DictType):
 			self.__pkeys = newpkey
 			return
 
@@ -136,7 +136,7 @@ class DB:
 			the optional newattnames exists it must be a dictionary and
 			will become the new attribute names dictionary."""
 
-		if type(newattnames) == DictType:
+		if isinstance(newattnames, DictType):
 			self.__attnames = newattnames
 			return
 		elif newattnames:
@@ -199,7 +199,7 @@ class DB:
 
 		fnames = self.get_attnames(xcl)
 
-		if type(arg) == DictType:
+		if isinstance(arg, DictType):
 			# To allow users to work with multiple tables we munge the
 			# name when the key is "oid"
 			if keyname == 'oid': k = arg['oid_%s' % xcl]

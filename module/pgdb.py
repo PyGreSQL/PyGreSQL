@@ -58,7 +58,6 @@ import string
 import exceptions
 import types
 import time
-import types
 
 # Marc-Andre is changing where DateTime goes.  This handles it either way.
 try: from mx import DateTime
@@ -181,8 +180,8 @@ class pgdbCursor:
 		# "The parameters may also be specified as list of
 		# tuples to e.g. insert multiple rows in a single
 		# operation, but this kind of usage is deprecated:
-		if params and type(params) == types.ListType and \
-					type(params[0]) == types.TupleType:
+		if params and isinstance(params, types.ListType) and \
+					isinstance(params[0], types.TupleType):
 			self.executemany(operation, params)
 		else:
 			# not a list of tuples
@@ -273,15 +272,15 @@ except (NameError, AttributeError):
   def _quote(x):
 	  if type(x) == DateTime.DateTimeType:
 		x = str(x)
-	  if type(x) == types.StringType:
+	  if isinstance(x, types.StringType):
 		  x = "'" + string.replace(
 				  string.replace(str(x), '\\', '\\\\'), "'", "''") + "'"
 
-	  elif type(x) in (types.IntType, types.LongType, types.FloatType):
+	  elif type(x, (types.IntType, types.LongType, types.FloatType)):
 		  pass
 	  elif x is None:
 		  x = 'NULL'
-	  elif type(x) in (types.ListType, types.TupleType):
+	  elif type(x, (types.ListType, types.TupleType)):
 		  x = '(%s)' % string.join(map(lambda x: str(_quote(x)), x), ',')
 	  elif hasattr(x, '__pg_repr__'):
 		  x = x.__pg_repr__()
