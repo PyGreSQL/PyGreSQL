@@ -244,17 +244,17 @@ try:
   _quoteparams = quoteparams_fast
 except (NameError, AttributeError):
   def _quote(x):
-	  if type(x) == DateTime.DateTimeType:
+	  if isinstance(x, DateTime.DateTimeType):
 		x = str(x)
 	  if isinstance(x, types.StringType):
 		  x = "'" + string.replace(
 				  string.replace(str(x), '\\', '\\\\'), "'", "''") + "'"
 
-	  elif type(x, (types.IntType, types.LongType, types.FloatType)):
+	  elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
 		  pass
 	  elif x is None:
 		  x = 'NULL'
-	  elif type(x, (types.ListType, types.TupleType)):
+	  elif isinstance(x, (types.ListType, types.TupleType)):
 		  x = '(%s)' % string.join(map(lambda x: str(_quote(x)), x), ',')
 	  elif hasattr(x, '__pg_repr__'):
 		  x = x.__pg_repr__()
