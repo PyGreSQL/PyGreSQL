@@ -289,11 +289,11 @@ get_type_array(PGresult *result, int nfields)
 		{
 			case INT2OID:
 			case INT4OID:
-			case OIDOID:
 				typ[j] = 1;
 				break;
 
 			case INT8OID:
+			case OIDOID:
 				typ[j] = 2;
 				break;
 
