@@ -12,6 +12,7 @@ Version 3.5
   - retry pkeys once if table missing in case it was just added
   - wrap query method separately to handle debug better
   - use isinstance instead of type
+  - fix free/PQfreemem issue - finally
 
 Version 3.4
   Some cleanups and fixes.  This is the first version where PyGreSQL is

@@ -3,7 +3,7 @@ Announce: Release of PyGreSQL version 3.5
 =========================================
 
 PyGreSQL v3.5 has been released.
-It is available at: ftp://ftp.druid.net/pub/distrib/PyGreSQL.tgz.  If
+It is available at: ftp://ftp.druid.net/pub/distrib/PyGreSQL-3.5.tgz.  If
 you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.              
 
@@ -50,6 +50,7 @@ Important changes from PyGreSQL 3.4 to PyGreSQL 3.5
   - retry pkeys once if table missing in case it was just added
   - wrap query method separately to handle debug better
   - use isinstance instead of type
+  - fix free/PQfreemem issue - finally
 
 Important changes from PyGreSQL 3.3 to PyGreSQL 3.4
   - Moved back out of PostgreSQL tree
