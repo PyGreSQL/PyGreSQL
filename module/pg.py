@@ -59,6 +59,10 @@ class DB:
 							# that takes a single string arg.  For example
 							# in a CGI set to "%s<BR>"
 
+		# this is an aid to debugging by putting the program name into
+		# the PostgreSQL log if turned on in PostgreSQL's config
+		self.query("SELECT 'Start PyGreSQL program: %s'" % sys.argv[0])
+
 	def _do_debug(self, s):
 		if not self.debug: return
 		if type(self.debug) == StringType: print self.debug % s
