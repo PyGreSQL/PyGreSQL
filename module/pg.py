@@ -1,5 +1,6 @@
 # pg.py
 # Written by D'Arcy J.M. Cain
+# $Id: pg.py,v 1.26 2004-11-19 12:43:04 darcy Exp $
 
 # This library implements some basic database management stuff.  It
 # includes the pg module and builds on it.  This is known as the
@@ -159,6 +160,8 @@ class DB:
 		for attname, typname in self.db.query(query % cl).getresult():
 			if re.match("^interval", typname):
 				l[attname] = 'text'
+			if re.match("^interval", typname):
+				l[attname] = 'date'
 			if re.match("^int", typname):
 				l[attname] = 'int'
 			elif re.match("^oid", typname):
@@ -262,7 +265,7 @@ class DB:
 		if a.has_key(foid):
 			where = "oid = %s" % a[foid]
 		else:
-			try: pk = self.pkeys(cl)
+			try: pk = self.pkey(cl)
 			except: raise ProgrammingError, \
 					"Update needs primary key or oid as %s" % foid
 
