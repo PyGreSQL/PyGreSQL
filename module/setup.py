@@ -20,7 +20,13 @@
 
 from distutils.core import setup
 from distutils.extension import Extension
-import sys
+import sys, os
+
+def getconfig(s):
+	f = os.popen("pg_config --%s"% (s))
+	x = f.readline().strip()
+	f.close()
+	return x
 
 if sys.platform == "win32":
 	# If you want to build from source; you must have built a win32 native libpq	# before and copied libpq.dll into the PyGreSQL root directory.
@@ -30,8 +36,8 @@ if sys.platform == "win32":
 	optional_libs=[ 'libpqdll', 'wsock32', 'advapi32' ]
 	data_files = [ 'libpq.dll' ]
 else:
-	include_dirs=['/usr/include/pgsql']
-	library_dirs=['/usr/lib/pgsql']
+	include_dirs=[getconfig ('includedir'),getconfig('includedir-server')]
+	library_dirs=[getconfig('libdir')]
 	optional_libs=['pq']
 	data_files = []
 
