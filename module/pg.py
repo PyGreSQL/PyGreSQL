@@ -1,6 +1,6 @@
 # pg.py
 # Written by D'Arcy J.M. Cain
-# $Id: pg.py,v 1.28 2005-01-08 15:04:35 darcy Exp $
+# $Id: pg.py,v 1.29 2005-02-18 14:08:49 darcy Exp $
 
 # This library implements some basic database management stuff.  It
 # includes the pg module and builds on it.  This is known as the
@@ -104,19 +104,27 @@ class DB:
 			return newpkey
 
 		if self.__pkeys == {}:
-			for rel, att in self.db.query("""SELECT
-							pg_class.relname, pg_attribute.attname
-						FROM pg_class, pg_attribute, pg_index
+			for rel, nsp, att in self.db.query("""
+						SELECT pg_class.relname, pg_namespace.nspname,
+							pg_attribute.attname
+						FROM pg_class, pg_namespace, pg_attribute, pg_index
 						WHERE pg_class.oid = pg_attribute.attrelid AND
+							pg_class.relnamespace = pg_namespace.oid AND
 							pg_class.oid = pg_index.indrelid AND
-							pg_index.indkey[0] = pg_attribute.attnum AND 
+							pg_index.indkey[0] = pg_attribute.attnum AND
+							pg_namespace.nspname NOT LIKE 'pg_%' AND
 							pg_index.indisprimary = 't' AND
 							pg_attribute.attisdropped = 'f'""").getresult():
-				self.__pkeys[rel] = att
+				self.__pkeys["%s.%s" % (nsp, rel)] = att
+			print >> sys.stderr, self.__pkeys
 		# Give it one more chance in case it was added after we started
 		elif not self.__pkeys.has_key(cl):
 			self.__pkeys = {}
 			return self.pkey(cl)
+
+		# make sure that we have a namespace
+		if cl.find('.') == -1:
+			cl = 'public.' + cl
 
 		# will raise an exception if primary key doesn't exist
 		return self.__pkeys[cl]
