@@ -1,4 +1,4 @@
-# $Id: pgdb.py,v 1.26 2004-12-14 18:36:46 darcy Exp $
+# $Id: pgdb.py,v 1.27 2004-12-17 21:32:03 darcy Exp $
 
 """ pgdb - DB-SIG compliant module for PygreSQL.
 
@@ -254,10 +254,12 @@ class _quoteitem(dict):
 def _quote(x):
 	if isinstance(x, DateTime.DateTimeType):
 		x = str(x)
+ 	elif isinstance(x, unicode):
+ 		x = x.encode( 'utf-8' )
+
 	if isinstance(x, types.StringType):
 		x = "'" + string.replace(
 			string.replace(str(x), '\\', '\\\\'), "'", "''") + "'"
-
 	elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
 		pass
 	elif x is None:
@@ -268,6 +270,7 @@ def _quote(x):
 		x = x.__pg_repr__()
 	else:
 		raise InterfaceError, 'do not know how to handle type %s' % type(x)
+
 
 	return x
 
