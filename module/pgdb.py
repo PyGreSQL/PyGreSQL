@@ -1,3 +1,5 @@
+# $Id: pgdb.py,v 1.25 2004-12-08 21:14:31 darcy Exp $
+
 """ pgdb - DB-SIG compliant module for PygreSQL.
 
 	(c) 1999, Pascal Andre <andre@via.ecp.fr>.
@@ -239,40 +241,37 @@ class pgdbCursor:
 		pass
 
 
-try:
-  _quote = quote_fast
-  _quoteparams = quoteparams_fast
-except (NameError, AttributeError):
-  def _quote(x):
-	  if isinstance(x, DateTime.DateTimeType):
+class _quoteitem(dict):
+	def __getitem__(self, key):
+		return _quote(super(_quoteitem, self).__getitem__(key))
+
+def _quote(x):
+	if isinstance(x, DateTime.DateTimeType):
 		x = str(x)
-	  if isinstance(x, types.StringType):
-		  x = "'" + string.replace(
-				  string.replace(str(x), '\\', '\\\\'), "'", "''") + "'"
+	if isinstance(x, types.StringType):
+		x = "'" + string.replace(
+			string.replace(str(x), '\\', '\\\\'), "'", "''") + "'"
 
-	  elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
-		  pass
-	  elif x is None:
-		  x = 'NULL'
-	  elif isinstance(x, (types.ListType, types.TupleType)):
-		  x = '(%s)' % string.join(map(lambda x: str(_quote(x)), x), ',')
-	  elif hasattr(x, '__pg_repr__'):
-		  x = x.__pg_repr__()
-	  else:
-		  raise InterfaceError, 'do not know how to handle type %s' % type(x)
+	elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
+		pass
+	elif x is None:
+		x = 'NULL'
+	elif isinstance(x, (types.ListType, types.TupleType)):
+		x = '(%s)' % string.join(map(lambda x: str(_quote(x)), x), ',')
+	elif hasattr(x, '__pg_repr__'):
+		x = x.__pg_repr__()
+	else:
+		raise InterfaceError, 'do not know how to handle type %s' % type(x)
 
-	  return x
+	return x
 
-  def _quoteparams(s, params):
-	  if hasattr(params, 'has_key'):
-		  x = {}
-		  for k, v in params.items():
-			  x[k] = _quote(v)
-		  params = x
-	  else:
-		  params = tuple(map(_quote, params))
+def _quoteparams(s, params):
+	if hasattr(params, 'has_key'):
+		params = _quoteitem(params)
+	else:
+		params = tuple(map(_quote, params))
 
-	  return s % params
+	return s % params
 
 ### connection object
 
