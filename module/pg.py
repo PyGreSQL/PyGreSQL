@@ -116,19 +116,15 @@ class DB:
 		return self.__pkeys[cl]
 
 	def get_databases(self):
-		l = []
-		for n in self.db.query("SELECT datname FROM pg_database").getresult():
-			l.append(n[0])
-		return l
+		return [x[0] for x in
+			self.db.query("SELECT datname FROM pg_database").getresult()]
 
 	def get_tables(self):
-		l = []
-		for n in self.db.query("""SELECT relname FROM pg_class
+		return [x[0] for x in
+				self.db.query("""SELECT relname FROM pg_class
 						WHERE relkind = 'r' AND
 							relname !~ '^Inv' AND
-							relname !~ '^pg_'""").getresult():
-			l.append(n[0])
-		return l
+							relname !~ '^pg_'""").getresult()]
 
 	def get_attnames(self, cl, newattnames = None):
 		"""This method gets a list of attribute names for a class.  If
@@ -155,6 +151,8 @@ class DB:
 
 		l = {}
 		for attname, typname in self.db.query(query % cl).getresult():
+			if re.match("^interval", typname):
+				l[attname] = 'text'
 			if re.match("^int", typname):
 				l[attname] = 'int'
 			elif re.match("^oid", typname):
