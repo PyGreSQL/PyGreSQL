@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.54 2004-12-08 21:16:40 darcy Exp $
+ * $Id: pgmodule.c,v 1.55 2004-12-14 17:22:50 darcy Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -1832,15 +1832,15 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 				switch (typ[j])
 				{
 					case 1:
-						val = PyInt_FromLong(strtol(s, NULL, 10));
+						val = PyInt_FromString(s, NULL, 10);
 						break;
 
 					case 2:
-						val = PyLong_FromLongLong(strtoll(s, NULL, 10));
+						val = PyLong_FromString(s, NULL, 10);
 						break;
 
 					case 3:
-						val = PyFloat_FromDouble(strtod(s, NULL));
+						val = PyFloat_FromString(PyString_FromString(s), NULL);
 						break;
 
 					case 4:
@@ -1954,15 +1954,15 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 				switch (typ[j])
 				{
 					case 1:
-						val = PyInt_FromLong(strtol(s, NULL, 10));
+						val = PyInt_FromString(s, NULL, 10);
 						break;
 
 					case 2:
-						val = PyLong_FromLongLong(strtoll(s, NULL, 10));
+						val = PyLong_FromString(s, NULL, 10);
 						break;
 
 					case 3:
-						val = PyFloat_FromDouble(strtod(s, NULL));
+						val = PyFloat_FromString(PyString_FromString(s), NULL);
 						break;
 
 					case 4:

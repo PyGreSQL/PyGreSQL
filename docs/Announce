@@ -51,6 +51,7 @@ Important changes from PyGreSQL 3.5 to PyGreSQL 3.6
   - Moved to standard exception hierarchy in classic API
   - Added new method to get transaction state
   - Use proper Python constants where appropriate
+  - Use Python versions of strtol, etc.  Allows WIN32 build
   - Bug fixes and cleanups
 
 Important changes from PyGreSQL 3.4 to PyGreSQL 3.5
