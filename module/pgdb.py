@@ -206,6 +206,9 @@ class pgdbCursor:
 				rows = self.__source.execute(sql)
 				if rows != None: # true is __source is NOT a DQL
 					totrows = totrows + rows
+				else:
+					self.rowcount = -1
+
 		except _pg.error, msg:
 			raise DatabaseError, "error '%s' in '%s'" % ( msg, sql )
 		except:
@@ -416,6 +419,7 @@ STRING = pgdbType(
 # BLOB support is pg specific
 BINARY = pgdbType()
 INTEGER = pgdbType('int2', 'int4', 'serial')
+NUMBER = pgdbType('int2', 'int4', 'serial', 'int8', 'float4', 'float8', 'numeric')
 LONG = pgdbType('int8')
 FLOAT = pgdbType('float4', 'float8', 'numeric')
 BOOL = pgdbType('bool')
