@@ -2172,7 +2172,7 @@ pg_query(pgobject * self, PyObject * args)
 				}
 
 				/* otherwise, return the oid */
-				return PyInt_FromLong(oid);
+				return PyLong_FromLongLong(oid);
 
 			case PGRES_COPY_OUT:		/* no data will be received */
 			case PGRES_COPY_IN:
