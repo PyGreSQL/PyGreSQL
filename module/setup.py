@@ -47,7 +47,7 @@ setup (name = "PyGreSQL",
 	author = "D'Arcy J. M. Cain",
 	author_email = "darcy@PyGreSQL.org",
 	url = "http://www.pygresql.org/",
-	licence = "Python",
+	license = "Python",
 
 	py_modules = ['pg', 'pgdb'],
 	ext_modules = [ Extension(
@@ -55,7 +55,7 @@ setup (name = "PyGreSQL",
 		sources = ['pgmodule.c'],
 		include_dirs = include_dirs,
 		library_dirs = library_dirs,
-		libraries = optional_libs
+		libraries = optional_libs,
 	)],
 	data_files = data_files
 )
