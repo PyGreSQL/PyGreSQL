@@ -1,9 +1,9 @@
 
-Announce: Release of PyGreSQL version 3.5
+Announce: Release of PyGreSQL version 3.6
 =========================================
 
-PyGreSQL v3.5 has been released.
-It is available at: ftp://ftp.druid.net/pub/distrib/PyGreSQL-3.5.tgz.  If
+PyGreSQL v3.6 has been released.
+It is available at: ftp://ftp.druid.net/pub/distrib/PyGreSQL-3.6.tgz.  If
 you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.              
 
@@ -43,6 +43,15 @@ code for Python 1.5 and PostgreSQL 6.2.1.  While I was at it I upgraded
 the code to use full ANSI style prototypes and changed the order of
 arguments to connect.  Later versions are fixes and enhancements to that.
 The latest version of PyGreSQL works with Python 1.5.2 and PostgreSQL 7.0.x
+
+Important changes from PyGreSQL 3.5 to PyGreSQL 3.6
+  - Better DB-API 2.0 compliance
+  - Exception hierarchy moved into C module and made available to both APIs
+  - Fix error in update method that caused false exceptions
+  - Moved to standard exception hierarchy in classic API
+  - Added new method to get transaction state
+  - Use proper Python constants where appropriate
+  - Bug fixes and cleanups
 
 Important changes from PyGreSQL 3.4 to PyGreSQL 3.5
   - Add interval to list of data types

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# $Id: setup.py,v 1.12 2004-12-13 21:08:35 darcy Exp $
 
 # Setup script for the PyGreSQL version 3
 # created 2000/04 Mark Alexander <mwa@gate.net>
@@ -42,7 +43,7 @@ else:
 	data_files = []
 
 setup (name = "PyGreSQL",
-	version = "3.5",
+	version = "3.6",
 	description = "Python PostgreSQL Interfaces",
 	author = "D'Arcy J. M. Cain",
 	author_email = "darcy@PyGreSQL.org",
