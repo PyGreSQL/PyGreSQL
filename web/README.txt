@@ -231,7 +231,7 @@ For support:
   - PyGreSQL:    contact me (darcy@druid.net) concerning the changes to 2.x
                  and up.  If you would like to proposes changes please 
                  join the PyGreSQL mailing list and send context diffs
-                 there.  See http://www.vex.net/mailman/listinfo/pygresql
+                 there.  See http://mailman.vex.net/mailman/listinfo/pygresql
                  to join the mailing list.
 
 
