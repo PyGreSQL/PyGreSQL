@@ -1,6 +1,6 @@
 # pg.py
 # Written by D'Arcy J.M. Cain
-# $Id: pg.py,v 1.29 2005-02-18 14:08:49 darcy Exp $
+# $Id: pg.py,v 1.30 2005-05-23 14:09:56 darcy Exp $
 
 # This library implements some basic database management stuff.  It
 # includes the pg module and builds on it.  This is known as the
@@ -116,7 +116,6 @@ class DB:
 							pg_index.indisprimary = 't' AND
 							pg_attribute.attisdropped = 'f'""").getresult():
 				self.__pkeys["%s.%s" % (nsp, rel)] = att
-			print >> sys.stderr, self.__pkeys
 		# Give it one more chance in case it was added after we started
 		elif not self.__pkeys.has_key(cl):
 			self.__pkeys = {}
