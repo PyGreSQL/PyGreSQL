@@ -1,4 +1,4 @@
-# $Id: pgdb.py,v 1.27 2004-12-17 21:32:03 darcy Exp $
+# $Id: pgdb.py,v 1.28 2005-08-12 22:02:58 cito Exp $
 
 """ pgdb - DB-SIG compliant module for PygreSQL.
 
@@ -319,7 +319,7 @@ class pgdbCnx:
 			src = self.__cnx.source()
 			return pgdbCursor(src, self.__cache)
 		except:
-			raise pgOperationalError, "invalid connection."
+			raise OperationalError, "invalid connection."
 
 ### module interface
 

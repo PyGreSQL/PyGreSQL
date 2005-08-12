@@ -1,48 +1,104 @@
 # pg.py
 # Written by D'Arcy J.M. Cain
-# $Id: pg.py,v 1.31 2005-05-26 13:58:36 cito Exp $
+# Improved by Christoph Zwerschke
+# $Id: pg.py,v 1.32 2005-08-12 22:02:58 cito Exp $
 
-"""PyGreSQL Classic Interface.
+"""PyGreSQL classic interface.
 
-This library implements some basic database management stuff.
-It includes the pg module and builds on it.  This is known as the
-"Classic" interface.  For DB-API compliance use the pgdb module.
+This pg module implements some basic database management stuff.
+It includes the _pg module and builds on it, providing the higher
+level wrapper class named DB with addtional functionality.
+This is known as the "classic" ("old style") PyGreSQL interface.
+For a DB-API 2 compliant interface use the newer pgdb module.
 """
 
 from _pg import *
 from types import *
 
+# Auxiliary functions which are independent from a DB connection:
+
 def _quote(d, t):
-	"""Return quotes if needed (utility function)."""
-	if d == None:
-		return "NULL"
-	if t in ('int', 'seq'):
-		if d == "": return "NULL"
-		return "%d" % long(d)
-	if t == 'decimal':
-		if d == "": return "NULL"
-		return "%f" % float(d)
+	"""Return quotes if needed."""
+	if d is None:
+		return 'NULL'
+	if t in ('int', 'seq', 'decimal'):
+		if d == '': return 'NULL'
+		return str(d)
 	if t == 'money':
-		if d == "": return "NULL"
+		if d == '': return 'NULL'
 		return "'%.2f'" % float(d)
 	if t == 'bool':
-		d = str(d).lower() in ('t', 'true', '1', 'y', 'yes', 'on')
+		if type(d) == StringType:
+			if d == '': return 'NULL'
+			d = str(d).lower() in ('t', 'true', '1', 'y', 'yes', 'on')
+		else:
+			d = not not d
 		return ("'f'", "'t'")[d]
-	if t in ('date', 'inet', 'cidr') and d == '': return "NULL"
+	if t in ('date', 'inet', 'cidr'):
+		if d == '': return 'NULL'
 	return "'%s'" % str(d).replace('\\','\\\\').replace('\'','\\\'')
 
+def _is_quoted(s):
+	"""Check whether this string is a quoted identifier."""
+	s = s.replace('_', 'a')
+	return not s.isalnum() or s[:1].isdigit() or s != s.lower()
+
+def _is_unquoted(s):
+	"""Check whether this string is an unquoted identifier."""
+	s = s.replace('_', 'a')
+	return s.isalnum() and not s[:1].isdigit()
+
+def _split_first_part(s):
+	"""Split the first part of a dot separated string."""
+	s = s.lstrip()
+	if s[:1] == '"':
+		p = []
+		s = s.split('"', 3)[1:]
+		p.append(s[0])
+		while len(s) == 3 and s[1] == '':
+			p.append('"')
+			s = s[2].split('"', 2)
+			p.append(s[0])
+		p = [''.join(p)]
+		s = '"'.join(s[1:]).lstrip()
+		if s:
+			if s[:0] == '.':
+				p.append(s[1:])
+			else:
+				s = _split_first_part(s)
+				p[0] += s[0]
+				if len(s) > 1:
+					p.append(s[1])
+	else:
+		p = s.split('.', 1)
+		s = p[0].rstrip()
+		if _is_unquoted(s):
+			s = s.lower()
+		p[0] = s
+	return p
+
+def _split_parts(s):
+	"""Split all parts of a dot separated string."""
+	q = []
+	while s:
+		s = _split_first_part(s)
+		q.append(s[0])
+		if len(s) < 2: break
+		s = s[1]
+	return q
+
+def _join_parts(s):
+	"""Join all parts of a dot separated string."""
+	return '.'.join([_is_quoted(p) and '"%s"' % p or p for p in s])
+
+# The PostGreSQL database connection interface:
+
 class DB:
-	"""This class wraps the pg connection type."""
+	"""Wrapper class for the _pg connection type."""
 
 	def __init__(self, *args, **kw):
 		self.db = connect(*args, **kw)
-
-		# Create convenience methods, in a way that is still overridable
-		# (members are not copied because they are actually functions):
-		for e in self.db.__methods__:
-			if e not in ("close", "query"): # These are wrapped separately
-				setattr(self, e, getattr(self.db, e))
-
+		self.dbname = self.db.db
 		self.__attnames = {}
 		self.__pkeys = {}
 		self.__args = args, kw
@@ -51,6 +107,13 @@ class DB:
 			# * to a function which takes a string argument or
 			# * to a file object to write debug statements to.
 
+	def __getattr__(self, name):
+		# All undefined members are the same as in the underlying pg connection:
+		if self.db:
+			return getattr(self.db, name)
+		else:
+			raise InternalError, 'Connection is not valid'
+
 	def _do_debug(self, s):
 		"""Print a debug message."""
 		if not self.debug: return
@@ -58,11 +121,15 @@ class DB:
 		if isinstance(self.debug, FunctionType): self.debug(s)
 		if isinstance(self.debug, FileType): print >> self.debug, s
 
-	def close(self,):
+	def close(self):
 		"""Close the database connection."""
 		# Wraps shared library function so we can track state.
-		self.db.close()
-		self.db = None
+
+		if self.db:
+			self.db.close()
+			self.db = None
+		else:
+			raise InternalError, 'Connection already closed'
 
 	def reopen(self):
 		"""Reopen connection to the database.
@@ -71,8 +138,10 @@ class DB:
 		Note that we can still reopen a database that we have closed.
 
 		"""
-		if self.db: self.close()
-		try: self.db = connect(*self.__args[0], **self.__args[1])
+		if self.db:
+			self.db.close()
+		try:
+			self.db = connect(*self.__args[0], **self.__args[1])
 		except:
 			self.db = None
 			raise
@@ -89,23 +158,34 @@ class DB:
 
 		"""
 		# Wraps shared library function for debugging.
+		if not self.db:
+			raise InternalError, 'Connection is not valid'
 		self._do_debug(qstr)
 		return self.db.query(qstr)
 
-	def split_schema(self, cl):
+	def _split_schema(self, cl):
 		"""Return schema and name of object separately.
 
-		If name is not qualified, determine first schema in search path
-		contaning the object, otherwise split qualified name.
+		This auxiliary function splits off the namespace (schema)
+		belonging to the class with the name cl. If the class name
+		is not qualified, the function is able to determine the schema
+		of the class, taking into account the current search path.
 
 		"""
-		if cl.find('.') < 0:
+		s = _split_parts(cl)
+		if len(s) > 1: # name already qualfied?
+			# should be database.schema.table or schema.table
+			if len(s) > 3:
+				raise ProgrammingError, 'Too many dots in class name %s' % cl
+			schema, cl = s[-2:]
+		else:
+			cl = s[0]
 			# determine search path
-			query = "SELECT current_schemas(TRUE)"
+			query = 'SELECT current_schemas(TRUE)'
 			schemas = self.db.query(query).getresult()[0][0][1:-1].split(',')
 			if schemas: # non-empty path
 				# search schema for this object in the current search path
-				query = " UNION ".join(["SELECT %d AS n, '%s' AS nspname" % s
+				query = ' UNION '.join(["SELECT %d AS n, '%s' AS nspname" % s
 					for s in enumerate(schemas)])
 				query = ("SELECT nspname FROM pg_class"
 					" JOIN pg_namespace ON pg_class.relnamespace=pg_namespace.oid"
@@ -119,9 +199,6 @@ class DB:
 					schema = 'public'
 			else: # empty path
 				schema = 'public'
-		else: # name already qualfied?
-			# should be database.schema.table or schema.table
-			schema, cl = cl.split('.', 2)[-2:]
 		return schema, cl
 
 	def pkey(self, cl, newpkey = None):
@@ -133,17 +210,18 @@ class DB:
 
 		"""
 		# Get all the primary keys at once
+		# Get all the primary keys at once
 		if isinstance(newpkey, DictType):
 			self.__pkeys = newpkey
 			return newpkey
-		qcl = "%s.%s"  % self.split_schema(cl) # determine qualified name
+		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		if newpkey:
 			self.__pkeys[qcl] = newpkey
 			return newpkey
 		if self.__pkeys == {} or not self.__pkeys.has_key(qcl):
 			# if not found, determine pkey again in case it was added after we started
-			for q, a in self.db.query("SELECT pg_namespace.nspname||'.'||"
-				"pg_class.relname,pg_attribute.attname FROM pg_class"
+			for r in self.db.query("SELECT pg_namespace.nspname"
+				",pg_class.relname,pg_attribute.attname FROM pg_class"
 				" JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace"
 				" AND pg_namespace.nspname NOT LIKE 'pg_%'"
 				" JOIN pg_attribute ON pg_attribute.attrelid=pg_class.oid"
@@ -151,25 +229,25 @@ class DB:
 				" JOIN pg_index ON pg_index.indrelid=pg_class.oid"
 				" AND pg_index.indisprimary='t'"
 				" AND pg_index.indkey[0]=pg_attribute.attnum").getresult():
-				self.__pkeys[q] = a
+				self.__pkeys[_join_parts(r[:2])] = r[2] # build qualified name
 			self._do_debug(self.__pkeys)
 		# will raise an exception if primary key doesn't exist
 		return self.__pkeys[qcl]
 
 	def get_databases(self):
 		"""Get list of databases in the system."""
-		return [x[0] for x in
-			self.db.query("SELECT datname FROM pg_database").getresult()]
+		return [s for s, in
+			self.db.query('SELECT datname FROM pg_database').getresult()]
 
 	def get_tables(self):
 		"""Get list of tables in connected database."""
-		return [x[0] for x in
-			self.db.query("SELECT pg_namespace.nspname||'.'||"
-				"pg_class.relname FROM pg_class"
+		return [_join_parts(s) for s in
+			self.db.query("SELECT pg_namespace.nspname"
+				",pg_class.relname FROM pg_class"
 				" JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace"
 				" WHERE pg_class.relkind='r' AND"
-				" pg_class.relname !~ '^Inv' AND "
-				" pg_class.relname !~ '^pg_' order by 1").getresult()]
+				" pg_class.relname!~'^Inv' AND "
+				" pg_class.relname!~'^pg_' ORDER BY 1,2").getresult()]
 
 	def get_attnames(self, cl, newattnames = None):
 		"""Given the name of a table, digs out the set of attribute names.
@@ -185,48 +263,51 @@ class DB:
 			return
 		elif newattnames:
 			raise ProgrammingError, \
-				"If supplied, newattnames must be a dictionary"
-		cl = self.split_schema(cl) # split into schema and cl
-		qcl = '%s.%s' % cl # build qualified name
+				'If supplied, newattnames must be a dictionary'
+		cl = self._split_schema(cl) # split into schema and cl
+		qcl = _join_parts(cl) # build qualified name
 		# May as well cache them:
 		if self.__attnames.has_key(qcl):
 			return self.__attnames[qcl]
-		query = ("SELECT pg_attribute.attname,pg_type.typname FROM pg_class"
+		if qcl not in self.get_tables():
+			raise ProgrammingError, 'Class %s does not exist' % qcl
+		t = {}
+		for att, typ in self.db.query("SELECT pg_attribute.attname"
+			",pg_type.typname FROM pg_class"
 			" JOIN pg_namespace ON pg_class.relnamespace=pg_namespace.oid"
 			" JOIN pg_attribute ON pg_attribute.attrelid=pg_class.oid"
 			" JOIN pg_type ON pg_type.oid=pg_attribute.atttypid"
 			" WHERE pg_namespace.nspname='%s' AND pg_class.relname='%s'"
-			" AND pg_attribute.attnum>0 AND pg_attribute.attisdropped='f'" % cl)
-		l = {}
-		for att, typ in self.db.query(query).getresult():
-			if typ.startswith("interval"):
-				l[att] = 'date'
-			elif typ.startswith("int"):
-				l[att] = 'int'
-			elif typ.startswith("oid"):
-				l[att] = 'int'
-			elif typ.startswith("text"):
-				l[att] = 'text'
-			elif typ.startswith("char"):
-				l[att] = 'text'
-			elif typ.startswith("name"):
-				l[att] = 'text'
-			elif typ.startswith("abstime"):
-				l[att] = 'date'
-			elif typ.startswith("date"):
-				l[att] = 'date'
-			elif typ.startswith("timestamp"):
-				l[att] = 'date'
-			elif typ.startswith("bool"):
-				l[att] = 'bool'
-			elif typ.startswith("float"):
-				l[att] = 'decimal'
-			elif typ.startswith("money"):
-				l[att] = 'money'
+			" AND pg_attribute.attnum>0 AND pg_attribute.attisdropped='f'"
+				% cl).getresult():
+			if typ.startswith('interval'):
+				t[att] = 'date'
+			elif typ.startswith('int'):
+				t[att] = 'int'
+			elif typ.startswith('oid'):
+				t[att] = 'int'
+			elif typ.startswith('text'):
+				t[att] = 'text'
+			elif typ.startswith('char'):
+				t[att] = 'text'
+			elif typ.startswith('name'):
+				t[att] = 'text'
+			elif typ.startswith('abstime'):
+				t[att] = 'date'
+			elif typ.startswith('date'):
+				t[att] = 'date'
+			elif typ.startswith('timestamp'):
+				t[att] = 'date'
+			elif typ.startswith('bool'):
+				t[att] = 'bool'
+			elif typ.startswith('float'):
+				t[att] = 'decimal'
+			elif typ.startswith('money'):
+				t[att] = 'money'
 			else:
-				l[att] = 'text'
-		l['oid'] = 'int' # every table has this
-		self.__attnames[qcl] = l # cache it
+				t[att] = 'text'
+		t['oid'] = 'int' # every table has this
+		self.__attnames[qcl] = t # cache it
 		return self.__attnames[qcl]
 
 	def get(self, cl, arg, keyname = None, view = 0):
@@ -237,51 +318,44 @@ class DB:
 		then the primary key for the table is used.  If arg is a dictionary
 		then the value for the key is taken from it and it is modified to
 		include the new values, replacing existing values where necessary.
-		The oid is also put into the dictionary but in order to allow the
-		caller to work with multiple tables, the attribute name is munge
-		as "oid_schema_table" to make it unique.
+		The OID is also put into the dictionary, but in order to allow the
+		caller to work with multiple tables, it is munged as oid(schema.table).
 
 		"""
 		if cl.endswith('*'): # scan descendant tables?
-			xcl = cl[:-1].rstrip() # need parent table name
-		else:
-			xcl = cl
-		xcl = self.split_schema(xcl) # split into schema and cl
-		qcl = '%s.%s' % xcl # build qualified name
-		if keyname == None:	# use the primary key by default
+			cl = cl[:-1].rstrip() # need parent table name
+		qcl = _join_parts(self._split_schema(cl)) # build qualified name
+		# To allow users to work with multiple tables,
+		# we munge the name when the key is "oid"
+		foid = 'oid(%s)' % qcl # build mangled name
+		if keyname == None: # use the primary key by default
 			keyname = self.pkey(qcl)
 		fnames = self.get_attnames(qcl)
 		if isinstance(arg, DictType):
-			# To allow users to work with multiple tables,
-			# we munge the name when the key is "oid"
-			if keyname == 'oid':
-				foid = 'oid_%s_%s' % xcl # build mangled name
-				k = arg[foid]
-			else:
-				k = arg[keyname]
+			k = arg[keyname == 'oid' and foid or keyname]
 		else:
 			k = arg
 			arg = {}
 		# We want the oid for later updates if that isn't the key
 		if keyname == 'oid':
-			q = "SELECT * FROM %s WHERE oid=%s" % (cl, k)
+			q = 'SELECT * FROM %s WHERE oid=%s LIMIT 1' % (qcl, k)
 		elif view:
-			q = "SELECT * FROM %s WHERE %s=%s" % \
-				(cl, keyname, _quote(k, fnames[keyname]))
+			q = 'SELECT * FROM %s WHERE %s=%s LIMIT 1' % \
+				(qcl, keyname, _quote(k, fnames[keyname]))
 		else:
-			foid = 'oid_%s_%s' % xcl # build mangled name
-			q = "SELECT oid AS %s,%s FROM %s WHERE %s=%s" % \
-				(foid, ','.join(fnames.keys()), cl, \
+			q = 'SELECT %s FROM %s WHERE %s=%s LIMIT 1' % \
+				(','.join(fnames.keys()), qcl, \
 					keyname, _quote(k, fnames[keyname]))
 		self._do_debug(q)
 		res = self.db.query(q).dictresult()
-		if res == []:
+		if not res:
 			raise DatabaseError, \
-				"No such record in %s where %s is %s" % \
-					(cl, keyname, _quote(k, fnames[keyname]))
-			return None
-		for k in res[0].keys():
-			arg[k] = res[0][k]
+				'No such record in %s where %s=%s' % \
+					(qcl, keyname, _quote(k, fnames[keyname]))
+		for k, d in res[0].items():
+			if k == 'oid':
+				k = foid
+			arg[k] = d
 		return arg
 
 	def insert(self, cl, a):
@@ -296,18 +370,17 @@ class DB:
 		although PostgreSQL does.
 
 		"""
-		cl = self.split_schema(cl) # split into schema and cl
-		qcl = '%s.%s' % cl # build qualified name
-		foid = 'oid_%s_%s' % cl # build mangled name
+		qcl = _join_parts(self._split_schema(cl)) # build qualified name
+		foid = 'oid(%s)' % qcl # build mangled name
 		fnames = self.get_attnames(qcl)
-		l = []
+		t = []
 		n = []
 		for f in fnames.keys():
 			if f != 'oid' and a.has_key(f):
-				l.append(_quote(a[f], fnames[f]))
+				t.append(_quote(a[f], fnames[f]))
 				n.append(f)
-		q = "INSERT INTO %s (%s) VALUES (%s)" % \
-			(qcl, ','.join(n), ','.join(l))
+		q = 'INSERT INTO %s (%s) VALUES (%s)' % \
+			(qcl, ','.join(n), ','.join(t))
 		self._do_debug(q)
 		a[foid] = self.db.query(q)
 		# Reload the dictionary to catch things modified by engine.
@@ -329,9 +402,8 @@ class DB:
 		"""
 		# Update always works on the oid which get returns if available,
 		# otherwise use the primary key.  Fail if neither.
-		cl = self.split_schema(cl) # split into schema and cl
-		qcl = '%s.%s' % cl # build qualified name
-		foid = 'oid_%s_%s' % cl # build mangled oid
+		qcl = _join_parts(self._split_schema(cl)) # build qualified name
+		foid = 'oid(%s)' % qcl # build mangled oid
 		if a.has_key(foid):
 			where = "oid=%s" % a[foid]
 		else:
@@ -339,17 +411,17 @@ class DB:
 				pk = self.pkey(qcl)
 			except:
 				raise ProgrammingError, \
-					"Update needs primary key or oid as %s" % foid
+					'Update needs primary key or oid as %s' % foid
 			where = "%s='%s'" % (pk, a[pk])
 		v = []
 		k = 0
 		fnames = self.get_attnames(qcl)
 		for ff in fnames.keys():
 			if ff != 'oid' and a.has_key(ff):
-				v.append("%s=%s" % (ff, _quote(a[ff], fnames[ff])))
+				v.append('%s=%s' % (ff, _quote(a[ff], fnames[ff])))
 		if v == []:
 			return None
-		q = "UPDATE %s SET %s WHERE %s" % (qcl, ','.join(v), where)
+		q = 'UPDATE %s SET %s WHERE %s' % (qcl, ','.join(v), where)
 		self._do_debug(q)
 		self.db.query(q)
 		# Reload the dictionary to catch things modified by engine:
@@ -358,25 +430,31 @@ class DB:
 		else:
 			return self.get(qcl, a)
 
-	def clear(self, cl, a = {}):
+	def clear(self, cl, a = None):
 		"""
 
 		This method clears all the attributes to values determined by the types.
-		Numeric types are set to 0, dates are set to 'TODAY' and everything
-		else is set to the empty string.  If the array argument is present,
-		it is used as the array and any entries matching attribute names
-		are cleared with everything else left unchanged.
+		Numeric types are set to 0, Booleans are set to 'f', dates are set
+		to 'now()' and everything else is set to the empty string.
+		If the array argument is present, it is used as the array and any entries
+		matching attribute names are cleared with everything else left unchanged.
 
 		"""
 		# At some point we will need a way to get defaults from a table.
-		qcl = "%s.%s"  % self.split_schema(cl) # determine qualified name
+		if a is None: a = {} # empty if argument is not present
+		qcl = _join_parts(self._split_schema(cl)) # build qualified name
+		foid = 'oid(%s)' % qcl # build mangled oid
 		fnames = self.get_attnames(qcl)
-		for ff in fnames.keys():
-			if fnames[ff] in ['int', 'decimal', 'seq', 'money']:
-				a[ff] = 0
+		for k, t in fnames.items():
+			if k == 'oid': continue
+			if t in ['int', 'decimal', 'seq', 'money']:
+				a[k] = 0
+			elif t == 'bool':
+				a[k] = 'f'
+			elif t == 'date':
+				a[k] = 'now()'
 			else:
-				a[ff] = ""
-		a['oid'] = 0
+				a[k] = ''
 		return a
 
 	def delete(self, cl, a):
@@ -389,9 +467,8 @@ class DB:
 		# Like update, delete works on the oid.
 		# One day we will be testing that the record to be deleted
 		# isn't referenced somewhere (or else PostgreSQL will).
-		cl = self.split_schema(cl) # split into schema and cl
-		qcl = '%s.%s' % cl # build qualified name
-		foid = 'oid_%s_%s' % cl # build mangled oid
-		q = "DELETE FROM %s WHERE oid=%s" % (qcl, a[foid])
+		qcl = _join_parts(self._split_schema(cl)) # build qualified name
+		foid = 'oid(%s)' % qcl # build mangled oid
+		q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[foid])
 		self._do_debug(q)
 		self.db.query(q)
