@@ -1,57 +1,58 @@
-# $Id: pgdb.py,v 1.28 2005-08-12 22:02:58 cito Exp $
+# $Id: pgdb.py,v 1.29 2005-08-25 13:52:59 cito Exp $
 
-""" pgdb - DB-SIG compliant module for PygreSQL.
+"""pgdb - DB-API 2.0 compliant module for PygreSQL.
 
 	(c) 1999, Pascal Andre <andre@via.ecp.fr>.
 	See package documentation for further information on copyright.
 
-	Inline documentation is sparse.  See DB-SIG 2.0 specification for
-	usage information.
+	Inline documentation is sparse.
+	See DB-API 2.0 specification for usage information:
+	http://www.python.org/peps/pep-0249.html
 
-		basic usage:
+	Basic usage:
 
-		pgdb.connect(connect_string) -> connection
-			connect_string = 'host:database:user:password:opt:tty'
-			All parts are optional. You may also pass host through
-			password as keyword arguments. To pass a port, pass it in
-			the host keyword parameter:
-				pgdb.connect(host='localhost:5432')
+	pgdb.connect(connect_string) # open a connection
+	# connect_string = 'host:database:user:password:opt:tty'
+	# All parts are optional. You may also pass host through
+	# password as keyword arguments. To pass a port,
+	# pass it in the host keyword parameter:
+	pgdb.connect(host='localhost:5432')
 
-		connection.cursor() -> cursor
+	connection.cursor() # open a cursor
 
-		connection.commit()
+	cursor.execute(query[, params])
+	# Execute a query, binding params (a dictionary) if they are
+	# passed. The binding syntax is the same as the % operator
+	# for dictionaries, and no quoting is done.
 
-		connection.close()
+	cursor.executemany(query, list of params)
+	# Execute a query many times, binding each param dictionary
+	# from the list.
 
-		connection.rollback()
+	cursor.fetchone() # fetch one row, [value, value, ...]
 
-		cursor.execute(query[, params])
-			execute a query, binding params (a dictionary) if it is
-			passed. The binding syntax is the same as the % operator
-			for dictionaries, and no quoting is done.
+	cursor.fetchall() # fetch all rows, [[value, value, ...], ...]
 
-		cursor.executemany(query, list of params)
-			execute a query many times, binding each param dictionary
-			from the list.
+	cursor.fetchmany([size])
+	# returns size or cursor.arraysize number of rows,
+	# [[value, value, ...], ...] from result set.
+	# Default cursor.arraysize is 1.
 
-		cursor.fetchone() -> [value, value, ...]
+	cursor.description # returns information about the columns
+	#	[(column_name, type_name, display_size,
+	#		internal_size, precision, scale, null_ok), ...]
+	# Note that precision, scale and null_ok are not implemented.
 
-		cursor.fetchall() -> [[value, value, ...], ...]
+	cursor.rowcount # number of rows available in the result set
+	# Available after a call to execute.
 
-		cursor.fetchmany([size]) -> [[value, value, ...], ...]
-			returns size or cursor.arraysize number of rows from result
-			set. Default cursor.arraysize is 1.
+	connection.commit() # commit transaction
 
-		cursor.description -> [(column_name, type_name, display_size,
-			internal_size, precision, scale, null_ok), ...]
+	connection.rollback() # or rollback transaction
 
-			Note that precision, scale and null_ok are not implemented.
+	cursor.close() # close the cursor
 
-		cursor.rowcount
-			number of rows available in the result set. Available after
-			a call to execute.
-
-		cursor.close()
+	connection.close() # close the connection
 
 """
 
@@ -61,9 +62,12 @@ import time
 
 from _pg import *
 
-# Marc-Andre is changing where DateTime goes.  This handles it either way.
-try: from mx import DateTime
-except ImportError: import DateTime
+try: # use mx.DateTime module if available
+	from mx.DateTime import DateTime, \
+		TimeDelta, DateTimeType
+except ImportError: # otherwise use standard datetime module
+	from datetime import datetime as DateTime, \
+		timedelta as TimeDelta, datetime as DateTimeType
 
 ### module constants
 
@@ -77,6 +81,7 @@ threadsafety = 1
 paramstyle = 'pyformat'
 
 ### internal type handling class
+
 class pgdbTypeCache:
 
 	def __init__(self, cnx):
@@ -176,11 +181,10 @@ class pgdbCursor:
 				else:
 					sql = operation
 				rows = self.__source.execute(sql)
-				if rows != None: # true is __source is NOT a DQL
-					totrows = totrows + rows
+				if rows != None: # true if __source is not DML
+					totrows += rows
 				else:
 					self.rowcount = -1
-
 		except Error, msg:
 			raise DatabaseError, "error '%s' in '%s'" % ( msg, sql )
 		except Exception, err:
@@ -252,10 +256,10 @@ class _quoteitem(dict):
 		return _quote(super(_quoteitem, self).__getitem__(key))
 
 def _quote(x):
-	if isinstance(x, DateTime.DateTimeType):
+	if isinstance(x, DateTimeType):
 		x = str(x)
- 	elif isinstance(x, unicode):
- 		x = x.encode( 'utf-8' )
+	elif isinstance(x, unicode):
+		x = x.encode( 'utf-8' )
 
 	if isinstance(x, types.StringType):
 		x = "'" + string.replace(
@@ -270,7 +274,6 @@ def _quote(x):
 		x = x.__pg_repr__()
 	else:
 		raise InterfaceError, 'do not know how to handle type %s' % type(x)
-
 
 	return x
 
@@ -325,7 +328,9 @@ class pgdbCnx:
 
 # connects to a database
 _connect_ = connect
-def connect(dsn = None, user = None, password = None, host = None, database = None):
+def connect(dsn = None,
+	user = None, password = None,
+	host = None, database = None):
 	# first get params from DSN
 	dbport = -1
 	dbhost = ""
@@ -373,8 +378,8 @@ def connect(dsn = None, user = None, password = None, host = None, database = No
 
 ### types handling
 
-# PostgreSQL is object-oriented: types are dynamic. We must thus use type names
-# as internal type codes.
+# PostgreSQL is object-oriented: types are dynamic.
+# We must thus use type names as internal type codes.
 
 class pgdbType:
 
@@ -416,13 +421,13 @@ ROWID = pgdbType(
 
 # mandatory type helpers
 def Date(year, month, day):
-	return DateTime.DateTime(year, month, day)
+	return DateTime(year, month, day)
 
 def Time(hour, minute, second):
-	return DateTime.TimeDelta(hour, minute, second)
+	return TimeDelta(hour, minute, second)
 
 def Timestamp(year, month, day, hour, minute, second):
-	return DateTime.DateTime(year, month, day, hour, minute, second)
+	return DateTime(year, month, day, hour, minute, second)
 
 def DateFromTicks(ticks):
 	return apply(Date, time.localtime(ticks)[:3])
@@ -432,4 +437,3 @@ def TimeFromTicks(ticks):
 
 def TimestampFromTicks(ticks):
 	return apply(Timestamp, time.localtime(ticks)[:6])
-

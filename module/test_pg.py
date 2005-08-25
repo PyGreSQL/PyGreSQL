@@ -1,6 +1,6 @@
 # test_pg.py
 # Written by Christoph Zwerschke
-# $Id: test_pg.py,v 1.1 2005-08-12 22:02:58 cito Exp $
+# $Id: test_pg.py,v 1.2 2005-08-25 13:52:59 cito Exp $
 
 """Test the classic PyGreSQL interface in the pg module.
 
@@ -302,7 +302,7 @@ class TestHasConnect(unittest.TestCase):
 
 
 class TestCanConnect(unittest.TestCase):
-	"""Test whether a basic connection to PostGreSQL is possible."""
+	"""Test whether a basic connection to PostgreSQL is possible."""
 
 	def testCanConnectTemplate1(self):
 		dbname = 'template1'
