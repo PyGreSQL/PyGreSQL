@@ -1,9 +1,9 @@
 
-Announce: Release of PyGreSQL version 3.6.2
+Announce: Release of PyGreSQL version 3.7
 ===========================================
 
-PyGreSQL v3.6.2 has been released.
-It is available at: ftp://ftp.druid.net/pub/distrib/PyGreSQL-3.6.tgz.  If
+PyGreSQL v3.7 has been released.
+It is available at: ftp://ftp.druid.net/pub/distrib/PyGreSQL-3.7.tgz.  If
 you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.              
 
@@ -29,11 +29,6 @@ PyGreSQL is a python module that interfaces to a PostgreSQL database. It
 embeds the PostgreSQL query library to allow easy use of the powerful
 PostgreSQL features from a Python script.
 
-This release primarily fixes a bug where the classic API does not correctly
-handle namespaces.
-
-See the other changes below or in the Changelog file.
-
 PyGreSQL 2.0 was developed and tested on a NetBSD 1.3_BETA system.  It
 is based on the PyGres95 code written by Pascal Andre,
 andre@chimay.via.ecp.fr.  I changed the version to 2.0 and updated the
@@ -41,6 +36,15 @@ code for Python 1.5 and PostgreSQL 6.2.1.  While I was at it I upgraded
 the code to use full ANSI style prototypes and changed the order of
 arguments to connect.  Later versions are fixes and enhancements to that.
 The latest version of PyGreSQL works with Python 1.5.2 and PostgreSQL 7.0.x
+
+Important changes from PyGreSQL 3.6.2 to PyGreSQL 3.7
+  - Fixes to quoting function.
+  - Use Python datetime if mxDatetime is not available.
+  - Add checks for valid database connection to methods.
+  - Improved namespace support, handle search_path correctly.
+  - Removed old dust and unnessesary imports, added docstrings.
+  - Internal sql statements as one-liners, smoothed out ugly code.
+  - Major improvements in classic pg module.
 
 Important changes from PyGreSQL 3.5 to PyGreSQL 3.6.2
   - Further fixes to namespace handling

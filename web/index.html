@@ -1,5 +1,5 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<!-- $Id: index.html,v 1.20 2005-08-25 15:42:00 cito Exp $ -->
+<!-- $Id: index.html,v 1.21 2005-08-25 15:50:54 darcy Exp $ -->
 
 <HTML>
  <HEAD>
@@ -17,93 +17,389 @@
   <DIV ID="headerBanner"></DIV>
   <DIV ID="headerTitle">:: PostgreSQL module for Python ::</DIV>
 
-  <DIV ID="Menu">
-   <A HREF="#copyright" title="">Copyright notice</A><BR>
-   <A HREF="#intro" title="">Introduction</A><BR>
-   <A HREF="#changes3.6.2" title="">Important changes for 3.6.2</A><BR>
-   <A HREF="#changes3.6.1" title="">Important changes for 3.6.1</A><BR>
-   <A HREF="#changes3.6" title="">Important changes for 3.6</A><BR>
-   <A HREF="#changes3.5" title="">Important changes for 3.5</A><BR>
-   <A HREF="#changes3.4" title="">Important changes for 3.4</A><BR>
-   <A HREF="#changes3.3" title="">Important changes for 3.3</A><BR>
-   <A HREF="#changes3.2" title="">Important changes for 3.2</A><BR>
-   <A HREF="#changes3.1" title="">Important changes for 3.1</A><BR>
-   <A HREF="#changes3.0" title="">Important changes for 3.0</A><BR>
-   <A HREF="#changes2.4" title="">Important changes for 2.4</A><BR>
-   <A HREF="#changes2.3" title="">Important changes for 2.3</A><BR>
-   <A HREF="#changes2.2" title="">Important changes for 2.2</A><BR>
-   <A HREF="#changes2.1" title="">Important changes for 2.1</A><BR>
-   <A HREF="#changes2.0" title="">Important changes for 2.0</A><BR>
-   <A HREF="#where" title="">Where to get the various parts</A><BR>
-   <A HREF="#mailinglist" title="">Mailing list</A><BR>
-   <A HREF="#doc" title="">Documentation</A><BR>
-   <A HREF="#examples" title="">Examples</A><BR>
+   <DIV ID="Menu">
+    <A HREF="#copyright" title="">Copyright notice</A><BR>
+    <A HREF="#intro" title="">Introduction</A><BR>
+    <A HREF="#changes3.7" title="">Important changes for 3.7</A><BR>
+    <A HREF="#changes3.6.2" title="">Important changes for 3.6.2</A><BR>
+    <A HREF="#changes3.6.1" title="">Important changes for 3.6.1</A><BR>
+    <A HREF="#changes3.6" title="">Important changes for 3.6</A><BR>
+    <A HREF="#changes3.5" title="">Important changes for 3.5</A><BR>
+    <A HREF="#changes3.4" title="">Important changes for 3.4</A><BR>
+    <A HREF="#changes3.3" title="">Important changes for 3.3</A><BR>
+    <A HREF="#changes3.2" title="">Important changes for 3.2</A><BR>
+    <A HREF="#changes3.1" title="">Important changes for 3.1</A><BR>
+    <A HREF="#changes3.0" title="">Important changes for 3.0</A><BR>
+    <A HREF="#changes2.4" title="">Important changes for 2.4</A><BR>
+    <A HREF="#changes2.3" title="">Important changes for 2.3</A><BR>
+    <A HREF="#changes2.2" title="">Important changes for 2.2</A><BR>
+    <A HREF="#changes2.1" title="">Important changes for 2.1</A><BR>
+    <A HREF="#changes2.0" title="">Important changes for 2.0</A><BR>
+    <A HREF="#where" title="">Where to get the various parts</A><BR>
+    <A HREF="#mailinglist" title="">Mailing list</A><BR>
+    <A HREF="#doc" title="">Documentation</A><BR>
+    <A HREF="#examples" title="">Examples</A><BR>
   </DIV>
 
   <DIV ID="Main">
-   <DIV ID="Content">
+    <DIV ID="Content">
+      <A NAME="copyright"></A>
+      <H2>Copyright notice</H2>
+      PyGreSQL, version 3.7<BR>
+      a Python interface for PostgreSQL database.<BR>
+      Written by D'Arcy J.M. Cain, darcy@PyGreSQL.org<BR>
+      Based heavily on code written by Pascal ANDRE,
+      andre@chimay.via.ecp.fr.<BR>
+      Copyright (c) 1995, Pascal ANDRE (andre@via.ecp.fr)<BR>
 
-    <A NAME="copyright"></A>
-    <H2>Copyright notice</H2>
-    PyGreSQL, version 3.6.2<BR>
-    a Python interface for PostgreSQL database.<BR>
-    Written by D'Arcy J.M. Cain, darcy@PyGreSQL.org<BR>
-    Based heavily on code written by Pascal ANDRE,
-    andre@chimay.via.ecp.fr.<BR>
-    Copyright (c) 1995, Pascal ANDRE (andre@via.ecp.fr)<BR>
+      <P>
+      Permission to use, copy, modify, and distribute this software and its
+      documentation for any purpose, without fee, and without a written
+      agreement is hereby granted, provided that the above copyright notice
+      and this paragraph and the following two paragraphs appear in all copies
+      or in any new file that contains a substantial portion of this file.
+      </P>
 
-    <P>
-    Permission to use, copy, modify, and distribute this software and its
-    documentation for any purpose, without fee, and without a written
-    agreement is hereby granted, provided that the above copyright notice
-    and this paragraph and the following two paragraphs appear in all copies
-    or in any new file that contains a substantial portion of this file.
-    </P>
+      <P>
+      IN NO EVENT SHALL THE AUTHOR BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, 
+      SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, 
+      ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+      THE AUTHOR HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+      </P>
 
-    <P>
-    IN NO EVENT SHALL THE AUTHOR BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
-    SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
-    ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
-    THE AUTHOR HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-    </P>
+      <P>
+      THE AUTHOR SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
+      LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+      A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS"
+      BASIS, AND THE AUTHOR HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
+      UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+      </P>
 
-    <P>
-    THE AUTHOR SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT
-    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-    A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS"
-    BASIS, AND THE AUTHOR HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
-    UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
-    </P>
+      <P>
+      Further modifications copyright 1997 to 2003 by D'Arcy J.M. Cain
+      (darcy@PyGreSQL.org) subject to the same terms and conditions as above.
+      </P>
 
-    <P>
-    Further modifications copyright 1997 to 2003 by D'Arcy J.M. Cain
-    (darcy@PyGreSQL.org) subject to the same terms and conditions as above.
-    </P>
+      <A NAME="intro"></A>
+      <H2>Introduction</H2>
 
-    <A NAME="intro"></A>
-    <H2>Introduction</H2>
+      PostgreSQL is a database system derived from Postgres4.2. It conforms to 
+      (most of) ANSI SQL and offers many interesting capabilities (C dynamic
+      linking for functions or type definition, etc.). This package is
+      copyright by the Regents of the University of California, and is freely
+      distributable.
 
-    PostgreSQL is a database system derived from Postgres4.2. It conforms to
-    (most of) ANSI SQL and offers many interesting capabilities (C dynamic
-    linking for functions or type definition, etc.). This package is
-    copyright by the Regents of the University of California, and is freely
-    distributable.
+      <P>
+      Python is an interpreted programming language. It is object oriented,
+      simple to use (light syntax, simple and straightforward statements),
+      and has many extensions for building GUIs, interfacing with WWW, etc.
+      an intelligent web browser (HotJava like) is currently under development
+      (November 1995), and this should open programmers many doors.  Python
+      is copyrighted by Stichting S Mathematisch Centrum, amsterdam, The
+      Netherlands, and is freely distributable.
+      </P>
 
-    <P>
-    Python is an interpreted programming language. It is object oriented,
-    simple to use (light syntax, simple and straightforward statements),
-    and has many extensions for building GUIs, interfacing with WWW, etc.
-    an intelligent web browser (HotJava like) is currently under development
-    (November 1995), and this should open programmers many doors.  Python
-    is copyrighted by Stichting S Mathematisch Centrum, amsterdam, The
-    Netherlands, and is freely distributable.
-    </P>
+      <P>
+      PyGreSQL is a python module that interfaces to a PostgreSQL database. It
+      embeds the PostgreSQL query library to allow easy use of the powerful
+      PostgreSQL features from a Python script.
+      </P>
 
-    <P>
-    PyGreSQL is a python module that interfaces to a PostgreSQL database. It
-    embeds the PostgreSQL query library to allow easy use of the powerful
-    PostgreSQL features from a Python script.
-    </P>
+      <P>
+      PyGreSQL 2.0 was developed and tested on a NetBSD 1.3_BETa system.  It
+      is based on the PyGres95 code written by Pascal ANDRE,
+      andre@chimay.via.ecp.fr.  I changed the version to 2.0 and updated the
+      code for Python 1.5 and PostgreSQL 6.4.2.  While I was at it I upgraded
+      the code to use full ANSI style prototypes and changed the order of
+      arguments to connect.  Version 2.1 is fixes and enhancements to that.
+      The current version works with PostgreSQL 7.3 and up.
+      </P>
+
+      <P>
+      This release fixes a few bugs, adds a few minor features and makes a
+      few speedups in the code.
+      </P>
+
+      <A NAME="changes3.7"></A>
+      <H2>Important changes for 3.7</H2>
+
+      <UL>
+        <LI>Fixes to quoting function.</LI>
+        <LI>Use Python datetime if mxDatetime is not available.</LI>
+        <LI>Add checks for valid database connection to methods.</LI>
+        <LI>Improved namespace support, handle search_path correctly.</LI>
+        <LI>Removed old dust and unnessesary imports, added docstrings.</LI>
+        <LI>Internal sql statements as one-liners, smoothed out ugly code.</LI>
+        <LI>Major improvements in classic pg module.</LI>
+      </UL>
+
+      <A NAME="changes3.6.2"></A>
+      <H2>Important changes for 3.6.2</H2>
+
+      <UL>
+        <LI>Further fixes to namespace handling</LI>
+      </UL>
+
+      <A NAME="changes3.6.1"></A>
+      <H2>Important changes for 3.6.1</H2>
+
+      <UL>
+        <LI>Handle namespaces correctly</LI>
+      </UL>
+
+      <A NAME="changes3.6"></A>
+      <H2>Important changes for 3.6</H2>
+
+      <UL>
+        <LI>Better DB-API 2.0 compliance</LI>
+        <LI>Exception hierarchy moved into C module and made available to
+          both APIs</LI>
+        <LI>Fix error in update method that caused false exceptions</LI>
+        <LI>Moved to standard exception hierarchy in classic API</LI>
+        <LI>Added new method to get transaction state</LI>
+        <LI>Use proper Python constants where appropriate</LI>
+        <LI>Use Python versions of strtol, etc.  Allows WIN32 build</LI>
+        <LI>Bug fixes and cleanups</LI>
+      </UL>
+
+      <A NAME="changes3.5"></A>
+      <H2>Important changes for 3.5</H2>
+
+      <UL>
+        <LI>Add interval to list of data types</LI>
+        <LI>fix up method wrapping especially close()</LI>
+        <LI>retry pkeys once if table missing in case it was just added</LI>
+        <LI>wrap query method separately to handle debug better</LI>
+        <LI>use isinstance instead of type</LI>
+        <LI>Miscellaneous cleanups and formatting</LI>
+      </UL>
+
+      <A NAME="changes3.4"></A>
+      <H2>Important changes for 3.4</H2>
+
+      <UL>
+        <LI>Moved back out of PostgreSQL tree</LI>
+        <LI>Allow for larger integer returns</LI>
+        <LI>Return proper strings for true and false</LI>
+        <LI>Cleanup convenience method creation</LI>
+        <LI>Enhance debugging method</LI>
+        <LI>Add reopen method</LI>
+        <LI>Allow programs to preload field names for speedup</LI>
+        <LI>Move OID handling so that it returns long instead of int</LI>
+        <LI>Miscellaneous cleanups and formatting</LI>
+      </UL>
+
+      <A NAME="changes3.3"></A>
+      <H2>Important changes for 3.3</H2>
+
+      <UL>
+        <LI>Added NUMERICOID to list of returned types.  This fixes a bug when
+          returning aggregates in the latest version of PostgreSQL.</LI>
+      </UL>
+
+      <A NAME="changes3.2"></A>
+      <H2>Important changes for 3.2</H2>
+
+      <UL>
+        <LI>add WIN32 support (gerhard@bigfoot.de)</LI>
+        <LI>Fix some DB-aPI quoting problems (niall.smart@ebeon.com)</LI>
+        <LI>Moved development into PostgreSQL development tree.</LI>
+        <LI>added NUMERICOID to list of returned types.</LI>
+      </UL>
+
+      <A NAME="changes3.1"></A>
+      <H2>Important changes for 3.1</H2>
+
+      <UL>
+        <LI>Fix some quoting functions.  In particular handle NULLs better.</LI>
+        <LI>Use a method to add primary key information rather than direct
+            manipulation of the class structures.</LI>
+        <LI>Break decimal out in _quote (in pg.py) and treat it as float.</LI>
+        <LI>Treat timestamp like date for quoting purposes.</LI>
+        <LI>Remove a redundant SELECT from the get method speeding it, and
+            insert since it calls get, up a little.</LI>
+        <LI>add test for BOOL type in typecast method to pgdbTypeCache class.
+            (tv@beamnet.de)</LI>
+        <LI>Fix pgdb.py to send port as integer to lower level function
+            (dildog@l0pht.com)</LI>
+        <LI>Change pg.py to speed up some operations</LI>
+        <LI>allow updates on tables with no primary keys.</LI> 
+      </UL>
+        
+      <A NAME="changes3.0"></A>
+      <H2>Important changes for 3.0</H2>
+        
+      <UL>
+        <LI>Remove strlen() call from pglarge_write() and get size from object.
+            (Richard@Bouska.cz)</LI>
+        <LI>add a little more error checking to the quote function in the
+            wrapper</LI>
+        <LI>add extra checking in _quote function</LI>
+        <LI>Wrap query in pg.py for debugging</LI>
+        <LI>add DB-aPI 2.0 support to pgmodule.c (andre@via.ecp.fr)</LI>
+        <LI>add DB-aPI 2.0 wrapper pgdb.py (andre@via.ecp.fr)</LI>
+        <LI>Correct keyword clash (temp) in tutorial</LI>
+        <LI>Clean up layout of tutorial</LI>
+        <LI>Return NULL values as None (rlawrence@lastfoot.com) (WARNING: This
+            will cause backwards compatibility issues.)</LI>
+        <LI>Change None to NULL in insert and update</LI> 
+        <LI>Change hash-bang lines to use /usr/bin/env</LI>
+        <LI>Clearing date should be blank (NULL) not TODaY</LI>
+        <LI>Quote backslashes in strings in _quote
+            (brian@CSUa.Berkeley.EDU)</LI>
+        <LI>Expanded and clarified build instructions
+            (tbryan@starship.python.net)</LI>
+        <LI>Make code thread safe (Jerome.alet@unice.fr)</LI> 
+        <LI>add REaDME.distutils (mwa@gate.net & jeremy@cnri.reston.va.us)</LI>
+        <LI>Many fixes by chifungfan@yahoo.com, tony@printra.net,
+            jeremy@alum.mit.edu and others to get the final version ready
+            to release.</LI>
+      </UL>
+
+      <A NAME="changes2.4"></A> 
+        <H2>Important changes for 2.4</H2>
+
+        <UL>
+          <LI>Insert returns None if the user doesn't have select permissions
+            on the table.  It can (and does) happen that one has insert but
+                    not select permissions on a table.</LI>
+          <LI>added ntuples() method to query object (brit@druid.net)</LI>
+          <LI>Corrected a bug related to getresult() and the money type</LI>
+          <LI>Corrected a but related to negative money amounts</LI>
+          <LI>allow update based on primary key if munged oid not available and table has a primary key</LI>
+          <LI>add many __doc__ strings. (andre@via.ecp.fr)</LI>
+        </UL>
+        
+        <A NAME="changes2.3"></A>
+        <H2>Important changes for 2.3</H2>
+        
+        <UL>
+          <LI>connect.host returns "localhost" when connected to Unix socket (torppa@tuhnu.cutery.fi)</LI>
+          <LI>Use Pyarg_ParseTupleandKeywords in connect()
+            (torppa@tuhnu.cutery.fi)</LI>
+          <LI>fixes and cleanups (torppa@tuhnu.cutery.fi)</LI>
+          <LI>Fixed memory leak in dictresult() (terekhov@emc.com)</LI>
+          <LI>Deprecated pgext.py - functionality now in pg.py</LI>
+          <LI>More cleanups to the tutorial</LI>
+          <LI>added fileno() method - terekhov@emc.com (Mikhail Terekhov)</LI>
+          <LI>added money type to quoting function</LI>
+          <LI>Compiles cleanly with more warnings turned on</LI>
+          <LI>Returns PostgreSQL error message on error</LI>
+          <LI>Init accepts keywords (Jarkko Torppa)</LI>
+          <LI>Convenience functions can be overridden (Jarkko Torppa)</LI>
+          <LI>added close() method</LI>
+        </UL>
+            
+        <A NAME="changes2.2"></A>
+        <H2>Important changes for 2.2</H2>
+        
+        <UL>
+          <LI>added user and password support thanks to Ng Pheng Siong
+            ngps@post1.com.</LI>
+          <LI>Insert queries return the inserted oid.</LI>
+          <LI>add new pg wrapper. (C module renamed to _pg).</LI>
+          <LI>Wrapped database connection in a class.</LI>
+          <LI>Cleaned up some of the tutorial.  (More work needed.)</LI>
+          <LI>added version and __version__.  Thanks to thilo@eevolute.com
+            for the suggestion.</LI>
+        </UL>
+        
+        <A NAME="changes2.1"></A>
+        <H2>Important changes for 2.1</H2>
+        
+        <UL>
+          <LI>return fields as proper Python objects for field type</LI>
+          <LI>Cleaned up pgext.py</LI>
+          <LI>added dictresult method</LI>
+        </UL>
+        
+        <A NAME="changes2.0"></A>
+        <H2>Important changes for 2.0</H2>
+        
+        <UL>
+          <LI>Updated code for PostgreSQL 6.2.1 and Python 1.5.</LI>
+          <LI>Reformatted code and converted to ANSI.</LI>
+          <LI>Changed name to PyGreSQL (from PyGres95.)</LI>
+          <LI>Changed order of arguments to connect function.</LI>
+          <LI>Created new type pgqueryobject and moved certain methods to it.</LI>
+          <LI>added a print function for pgqueryobject</LI>
+          <LI>Various code changes - mostly stylistic.</LI>
+        </UL>
+        
+        <A NAME="where"></A>
+        <H2>Where to get the various parts</H2>
+        
+        The home sites and the latest versions of the different packages are:
+        
+        <TABLE BORDER="0" WIDTH="100%">
+        <TR>
+          <TD><A HREF="http://www.python.org/">Python</A></TD>
+          <TD><A HREF="ftp://ftp.python.org/pub/python/">
+          ftp://ftp.python.org/pub/python/</A></TD>
+        </TR>
+        <TR>
+          <TD><A HREF="http://www.PostgreSQL.org/">PostgreSQL</A></TD>
+          <TD><A HREF="ftp://ftp.PostgreSQL.org/pub/latest/">
+          ftp://ftp.PostgreSQL.org/pub/latest/</A></TD></TR>
+        <TR>
+          <TD>PyGreSQL</TD>
+          <TD><A HREF="ftp://ftp.PyGreSQL.org/pub/distrib/PyGreSQL.tgz">
+                        ftp://ftp.PyGreSQL.org/pub/distrib/PyGreSQL.tgz</A>
+                        (Latest released version)</TD>
+        </TR>
+        <TR>
+          <TD>PyGreSQL (Beta)</TD>
+          <TD><A HREF="ftp://ftp.PyGreSQL.org/pub/distrib/PyGreSQL-beta.tgz">
+                    ftp://ftp.PyGreSQL.org/pub/distrib/PyGreSQL-beta.tgz</A>
+                    (Latest pre-release version)</TD>
+        </TR>
+        </TABLE>
+
+        <A NAME="cvs"></A>
+        <H2>CVS Access</H2>
+        The
+        <A HREF="http://www.pygresql.org/cvsweb.cgi/pygresql">CVS repository</A>
+        is available through
+        <A HREF="http://www.freebsd.org/projects/cvsweb.html">CVSWeb</A>.
+
+        <A NAME="mailinglist"></A>
+        <H2>Mailing list</H2>
+        
+        You can join
+        <A HREF="http://mailman.vex.net/mailman/listinfo/pygresql">the mailing
+        list</A> to discuss future development of the PyGreSQL interface.
+        This is usually a low volume list except when there are new features
+        being added.
+
+        <A NAME="doc"></A>
+        <H2>Documentation</H2>
+        
+        The documentation is contained in the <A HREF="README.txt">README</A>
+        file that comes with the package.
+
+        <A NAME="examples"></A>
+        <H2>Examples</H2>
+        
+        I am starting to collect examples of applications that use PyGreSQL.
+        So far I only have a few but if you have an example for me, you can
+        either send me the files or the URL for me to point to.
+        
+        <P>
+        Here is a <A HREF="http://www.druid.net/rides/">List of motorcycle
+        rides in Ontario</A> that uses a PostgreSQL database to store the
+        rides.  There is a link at the bottom of the page to view the source
+        code.
+        </P>
+        
+        <P>
+        Oleg Broytmann has written a simple example
+        <A HREF="http://sun.med.ru/~phd/Software/Python/#rgb_example">RGB
+        database demo</A>
+        </P>
+        
+    <DIV class="copyright"></DIV>
+    </DIV>
+    <BR>
 
     <P>
     PyGreSQL 2.0 was developed and tested on a NetBSD 1.3_BETa system.  It
