@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.58 2005-08-25 15:50:53 darcy Exp $
+ * $Id: pgmodule.c,v 1.59 2005-09-01 11:41:36 darcy Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -3266,7 +3266,7 @@ init_pg(void)
 	dict = PyModule_GetDict(mod);
 
 	/* Exceptions as defined by DB-API 2.0 */
-	Error = PyErr_NewException("pg.error", PyExc_StandardError, NULL);
+	Error = PyErr_NewException("pg.Error", PyExc_StandardError, NULL);
 	PyDict_SetItemString(dict, "Error", Error);
 
 	Warning = PyErr_NewException("pg.Warning", PyExc_StandardError, NULL);
