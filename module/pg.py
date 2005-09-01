@@ -1,7 +1,7 @@
 # pg.py
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
-# $Id: pg.py,v 1.32 2005-08-12 22:02:58 cito Exp $
+# $Id: pg.py,v 1.33 2005-09-01 20:02:55 cito Exp $
 
 """PyGreSQL classic interface.
 
@@ -209,7 +209,6 @@ class DB:
 		then replace the __pkeys dictionary with it.
 
 		"""
-		# Get all the primary keys at once
 		# Get all the primary keys at once
 		if isinstance(newpkey, DictType):
 			self.__pkeys = newpkey
