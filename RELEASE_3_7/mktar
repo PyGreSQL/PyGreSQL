@@ -1,0 +1,38 @@
+#! /bin/sh
+
+BETA=NO
+VERSION=3.7
+
+# small safety test
+if [ ! -f module/pgmodule.c ]
+then
+	echo "Hmmm.  Are you sure you are in the right directory?"
+	exit 1
+fi
+
+if [ $BETA = "YES" ]
+then
+	VERSION=$VERSION-pre`date +"%y%m%d"`
+	PACKAGE=pygresql.pkg-beta
+	SYMLINK=PyGreSQL-beta.tgz
+else
+	PACKAGE=pygresql.pkg
+	SYMLINK=PyGreSQL.tgz
+fi
+
+TF=/usr/ftp/pub/distrib/PyGreSQL-$VERSION.tgz
+DISTFILES="docs/Announce docs/ChangeLog module/pg.py module/pgdb.py module/pgmodule.c module/setup.py"
+CWD=`pwd`
+
+rm -rf  PyGreSQL-$VERSION
+mkdir PyGreSQL-$VERSION PyGreSQL-$VERSION/tutorial
+cp web/README.txt PyGreSQL-$VERSION/README
+cp ${DISTFILES} PyGreSQL-$VERSION
+cp tutorial/*.py PyGreSQL-$VERSION/tutorial
+tar cvzf $TF PyGreSQL-$VERSION
+chmod 644 $TF
+rm -rf  PyGreSQL-$VERSION
+rm -f /usr/ftp/pub/distrib/$SYMLINK
+ln -s PyGreSQL-$VERSION.tgz /usr/ftp/pub/distrib/$SYMLINK
+echo "$TF has been built"
+
