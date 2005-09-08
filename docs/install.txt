@@ -1,0 +1,125 @@
+=====================
+PyGreSQL Installation
+=====================
+
+.. note::
+  *This documentation is pretty outdated and needs updates and additions*
+
+Installation
+============
+
+For a Linux x86 system that uses RPMs, you can pick up an RPM at
+  ftp://ftp.druid.net/pub/distrib/pygresql.i386.rpm
+
+If you are using the DB-API 2.0 module you may consider installing mxDateTime.
+Otherwise, the Python standard lib datetime module is used.
+
+mxDateTime is avaliable at
+  http://www.egenix.com/files/python/mxDateTime.html
+
+Also, check out setup.py for an alternate method of installing the package.
+
+You have two options.  You can compile PyGreSQL as a stand-alone module
+or you can build it into the Python interpreter.
+
+General
+=======
+
+* You must first have installed Python and PostgreSQL on your system.
+  The header files and developer's libraries for both Python and PostgreSQL
+  must be installed on your system before you can build PyGreSQL.  If you
+  built both Python and PostgreSQL from source, you should be fine.  If your
+  system uses some package mechanism (such as RPMs or NetBSD packages), then
+  you probably need to install packages such as Python-devel in addition to
+  the Python package.
+
+* PyGreSQL is implemented as three parts, a C module labeled _pg and two
+  Python wrappers called pg.py and pgdb.py.  This changed between 2.1 and
+  2.2 and again in 3.0.  These changes should not affect any existing
+  programs but the installation is slightly different.
+
+* Download and unpack the PyGreSQL tarball if you haven't already done so.
+
+Stand-Alone
+===========
+
+* In the directory containing pgmodule.c, run the following command::
+
+    cc -fpic -shared -o _pg.so -I[pyInc] -I[pgInc] -L[pgLib] -lpq pgmodule.c
+
+  where::
+
+    [pyInc] = path of the Python include (usually Python.h)
+    [pgInc] = path of the PostgreSQL include (usually postgres.h)
+    [pgLib] = path of the PostgreSQL libraries (usually libpq.so or libpq.a)
+
+  Some options may be added to this line:
+    -DNO_DEF_VAR   no default variables support
+    -DNO_DIRECT    no direct access methods
+    -DNO_LARGE     no large object support
+    -DNO_SNPRINTF  if running a system with no snprintf call
+    -DNO_PQSOCKET  if running an older PostgreSQL
+
+  On some systems you may need to include -lcrypt in the list of libraries
+  to make it compile.
+
+  Define NO_PQSOCKET if you are using a version of PostgreSQL before 6.4
+  that does not have the PQsocket function.  The other options will be
+  described in the next sections.
+
+* Test the new module.  Something like the following should work::
+
+    $ python
+
+    >>> import _pg
+    >>> db = _pg.connect('thilo','localhost')
+    >>> db.query("INSERT INTO test VALUES ('ping','pong')")
+    18304
+    >>> db.query("SELECT * FROM test")
+    eins|zwei
+    ----+----
+    ping|pong
+    (1 row)
+
+* Finally, move the _pg.so, pg.py, and pgdb.py to a directory in your
+  PYTHONPATH.  A good place would be /usr/lib/python/site-python if
+  your Python modules are in /usr/lib/python.
+
+Built-in to Python interpreter
+==============================
+
+* Find the directory where your 'Setup' file lives (usually ??/Modules) in
+  the Python source hierarchy and copy or symlink the 'pgmodule.c' file there.
+
+* Add the following line to your 'Setup' file::
+
+    _pg  pgmodule.c -I[pgInc] -L[pgLib] -lpq # -lcrypt # needed on some systems
+
+  where::
+
+    [pgInc] = path of PostgreSQL include (often /usr/local/include/python)
+    [pgLib] = path of the PostgreSQL libraries (often /usr/local/lib/python)
+
+  Some options may be added to this line:
+    -DNO_DEF_VAR   no default variables support
+    -DNO_DIRECT    no direct access methods
+    -DNO_LARGE     no large object support
+    -DNO_SNPRINTF  if running a system with no snprintf call
+    -DNO_PQSOCKET  if running an older PostgreSQL
+
+  Define NO_PQSOCKET if you are using a version of PostgreSQL before 6.4
+  that does not have the PQsocket function.  The other options will be
+  described in the next sections.
+
+* If you want a shared module, make sure that the "*shared*" keyword is
+  uncommented and add the above line below it.  You used to need to install
+  your shared modules with "make sharedinstall but this no longer seems
+  to be true."
+
+* Copy pg.py to the lib directory where the rest of your modules are. For
+  example, that's /usr/local/lib/Python on my system.
+
+* Rebuild Python from the root directory of the Python source hierarchy by
+  running 'make -f Makefile.pre.in boot' and 'make && make install'
+
+* For more details read the documentation at the top of Makefile.pre.in
