@@ -3,8 +3,8 @@ PyGreSQL ChangeLog
 ==================
 
 
-Version 3.7 (to be released soon)
----------------------------------
+Version 3.7 (2005-09-07)
+------------------------
 Improvement of pgdb module:
 
 - Use Python standard `datetime` if `mxDateTime` is not available
