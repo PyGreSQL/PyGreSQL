@@ -14,7 +14,7 @@ To Do
 - The fetch method should use real cursors.
 
 
-Whish List
+Wish List
 ----------
 
 - Users should be able to register their own types with _pg.
@@ -28,4 +28,4 @@ Whish List
 - More and better documented examples.
 - Provide more howtos for compiling and installing on
   various platforms.
-- Provide binary packages, particularly a Win installer.
+- Provide binary packages, particularly a Windows installer.
