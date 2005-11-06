@@ -744,8 +744,8 @@ Description:
   one sent modified to reflect any changes caused by the update due
   to triggers, rules, defaults, etc.
 
-clears - clears row values in memory
-------------------------------------
+clear - clears row values in memory
+-----------------------------------
 Syntax::
 
  clear(table, [a])
