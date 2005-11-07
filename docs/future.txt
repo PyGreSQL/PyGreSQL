@@ -13,16 +13,26 @@ To Do
 - The C module needs to be cleaned up and redundant code merged.
 - The fetch method should use real cursors.
 
+Proposed Patches
+----------------
+
+- ByteA support
+  (http://mailman.vex.net/pipermail/pygresql/2004-September/001338.html)
+- Notice handling
+  (http://mailman.vex.net/pipermail/pygresql/2005-November/001530.html)
+
 
 Wish List
-----------
+---------
 
+- Make SQLSTATE error codes available.
 - Users should be able to register their own types with _pg.
 - I would like a new method that returns a dictionary
   of dictionaries from a SELECT.
 - Add support for persistent and pooled connections
-  that can be used in multi-threaded environments.
-  (Maybe add modules from Christoph's Webware sandbox.)
+  that can be used in multi-threaded environments (we could simply
+  (add http://www.webwareforpython.org/DBUtils to the distribution).
+- Make PyGreSQL thread-safe on the connection level.
 - The API documentation could be created with Epydoc.
 - Write a tutorial for beginners and advanced use.
 - More and better documented examples.
