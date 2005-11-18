@@ -1,7 +1,12 @@
+#!/usr/bin/env python
+#
 # pg.py
+#
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
-# $Id: pg.py,v 1.33 2005-09-01 20:02:55 cito Exp $
+#
+# $Id: pg.py,v 1.34 2005-11-18 13:51:02 cito Exp $
+#
 
 """PyGreSQL classic interface.
 
@@ -10,6 +15,7 @@ It includes the _pg module and builds on it, providing the higher
 level wrapper class named DB with addtional functionality.
 This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
+
 """
 
 from _pg import *
@@ -471,3 +477,9 @@ class DB:
 		q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[foid])
 		self._do_debug(q)
 		self.db.query(q)
+
+# if run as script, print some information
+if __name__ == '__main__':
+	print 'PyGreSQL version', version
+	print
+	print __doc__

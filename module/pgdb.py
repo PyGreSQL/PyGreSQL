@@ -1,15 +1,22 @@
-# $Id: pgdb.py,v 1.29 2005-08-25 13:52:59 cito Exp $
+#!/usr/bin/env python
+#
+# pgdb.py
+#
+# Written by D'Arcy J.M. Cain
+#
+# $Id: pgdb.py,v 1.30 2005-11-18 13:51:02 cito Exp $
+#
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
 
-	(c) 1999, Pascal Andre <andre@via.ecp.fr>.
-	See package documentation for further information on copyright.
+(c) 1999, Pascal Andre <andre@via.ecp.fr>.
+See package documentation for further information on copyright.
 
-	Inline documentation is sparse.
-	See DB-API 2.0 specification for usage information:
-	http://www.python.org/peps/pep-0249.html
+Inline documentation is sparse.
+See DB-API 2.0 specification for usage information:
+http://www.python.org/peps/pep-0249.html
 
-	Basic usage:
+Basic usage:
 
 	pgdb.connect(connect_string) # open a connection
 	# connect_string = 'host:database:user:password:opt:tty'
@@ -437,3 +444,9 @@ def TimeFromTicks(ticks):
 
 def TimestampFromTicks(ticks):
 	return apply(Timestamp, time.localtime(ticks)[:6])
+
+# if run as script, print some information
+if __name__ == '__main__':
+	print 'PyGreSQL version', version
+	print
+	print __doc__
