@@ -157,7 +157,7 @@ For support
   see http://www.postgresql.org/support/
 
 **PyGreSQL**:
-  contact D'Arcy (darcy@druid.net)
+  Contact the PyGreSQL mailing list
   concerning PyGreSQL 2.0 and up.
 
   If you would like to proposes changes, please join the
@@ -165,6 +165,10 @@ For support
 
   See http://mailman.vex.net/mailman/listinfo/pygresql
   to join the mailing list.
+
+Please note that messages to individual developers will generally not be
+answered directly.  All questions, comments and code changes must be
+submitted to the mailing list for peer review and archiving.
 
 PyGreSQL programming information
 --------------------------------
