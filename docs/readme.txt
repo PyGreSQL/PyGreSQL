@@ -92,7 +92,7 @@ Home sites of the different packages
 
 Download PyGreSQL here
 ----------------------
-The **released version of the source code** is avaiblable at
+The **released version of the source code** is available at
   ftp://ftp.pygresql.org/pub/distrib/PyGreSQL.tgz
 You can also check the latest **pre-release version** at
   ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-beta.tgz
