@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.34 2005-11-18 13:51:02 cito Exp $
+# $Id: pg.py,v 1.35 2005-12-28 00:23:33 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -283,35 +283,29 @@ class DB:
 			" JOIN pg_attribute ON pg_attribute.attrelid=pg_class.oid"
 			" JOIN pg_type ON pg_type.oid=pg_attribute.atttypid"
 			" WHERE pg_namespace.nspname='%s' AND pg_class.relname='%s'"
-			" AND pg_attribute.attnum>0 AND pg_attribute.attisdropped='f'"
+			" AND (pg_attribute.attnum>0 or pg_attribute.attname='oid')"
+			" AND pg_attribute.attisdropped='f'"
 				% cl).getresult():
-			if typ.startswith('interval'):
-				t[att] = 'date'
+			if typ.startswith('bool'):
+				t[att] = 'bool'
 			elif typ.startswith('int'):
 				t[att] = 'int'
 			elif typ.startswith('oid'):
 				t[att] = 'int'
-			elif typ.startswith('text'):
-				t[att] = 'text'
-			elif typ.startswith('char'):
-				t[att] = 'text'
-			elif typ.startswith('name'):
-				t[att] = 'text'
+			elif typ.startswith('float'):
+				t[att] = 'decimal'
 			elif typ.startswith('abstime'):
 				t[att] = 'date'
 			elif typ.startswith('date'):
 				t[att] = 'date'
+			elif typ.startswith('interval'):
+				t[att] = 'date'
 			elif typ.startswith('timestamp'):
 				t[att] = 'date'
-			elif typ.startswith('bool'):
-				t[att] = 'bool'
-			elif typ.startswith('float'):
-				t[att] = 'decimal'
 			elif typ.startswith('money'):
 				t[att] = 'money'
 			else:
 				t[att] = 'text'
-		t['oid'] = 'int' # every table has this
 		self.__attnames[qcl] = t # cache it
 		return self.__attnames[qcl]
 

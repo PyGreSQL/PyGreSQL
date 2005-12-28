@@ -1,6 +1,6 @@
 # test_pg.py
 # Written by Christoph Zwerschke
-# $Id: test_pg.py,v 1.2 2005-08-25 13:52:59 cito Exp $
+# $Id: test_pg.py,v 1.3 2005-12-28 00:23:16 cito Exp $
 
 """Test the classic PyGreSQL interface in the pg module.
 
@@ -338,7 +338,8 @@ class TestConnectObject(unittest.TestCase):
 		methods = ['close', 'endcopy', 'fileno',
 			'getline', 'getlo', 'getnotify',
 			'inserttable', 'locreate', 'loimport',
-			'putline', 'query', 'reset', 'source']
+			'putline', 'query', 'reset',
+			'source', 'transaction']
 		connection_methods = [a for a in dir(self.connection)
 			if callable(eval("self.connection." + a))]
 		self.assertEqual(methods, connection_methods)
@@ -586,7 +587,7 @@ class TestDBClassBasic(unittest.TestCase):
 			'insert', 'inserttable', 'locreate', 'loimport',
 			'options', 'pkey', 'port', 'putline', 'query',
 			'reopen', 'reset', 'source', 'status',
-			'tty', 'update', 'user']
+			'transaction', 'tty', 'update', 'user']
 		db_attributes = [a for a in dir(self.db)
 			if not a.startswith('_')]
 		self.assertEqual(attributes, db_attributes)
@@ -669,19 +670,19 @@ class TestDBClass(unittest.TestCase):
 		except pg.ProgrammingError:
 			pass
 		self.db.query("create table pkeytest0 ("
-			"a smallint)")
+			"a smallint) with oids")
 		try:
 			self.db.query('drop table pkeytest1')
 		except pg.ProgrammingError:
 			pass
 		self.db.query("create table pkeytest1 ("
-			"b smallint primary key)")
+			"b smallint primary key) with oids")
 		try:
 			self.db.query('drop table pkeytest2')
 		except pg.ProgrammingError:
 			pass
 		self.db.query("create table pkeytest2 ("
-			"c smallint, d smallint primary key)")
+			"c smallint, d smallint primary key) with oids")
 		try:
 			self.db.query('drop table pkeytest3')
 		except pg.ProgrammingError:
@@ -689,7 +690,7 @@ class TestDBClass(unittest.TestCase):
 		self.db.query("create table pkeytest3 ("
 			"e smallint, f smallint, g smallint, "
 			"h smallint, i smallint, "
-			"primary key (f,h))")
+			"primary key (f,h)) with oids")
 		self.assertRaises(KeyError, self.db.pkey, "pkeytest0")
 		self.assertEqual(self.db.pkey("pkeytest1"), "b")
 		self.assertEqual(self.db.pkey("pkeytest2"), "d")
@@ -713,7 +714,8 @@ class TestDBClass(unittest.TestCase):
 				self.db.query('drop table ' + t)
 			except pg.ProgrammingError:
 				pass
-			self.db.query("create table %s as select 0" % t)
+			self.db.query("create table %s with oids "
+				"as select 0" % t)
 		result3 = self.db.get_tables()
 		result2 = []
 		for t in result3:
@@ -746,7 +748,7 @@ class TestDBClass(unittest.TestCase):
 				'x smallint, y smallint, z smallint, '
 				'Normal_NaMe smallint, "Special Name" smallint, '
 				't text, u char(2), v varchar(2), '
-				'primary key (y, u))' % table)
+				'primary key (y, u)) with oids' % table)
 			attributes = self.db.get_attnames(table)
 			result = {'a': 'int', 'c': 'int', 'b': 'int',
 				'e': 'text', 'f': 'decimal', 'f2': 'decimal',
@@ -761,9 +763,11 @@ class TestDBClass(unittest.TestCase):
 				self.db.query('drop table "%s"' % table)
 			except pg.ProgrammingError:
 				pass
-			self.db.query('create table "%s" as '
-				"select 1 as n, 'x' as t "
-				"union select 2, 'y' union select 3, 'z'" % table)
+			self.db.query('create table "%s" ('
+				"n integer, t text) with oids" % table)
+			for n, t in enumerate('xyz'):
+				self.db.query('insert into "%s" values('
+					"%d, '%s')" % (table, n+1, t))
 			self.assertRaises(KeyError, self.db.get, table, 2)
 			r = self.db.get(table, 2, 'n')
 			oid_table = table
@@ -803,7 +807,7 @@ class TestDBClass(unittest.TestCase):
 			self.db.query('create table "%s" (' \
 				"i2 smallint, i4 integer, i8 bigint," \
 				"d decimal, f4 real, f8 double precision," \
-				"v4 varchar(4), c4 char(4), t text)" % table)
+				"v4 varchar(4), c4 char(4), t text) with oids" % table)
 			data = dict(i2 = 2**15 - 1,
 				i4 = int(2**31 - 1), i8 = long(2**31 - 1),
 				d = 1.0 + 1.0/32, f4 = 1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
@@ -827,9 +831,12 @@ class TestDBClass(unittest.TestCase):
 				self.db.query('drop table "%s"' % table)
 			except pg.ProgrammingError:
 				pass
-			self.db.query('create table "%s" as '
-				"select 1 as n, 'x' as t "
-				"union select 2, 'y' union select 3, 'z'" % table)
+			self.db.query('create table "%s" ('
+				"n integer, t text) with oids" % table)
+			for n, t in enumerate('xyz'):
+				self.db.query('insert into "%s" values('
+					"%d, '%s')" % (table, n+1, t))
+			self.assertRaises(KeyError, self.db.get, table, 2)
 			r = self.db.get(table, 2, 'n')
 			r['t'] = 'u'
 			s = self.db.update(table, r)
@@ -845,7 +852,7 @@ class TestDBClass(unittest.TestCase):
 			except pg.ProgrammingError:
 				pass
 			self.db.query('create table "%s" ('
-				"n integer, b boolean, d date, t text)" % table)
+				"n integer, b boolean, d date, t text) with oids" % table)
 			r = self.db.clear(table)
 			result = {'n': 0, 'b': 'f', 'd': 'now()', 't': ''}
 			self.assertEqual(r, result)
@@ -862,9 +869,12 @@ class TestDBClass(unittest.TestCase):
 				self.db.query('drop table "%s"' % table)
 			except pg.ProgrammingError:
 				pass
-			self.db.query('create table "%s" as '
-				"select 1 as n, 'x' as t "
-				"union select 2, 'y' union select 3, 'z'" % table)
+			self.db.query('create table "%s" ('
+				"n integer, t text) with oids" % table)
+			for n, t in enumerate('xyz'):
+				self.db.query('insert into "%s" values('
+					"%d, '%s')" % (table, n+1, t))
+			self.assertRaises(KeyError, self.db.get, table, 2)
 			r = self.db.get(table, 1, 'n')
 			s = self.db.delete(table, r)
 			r = self.db.get(table, 3, 'n')
@@ -909,7 +919,8 @@ class TestSchemas(unittest.TestCase):
 		self.assertEqual(r, result)
 		r = self.db.get_attnames("s4.t4")
 		self.assertEqual(r, result)
-		self.db.query("create table s3.t3m as select 1 as m")
+		self.db.query("create table s3.t3m with oids "
+			"as select 1 as m")
 		result_m = {'oid': 'int', 'm': 'int'}
 		r = self.db.get_attnames("s3.t3m")
 		self.assertEqual(r, result_m)
@@ -973,17 +984,17 @@ class DBTestSuite(unittest.TestSuite):
 		c.query("create table test (" \
 			"i2 smallint, i4 integer, i8 bigint," \
 			"d decimal, f4 real, f8 double precision," \
-			"v4 varchar(4), c4 char(4), t text)")
+			"v4 varchar(4), c4 char(4), t text) with oids")
 		for num_schema in range(5):
 			if num_schema:
 				schema = "s%d" % num_schema
 				c.query("create schema " + schema)
 			else:
 				schema = "public"
-			c.query("create table %s.t as "
+			c.query("create table %s.t with oids as "
 				"select 1 as n, %d as d"
 				% (schema, num_schema))
-			c.query("create table %s.t%d as "
+			c.query("create table %s.t%d with oids as "
 				"select 1 as n, %d as d"
 				% (schema, num_schema, num_schema))
 		c.close()
