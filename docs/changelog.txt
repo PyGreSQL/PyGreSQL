@@ -3,6 +3,13 @@ PyGreSQL ChangeLog
 ==================
 
 
+Version 3.8 (Beta)
+------------------
+- Take into account that nowadays not every table must have an oid column
+- Simplification and improvement of the inserttable() function
+- Fix up unit tests
+- The usual assortment of minor fixes and enhancements
+
 Version 3.7 (2005-09-07)
 ------------------------
 Improvement of pgdb module:
