@@ -644,6 +644,23 @@ Description:
   Although you can do this with a simple select, it is added here for
   convenience.
 
+get_relations - get list of relations in connected database
+-----------------------------------------------------------
+Syntax::
+
+  get_relations(types)
+
+Parameters:
+  :types: a string or sequence of type letters
+
+Description:
+  The type letters are ``r`` = ordinary table, ``i`` = index,
+  ``S`` = sequence, ``v`` = view, ``c`` = composite type,
+  ``s`` = special, ``t`` = TOAST table.
+  If types is None or an empty string, all relations are returned.
+  Although you can do this with a simple select,
+  it is added here for convenience.
+
 get_tables - get list of tables in connected database
 -----------------------------------------------------
 Syntax::
@@ -676,14 +693,14 @@ Returns:
 Description:
   Given the name of a table, digs out the set of attribute names.
 
-get - get a row from a database table
--------------------------------------
+get - get a row from a database table or view
+---------------------------------------------
 Syntax::
 
  get(table, arg, [keyname])
 
 Parameters:
-  :table:   name of table
+  :table:   name of table or view
   :arg:     either a dictionary or the value to be looked up
   :keyname: name of field to use as key (optional)
 
