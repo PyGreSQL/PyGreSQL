@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.35 2005-12-28 00:23:33 cito Exp $
+# $Id: pg.py,v 1.36 2006-01-22 12:52:45 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -244,15 +244,30 @@ class DB:
 		return [s for s, in
 			self.db.query('SELECT datname FROM pg_database').getresult()]
 
-	def get_tables(self):
-		"""Get list of tables in connected database."""
+	def get_relations(self, typ = None):
+		"""Get list of relations in connected database of specified types.
+			If type is None, all relations are returned.
+			Otherwise type can be a string or sequence of type letters."""
+
+		if typ:
+			where = "pg_class.relkind IN (%s) AND" % \
+							','.join(["'%s'" % x for x in typ])
+		else:
+			where = ''
+
 		return [_join_parts(s) for s in
-			self.db.query("SELECT pg_namespace.nspname"
-				",pg_class.relname FROM pg_class"
-				" JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace"
-				" WHERE pg_class.relkind='r' AND"
-				" pg_class.relname!~'^Inv' AND "
-				" pg_class.relname!~'^pg_' ORDER BY 1,2").getresult()]
+			self.db.query(
+				"SELECT pg_namespace.nspname, pg_class.relname "
+				"FROM pg_class "
+				"JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace "
+				"WHERE %s pg_class.relname !~ '^Inv' AND "
+					"pg_class.relname !~ '^pg_' "
+				"ORDER BY 1,2" % where).getresult()]
+
+	def get_tables(self):
+		"""Return list of tables in connected database."""
+
+		return self.get_relations('r')
 
 	def get_attnames(self, cl, newattnames = None):
 		"""Given the name of a table, digs out the set of attribute names.
@@ -274,7 +289,7 @@ class DB:
 		# May as well cache them:
 		if self.__attnames.has_key(qcl):
 			return self.__attnames[qcl]
-		if qcl not in self.get_tables():
+		if qcl not in self.get_relations('rv'):
 			raise ProgrammingError, 'Class %s does not exist' % qcl
 		t = {}
 		for att, typ in self.db.query("SELECT pg_attribute.attname"
@@ -310,7 +325,7 @@ class DB:
 		return self.__attnames[qcl]
 
 	def get(self, cl, arg, keyname = None, view = 0):
-		"""Get a tuple from a database table.
+		"""Get a tuple from a database table or view.
 
 		This method is the basic mechanism to get a single row.  It assumes
 		that the key specifies a unique row.  If keyname is not specified
