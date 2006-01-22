@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.36 2006-01-22 12:52:45 darcy Exp $
+# $Id: pg.py,v 1.37 2006-01-22 15:24:38 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -244,14 +244,16 @@ class DB:
 		return [s for s, in
 			self.db.query('SELECT datname FROM pg_database').getresult()]
 
-	def get_relations(self, typ = None):
-		"""Get list of relations in connected database of specified types.
-			If type is None, all relations are returned.
-			Otherwise type can be a string or sequence of type letters."""
+	def get_relations(self, kinds = None):
+		"""Get list of relations in connected database of specified kinds.
 
-		if typ:
+			If kinds is None or empty, all relations are returned.
+			Otherwise kinds can be a string or sequence of type letters.
+
+		"""
+		if kinds:
 			where = "pg_class.relkind IN (%s) AND" % \
-							','.join(["'%s'" % x for x in typ])
+							','.join(["'%s'" % x for x in kinds])
 		else:
 			where = ''
 
@@ -266,7 +268,6 @@ class DB:
 
 	def get_tables(self):
 		"""Return list of tables in connected database."""
-
 		return self.get_relations('r')
 
 	def get_attnames(self, cl, newattnames = None):
