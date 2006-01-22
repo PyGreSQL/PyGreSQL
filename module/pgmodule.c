@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.60 2005-12-27 22:44:08 cito Exp $
+ * $Id: pgmodule.c,v 1.61 2006-01-22 13:15:12 darcy Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -407,7 +407,6 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 {
 	char	   *query;
 	const char *temp;
-	long		num_rows;
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_CNX))
@@ -460,9 +459,10 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 		case PGRES_COMMAND_OK:	/* other requests */
 		case PGRES_COPY_OUT:
 		case PGRES_COPY_IN:
+			long		num_rows;
 			self->result_type = RESULT_DDL;
 			temp = PQcmdTuples(self->last_result);
-			num_rows = 1;
+			num_rows = -1;
 			if (temp[0] != 0)
 			{
 				self->result_type = RESULT_DML;
