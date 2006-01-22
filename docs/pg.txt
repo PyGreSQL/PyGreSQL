@@ -648,16 +648,16 @@ get_relations - get list of relations in connected database
 -----------------------------------------------------------
 Syntax::
 
-  get_relations(types)
+  get_relations(kinds)
 
 Parameters:
-  :types: a string or sequence of type letters
+  :kinds: a string or sequence of type letters
 
 Description:
   The type letters are ``r`` = ordinary table, ``i`` = index,
   ``S`` = sequence, ``v`` = view, ``c`` = composite type,
   ``s`` = special, ``t`` = TOAST table.
-  If types is None or an empty string, all relations are returned.
+  If ``kinds`` is None or an empty string, all relations are returned.
   Although you can do this with a simple select,
   it is added here for convenience.
 
