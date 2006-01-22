@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.30 2005-11-18 13:51:02 cito Exp $
+# $Id: pgdb.py,v 1.31 2006-01-22 12:12:57 darcy Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -444,6 +444,9 @@ def TimeFromTicks(ticks):
 
 def TimestampFromTicks(ticks):
 	return apply(Timestamp, time.localtime(ticks)[:6])
+
+def Binary(str):
+	return str
 
 # if run as script, print some information
 if __name__ == '__main__':
