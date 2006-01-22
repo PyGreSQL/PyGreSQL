@@ -11,14 +11,17 @@
     -- Ian Bicking
 '''
 
-__rcs_id__  = '$Id: dbapi20.py,v 1.1 2006-01-19 11:31:25 darcy Exp $'
-__version__ = '$Revision: 1.1 $'[11:-2]
+__rcs_id__  = '$Id: dbapi20.py,v 1.2 2006-01-22 13:16:48 darcy Exp $'
+__version__ = '$Revision: 1.2 $'[11:-2]
 __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'
 
 import unittest
 import time
 
 # $Log: not supported by cvs2svn $
+# Revision 1.1  2006/01/19 11:31:25  darcy
+# Add dbapi20 module for testing.
+#
 # Revision 1.8  2003/04/10 00:13:25  zenzen
 # Changes, as per suggestions by M.-A. Lemburg
 # - Add a table prefix, to ensure namespace collisions can always be avoided
@@ -274,8 +277,8 @@ class DatabaseAPI20Test(unittest.TestCase):
             cur = con.cursor()
             self.executeDDL1(cur)
             self.assertEqual(cur.rowcount,-1,
-                'cursor.rowcount should be -1 after executing no-result '
-                'statements'
+                'cursor.rowcount should be -1, not %r '
+                'after executing no-result statements' % cur.rowcount
                 )
             cur.execute("insert into %sbooze values ('Victoria Bitter')" % (
                 self.table_prefix
