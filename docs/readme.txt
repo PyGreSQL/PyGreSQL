@@ -3,7 +3,7 @@ PyGreSQL - Python interface for PostgreSQL
 ==========================================
 
 --------------------
-PyGreSQL version 3.7
+PyGreSQL version 3.8
 --------------------
 
 .. meta::
@@ -73,7 +73,7 @@ It is based on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.f
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL 3.7 needs PostgreSQL 7.1.3 and Python 2.1 or above.
+The current version PyGreSQL 3.8 needs PostgreSQL 7.1.3 and Python 2.1 or above.
 
 
 Where to get ... ?

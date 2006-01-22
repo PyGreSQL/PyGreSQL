@@ -3,12 +3,12 @@ PyGreSQL Announcements
 ======================
 
 -------------------------------
-Release of PyGreSQL version 3.7
+Release of PyGreSQL version 3.8
 -------------------------------
 
-PyGreSQL v3.7 has been released.
+PyGreSQL v3.8 has been released.
 
-It is available at: ftp://ftp.postgresql.org/pub/distrib/PyGreSQL-3.7.tgz.
+It is available at: ftp://ftp.postgresql.org/pub/distrib/PyGreSQL-3.8.tgz.
 
 If you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.
@@ -20,4 +20,4 @@ Please refer to `readme.txt <readme.html>`_
 for general information.
 
 | D'Arcy J.M. Cain
-| darcy@pygresql.org
+| darcy@PyGreSQL.org
