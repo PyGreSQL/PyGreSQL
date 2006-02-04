@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.63 2006-01-22 15:18:51 darcy Exp $
+ * $Id: pgmodule.c,v 1.64 2006-02-04 18:42:17 darcy Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -1823,6 +1823,7 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 			int			k;
 			char	   *s = PQgetvalue(self->last_result, i, j);
 			char		cashbuf[64];
+			PyObject   *float_str;
 
 			if (PQgetisnull(self->last_result, i, j))
 			{
@@ -1841,7 +1842,9 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 						break;
 
 					case 3:
-						val = PyFloat_FromString(PyString_FromString(s), NULL);
+						float_str = PyString_FromString(s);
+						val = PyFloat_FromString(float_str, NULL);
+						Py_DECREF(float_str);
 						break;
 
 					case 4:
@@ -1945,6 +1948,7 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 			int			k;
 			char	   *s = PQgetvalue(self->last_result, i, j);
 			char		cashbuf[64];
+			PyObject   *float_str;
 
 			if (PQgetisnull(self->last_result, i, j))
 			{
@@ -1963,7 +1967,9 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 						break;
 
 					case 3:
-						val = PyFloat_FromString(PyString_FromString(s), NULL);
+						float_str = PyString_FromString(s);
+						val = PyFloat_FromString(float_str, NULL);
+						Py_DECREF(float_str);
 						break;
 
 					case 4:
