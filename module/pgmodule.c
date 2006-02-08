@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.64 2006-02-04 18:42:17 darcy Exp $
+ * $Id: pgmodule.c,v 1.65 2006-02-08 20:27:36 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -27,14 +27,11 @@
  *
  */
 
-#include <Python.h>
+#include "Python.h"
 #include "postgres.h"
 #include "libpq-fe.h"
 #include "libpq/libpq-fs.h"
 #include "catalog/pg_type.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 /* PyObject_Del does not exist in older versions of Python. */
 #if PY_VERSION_HEX < 0x01060000
@@ -90,10 +87,6 @@ const char *__movename[5] =
 #ifndef NO_DEF_VAR
 #define DEFAULT_VARS	1		/* enables default variables use */
 #endif   /* NO_DEF_VAR */
-
-#ifdef MS_WIN32
-#define NO_SNPRINTF 1
-#endif
 
 /* In 7.4 PQfreeNotify was deprecated and PQfreemem is used instead.  A
    macro exists in 7.4 for backwards compatibility. */
@@ -600,14 +593,8 @@ pgsource_move(pgsourceobject * self, PyObject * args, int move)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		char		errbuf[256];
-
-#ifdef	NO_SNPRINTF
-		sprintf(errbuf, "method %s() takes no parameter.", __movename[move]);
-#else
-		snprintf(errbuf, sizeof(errbuf),
+		PyOS_snprintf(errbuf, sizeof(errbuf),
 				 "method %s() takes no parameter.", __movename[move]);
-#endif
-
 		PyErr_SetString(PyExc_SyntaxError, errbuf);
 		return NULL;
 	}
@@ -1425,30 +1412,11 @@ static int
 pglarge_print(pglargeobject * self, FILE *fp, int flags)
 {
 	char		print_buffer[128];
-
-	if (self->lo_fd >= 0)
-	{
-#ifdef	NO_SNPRINTF
-		sprintf(print_buffer,
-				"Opened large object, oid %ld", (long) self->lo_oid);
-#else
-		snprintf(print_buffer, sizeof(print_buffer),
-				 "Opened large object, oid %ld", (long) self->lo_oid);
-#endif
-		fputs(print_buffer, fp);
-	}
-	else
-	{
-#ifdef	NO_SNPRINTF
-		sprintf(print_buffer,
-				"Closed large object, oid %ld", (long) self->lo_oid);
-#else
-		snprintf(print_buffer, sizeof(print_buffer),
-				 "Closed large object, oid %ld", (long) self->lo_oid);
-#endif
-		fputs(print_buffer, fp);
-	}
-
+	PyOS_snprintf(print_buffer, sizeof(print_buffer),
+		self->lo_fd >= 0 ?
+			"Opened large object, oid %ld" :
+			"Closed large object, oid %ld", (long) self->lo_oid);
+	fputs(print_buffer, fp);
 	return 0;
 }
 
@@ -2331,6 +2299,7 @@ pgquery_print(pgqueryobject * self, FILE *fp, int flags)
 	op.header = 1;
 	op.fieldSep = "|";
 	op.pager = 1;
+    printf("FILE HANDLE: %p\n", fp);
 	PQprint(fp, self->last_result, &op);
 	return 0;
 }

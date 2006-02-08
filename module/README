@@ -1,4 +1,4 @@
-$Id: README,v 1.25 2006-01-22 15:18:51 darcy Exp $
+$Id: README,v 1.26 2006-02-08 20:27:36 cito Exp $
 PyGreSQL - v3.6.2: PostgreSQL module for Python
 ===============================================
 
@@ -14,18 +14,18 @@ PyGreSQL - v3.6.2: PostgreSQL module for Python
   Permission to use, copy, modify, and distribute this software and its
   documentation for any purpose, without fee, and without a written agreement
   is hereby granted, provided that the above copyright notice and this
-  paragraph and the following two paragraphs appear in all copies or in any 
+  paragraph and the following two paragraphs appear in all copies or in any
   new file that contains a substantial portion of this file.
 
-  IN NO EVENT SHALL THE AUTHOR BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, 
-  SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, 
-  ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE 
+  IN NO EVENT SHALL THE AUTHOR BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+  SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS,
+  ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE
   AUTHOR HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   THE AUTHOR SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED
-  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR 
-  PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-  AUTHOR HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, 
+  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+  AUTHOR HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
   ENHANCEMENTS, OR MODIFICATIONS.
 
   Further modifications copyright 1997 - 2000 by D'Arcy J.M. Cain
@@ -62,7 +62,7 @@ PostgreSQL features from a Python script.
 PyGreSQL 2.0 was developed and tested on a NetBSD 1.3_BETA system.  It is
 based on the PyGres95 code written by Pascal Andre, andre@chimay.via.ecp.fr.
 I changed the version to 2.0 and updated the code for Python 1.5 and
-PostgreSQL 6.2.1.  While I was at it I upgraded the code to use full ANSI 
+PostgreSQL 6.2.1.  While I was at it I upgraded the code to use full ANSI
 style prototypes and changed the order of arguments to connect.
 
 
@@ -91,7 +91,7 @@ style prototypes and changed the order of arguments to connect.
   you must already have built Python as well as the mxDateTime package
   from http://starship.python.net/~lemburg/mxDateTime.html.
 
-* For a Linux x86 system that uses RPMs, you can pick up an RPM at 
+* For a Linux x86 system that uses RPMs, you can pick up an RPM at
   ftp://ftp.druid.net/pub/distrib/pygresql.i386.rpm
 
 * Note that if you are using the DB-API module you must also install
@@ -99,17 +99,17 @@ style prototypes and changed the order of arguments to connect.
 
 * Also, check out setup.py for an alternate method of installing the package.
 
-You have two options.  You can compile PyGreSQL as a stand-alone module 
+You have two options.  You can compile PyGreSQL as a stand-alone module
 or you can build it into the Python interpreter.
 
-GENERAL 
+GENERAL
 
 * You must first have installed Python and PostgreSQL on your system.
   The header files and developer's libraries for both Python and PostgreSQL
-  must be installed on your system before you can build PyGreSQL.  If you 
-  built both Python and PostgreSQL from source, you should be fine.  If your 
-  system uses some package mechanism (such as RPMs or NetBSD packages), then 
-  you probably need to install packages such as Python-devel in addition to 
+  must be installed on your system before you can build PyGreSQL.  If you
+  built both Python and PostgreSQL from source, you should be fine.  If your
+  system uses some package mechanism (such as RPMs or NetBSD packages), then
+  you probably need to install packages such as Python-devel in addition to
   the Python package.
 
 * PyGreSQL is implemented as three parts, a C module labeled _pg and two
@@ -131,7 +131,6 @@ STAND-ALONE
     -DNO_DEF_VAR  - no default variables support
     -DNO_DIRECT   - no direct access methods
     -DNO_LARGE    - no large object support
-    -DNO_SNPRINTF - if running a system with no snprintf call
     -DNO_PQSOCKET - if running an older PostgreSQL
 
   On some systems you may need to include -lcrypt in the list of libraries
@@ -142,7 +141,7 @@ STAND-ALONE
   described in the next sections.
 
 * Test the new module.  Something like the following should work.
-  
+
   $ python
 
   >>> import _pg
@@ -155,13 +154,13 @@ STAND-ALONE
   ping|pong
   (1 row)
 
-* Finally, move the _pg.so, pg.py, and pgdb.py to a directory in your 
+* Finally, move the _pg.so, pg.py, and pgdb.py to a directory in your
   PYTHONPATH.  A good place would be /usr/lib/python1.5/site-python if
   your Python modules are in /usr/lib/python1.5.
 
 BUILT-IN TO PYTHON INTERPRETER
 
-* Find the directory where your 'Setup' file lives (usually ??/Modules) in 
+* Find the directory where your 'Setup' file lives (usually ??/Modules) in
   the Python source hierarchy and copy or symlink the 'pgmodule.c' file there.
 
 * Add the following line to your Setup file
@@ -173,7 +172,6 @@ BUILT-IN TO PYTHON INTERPRETER
     -DNO_DEF_VAR  - no default variables support
     -DNO_DIRECT   - no direct access methods
     -DNO_LARGE    - no large object support
-    -DNO_SNPRINTF - if running a system with no snprintf call
     -DNO_PQSOCKET - if running an older PostgreSQL
 
   Define NO_PQSOCKET if you are using a version of PostgreSQL before 6.4
@@ -188,7 +186,7 @@ BUILT-IN TO PYTHON INTERPRETER
 * Copy pg.py to the lib directory where the rest of your modules are. For
   example, that's /usr/local/lib/Python on my system.
 
-* Rebuild Python from the root directory of the Python source hierarchy by 
+* Rebuild Python from the root directory of the Python source hierarchy by
   running 'make -f Makefile.pre.in boot' and 'make && make install'
 
 * For more details read the documentation at the top of Makefile.pre.in
@@ -227,7 +225,7 @@ For support:
                  remarks I will try to answer as long as my free time allow
                  me to do that.
   - PyGreSQL:    contact me (darcy@druid.net) concerning the changes to 2.x
-                 and up.  If you would like to proposes changes please 
+                 and up.  If you would like to proposes changes please
                  join the PyGreSQL mailing list and send context diffs
                  there.  See http://www.vex.net/mailman/listinfo/pygresql
                  to join the mailing list.
