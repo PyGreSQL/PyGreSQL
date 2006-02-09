@@ -5,6 +5,17 @@ PyGreSQL ChangeLog
 
 Version 3.8 (Beta)
 ------------------
+- Replaced snprintf by PyOS_snprintf.
+- Removed NO_SNPRINTF switch which is not needed any longer
+- Clean up some variable names and namespace
+- Add get_relations() method to get any type of relation
+- Rewrite get_tables() to use get_relations()
+- Use new method in get_attnames method to get attributes of views as well
+- Add Binary type
+- Number of rows is now -1 after executing no-result statements
+- Fix some number handling
+- Non-simple types do not raise an error any more
+- Improvements to documentation framework
 - Take into account that nowadays not every table must have an oid column
 - Simplification and improvement of the inserttable() function
 - Fix up unit tests
