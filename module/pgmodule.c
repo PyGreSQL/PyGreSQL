@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.65 2006-02-08 20:27:36 cito Exp $
+ * $Id: pgmodule.c,v 1.66 2006-02-10 23:53:26 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -27,11 +27,16 @@
  *
  */
 
-#include "Python.h"
+/* Note: This should be linked against the same C runtime lib as Python */
+
 #include "postgres.h"
 #include "libpq-fe.h"
 #include "libpq/libpq-fs.h"
 #include "catalog/pg_type.h"
+
+#undef HAVE_STRERROR /* will be defined in Python.h */
+
+#include "Python.h"
 
 /* PyObject_Del does not exist in older versions of Python. */
 #if PY_VERSION_HEX < 0x01060000
@@ -107,10 +112,10 @@ static PyObject *pg_default_tty;	/* default debug tty */
 static PyObject *pg_default_port;		/* default connection port */
 static PyObject *pg_default_user;		/* default username */
 static PyObject *pg_default_passwd;		/* default password */
-#endif   /* DEFAULT_VARS */
+#endif	/* DEFAULT_VARS */
 
 DL_EXPORT(void) init_pg(void);
-int		   *get_type_array(PGresult *result, int nfields);
+int *get_type_array(PGresult *result, int nfields);
 
 /* --------------------------------------------------------------------- */
 /* OBJECTS DECLARATION */
@@ -121,8 +126,8 @@ typedef struct
 {
 	PyObject_HEAD
 	int			valid;			/* validity flag */
-	PGconn	   *cnx;			/* PostGres connection handle */
-	PGresult   *last_result;	/* last result content */
+	PGconn		*cnx;			/* PostGres connection handle */
+	PGresult	*last_result;	/* last result content */
 }	pgobject;
 
 staticforward PyTypeObject PgType;
@@ -132,7 +137,7 @@ staticforward PyTypeObject PgType;
 static PyObject *
 pgobject_New(void)
 {
-	pgobject   *pgobj;
+	pgobject	*pgobj;
 
 	if ((pgobj = PyObject_NEW(pgobject, &PgType)) == NULL)
 		return NULL;
@@ -148,7 +153,7 @@ pgobject_New(void)
 typedef struct
 {
 	PyObject_HEAD
-	PGresult   *last_result;	/* last result content */
+	PGresult	*last_result;	/* last result content */
 	int			result_type;	/* type of previous result */
 	long		current_pos;	/* current position in last result */
 	long		num_rows;		/* number of (affected) rows */
@@ -164,8 +169,8 @@ typedef struct
 {
 	PyObject_HEAD
 	int			valid;			/* validity flag */
-	pgobject   *pgcnx;			/* parent connection object */
-	PGresult   *last_result;	/* last result content */
+	pgobject	*pgcnx;			/* parent connection object */
+	PGresult	*last_result;	/* last result content */
 	int			result_type;	/* result type (DDL/DML/DQL) */
 	long		arraysize;		/* array size for fetch method */
 	int			current_row;	/* current selected row */
@@ -184,7 +189,7 @@ staticforward PyTypeObject PgSourceType;
 typedef struct
 {
 	PyObject_HEAD
-	pgobject * pgcnx;			/* parent connection object */
+	pgobject	*pgcnx;			/* parent connection object */
 	Oid			lo_oid;			/* large object oid */
 	int			lo_fd;			/* large object fd */
 }	pglargeobject;
@@ -197,13 +202,105 @@ staticforward PyTypeObject PglargeType;
 /* --------------------------------------------------------------------- */
 /* INTERNAL FUNCTIONS */
 
+
+/* prints result (mostly useful for debugging) */
+/* Note: This is a simplified version of the Postgres function PQprint().
+ * PQprint() is not used because handing over a stream from Python to
+ * Postgres can be problematic if they use different libs for streams.
+ * Also, PQprint() is considered obsolete and may be removed sometime.
+ */
+static void
+print_result(FILE *fout, const PGresult *res)
+{
+	int n = PQnfields(res);
+	if (n > 0)
+	{
+		int i, j;
+		int *fieldMax = NULL;
+		char **fields = NULL;
+		const char **fieldNames;
+		int m = PQntuples(res);
+		if (!(fieldNames = (const char **) calloc(n, sizeof(char *))))
+		{
+			fprintf(stderr, "out of memory\n"); exit(1);
+		}
+		if (!(fieldMax = (int *) calloc(n, sizeof(int))))
+		{
+			fprintf(stderr, "out of memory\n"); exit(1);
+		}
+		for (j = 0; j < n; j++)
+		{
+			const char *s = PQfname(res, j);
+			fieldNames[j] = s;
+			fieldMax[j] = s ? strlen(s) : 0;
+		}
+		if (!(fields = (char **) calloc(n * (m + 1), sizeof(char *))))
+		{
+			fprintf(stderr, "out of memory\n"); exit(1);
+		}
+		for (i = 0; i < m; i++)
+		{
+			for (j = 0; j < n; j++)
+			{
+				const char *val;
+				int len;
+				len = PQgetlength(res, i, j);
+				val = PQgetvalue(res, i, j);
+				if (len >= 1 && val && *val)
+				{
+					if (len > fieldMax[j])
+						fieldMax[j] = len;
+					if (!(fields[i * n + j] = (char *) malloc(len + 1)))
+					{
+						fprintf(stderr, "out of memory\n"); exit(1);
+					}
+					strcpy(fields[i * n + j], val);
+				}
+			}
+		}
+		for (j = 0; j < n; j++)
+		{
+			const char *s = PQfname(res, j);
+			int len = strlen(s);
+			if (len > fieldMax[j])
+				fieldMax[j] = len;
+			fprintf(fout, "%-*s", fieldMax[j], s);
+			if (j + 1 < n)
+				fputc('|', fout);
+		}
+		fputc('\n', fout);
+		for (j = 0; j < n; j++)
+		{
+			for (i = fieldMax[j]; i--; fputc('-', fout));
+			if (j + 1 < n)
+				fputc('+', fout);
+		}
+		fputc('\n', fout);
+		for (i = 0; i < m; i++)
+			for (j = 0; j < n; j++)
+			{
+				char *s = fields[i * n + j];
+				fprintf(fout, "%-*s", fieldMax[j], s ? s : "");
+				if (j + 1 < n)
+					fputc('|', fout);
+				if (s)
+					free(s);
+			}
+			fputc('\n', fout);
+		free(fields);
+		fprintf(fout, "(%d row%s)\n\n", m, m == 1 ? "" : "s");
+		free(fieldMax);
+		free((void *) fieldNames);
+	}
+}
+
 /* checks connection validity */
 static int
 check_cnx_obj(pgobject * self)
 {
 	if (!self->valid)
 	{
-		PyErr_SetString(IntegrityError, "connection has been closed");
+		PyErr_SetString(IntegrityError, "connection has been closed.");
 		return 0;
 	}
 	return 1;
@@ -282,7 +379,7 @@ get_type_array(PGresult *result, int nfields)
 
 	if ((typ = malloc(sizeof(int) * nfields)) == NULL)
 	{
-		PyErr_SetString(PyExc_SyntaxError, "memory error in getresult().");
+		PyErr_SetString(PyExc_MemoryError, "memory error in getresult().");
 		return NULL;
 	}
 
@@ -474,7 +571,7 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 			break;
 		default:
 			PyErr_SetString(InternalError, "internal error: "
-							"unknown result status.");
+				"unknown result status.");
 			break;
 	}
 
@@ -501,8 +598,8 @@ pgsource_oidstatus(pgsourceobject * self, PyObject * args)
 	/* checks args */
 	if ((args != NULL) && (!PyArg_ParseTuple(args, "")))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method oidstatus() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method oidstatus() takes no parameters.");
 		return NULL;
 	}
 
@@ -537,8 +634,8 @@ pgsource_fetch(pgsourceobject * self, PyObject * args)
 	size = self->arraysize;
 	if (!PyArg_ParseTuple(args, "|l", &size))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"fetch(num), with num (integer, optional).");
+		PyErr_SetString(PyExc_TypeError,
+			"fetch(num), with num (integer, optional).");
 		return NULL;
 	}
 
@@ -594,8 +691,8 @@ pgsource_move(pgsourceobject * self, PyObject * args, int move)
 	{
 		char		errbuf[256];
 		PyOS_snprintf(errbuf, sizeof(errbuf),
-				 "method %s() takes no parameter.", __movename[move]);
-		PyErr_SetString(PyExc_SyntaxError, errbuf);
+			"method %s() takes no parameter.", __movename[move]);
+		PyErr_SetString(PyExc_TypeError, errbuf);
 		return NULL;
 	}
 
@@ -734,7 +831,7 @@ pgsource_listinfo(pgsourceobject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"method listinfo() takes no parameter.");
+			"method listinfo() takes no parameter.");
 		return NULL;
 	}
 
@@ -920,20 +1017,14 @@ pgsource_setattr(pgsourceobject * self, char *name, PyObject * v)
 }
 
 /* prints query object in human readable format */
+
 static int
 pgsource_print(pgsourceobject * self, FILE *fp, int flags)
 {
-	PQprintOpt	op;
-
 	switch (self->result_type)
 	{
 		case RESULT_DQL:
-			memset(&op, 0, sizeof(op));
-			op.align = 1;
-			op.header = 1;
-			op.fieldSep = "|";
-			op.pager = 1;
-			PQprint(fp, self->last_result, &op);
+			print_result(fp, self->last_result);
 			break;
 		case RESULT_DDL:
 		case RESULT_DML:
@@ -1047,8 +1138,8 @@ pglarge_close(pglargeobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method close() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method close() takes no parameters.");
 		return NULL;
 	}
 
@@ -1132,7 +1223,7 @@ pglarge_write(pglargeobject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "s#", &buffer, &bufsize))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"write(buffer), with buffer (sized string).");
+			"write(buffer), with buffer (sized string).");
 		return NULL;
 	}
 
@@ -1200,8 +1291,8 @@ pglarge_size(pglargeobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method size() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method size() takes no parameters.");
 		return NULL;
 	}
 
@@ -1227,7 +1318,7 @@ pglarge_size(pglargeobject * self, PyObject * args)
 	if ((start = lo_lseek(self->pgcnx->cnx, self->lo_fd, start, SEEK_SET)) == -1)
 	{
 		PyErr_SetString(PyExc_IOError,
-						"error while moving back to first position.");
+			"error while moving back to first position.");
 		return NULL;
 	}
 
@@ -1248,8 +1339,8 @@ pglarge_tell(pglargeobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method tell() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method tell() takes no parameters.");
 		return NULL;
 	}
 
@@ -1286,7 +1377,7 @@ pglarge_export(pglargeobject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "s", &name))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"export(filename), with filename (string).");
+			"export(filename), with filename (string).");
 		return NULL;
 	}
 
@@ -1312,8 +1403,8 @@ pglarge_unlink(pglargeobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method unlink() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method unlink() takes no parameters.");
 		return NULL;
 	}
 
@@ -1595,8 +1686,8 @@ pg_reset(pgobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method reset() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method reset() takes no parameters.");
 		return NULL;
 	}
 
@@ -1622,8 +1713,8 @@ pg_fileno(pgobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method fileno() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method fileno() takes no parameters.");
 		return NULL;
 	}
 
@@ -1644,8 +1735,8 @@ pgquery_ntuples(pgqueryobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method ntuples() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method ntuples() takes no parameters.");
 		return NULL;
 	}
 
@@ -1668,8 +1759,8 @@ pgquery_listfields(pgqueryobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method listfields() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method listfields() takes no parameters.");
 		return NULL;
 	}
 
@@ -1701,7 +1792,7 @@ pgquery_fieldname(pgqueryobject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "i", &i))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"fieldname(number), with number(integer).");
+			"fieldname(number), with number(integer).");
 		return NULL;
 	}
 
@@ -1765,8 +1856,8 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 	/* checks args (args == NULL for an internal call) */
 	if ((args != NULL) && (!PyArg_ParseTuple(args, "")))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method getresult() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method getresult() takes no parameters.");
 		return NULL;
 	}
 
@@ -1890,8 +1981,8 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 	/* checks args (args == NULL for an internal call) */
 	if ((args != NULL) && (!PyArg_ParseTuple(args, "")))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method getresult() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method getresult() takes no parameters.");
 		return NULL;
 	}
 
@@ -2020,8 +2111,8 @@ pg_getnotify(pgobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method getnotify() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method getnotify() takes no parameters.");
 		return NULL;
 	}
 
@@ -2173,7 +2264,7 @@ pg_query(pgobject * self, PyObject * args)
 				return Py_None;
 			default:
 				PyErr_SetString(InternalError, "internal error: "
-								"unknown result status.");
+					"unknown result status.");
 				break;
 		}
 
@@ -2236,8 +2327,8 @@ pg_getline(pgobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method getline() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method getline() takes no parameters.");
 		return NULL;
 	}
 
@@ -2276,8 +2367,8 @@ pg_endcopy(pgobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method endcopy() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method endcopy() takes no parameters.");
 		return NULL;
 	}
 
@@ -2292,15 +2383,7 @@ pg_endcopy(pgobject * self, PyObject * args)
 static PyObject *
 pgquery_print(pgqueryobject * self, FILE *fp, int flags)
 {
-	PQprintOpt	op;
-
-	memset(&op, 0, sizeof(op));
-	op.align = 1;
-	op.header = 1;
-	op.fieldSep = "|";
-	op.pager = 1;
-    printf("FILE HANDLE: %p\n", fp);
-	PQprint(fp, self->last_result, &op);
+	print_result(fp, self->last_result);
 	return 0;
 }
 
@@ -2533,8 +2616,8 @@ pg_transaction(pgobject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method transaction() takes no parameters.");
+		PyErr_SetString(PyExc_TypeError,
+			"method transaction() takes no parameters.");
 		return NULL;
 	}
 
@@ -2561,7 +2644,7 @@ pg_locreate(pgobject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "i", &mode))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"locreate(mode), with mode (integer).");
+			"locreate(mode), with mode (integer).");
 		return NULL;
 	}
 
@@ -2834,8 +2917,8 @@ pggetdefhost(PyObject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method get_defhost() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError,
+			"method get_defhost() takes no parameter.");
 		return NULL;
 	}
 
@@ -2857,7 +2940,7 @@ pgsetdefhost(PyObject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"set_defhost(name), with name (string/None).");
+			"set_defhost(name), with name (string/None).");
 		return NULL;
 	}
 
@@ -2885,8 +2968,8 @@ pggetdefbase(PyObject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method get_defbase() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError,
+			"method get_defbase() takes no parameter.");
 		return NULL;
 	}
 
@@ -2908,7 +2991,7 @@ pgsetdefbase(PyObject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"set_defbase(name), with name (string/None).");
+			"set_defbase(name), with name (string/None).");
 		return NULL;
 	}
 
@@ -2936,8 +3019,8 @@ pggetdefopt(PyObject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method get_defopt() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError,
+			"method get_defopt() takes no parameter.");
 		return NULL;
 	}
 
@@ -2959,7 +3042,7 @@ pgsetdefopt(PyObject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"set_defopt(name), with name (string/None).");
+			"set_defopt(name), with name (string/None).");
 		return NULL;
 	}
 
@@ -2987,8 +3070,8 @@ pggetdeftty(PyObject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method get_deftty() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError,
+			"method get_deftty() takes no parameter.");
 		return NULL;
 	}
 
@@ -3011,7 +3094,7 @@ pgsetdeftty(PyObject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"set_deftty(name), with name (string/None).");
+			"set_deftty(name), with name (string/None).");
 		return NULL;
 	}
 
@@ -3039,8 +3122,8 @@ pggetdefuser(PyObject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method get_defuser() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError,
+			"method get_defuser() takes no parameter.");
 
 		return NULL;
 	}
@@ -3063,7 +3146,7 @@ pgsetdefuser(PyObject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-						"set_defuser(name), with name (string/None).");
+			"set_defuser(name), with name (string/None).");
 		return NULL;
 	}
 
@@ -3095,7 +3178,7 @@ pgsetdefpasswd(PyObject * self, PyObject * args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-				"set_defpasswd(password), with password (string/None).");
+			"set_defpasswd(password), with password (string/None).");
 		return NULL;
 	}
 
@@ -3124,8 +3207,8 @@ pggetdefport(PyObject * self, PyObject * args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_SyntaxError,
-						"method get_defport() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError,
+			"method get_defport() takes no parameter.");
 		return NULL;
 	}
 
@@ -3147,7 +3230,7 @@ pgsetdefport(PyObject * self, PyObject * args)
 	if ((!PyArg_ParseTuple(args, "l", &port)) || (port < -1))
 	{
 		PyErr_SetString(PyExc_TypeError, "set_defport(port), with port "
-						"(positive integer/-1).");
+			"(positive integer/-1).");
 		return NULL;
 	}
 
