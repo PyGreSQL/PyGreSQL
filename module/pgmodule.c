@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.67 2006-02-11 08:54:47 cito Exp $
+ * $Id: pgmodule.c,v 1.68 2006-02-11 09:57:42 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -1681,7 +1681,7 @@ pg_reset(pgobject * self, PyObject * args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -1699,6 +1699,31 @@ pg_reset(pgobject * self, PyObject * args)
 	return Py_None;
 }
 
+/* cancels current command */
+static char pg_cancel__doc__[] =
+"cancel() -- abandon processing of the current command.";
+
+static PyObject *
+pg_cancel(pgobject * self, PyObject * args)
+{
+	if (!self->cnx)
+	{
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		return NULL;
+	}
+
+	/* checks args */
+	if (!PyArg_ParseTuple(args, ""))
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"method reset() takes no parameters.");
+		return NULL;
+	}
+
+	/* request that the server abandon processing of the current command */
+    return PyInt_FromLong((long) PQrequestCancel(self->cnx));
+}
+
 /* get connection socket */
 static char pg_fileno__doc__[] =
 "fileno() -- return database connection socket file handle.";
@@ -1708,7 +1733,7 @@ pg_fileno(pgobject * self, PyObject * args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2106,7 +2131,7 @@ pg_getnotify(pgobject * self, PyObject * args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2203,7 +2228,7 @@ pg_query(pgobject * self, PyObject * args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2293,7 +2318,7 @@ pg_putline(pgobject * self, PyObject * args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2322,7 +2347,7 @@ pg_getline(pgobject * self, PyObject * args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2362,7 +2387,7 @@ pg_endcopy(pgobject * self, PyObject * args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2420,7 +2445,7 @@ pg_inserttable(pgobject * self, PyObject * args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2611,7 +2636,7 @@ pg_transaction(pgobject * self, PyObject * args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 
@@ -2730,6 +2755,7 @@ static struct PyMethodDef pgobj_methods[] = {
 	{"source", (PyCFunction) pg_source, METH_VARARGS, pg_source__doc__},
 	{"query", (PyCFunction) pg_query, METH_VARARGS, pg_query__doc__},
 	{"reset", (PyCFunction) pg_reset, METH_VARARGS, pg_reset__doc__},
+    {"cancel", (PyCFunction) pg_cancel, METH_VARARGS, pg_cancel__doc__},
 	{"close", (PyCFunction) pg_close, METH_VARARGS, pg_close__doc__},
 	{"fileno", (PyCFunction) pg_fileno, METH_VARARGS, pg_fileno__doc__},
 	{"getnotify", (PyCFunction) pg_getnotify, METH_VARARGS,
@@ -2769,7 +2795,7 @@ pg_getattr(pgobject * self, char *name)
 	/* first exception - close which returns a different error */
 	if (strcmp(name, "close") && !self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
 		return NULL;
 	}
 

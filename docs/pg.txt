@@ -108,7 +108,7 @@ Return type:
   :string, None: default host specification
 
 Exceptions raised:
-  :SyntaxError: too many arguments
+  :TypeError: too many arguments
 
 Description:
   This method returns the current default host specification,
@@ -147,7 +147,7 @@ Return type:
   :integer, None: default port specification
 
 Exceptions raised:
-  :SyntaxError: too many arguments
+  :TypeError: too many arguments
 
 Description:
   This method returns the current default port specification,
@@ -182,7 +182,7 @@ Return type:
   :string, None: default options specification
 
 Exceptions raised:
-  :SyntaxError: too many arguments
+  :TypeError: too many arguments
 
 Description:
   This method returns the current default connection options  specification,
@@ -220,7 +220,7 @@ Return type:
   :string, None: default debug terminal specification
 
 Exceptions raised:
-  :SyntaxError: too many arguments
+  :TypeError: too many arguments
 
 Description:
   This method returns the current default debug terminal specification, or
@@ -258,7 +258,7 @@ Return type:
   :string, None: default database name specification
 
 Exceptions raised:
-  :SyntaxError: too many arguments
+  :TypeError: too many arguments
 
 Description:
   This method returns the current default database name specification, or
@@ -361,6 +361,25 @@ Exceptions raised:
 Description:
   This method resets the current database connection.
 
+cancel - abandon processing of current SQL command
+--------------------------------------------------
+Syntax::
+
+  cancel()
+
+Parameters:
+  None
+
+Return type:
+  None
+
+Exceptions raised:
+  :TypeError: too many (any) arguments
+
+Description:
+  This method requests that the server abandon processing
+  of the current SQL command.
+
 close - close the database connection
 -------------------------------------
 Syntax::
@@ -411,7 +430,7 @@ Return type:
   :tuple, None: last notify from server
 
 Exceptions raised:
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :TypeError: invalid connection
 
 Description:
@@ -482,8 +501,9 @@ Return type:
   :string: the line read
 
 Exceptions raised:
-  :TypeError:   invalid connection
-  :SyntaxError: too many parameters
+  :TypeError: invalid connection
+  :TypeError: too many parameters
+  :MemoryError: buffer overflow
 
 Description:
   This method allows to directly read a string from the server socket.
@@ -501,8 +521,8 @@ Return type:
   None
 
 Exceptions raised:
-  :TypeError:   invalid connection
-  :SyntaxError: too many parameters
+  :TypeError: invalid connection
+  :TypeError: too many parameters
 
 Description:
   The use of direct access methods may desynchonize client and server.
@@ -815,7 +835,7 @@ Return type:
   :list: result values as a list of tuples
 
 Exceptions raised:
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :pg.InternalError: invalid previous result
 
 Description:
@@ -836,7 +856,7 @@ Return type:
   :list: result values as a list of dictionaries
 
 Exceptions raised:
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :pg.InternalError: invalid previous result
 
 Description:
@@ -858,7 +878,7 @@ Return type:
   :list: field names
 
 Exceptions raised:
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :pg.InternalError: invalid previous result, or lost connection
 
 Description:
@@ -921,7 +941,7 @@ Return type:
   :integer: number of tuples in `pgqueryobject`
 
 Exceptions raised:
-  :SyntaxError: Too many arguments.
+  :TypeError: Too many arguments.
 
 Description:
   This method returns the number of tuples found in a query.
@@ -979,7 +999,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: invalid connection
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :IOError: object is not opened, or close error
 
 Description:
@@ -1059,7 +1079,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: invalid connection or invalid object
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :IOError: object is not opened, or seek error
 
 Description:
@@ -1077,7 +1097,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: invalid connection or invalid object
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :IOError: object is not closed, or unlink error
 
 Description:
@@ -1098,7 +1118,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: invalid connection or invalid object
-  :SyntaxError: too many parameters
+  :TypeError: too many parameters
   :IOError: object is not opened, or seek/tell error
 
 Description:
