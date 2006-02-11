@@ -1,6 +1,6 @@
 # test_pg.py
 # Written by Christoph Zwerschke
-# $Id: test_pg.py,v 1.3 2005-12-28 00:23:16 cito Exp $
+# $Id: test_pg.py,v 1.4 2006-02-11 21:13:32 cito Exp $
 
 """Test the classic PyGreSQL interface in the pg module.
 
@@ -8,11 +8,11 @@ The testing is done against a real local PostgreSQL database.
 
 There are a few drawbacks:
 * A local PostgreSQL database must be up and running, and
-the user who is running the test needs create database privilege
-* The performance of the API is not tested
-* Connecting to a remote host is not tested
-* Passing user, password and options is not tested
-* Status and error messages from the connection are not tested
+the user who is running the tests must be a trusted superuser.
+* The performance of the API is not tested.
+* Connecting to a remote host is not tested.
+* Passing user, password and options is not tested.
+* Status and error messages from the connection are not tested.
 * It would be more reasonable to create a test for the underlying
 shared library functions in the _pg module and assume they are ok.
 The pg and pgdb modules should be tested against _pg mock functions.
@@ -335,8 +335,8 @@ class TestConnectObject(unittest.TestCase):
 		self.assertEqual(attributes, connection_attributes)
 
 	def testAllConnectMethods(self):
-		methods = ['close', 'endcopy', 'fileno',
-			'getline', 'getlo', 'getnotify',
+		methods = ['cancel', 'close', 'endcopy',
+			'fileno', 'getline', 'getlo', 'getnotify',
 			'inserttable', 'locreate', 'loimport',
 			'putline', 'query', 'reset',
 			'source', 'transaction']
@@ -508,6 +508,29 @@ class TestSimpleQueries(unittest.TestCase):
 		result = 2
 		self.assertEqual(r, result)
 
+	def testPrint(self):
+		q = "select 1 as a, 'hello' as h, 'w' as world" \
+			" union select 2, 'xyz', 'uvw'"
+		r = self.c.query(q)
+		t = '~test_pg_testPrint_temp.tmp'
+		s = open(t, 'w')
+		import sys, os
+		stdout, sys.stdout = sys.stdout, s
+		try:
+			print r
+		except:
+			pass
+		sys.stdout = stdout
+		s.close()
+		r = filter(bool, open(t, 'r').read().splitlines())
+		os.remove(t)
+		self.assertEqual(r,
+			['a|h    |world',
+			'-+-----+-----',
+			'1|hello|w    ',
+			'2|xyz  |uvw  ',
+			'(2 rows)'])
+
 
 class TestInserttable(unittest.TestCase):
 	""""Test inserttable method."""
@@ -580,9 +603,10 @@ class TestDBClassBasic(unittest.TestCase):
 		self.db.close()
 
 	def testAllDBAttributes(self):
-		attributes = ['clear', 'close', 'db', 'dbname',
-			'debug', 'delete', 'endcopy', 'error', 'fileno',
-			'get', 'get_attnames', 'get_databases', 'get_tables',
+		attributes = ['cancel', 'clear', 'close',
+			'db', 'dbname', 'debug', 'delete', 'endcopy',
+			'error', 'fileno', 'get', 'get_attnames',
+			'get_databases', 'get_relations', 'get_tables',
 			'getline', 'getlo', 'getnotify', 'host',
 			'insert', 'inserttable', 'locreate', 'loimport',
 			'options', 'pkey', 'port', 'putline', 'query',
@@ -732,6 +756,23 @@ class TestDBClass(unittest.TestCase):
 		result2 = self.db.get_tables()
 		self.assertEqual(result2, result1)
 
+	def testGetRelations(self):
+		result = self.db.get_relations()
+		self.assert_('public.test' in result)
+		self.assert_('public.test_view' in result)
+		result = self.db.get_relations('rv')
+		self.assert_('public.test' in result)
+		self.assert_('public.test_view' in result)
+		result = self.db.get_relations('r')
+		self.assert_('public.test' in result)
+		self.assert_('public.test_view' not in result)
+		result = self.db.get_relations('v')
+		self.assert_('public.test' not in result)
+		self.assert_('public.test_view' in result)
+		result = self.db.get_relations('cisSt')
+		self.assert_('public.test' not in result)
+		self.assert_('public.test_view' not in result)
+
 	def testAttnames(self):
 		self.assertRaises(pg.ProgrammingError,
 			self.db.get_attnames, 'does_not_exist')
@@ -811,7 +852,7 @@ class TestDBClass(unittest.TestCase):
 			data = dict(i2 = 2**15 - 1,
 				i4 = int(2**31 - 1), i8 = long(2**31 - 1),
 				d = 1.0 + 1.0/32, f4 = 1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
-				v4 = "1234", c4 = "1234", t  = "1234" * 10)
+				v4 = "1234", c4 = "1234", t = "1234" * 10)
 			r = self.db.insert(table, data)
 			self.assertEqual(r, data)
 			oid_table = table
@@ -981,10 +1022,12 @@ class DBTestSuite(unittest.TestSuite):
 			+ " template=template0")
 		c.close()
 		c = pg.connect(dbname)
-		c.query("create table test (" \
-			"i2 smallint, i4 integer, i8 bigint," \
-			"d decimal, f4 real, f8 double precision," \
+		c.query("create table test ("
+			"i2 smallint, i4 integer, i8 bigint,"
+			"d decimal, f4 real, f8 double precision,"
 			"v4 varchar(4), c4 char(4), t text) with oids")
+		c.query("create view test_view as"
+			" select i4, v4 from test")
 		for num_schema in range(5):
 			if num_schema:
 				schema = "s%d" % num_schema

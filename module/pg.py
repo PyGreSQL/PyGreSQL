@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.37 2006-01-22 15:24:38 cito Exp $
+# $Id: pg.py,v 1.38 2006-02-11 21:13:32 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -247,8 +247,9 @@ class DB:
 	def get_relations(self, kinds = None):
 		"""Get list of relations in connected database of specified kinds.
 
-			If kinds is None or empty, all relations are returned.
-			Otherwise kinds can be a string or sequence of type letters.
+			If kinds is None or empty, all kinds of relations are returned.
+			Otherwise kinds can be a string or sequence of type letters
+			specifying which kind of relations you want to list.
 
 		"""
 		if kinds:
