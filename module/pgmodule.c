@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.66 2006-02-10 23:53:26 cito Exp $
+ * $Id: pgmodule.c,v 1.67 2006-02-11 08:54:47 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -277,6 +277,7 @@ print_result(FILE *fout, const PGresult *res)
 		}
 		fputc('\n', fout);
 		for (i = 0; i < m; i++)
+        {
 			for (j = 0; j < n; j++)
 			{
 				char *s = fields[i * n + j];
@@ -287,6 +288,7 @@ print_result(FILE *fout, const PGresult *res)
 					free(s);
 			}
 			fputc('\n', fout);
+        }
 		free(fields);
 		fprintf(fout, "(%d row%s)\n\n", m, m == 1 ? "" : "s");
 		free(fieldMax);
