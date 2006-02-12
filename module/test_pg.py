@@ -1,6 +1,11 @@
+#!/usr/bin/env python
+#
 # test_pg.py
+#
 # Written by Christoph Zwerschke
-# $Id: test_pg.py,v 1.4 2006-02-11 21:13:32 cito Exp $
+#
+# $Id: test_pg.py,v 1.5 2006-02-12 19:40:43 cito Exp $
+#
 
 """Test the classic PyGreSQL interface in the pg module.
 
@@ -22,8 +27,16 @@ The pg and pgdb modules should be tested against _pg mock functions.
 import pg
 import unittest
 
-import locale
-locale.setlocale(locale.LC_ALL, '')
+# Try to load german locale for Umlaut tests
+german = True
+try:
+	import locale
+	locale.setlocale(locale.LC_ALL, ('de', 'latin1'))
+except:
+	try:
+		locale.setlocale(locale.LC_ALL, 'german')
+	except:
+		german = False
 
 
 class TestAuxiliaryFunctions(unittest.TestCase):
@@ -120,14 +133,15 @@ class TestAuxiliaryFunctions(unittest.TestCase):
 		self.assert_(not f('ab0'))
 		self.assert_(not f('abc'))
 		self.assert_(not f('abc'))
-		self.assert_(not f('\xe4'))
-		self.assert_(f('\xc4'))
-		self.assert_(not f('k\xe4se'))
-		self.assert_(f('K\xe4se'))
-		self.assert_(not f('emmentaler_k\xe4se'))
-		self.assert_(f('emmentaler k\xe4se'))
-		self.assert_(f('EmmentalerK\xe4se'))
-		self.assert_(f('Emmentaler K\xe4se'))
+		if german:
+			self.assert_(not f('\xe4'))
+			self.assert_(f('\xc4'))
+			self.assert_(not f('k\xe4se'))
+			self.assert_(f('K\xe4se'))
+			self.assert_(not f('emmentaler_k\xe4se'))
+			self.assert_(f('emmentaler k\xe4se'))
+			self.assert_(f('EmmentalerK\xe4se'))
+			self.assert_(f('Emmentaler K\xe4se'))
 
 	def testIsUnquoted(self):
 		f = pg._is_unquoted
@@ -838,6 +852,14 @@ class TestDBClass(unittest.TestCase):
 			self.assertEqual(self.db.get(table, r)['t'], 'z')
 			r['n'] = 2
 			self.assertEqual(self.db.get(table, r)['t'], 'y')
+
+	def testGetFromView(self):
+		self.db.query('delete from test where i4=14')
+		self.db.query('insert into test (i4, v4) values('
+			"14, 'abc4')")
+		r = self.db.get('test_view', 14, 'i4')
+		self.assert_('v4' in r)
+		self.assertEqual(r['v4'], 'abc4')
 
 	def testInsert(self):
 		for table in ('insert_test_table', 'test table for insert'):
