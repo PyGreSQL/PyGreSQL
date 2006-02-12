@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.16 2006-02-12 15:44:29 cito Exp $
+# $Id: setup.py,v 1.17 2006-02-12 16:39:05 cito Exp $
 
 """Setup script for PyGreSQL version 3.8
 
@@ -42,12 +42,12 @@ import sys, os
 def pg_config(s):
 	"""Retrieve information about installed version of PostgreSQL."""
 	f = os.popen("pg_config --%s" % s)
-	s = f.readline().strip()
+	d = f.readline().strip()
 	if f.close() is not None:
 		raise Exception, "pg_config tool is not available."
-	if not s:
+	if not d:
 		raise Exception, "Could not get %s information." % s
-	return s
+	return d
 
 def mk_include():
 	"""Create a temporary local include directory.
