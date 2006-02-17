@@ -1,6 +1,6 @@
 #! /bin/sh
 
-BETA=YES
+BETA=NO
 VERSION=3.8
 
 # small safety test
