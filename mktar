@@ -20,20 +20,31 @@ else
 	SYMLINK=PyGreSQL.tgz
 fi
 
-TF=/usr/ftp/pub/distrib/PyGreSQL-$VERSION.tgz
-DOCFILES="docs/announce.txt docs/changelog.txt docs/install.txt"
-MODFILES="module/pg.py module/pgdb.py module/pgmodule.c module/setup.py"
-DISTFILES="$DOCFILES $MODFILES"
-CWD=`pwd`
+DISTDIR=/usr/ftp/pub/distrib
+DISTDIR=.
+TD=PyGreSQL-$VERSION
+TF=$DISTDIR/$TD.tgz
 
-rm -rf  PyGreSQL-$VERSION
-mkdir PyGreSQL-$VERSION PyGreSQL-$VERSION/tutorial
-cp ${DISTFILES} PyGreSQL-$VERSION
-cp tutorial/*.py PyGreSQL-$VERSION/tutorial
-tar cvzf $TF PyGreSQL-$VERSION
+MODFILES="module/pg.py module/pgdb.py module/pgmodule.c module/setup.py"
+DOCFILES="docs/*.txt docs/*.html docs/*.css"
+TUTFILES="tutorial/*.py"
+
+echo "Making source tarball..."
+
+./mkdocs
+
+rm -rf $TD
+mkdir $TD
+mkdir $TD/docs
+mkdir $TD/tutorial
+cp $MODFILES $TD
+cp $DOCFILES $TD/docs
+cp $TUTFILES $TD/tutorial
+tar -cvzf $TF $TD
 chmod 644 $TF
-rm -rf  PyGreSQL-$VERSION
-rm -f /usr/ftp/pub/distrib/$SYMLINK
-ln -s PyGreSQL-$VERSION.tgz /usr/ftp/pub/distrib/$SYMLINK
+rm -rf $TD
+rm -f $DISTDIR/$SYMLINK
+ln -s $TD.tgz $DISTDIR/$SYMLINK
+
 echo "$TF has been built"
 
