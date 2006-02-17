@@ -1,7 +1,7 @@
 #! /bin/sh
 
-BETA=NO
-VERSION=3.8
+BETA=YES
+VERSION=3.8.1
 
 # small safety test
 if [ ! -f module/pgmodule.c ]
@@ -21,12 +21,13 @@ else
 fi
 
 TF=/usr/ftp/pub/distrib/PyGreSQL-$VERSION.tgz
-DISTFILES="docs/announce.txt docs/changelog.txt module/pg.py module/pgdb.py module/pgmodule.c module/setup.py"
+DOCFILES="docs/announce.txt docs/changelog.txt docs/install.txt"
+MODFILES="module/pg.py module/pgdb.py module/pgmodule.c module/setup.py"
+DISTFILES="$DOCFILES $MODFILES"
 CWD=`pwd`
 
 rm -rf  PyGreSQL-$VERSION
 mkdir PyGreSQL-$VERSION PyGreSQL-$VERSION/tutorial
-cp module/README PyGreSQL-$VERSION/README
 cp ${DISTFILES} PyGreSQL-$VERSION
 cp tutorial/*.py PyGreSQL-$VERSION/tutorial
 tar cvzf $TF PyGreSQL-$VERSION
