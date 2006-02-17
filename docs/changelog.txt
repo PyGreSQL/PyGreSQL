@@ -3,7 +3,7 @@ PyGreSQL ChangeLog
 ==================
 
 
-Version 3.8
+Version 3.8 (2006-02-17)
 ------------------
 - Installed new favicon.ico from Matthew Sporleder <mspo@mspo.com>
 - Replaced snprintf by PyOS_snprintf.
