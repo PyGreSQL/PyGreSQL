@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.17 2006-02-12 16:39:05 cito Exp $
+# $Id: setup.py,v 1.18 2006-02-17 20:51:45 cito Exp $
 
 """Setup script for PyGreSQL version 3.8
 
@@ -14,7 +14,8 @@ Authors and history:
 Prerequisites to be installed:
 * Python including devel package (header files and distutils)
 * PostgreSQL libs and devel packages (header files of client and server)
-* PostgreSQL pg_config tool (usually included in the server package)
+* PostgreSQL pg_config tool (usually included in the devel package)
+  (the Windows installer has it as part of the database server feature)
 
 Tested with Python 2.4.2 and PostGreSQL 8.1.2.
 
@@ -28,7 +29,7 @@ If you want to use the free Microsoft Visual C++ Toolkit 2003 compiler,
 you need to patch distutils (www.vrplumber.com/programming/mstoolkit/).
 Alternatively, you can use MinGW (www.mingw.org) for building on Win32:
 python setup.py build -c mingw32 install # use MinGW
-You should edit the file "%MinGWpath%\lib\gcc\%MinGWversion%\specs"
+You should edit the file "%MinGWpath%/lib/gcc/%MinGWversion%/specs"
 and change the entry that reads -lmsvcrt to -lmsvcr71 if using MinGW.
 
 See www.python.org/doc/current/inst/ for more information
