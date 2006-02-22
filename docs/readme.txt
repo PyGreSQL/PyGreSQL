@@ -98,10 +98,12 @@ You can also check the latest **pre-release version** at
   ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-beta.tgz
 A **Linux RPM** can be picked up from
   ftp://ftp.pygresql.org/pub/distrib/pygresql.i386.rpm
-A **NetBSD package** will be available at
-  ftp://ftp.pygresql.org/pub/distrib/pygresql.pkg.tgz
+A **NetBSD package** is available in their pkgsrc collection
+  ftp://ftp.netbsd.org/pub/NetBSD/packages/pkgsrc/databases/py-postgresql/README.html
+A **FreeBSD package** is available in their ports collection
+  http://www.freebsd.org/cgi/cvsweb.cgi/ports/databases/py-PyGreSQL/
 A **Win32 package** is available at
-  http://highqualdev.com
+  (please tell us if you know of a reliable site)
 
 
 Distribution files
