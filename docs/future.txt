@@ -13,6 +13,7 @@ To Do
 - The C module needs to be cleaned up and redundant code merged.
 - The fetch method should use real cursors.
 
+
 Proposed Patches
 ----------------
 
@@ -36,6 +37,3 @@ Wish List
 - The API documentation could be created with Epydoc.
 - Write a tutorial for beginners and advanced use.
 - More and better documented examples.
-- Provide more howtos for compiling and installing on
-  various platforms.
-- Provide binary packages, particularly a Windows installer.

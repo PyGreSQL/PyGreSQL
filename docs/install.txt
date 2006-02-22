@@ -34,6 +34,8 @@ the Python version you have installed.
 
 Install the package as usual on your system.
 
+Note that the documentation is currently only included in the source package.
+
 
 Installing from Source
 ======================
