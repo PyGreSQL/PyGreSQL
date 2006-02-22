@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.18 2006-02-17 20:51:45 cito Exp $
+# $Id: setup.py,v 1.19 2006-02-22 20:37:07 cito Exp $
 
 """Setup script for PyGreSQL version 3.8
 
@@ -17,7 +17,7 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-Tested with Python 2.4.2 and PostGreSQL 8.1.2.
+Tested with Python 2.4.2 and PostGreSQL 8.1.3.
 
 Use as follows:
 python setup.py build   # to build the module
