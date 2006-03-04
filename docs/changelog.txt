@@ -3,6 +3,10 @@ PyGreSQL ChangeLog
 ==================
 
 
+Version 3.8.1 (beta)
+--------------------
+- reverted code in clear() method that set date to current.
+
 Version 3.8 (2006-02-17)
 ------------------------
 - Installed new favicon.ico from Matthew Sporleder <mspo@mspo.com>
