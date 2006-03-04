@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.38 2006-02-11 21:13:32 cito Exp $
+# $Id: pg.py,v 1.39 2006-03-04 01:28:34 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -450,10 +450,10 @@ class DB:
 		"""
 
 		This method clears all the attributes to values determined by the types.
-		Numeric types are set to 0, Booleans are set to 'f', dates are set
-		to 'now()' and everything else is set to the empty string.
-		If the array argument is present, it is used as the array and any entries
-		matching attribute names are cleared with everything else left unchanged.
+		Numeric types are set to 0, Booleans are set to 'f', and everything
+        else is set to the empty string.  If the array argument is present,
+        it is used as the array and any entries matching attribute names are
+        cleared with everything else left unchanged.
 
 		"""
 		# At some point we will need a way to get defaults from a table.
@@ -467,8 +467,6 @@ class DB:
 				a[k] = 0
 			elif t == 'bool':
 				a[k] = 'f'
-			elif t == 'date':
-				a[k] = 'now()'
 			else:
 				a[k] = ''
 		return a
