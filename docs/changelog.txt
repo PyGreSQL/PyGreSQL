@@ -6,6 +6,7 @@ PyGreSQL ChangeLog
 Version 3.8.1 (beta)
 --------------------
 - reverted code in clear() method that set date to current.
+- Added code for backwards compatibility in OID munging code.
 
 Version 3.8 (2006-02-17)
 ------------------------
