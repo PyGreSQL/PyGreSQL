@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.39 2006-03-04 01:28:34 darcy Exp $
+# $Id: pg.py,v 1.40 2006-03-07 21:50:46 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -420,6 +420,13 @@ class DB:
 		# otherwise use the primary key.  Fail if neither.
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		foid = 'oid(%s)' % qcl # build mangled oid
+
+		# XXX this code is for backwards compatibility and will be
+		# XXX removed eventually
+		ofoid = 'oid_' + self._split_schema(cl)[-1]
+		if not a.has_key(foid) and a.has_key(ofoid):
+			a[foid] = a[ofoid]
+
 		if a.has_key(foid):
 			where = "oid=%s" % a[foid]
 		else:
@@ -451,9 +458,9 @@ class DB:
 
 		This method clears all the attributes to values determined by the types.
 		Numeric types are set to 0, Booleans are set to 'f', and everything
-        else is set to the empty string.  If the array argument is present,
-        it is used as the array and any entries matching attribute names are
-        cleared with everything else left unchanged.
+		else is set to the empty string.  If the array argument is present,
+		it is used as the array and any entries matching attribute names are
+		cleared with everything else left unchanged.
 
 		"""
 		# At some point we will need a way to get defaults from a table.
@@ -483,6 +490,13 @@ class DB:
 		# isn't referenced somewhere (or else PostgreSQL will).
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		foid = 'oid(%s)' % qcl # build mangled oid
+
+		# XXX this code is for backwards compatibility and will be
+		# XXX removed eventually
+		ofoid = 'oid_' + self._split_schema(cl)[-1]
+		if not a.has_key(foid) and a.has_key(ofoid):
+			a[foid] = a[ofoid]
+
 		q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[foid])
 		self._do_debug(q)
 		self.db.query(q)
