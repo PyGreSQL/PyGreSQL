@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.5 2006-02-12 19:40:43 cito Exp $
+# $Id: test_pg.py,v 1.6 2006-03-13 16:58:52 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -38,6 +38,23 @@ except:
 	except:
 		german = False
 
+def smart_ddl(conn, cmd):
+    """Execute DDL, but don't complain about minor things."""
+    try:
+        if cmd.startswith('create table '):
+            i = cmd.find(' as select ')
+            if i < 0:
+                i = len(cmd)
+            conn.query(cmd[:i] + ' with oids' + cmd[i:])
+        else:
+            conn.query(cmd)
+    except pg.ProgrammingError:
+        if cmd.startswith('drop table '):
+            pass
+        elif cmd.startswith('create table '):
+            conn.query(cmd)
+        else:
+            raise
 
 class TestAuxiliaryFunctions(unittest.TestCase):
 	"""Test the auxiliary functions external to the connection class."""
@@ -356,6 +373,9 @@ class TestConnectObject(unittest.TestCase):
 			'source', 'transaction']
 		connection_methods = [a for a in dir(self.connection)
 			if callable(eval("self.connection." + a))]
+		if 'transaction' not in connection_methods:
+			# this may be the case for PostgreSQL < 7.4
+			connection_methods.append('transaction')
 		self.assertEqual(methods, connection_methods)
 
 	def testAttributeDb(self):
@@ -628,6 +648,9 @@ class TestDBClassBasic(unittest.TestCase):
 			'transaction', 'tty', 'update', 'user']
 		db_attributes = [a for a in dir(self.db)
 			if not a.startswith('_')]
+		if 'transaction' not in db_attributes:
+			# this may be the case for PostgreSQL < 7.4
+			db_attributes.insert(-3, 'transaction')
 		self.assertEqual(attributes, db_attributes)
 
 	def testAttributeDb(self):
@@ -703,32 +726,20 @@ class TestDBClass(unittest.TestCase):
 		self.db.close()
 
 	def testPkey(self):
-		try:
-			self.db.query('drop table pkeytest0')
-		except pg.ProgrammingError:
-			pass
-		self.db.query("create table pkeytest0 ("
-			"a smallint) with oids")
-		try:
-			self.db.query('drop table pkeytest1')
-		except pg.ProgrammingError:
-			pass
-		self.db.query("create table pkeytest1 ("
-			"b smallint primary key) with oids")
-		try:
-			self.db.query('drop table pkeytest2')
-		except pg.ProgrammingError:
-			pass
-		self.db.query("create table pkeytest2 ("
-			"c smallint, d smallint primary key) with oids")
-		try:
-			self.db.query('drop table pkeytest3')
-		except pg.ProgrammingError:
-			pass
-		self.db.query("create table pkeytest3 ("
+		smart_ddl(self.db, 'drop table pkeytest0')
+		smart_ddl(self.db, "create table pkeytest0 ("
+			"a smallint)")
+		smart_ddl(self.db, 'drop table pkeytest1')
+		smart_ddl(self.db, "create table pkeytest1 ("
+			"b smallint primary key)")
+		smart_ddl(self.db, 'drop table pkeytest2')
+		smart_ddl(self.db, "create table pkeytest2 ("
+			"c smallint, d smallint primary key)")
+		smart_ddl(self.db, 'drop table pkeytest3')
+		smart_ddl(self.db, "create table pkeytest3 ("
 			"e smallint, f smallint, g smallint, "
 			"h smallint, i smallint, "
-			"primary key (f,h)) with oids")
+			"primary key (f,h))")
 		self.assertRaises(KeyError, self.db.pkey, "pkeytest0")
 		self.assertEqual(self.db.pkey("pkeytest1"), "b")
 		self.assertEqual(self.db.pkey("pkeytest2"), "d")
@@ -748,12 +759,9 @@ class TestDBClass(unittest.TestCase):
 			'averyveryveryveryveryveryverylongtablename',
 			'b0', 'b3', 'x', 'xx', 'xXx', 'y', 'z')
 		for t in tables:
-			try:
-				self.db.query('drop table ' + t)
-			except pg.ProgrammingError:
-				pass
-			self.db.query("create table %s with oids "
-				"as select 0" % t)
+			smart_ddl(self.db, 'drop table ' + t)
+			smart_ddl(self.db, "create table %s"
+				" as select 0" % t)
 		result3 = self.db.get_tables()
 		result2 = []
 		for t in result3:
@@ -793,17 +801,14 @@ class TestDBClass(unittest.TestCase):
 		self.assertRaises(pg.ProgrammingError,
 			self.db.get_attnames, 'has.too.many.dots')
 		for table in ('attnames_test_table', 'test table for attnames'):
-			try:
-				self.db.query('drop table "%s"' % table)
-			except pg.ProgrammingError:
-				pass
-			self.db.query('create table "%s" ('
+			smart_ddl(self.db, 'drop table "%s"' % table)
+			smart_ddl(self.db, 'create table "%s" ('
 				'a smallint, b integer, c bigint, '
 				'e decimal, f float, f2 double precision, '
 				'x smallint, y smallint, z smallint, '
 				'Normal_NaMe smallint, "Special Name" smallint, '
 				't text, u char(2), v varchar(2), '
-				'primary key (y, u)) with oids' % table)
+				'primary key (y, u))' % table)
 			attributes = self.db.get_attnames(table)
 			result = {'a': 'int', 'c': 'int', 'b': 'int',
 				'e': 'text', 'f': 'decimal', 'f2': 'decimal',
@@ -814,12 +819,9 @@ class TestDBClass(unittest.TestCase):
 
 	def testGet(self):
 		for table in ('get_test_table', 'test table for get'):
-			try:
-				self.db.query('drop table "%s"' % table)
-			except pg.ProgrammingError:
-				pass
-			self.db.query('create table "%s" ('
-				"n integer, t text) with oids" % table)
+			smart_ddl(self.db, 'drop table "%s"' % table)
+			smart_ddl(self.db, 'create table "%s" ('
+				"n integer, t text)" % table)
 			for n, t in enumerate('xyz'):
 				self.db.query('insert into "%s" values('
 					"%d, '%s')" % (table, n+1, t))
@@ -863,14 +865,11 @@ class TestDBClass(unittest.TestCase):
 
 	def testInsert(self):
 		for table in ('insert_test_table', 'test table for insert'):
-			try:
-				self.db.query('drop table "%s"' % table)
-			except pg.ProgrammingError:
-				pass
-			self.db.query('create table "%s" (' \
+			smart_ddl(self.db, 'drop table "%s"' % table)
+			smart_ddl(self.db, 'create table "%s" (' \
 				"i2 smallint, i4 integer, i8 bigint," \
 				"d decimal, f4 real, f8 double precision," \
-				"v4 varchar(4), c4 char(4), t text) with oids" % table)
+				"v4 varchar(4), c4 char(4), t text)" % table)
 			data = dict(i2 = 2**15 - 1,
 				i4 = int(2**31 - 1), i8 = long(2**31 - 1),
 				d = 1.0 + 1.0/32, f4 = 1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
@@ -890,12 +889,9 @@ class TestDBClass(unittest.TestCase):
 
 	def testUpdate(self):
 		for table in ('update_test_table', 'test table for update'):
-			try:
-				self.db.query('drop table "%s"' % table)
-			except pg.ProgrammingError:
-				pass
-			self.db.query('create table "%s" ('
-				"n integer, t text) with oids" % table)
+			smart_ddl(self.db, 'drop table "%s"' % table)
+			smart_ddl(self.db, 'create table "%s" ('
+				"n integer, t text)" % table)
 			for n, t in enumerate('xyz'):
 				self.db.query('insert into "%s" values('
 					"%d, '%s')" % (table, n+1, t))
@@ -910,30 +906,24 @@ class TestDBClass(unittest.TestCase):
 
 	def testClear(self):
 		for table in ('clear_test_table', 'test table for clear'):
-			try:
-				self.db.query('drop table "%s"' % table)
-			except pg.ProgrammingError:
-				pass
-			self.db.query('create table "%s" ('
-				"n integer, b boolean, d date, t text) with oids" % table)
+			smart_ddl(self.db, 'drop table "%s"' % table)
+			smart_ddl(self.db, 'create table "%s" ('
+				"n integer, b boolean, d date, t text)" % table)
 			r = self.db.clear(table)
-			result = {'n': 0, 'b': 'f', 'd': 'now()', 't': ''}
+			result = {'n': 0, 'b': 'f', 'd': '', 't': ''}
 			self.assertEqual(r, result)
 			r['a'] = r['n'] = 1
 			r['d'] = r['t'] = 'x'
 			r['oid'] = 1L
 			r = self.db.clear(table, r)
-			result = {'a': 1, 'n': 0, 'b': 'f', 'd': 'now()', 't': '', 'oid': 1L}
+			result = {'a': 1, 'n': 0, 'b': 'f', 'd': '', 't': '', 'oid': 1L}
 			self.assertEqual(r, result)
 
 	def testDelete(self):
 		for table in ('delete_test_table', 'test table for delete'):
-			try:
-				self.db.query('drop table "%s"' % table)
-			except pg.ProgrammingError:
-				pass
-			self.db.query('create table "%s" ('
-				"n integer, t text) with oids" % table)
+			smart_ddl(self.db, 'drop table "%s"' % table)
+			smart_ddl(self.db, 'create table "%s" ('
+				"n integer, t text)" % table)
 			for n, t in enumerate('xyz'):
 				self.db.query('insert into "%s" values('
 					"%d, '%s')" % (table, n+1, t))
@@ -982,8 +972,8 @@ class TestSchemas(unittest.TestCase):
 		self.assertEqual(r, result)
 		r = self.db.get_attnames("s4.t4")
 		self.assertEqual(r, result)
-		self.db.query("create table s3.t3m with oids "
-			"as select 1 as m")
+		smart_ddl(self.db, "create table s3.t3m"
+			" as select 1 as m")
 		result_m = {'oid': 'int', 'm': 'int'}
 		r = self.db.get_attnames("s3.t3m")
 		self.assertEqual(r, result_m)
@@ -1044,10 +1034,10 @@ class DBTestSuite(unittest.TestSuite):
 			+ " template=template0")
 		c.close()
 		c = pg.connect(dbname)
-		c.query("create table test ("
+		smart_ddl(c, "create table test ("
 			"i2 smallint, i4 integer, i8 bigint,"
 			"d decimal, f4 real, f8 double precision,"
-			"v4 varchar(4), c4 char(4), t text) with oids")
+			"v4 varchar(4), c4 char(4), t text)")
 		c.query("create view test_view as"
 			" select i4, v4 from test")
 		for num_schema in range(5):
@@ -1056,11 +1046,11 @@ class DBTestSuite(unittest.TestSuite):
 				c.query("create schema " + schema)
 			else:
 				schema = "public"
-			c.query("create table %s.t with oids as "
-				"select 1 as n, %d as d"
+			smart_ddl(c, "create table %s.t"
+				" as select 1 as n, %d as d"
 				% (schema, num_schema))
-			c.query("create table %s.t%d with oids as "
-				"select 1 as n, %d as d"
+			smart_ddl(c, "create table %s.t%d"
+				" as select 1 as n, %d as d"
 				% (schema, num_schema, num_schema))
 		c.close()
 
