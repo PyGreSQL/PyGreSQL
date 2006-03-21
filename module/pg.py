@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.41 2006-03-13 16:57:34 cito Exp $
+# $Id: pg.py,v 1.42 2006-03-21 19:57:45 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -305,8 +305,6 @@ class DB:
 				% cl).getresult():
 			if typ.startswith('bool'):
 				t[att] = 'bool'
-			elif typ.startswith('int'):
-				t[att] = 'int'
 			elif typ.startswith('oid'):
 				t[att] = 'int'
 			elif typ.startswith('float'):
@@ -317,6 +315,8 @@ class DB:
 				t[att] = 'date'
 			elif typ.startswith('interval'):
 				t[att] = 'date'
+			elif typ.startswith('int'):
+				t[att] = 'int'
 			elif typ.startswith('timestamp'):
 				t[att] = 'date'
 			elif typ.startswith('money'):

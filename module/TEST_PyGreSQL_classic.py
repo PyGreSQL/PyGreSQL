@@ -26,7 +26,8 @@ class utility_test(unittest.TestCase):
 							"(%s int PRIMARY KEY)" % (t, t))
             except: pass
 
-        try: db.query("CREATE TABLE _test_schema (_test int PRIMARY KEY)")
+        try: db.query("CREATE TABLE _test_schema "
+                       "(_test int PRIMARY KEY, _i interval)")
         except: pass
 
         try: db.query("CREATE VIEW _test_vschema AS "
@@ -44,12 +45,12 @@ class utility_test(unittest.TestCase):
         # see if they differentiate the table names properly
         self.assertEqual(
             db.get_attnames('_test_schema'),
-            {'_test': 'int', 'oid': 'int'}
+            {'_test': 'int', 'oid': 'int', '_i': 'date'}
         )
 
         self.assertEqual(
             db.get_attnames('public._test_schema'),
-            {'_test': 'int', 'oid': 'int'}
+            {'_test': 'int', 'oid': 'int', '_i': 'date'}
         )
 
         self.assertEqual(
