@@ -1,0 +1,6 @@
+#! /bin/sh
+
+echo "Making HTML docs..."
+
+python ./buildhtml.py --stylesheet docs.css --link-stylesheet --prune=docs/CVS docs
+

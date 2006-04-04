@@ -1,0 +1,166 @@
+=====================
+PyGreSQL Installation
+=====================
+
+.. sectnum::
+.. contents:: Contents
+
+
+General
+=======
+
+You must first have installed Python and PostgreSQL on your system.
+If you want to access remote database only, you don't need to install
+the full PostgreSQL server, but only the C interface (libpq).
+
+If you are using the DB-API 2.0 module you may consider installing
+`mxDateTime <http://www.egenix.com/files/python/mxDateTime.html>`_.
+Otherwise, the Python standard lib datetime module is used.
+
+PyGreSQL will be installed as three modules, a dynamic module called
+_pg.pyd, and two pure Python wrapper modules called pg.py and pgdb.py.
+All three files will be installed directly into the Python site-packages
+directory. To uninstall PyGreSQL, simply remove these three files again.
+
+
+Installing from a Binary Distribution
+=====================================
+
+This is the easiest way to install PyGreSQL.
+
+You can currently download PyGreSQL as Linux RPM, NetBSD package and Windows
+installer. Make sure the required Python version of the binary package matches
+the Python version you have installed.
+
+Install the package as usual on your system.
+
+
+Installing from Source
+======================
+
+If you want to install PyGreSQL from Source, or there is no binary
+package available for your platform, follow these instructions.
+
+Make sure the Python header files and PostgreSQL client and server header
+files are installed. These come usually with the "devel" packages on Unix
+systems and the installer executables on Windows systems.
+
+If you are using a precompiled PostgreSQL, you will also need the pg_config
+tool. This is usually also part of the "devel" package on Unix, and will be
+installed as part of the database server feature on Windows systems.
+
+Building and installing with Distutils
+--------------------------------------
+
+You can build and install PyGreSQL using Distutils.
+
+On a Windows system, you should have the Microsoft Visual C++ compiler and
+the Microsoft .NET Framework SDK installed and on your search path.
+If you want to use the free Microsoft Visual C++ Toolkit 2003 compiler,
+you need to `patch distutils <http://www.vrplumber.com/programming/mstoolkit/>`_.
+Alternatively, you can use `MinGW <http://www.mingw.org>`_.
+
+Download and unpack the PyGreSQL source tarball if you haven't already done so.
+
+Type the following commands to build and install PyGreSQL::
+
+    python setup.py build
+    python setup.py install
+
+If you are using MinGW on a Windows system, you should edit the file
+"%MinGWpath%/lib/gcc/%MinGWversion%/specs" and change the entry
+that reads ``-lmsvcrt`` to ``-lmsvcr71``. Then use the following command
+to build and install PyGreSQL::
+
+    python setup.py build -c mingw32 install
+
+Now you should be ready to use PyGreSQL.
+
+Compiling Manually
+------------------
+
+The source file for compiling the dynamic module is called pgmodule.c.
+You have two options. You can compile PyGreSQL as a stand-alone module
+or you can build it into the Python interpreter.
+
+Stand-Alone
+-----------
+
+* In the directory containing pgmodule.c, run the following command::
+
+    cc -fpic -shared -o _pg.so -I[pyInc] -I[pgInc] -L[pgLib] -lpq pgmodule.c
+
+  where::
+
+    [pyInc] = path of the Python include (usually Python.h)
+    [pgInc] = path of the PostgreSQL include (usually postgres.h)
+    [pgLib] = path of the PostgreSQL libraries (usually libpq.so or libpq.a)
+
+  Some options may be added to this line:
+    -DNO_DEF_VAR   no default variables support
+    -DNO_DIRECT    no direct access methods
+    -DNO_LARGE     no large object support
+    -DNO_PQSOCKET  if running an older PostgreSQL
+
+  On some systems you may need to include -lcrypt in the list of libraries
+  to make it compile.
+
+  Define NO_PQSOCKET if you are using a version of PostgreSQL before 6.4
+  that does not have the PQsocket function. The other options will be
+  described in the next sections.
+
+* Test the new module. Something like the following should work::
+
+    $ python
+
+    >>> import _pg
+    >>> db = _pg.connect('thilo','localhost')
+    >>> db.query("INSERT INTO test VALUES ('ping','pong')")
+    18304
+    >>> db.query("SELECT * FROM test")
+    eins|zwei
+    ----+----
+    ping|pong
+    (1 row)
+
+* Finally, move the _pg.so, pg.py, and pgdb.py to a directory in your
+  PYTHONPATH. A good place would be /usr/lib/python/site-packages if
+  your Python modules are in /usr/lib/python.
+
+Built-in to Python interpreter
+------------------------------
+
+* Find the directory where your 'Setup' file lives (usually ??/Modules) in
+  the Python source hierarchy and copy or symlink the 'pgmodule.c' file there.
+
+* Add the following line to your 'Setup' file::
+
+    _pg  pgmodule.c -I[pgInc] -L[pgLib] -lpq # -lcrypt # needed on some systems
+
+  where::
+
+    [pgInc] = path of PostgreSQL include (often /usr/local/include/python)
+    [pgLib] = path of the PostgreSQL libraries (often /usr/local/lib/python)
+
+  Some options may be added to this line:
+    -DNO_DEF_VAR   no default variables support
+    -DNO_DIRECT    no direct access methods
+    -DNO_LARGE     no large object support
+    -DNO_PQSOCKET  if running an older PostgreSQL
+
+  Define NO_PQSOCKET if you are using a version of PostgreSQL before 6.4
+  that does not have the PQsocket function. The other options will be
+  described in the next sections.
+
+* If you want a shared module, make sure that the "*shared*" keyword is
+  uncommented and add the above line below it. You used to need to install
+  your shared modules with ``make sharedinstall`` but this no longer seems
+  to be true.
+
+* Copy pg.py to the lib directory where the rest of your modules are. For
+  example, that's /usr/local/lib/Python on my system.
+
+* Rebuild Python from the root directory of the Python source hierarchy by
+  running ``make -f Makefile.pre.in boot' and 'make && make install``.
+
+* For more details read the documentation at the top of Makefile.pre.in
