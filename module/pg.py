@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.43 2006-04-13 17:48:05 darcy Exp $
+# $Id: pg.py,v 1.44 2006-04-13 17:56:04 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -344,18 +344,17 @@ class DB:
 		# To allow users to work with multiple tables,
 		# we munge the name when the key is "oid"
 		foid = 'oid(%s)' % qcl # build mangled name
-
-		# XXX this code is for backwards compatibility and will be
-		# XXX removed eventually
-		if not a.has_key(foid):
-			ofoid = 'oid_' + self._split_schema(cl)[-1]
-			if a.has_key(ofoid):
-				a[foid] = a[ofoid]
-
 		if keyname == None: # use the primary key by default
 			keyname = self.pkey(qcl)
 		fnames = self.get_attnames(qcl)
 		if isinstance(arg, DictType):
+			# XXX this code is for backwards compatibility and will be
+			# XXX removed eventually
+			if not arg.has_key(foid):
+				ofoid = 'oid_' + self._split_schema(cl)[-1]
+				if arg.has_key(ofoid):
+					arg[foid] = arg[ofoid]
+
 			k = arg[keyname == 'oid' and foid or keyname]
 		else:
 			k = arg
