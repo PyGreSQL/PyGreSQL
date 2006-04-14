@@ -68,6 +68,12 @@ class utility_test(unittest.TestCase):
         self.assertEqual(db.pkey('public._test_schema'), '_test')
         self.assertEqual(db.pkey('_test1._test_schema'), '_test1')
 
+        self.assertEqual(db.pkey('_test_schema',
+                {'test1': 'a', 'test2.test3': 'b'}),
+                {'public.test1': 'a', 'test2.test3': 'b'})
+        self.assertEqual(db.pkey('test1'), 'a')
+        self.assertEqual(db.pkey('public.test1'), 'a')
+
     def test_get(self):
         try: db.query("INSERT INTO _test_schema VALUES (1234)")
         except: pass # OK if it already exists

@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.44 2006-04-13 17:56:04 darcy Exp $
+# $Id: pg.py,v 1.45 2006-04-14 16:13:22 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -215,16 +215,26 @@ class DB:
 		then replace the __pkeys dictionary with it.
 
 		"""
-		# Get all the primary keys at once
+		# First see if the caller is supplying a dictionary
 		if isinstance(newpkey, DictType):
-			self.__pkeys = newpkey
-			return newpkey
+			# make sure that we have a namespace
+			self.__pkeys = {}
+			for x in newpkey.keys():
+				if x.find('.') == -1:
+					self.__pkeys['public.' + x] = newpkey[x]
+				else:
+					self.__pkeys[x] = newpkey[x]
+
+			return self.__pkeys
+
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		if newpkey:
 			self.__pkeys[qcl] = newpkey
 			return newpkey
+
+		# Get all the primary keys at once
 		if self.__pkeys == {} or not self.__pkeys.has_key(qcl):
-			# if not found, determine pkey again in case it was added after we started
+			# if not found, check again in case it was added after we started
 			for r in self.db.query("SELECT pg_namespace.nspname"
 				",pg_class.relname,pg_attribute.attname FROM pg_class"
 				" JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace"
