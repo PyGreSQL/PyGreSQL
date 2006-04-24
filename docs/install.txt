@@ -170,7 +170,8 @@ Built-in to Python interpreter
     PSINC = path to the PostgreSQL server include files (see above)
     PGLIB = path to the PostgreSQL object code libraries (see above)
 
-  Some options may be added to this line:
+  Some options may be added to this line::
+
     -DNO_DEF_VAR   no default variables support
     -DNO_DIRECT    no direct access methods
     -DNO_LARGE     no large object support
