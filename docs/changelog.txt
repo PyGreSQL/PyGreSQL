@@ -5,10 +5,12 @@ PyGreSQL ChangeLog
 
 Version 3.8.1 (beta)
 --------------------
+- Added the functions escape_string() and escape/unescape_bytea()
+  (as suggested by Charlie Dyson and Kavous Bojnourdi a long time ago).
 - Reverted code in clear() method that set date to current.
 - Added code for backwards compatibility in OID munging code.
 - Reorder attnames tests so that "interval" is checked for before "int."
-- If caller supplies key dictionary, make sure that all has a namespace
+- If caller supplies key dictionary, make sure that all has a namespace.
 
 Version 3.8 (2006-02-17)
 ------------------------

@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.6 2006-03-13 16:58:52 cito Exp $
+# $Id: test_pg.py,v 1.7 2006-05-07 12:37:23 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -39,22 +39,22 @@ except:
 		german = False
 
 def smart_ddl(conn, cmd):
-    """Execute DDL, but don't complain about minor things."""
-    try:
-        if cmd.startswith('create table '):
-            i = cmd.find(' as select ')
-            if i < 0:
-                i = len(cmd)
-            conn.query(cmd[:i] + ' with oids' + cmd[i:])
-        else:
-            conn.query(cmd)
-    except pg.ProgrammingError:
-        if cmd.startswith('drop table '):
-            pass
-        elif cmd.startswith('create table '):
-            conn.query(cmd)
-        else:
-            raise
+	"""Execute DDL, but don't complain about minor things."""
+	try:
+		if cmd.startswith('create table '):
+			i = cmd.find(' as select ')
+			if i < 0:
+				i = len(cmd)
+			conn.query(cmd[:i] + ' with oids' + cmd[i:])
+		else:
+			conn.query(cmd)
+	except pg.ProgrammingError:
+		if cmd.startswith('drop table '):
+			pass
+		elif cmd.startswith('create table '):
+			conn.query(cmd)
+		else:
+			raise
 
 class TestAuxiliaryFunctions(unittest.TestCase):
 	"""Test the auxiliary functions external to the connection class."""
@@ -287,6 +287,15 @@ class TestHasConnect(unittest.TestCase):
 	def testhasConnect(self):
 		self.assert_(callable(pg.connect))
 
+	def testhasEscapeString(self):
+		self.assert_(callable(pg.escape_string))
+
+	def testhasEscapeBytea(self):
+		self.assert_(callable(pg.escape_bytea))
+
+	def testhasUnescapeBytea(self):
+		self.assert_(callable(pg.unescape_bytea))
+
 	def testDefHost(self):
 		d0 = pg.get_defhost()
 		d1 = 'pgtesthost'
@@ -330,6 +339,26 @@ class TestHasConnect(unittest.TestCase):
 		self.assertEqual(pg.get_defbase(), d1)
 		pg.set_defbase(d0)
 		self.assertEqual(pg.get_defbase(), d0)
+
+
+class TestEscapeFunctions(unittest.TestCase):
+	""""Test pg escape and unescape functions."""
+
+	def testEscapeString(self):
+		self.assertEqual(pg.escape_string('hello'), 'hello')
+		self.assertEqual(pg.escape_string(
+			r"It's fine to have a \ inside."),
+			r"It''s fine to have a \\ inside.")
+
+	def testEscapeBytea(self):
+		self.assertEqual(pg.escape_bytea('hello'), 'hello')
+		self.assertEqual(pg.escape_bytea(
+			'O\x00ps\xff!'), r'O\\000ps\\377!')
+
+	def testUnescapeBytea(self):
+		self.assertEqual(pg.unescape_bytea('hello'), 'hello')
+		self.assertEqual(pg.unescape_bytea(
+			r'O\000ps\377!'), 'O\x00ps\xff!')
 
 
 class TestCanConnect(unittest.TestCase):
@@ -639,13 +668,15 @@ class TestDBClassBasic(unittest.TestCase):
 	def testAllDBAttributes(self):
 		attributes = ['cancel', 'clear', 'close',
 			'db', 'dbname', 'debug', 'delete', 'endcopy',
-			'error', 'fileno', 'get', 'get_attnames',
+			'error', 'escape_bytea', 'escape_string',
+			'fileno', 'get', 'get_attnames',
 			'get_databases', 'get_relations', 'get_tables',
 			'getline', 'getlo', 'getnotify', 'host',
 			'insert', 'inserttable', 'locreate', 'loimport',
 			'options', 'pkey', 'port', 'putline', 'query',
 			'reopen', 'reset', 'source', 'status',
-			'transaction', 'tty', 'update', 'user']
+			'transaction', 'tty', 'unescape_bytea',
+			'update', 'user']
 		db_attributes = [a for a in dir(self.db)
 			if not a.startswith('_')]
 		if 'transaction' not in db_attributes:
@@ -694,6 +725,15 @@ class TestDBClassBasic(unittest.TestCase):
 		self.assertEqual(self.db.user, def_user)
 		self.assertEqual(self.db.db.user, def_user)
 
+	def testMethodEscapeString(self):
+		self.assertEqual(self.db.escape_string('hello'), 'hello')
+
+	def testMethodEscapeBytea(self):
+		self.assertEqual(self.db.escape_bytea('hello'), 'hello')
+
+	def testMethodUnescapeBytea(self):
+		self.assertEqual(self.db.unescape_bytea('hello'), 'hello')
+
 	def testMethodQuery(self):
 		self.db.query("select 1+1")
 
@@ -711,7 +751,6 @@ class TestDBClassBasic(unittest.TestCase):
 		self.assertRaises(pg.InternalError, self.db.query, 'select 1')
 		self.db = pg.DB(self.dbname)
 
-
 class TestDBClass(unittest.TestCase):
 	""""Test the methods of the DB class wrapped pg connection."""
 
@@ -724,6 +763,19 @@ class TestDBClass(unittest.TestCase):
 
 	def tearDown(self):
 		self.db.close()
+
+	def testEscapeString(self):
+		self.assertEqual(self.db.escape_string(
+			r"It's fine to have a \ inside."),
+			r"It''s fine to have a \\ inside.")
+
+	def testEscapeBytea(self):
+		self.assertEqual(self.db.escape_bytea(
+			'O\x00ps\xff!'), r'O\\000ps\\377!')
+
+	def testUnescapeBytea(self):
+		self.assertEqual(self.db.unescape_bytea(
+			r'O\000ps\377!'), 'O\x00ps\xff!')
 
 	def testPkey(self):
 		smart_ddl(self.db, 'drop table pkeytest0')
@@ -941,6 +993,21 @@ class TestDBClass(unittest.TestCase):
 			s = self.db.delete(table, r)
 			self.assertRaises(pg.DatabaseError, self.db.get, table, 2, 'n')
 
+	def testBytea(self):
+		smart_ddl(self.db, 'drop table bytea_test')
+		smart_ddl(self.db, 'create table bytea_test ('
+			'data bytea)')
+		s = "It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
+		r = self.db.escape_bytea(s)
+		self.db.query('insert into bytea_test values('
+			"'%s')" % r)
+		r = self.db.query('select * from bytea_test').getresult()
+		self.assert_(len(r) == 1)
+		r = r[0]
+		self.assert_(len(r) == 1)
+		r = r[0]
+		r = self.db.unescape_bytea(r)
+		self.assertEqual(r, s)
 
 class TestSchemas(unittest.TestCase):
 	""""Test correct handling of schemas (namespaces)."""
@@ -1075,6 +1142,7 @@ if __name__ == '__main__':
 	TestSuite1 = unittest.TestSuite((
 		unittest.makeSuite(TestAuxiliaryFunctions),
 		unittest.makeSuite(TestHasConnect),
+		unittest.makeSuite(TestEscapeFunctions),
 		unittest.makeSuite(TestCanConnect),
 		unittest.makeSuite(TestConnectObject),
 		unittest.makeSuite(TestSimpleQueries),

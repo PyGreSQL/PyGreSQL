@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.45 2006-04-14 16:13:22 darcy Exp $
+# $Id: pg.py,v 1.46 2006-05-07 12:37:23 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -119,6 +119,10 @@ class DB:
 			return getattr(self.db, name)
 		else:
 			raise InternalError, 'Connection is not valid'
+
+	# For convenience, define some module functions as static methods also:
+	escape_string, escape_bytea, unescape_bytea = map(staticmethod,
+		(escape_string, escape_bytea, unescape_bytea))
 
 	def _do_debug(self, s):
 		"""Print a debug message."""

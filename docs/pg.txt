@@ -81,7 +81,7 @@ Exceptions raised:
   (plus all exceptions relative to object allocation)
 
 Description:
-  This method opens a connection to a specified database on a given
+  This function opens a connection to a specified database on a given
   PostgreSQL server. You can use keywords here, as described in the
   Python tutorial. The names of the keywords are the name of the
   parameters given in the syntax line. For a precise description
@@ -93,7 +93,6 @@ Examples::
 
   con1 = pg.connect('testdb', 'myhost', 5432, None, None, 'bob', None)
   con2 = pg.connect(dbname='testdb', host='localhost', user='bob')
-
 
 get_defhost, set_defhost - default server host [DV]
 ---------------------------------------------------
@@ -283,6 +282,91 @@ Description:
   `None` is supplied as parameter, environment variables will be used in
   future connections. It returns the previous setting for default host.
 
+escape_string - escape a string for use within SQL
+--------------------------------------------------
+Syntax::
+
+  escape_string(string)
+
+Parameters:
+  :string: the string that is to be escaped
+
+Return type:
+  :str: the escaped string
+
+Exceptions raised:
+  :TypeError: bad argument type, or too many arguments
+
+Description:
+  This function escapes a string for use within an SQL command.
+  This is useful when inserting data values as literal constants
+  in SQL commands. Certain characters (such as quotes and backslashes)
+  must be escaped to prevent them from being interpreted specially
+  by the SQL parser. `escape_string` performs this operation.
+
+.. caution:: It is especially important to do proper escaping when
+  handling strings that were received from an untrustworthy source.
+  Otherwise there is a security risk: you are vulnerable to "SQL injection"
+  attacks wherein unwanted SQL commands are fed to your database.
+
+Example::
+
+  name = raw_input("Name? ")
+  phone = con.query("select phone from employees"
+    " where name='%s'" % escape_string(name)).getresult()
+
+escape_bytea - escape binary data for use within SQL as type `bytea`
+--------------------------------------------------------------------
+Syntax::
+
+  escape_bytea(datastring)
+
+Parameters:
+  :datastring: string containing the binary data that is to be escaped
+
+Return type:
+  :str: the escaped string
+
+Exceptions raised:
+  :TypeError: bad argument type, or too many arguments
+
+Description:
+  Escapes binary data for use within an SQL command with the type `bytea`.
+  As with `escape_string`, this is only used when inserting data directly
+  into an SQL command string.
+
+Example::
+
+  picture = file('garfield.gif', 'rb').read()
+  con.query("update pictures set img='%s' where name='Garfield'"
+    % escape_bytea(picture))
+
+unescape_bytea -- unescape `bytea` data that has been retrieved as text
+-----------------------------------------------------------------------
+Syntax::
+
+  unescape_bytea(string)
+
+Parameters:
+  :datastring: the `bytea` data string that has been retrieved as text
+
+Return type:
+  :str: string containing the binary data
+
+Exceptions raised:
+  :TypeError: bad argument type, or too many arguments
+
+Description:
+  Converts an escaped string representation of binary data into binary
+  data - the reverse of `escape_bytea`. This is needed when retrieving
+  `bytea` data with the `getresult()` or `dictresult()` method.
+
+Example::
+
+  picture = unescape_bytea(con.query(
+    "select img from pictures where name='Garfield'").getresult[0][0])
+  file('garfield.gif', 'wb').write(picture)
+
 Module constants
 ----------------
 Some constants are defined in the module dictionary.
@@ -341,7 +425,7 @@ Description:
   inserted row. If it is otherwise a query that does not return a result
   (i.e., is not a some kind of SELECT statement), it returns `None`.
   Otherwise, it returns a `pgqueryobject` that can be accessed via the
-  getresult() or dictresult() method or simply printed.
+  `getresult()` or `dictresult()` method or simply printed.
 
 reset - resets the connection
 -----------------------------
@@ -817,6 +901,51 @@ Description:
   This method deletes the row from a table. It deletes based on the OID
   as munged as described above.
 
+escape_string - escape a string for use within SQL
+--------------------------------------------------
+Syntax::
+
+  escape_string(string)
+
+Parameters:
+  :string: the string that is to be escaped
+
+Return type:
+  :str: the escaped string
+
+Description:
+  See the module function with the same name.
+
+escape_bytea - escape binary data for use within SQL as type `bytea`
+--------------------------------------------------------------------
+Syntax::
+
+  escape_bytea(datastring)
+
+Parameters:
+  :datastring: string containing the binary data that is to be escaped
+
+Return type:
+  :str: the escaped string
+
+Description:
+  See the module function with the same name.
+
+unescape_bytea -- unescape `bytea` data that has been retrieved as text
+-----------------------------------------------------------------------
+Syntax::
+
+  unescape_bytea(string)
+
+Parameters:
+  :datastring: the `bytea` data string that has been retrieved as text
+
+Return type:
+  :str: string containing the binary data
+
+Description:
+  See the module function with the same name.
+
 
 pgqueryobject methods
 =====================
@@ -1162,4 +1291,3 @@ some information about it. These attributes are:
   You should provide some locking to be able if you want to check this.
   The `oid` attribute is very interesting because it allow you reuse the OID
   later, creating the `pglarge` object with a `pgobject` getlo() method call.
-

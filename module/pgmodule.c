@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.69 2006-02-12 15:44:29 cito Exp $
+ * $Id: pgmodule.c,v 1.70 2006-05-07 12:37:23 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -281,7 +281,7 @@ print_result(FILE *fout, const PGresult *res)
 		}
 		fputc('\n', fout);
 		for (i = 0; i < m; i++)
-        {
+		{
 			for (j = 0; j < n; j++)
 			{
 				char *s = fields[i * n + j];
@@ -292,7 +292,7 @@ print_result(FILE *fout, const PGresult *res)
 					free(s);
 			}
 			fputc('\n', fout);
-        }
+		}
 		free(fields);
 		fprintf(fout, "(%d row%s)\n\n", m, m == 1 ? "" : "s");
 		free(fieldMax);
@@ -2937,6 +2937,80 @@ staticforward PyTypeObject PgQueryType = {
 
 /* MODULE FUNCTIONS */
 
+/* escape string */
+static char escape_string__doc__[] =
+"escape_string(str) -- escape a string for use within SQL.";
+
+static PyObject *
+escape_string(PyObject *self, PyObject *args) {
+	char *from; /* our string argument */
+	char *to=NULL; /* the result */
+	int from_length; /* length of string */
+	int to_length; /* length of result */
+	PyObject *ret; /* string object to return */
+
+	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+		return NULL;
+    to_length = 2*from_length + 1;
+    if (to_length < from_length) { /* overflow */
+        to_length = from_length;
+        from_length = (from_length - 1)/2;
+    }
+	to=(char *)malloc(to_length);
+	to_length = (int)PQescapeString(to, from, (size_t)from_length);
+	ret = Py_BuildValue("s#", to, to_length);
+    if (to)
+        free(to);
+	if (!ret) /* pass on exception */
+        return NULL;
+	return ret;
+}
+
+/* escape bytea */
+static char escape_bytea__doc__[] =
+"escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
+
+static PyObject *
+escape_bytea(PyObject *self, PyObject *args) {
+	unsigned char *from; /* our string argument */
+	unsigned char *to; /* the result */
+	int from_length; /* length of string */
+	size_t to_length; /* length of result */
+	PyObject *ret; /* string object to return */
+
+	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+		return NULL;
+	to = PQescapeBytea(from, (int)from_length, &to_length);
+	ret = Py_BuildValue("s", to);
+    if (to)
+        PQfreemem(to);
+	if (!ret) /* pass on exception */
+        return NULL;
+	return ret;
+}
+
+/* unescape bytea */
+static char unescape_bytea__doc__[] =
+"unescape_bytea(str) -- unescape bytea data that has been retrieved as text.";
+
+static PyObject
+*unescape_bytea(PyObject *self, PyObject *args) {
+	unsigned char *from; /* our string argument */
+	unsigned char *to; /* the result */
+	size_t to_length; /* length of result string */
+	PyObject *ret; /* string object to return */
+
+	if (!PyArg_ParseTuple(args, "s", &from))
+		return NULL;
+	to = PQunescapeBytea(from, &to_length);
+	ret = Py_BuildValue("s#", to, (int)to_length);
+    if (to)
+        PQfreemem(to);
+	if (!ret) /* pass on exception */
+        return NULL;
+	return ret;
+}
+
 #ifdef DEFAULT_VARS
 
 /* gets default host */
@@ -3286,6 +3360,12 @@ pgsetdefport(PyObject * self, PyObject * args)
 static struct PyMethodDef pg_methods[] = {
 	{"connect", (PyCFunction) pgconnect, METH_VARARGS|METH_KEYWORDS,
 			connect__doc__},
+	{"escape_string", (PyCFunction) escape_string, METH_VARARGS,
+			escape_string__doc__},
+	{"escape_bytea", (PyCFunction) escape_bytea, METH_VARARGS,
+			escape_bytea__doc__},
+	{"unescape_bytea", (PyCFunction) unescape_bytea, METH_VARARGS,
+			unescape_bytea__doc__},
 
 #ifdef DEFAULT_VARS
 	{"get_defhost", pggetdefhost, METH_VARARGS, getdefhost__doc__},
