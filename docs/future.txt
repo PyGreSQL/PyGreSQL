@@ -6,6 +6,8 @@ PyGreSQL future directions
 To Do
 -----
 
+- Support PQescapeStringConn and PQescapeByteaConn
+  (see http://www.postgresql.org/docs/techdocs.49)
 - The DB-API module needs docstrings and external documentation.
 - Create separate unit tests for _pg, pg and pgdb.
 - The large object and direct access functions need much more attention.
