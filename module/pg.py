@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.46 2006-05-07 12:37:23 cito Exp $
+# $Id: pg.py,v 1.47 2006-05-28 19:18:50 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -42,7 +42,7 @@ def _quote(d, t):
 		return ("'f'", "'t'")[d]
 	if t in ('date', 'inet', 'cidr'):
 		if d == '': return 'NULL'
-	return "'%s'" % str(d).replace('\\','\\\\').replace('\'','\\\'')
+	return "'%s'" % str(d).replace("\\", "\\\\").replace("'", "''")
 
 def _is_quoted(s):
 	"""Check whether this string is a quoted identifier."""

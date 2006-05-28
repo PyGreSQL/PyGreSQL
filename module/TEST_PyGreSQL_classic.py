@@ -117,6 +117,8 @@ class utility_test(unittest.TestCase):
         self.assertEqual(_quote('inet', 'inet'), "'inet'")
         self.assertEqual(_quote('cidr', 'cidr'), "'cidr'")
         self.assertEqual(_quote('', 'text'), "''")
+        self.assertEqual(_quote("\\", 'text'), "'\\\\'")
+        self.assertEqual(_quote("'", 'text'), "''''")
 
 if __name__ == '__main__':
     unittest.main()

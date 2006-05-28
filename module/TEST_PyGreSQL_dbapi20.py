@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.3 2005-01-08 14:46:24 darcy Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.4 2006-05-28 19:18:50 cito Exp $
 
 import dbapi20
 import unittest
@@ -22,7 +22,7 @@ class test_Psycopg(dbapi20.DatabaseAPI20Test):
     def setUp(self):
         # Call superclass setUp In case this does something in the
         # future
-        dbapi20.DatabaseAPI20Test.setUp(self) 
+        dbapi20.DatabaseAPI20Test.setUp(self)
 
         con = self._connect()
         con.close()

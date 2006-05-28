@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.7 2006-05-07 12:37:23 cito Exp $
+# $Id: test_pg.py,v 1.8 2006-05-28 19:18:50 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -120,9 +120,9 @@ class TestAuxiliaryFunctions(unittest.TestCase):
 		self.assertEqual(f(123, 'text'), "'123'")
 		self.assertEqual(f(1.23, 'text'), "'1.23'")
 		self.assertEqual(f('abc', 'text'), "'abc'")
-		self.assertEqual(f("ab'c", 'text'), "'ab\\'c'")
+		self.assertEqual(f("ab'c", 'text'), "'ab''c'")
 		self.assertEqual(f('ab\\c', 'text'), "'ab\\\\c'")
-		self.assertEqual(f("a\\b'c", 'text'), "'a\\\\b\\'c'")
+		self.assertEqual(f("a\\b'c", 'text'), "'a\\\\b''c'")
 
 	def testIsQuoted(self):
 		f = pg._is_quoted
@@ -681,7 +681,7 @@ class TestDBClassBasic(unittest.TestCase):
 			if not a.startswith('_')]
 		if 'transaction' not in db_attributes:
 			# this may be the case for PostgreSQL < 7.4
-			db_attributes.insert(-3, 'transaction')
+			db_attributes.insert(-4, 'transaction')
 		self.assertEqual(attributes, db_attributes)
 
 	def testAttributeDb(self):

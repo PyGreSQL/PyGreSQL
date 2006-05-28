@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.31 2006-01-22 12:12:57 darcy Exp $
+# $Id: pgdb.py,v 1.32 2006-05-28 19:18:50 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -269,8 +269,7 @@ def _quote(x):
 		x = x.encode( 'utf-8' )
 
 	if isinstance(x, types.StringType):
-		x = "'" + string.replace(
-			string.replace(str(x), '\\', '\\\\'), "'", "''") + "'"
+		x = "'%s'" % str(x).replace("\\", "\\\\").replace("'", "''")
 	elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
 		pass
 	elif x is None:
