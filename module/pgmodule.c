@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.70 2006-05-07 12:37:23 cito Exp $
+ * $Id: pgmodule.c,v 1.71 2006-05-28 19:19:56 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -2956,7 +2956,7 @@ escape_string(PyObject *self, PyObject *args) {
         to_length = from_length;
         from_length = (from_length - 1)/2;
     }
-	to=(char *)malloc(to_length);
+	to = (char *)malloc(to_length);
 	to_length = (int)PQescapeString(to, from, (size_t)from_length);
 	ret = Py_BuildValue("s#", to, to_length);
     if (to)
@@ -2983,7 +2983,7 @@ escape_bytea(PyObject *self, PyObject *args) {
 	to = PQescapeBytea(from, (int)from_length, &to_length);
 	ret = Py_BuildValue("s", to);
     if (to)
-        PQfreemem(to);
+        PQfreemem((void *)to);
 	if (!ret) /* pass on exception */
         return NULL;
 	return ret;
@@ -3005,7 +3005,7 @@ static PyObject
 	to = PQunescapeBytea(from, &to_length);
 	ret = Py_BuildValue("s#", to, (int)to_length);
     if (to)
-        PQfreemem(to);
+        PQfreemem((void *)to);
 	if (!ret) /* pass on exception */
         return NULL;
 	return ret;
