@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.32 2006-05-28 19:18:50 cito Exp $
+# $Id: pgdb.py,v 1.33 2006-05-28 19:24:43 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -63,7 +63,6 @@ Basic usage:
 
 """
 
-import string
 import types
 import time
 
@@ -113,8 +112,8 @@ class pgdbTypeCache:
 		elif typ == FLOAT:
 			value = float(value)
 		elif typ == MONEY:
-			value = string.replace(value, "$", "")
-			value = string.replace(value, ",", "")
+			value = value.replace("$", "")
+			value = value.replace(",", "")
 			value = float(value)
 		elif typ == DATETIME:
 			# format may differ ... we'll give string
@@ -136,7 +135,7 @@ class pgdbTypeCache:
 			# have to be prepended by the caller.
 			res = (
 				res[0],
-				None, string.atoi(res[1]),
+				None, int(res[1]),
 				None, None, None
 			)
 			self.__type_cache[oid] = res
@@ -275,7 +274,7 @@ def _quote(x):
 	elif x is None:
 		x = 'NULL'
 	elif isinstance(x, (types.ListType, types.TupleType)):
-		x = '(%s)' % string.join(map(lambda x: str(_quote(x)), x), ',')
+		x = '(%s)' % ','.join(map(lambda x: str(_quote(x)), x))
 	elif hasattr(x, '__pg_repr__'):
 		x = x.__pg_repr__()
 	else:
@@ -346,7 +345,7 @@ def connect(dsn = None,
 	dbopt = ""
 	dbtty = ""
 	try:
-		params = string.split(dsn, ":")
+		params = dsn.split(":")
 		dbhost = params[0]
 		dbbase = params[1]
 		dbuser = params[2]
@@ -365,7 +364,7 @@ def connect(dsn = None,
 		dbbase = database
 	if host != None:
 		try:
-			params = string.split(host, ":")
+			params = host.split(":")
 			dbhost = params[0]
 			dbport = int(params[1])
 		except:
