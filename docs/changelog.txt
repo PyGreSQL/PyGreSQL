@@ -4,7 +4,9 @@ PyGreSQL ChangeLog
 
 
 Version 3.8.1 (2006-06-05)
---------------------
+--------------------------
+- Use string methods instead of deprecated string functions.
+- Only use SQL-standard way of escaping quotes.
 - Added the functions escape_string() and escape/unescape_bytea()
   (as suggested by Charlie Dyson and Kavous Bojnourdi a long time ago).
 - Reverted code in clear() method that set date to current.
