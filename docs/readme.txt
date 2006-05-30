@@ -2,9 +2,9 @@
 PyGreSQL - Python interface for PostgreSQL
 ==========================================
 
---------------------
-PyGreSQL version 3.8
---------------------
+----------------------
+PyGreSQL version 3.8.1
+----------------------
 
 .. meta::
    :description: PyGreSQL - Python interface for PostgreSQL
@@ -73,7 +73,7 @@ It is based on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.f
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL 3.8 needs PostgreSQL 7.1.3 and Python 2.1 or above.
+The current version PyGreSQL 3.8.1 needs PostgreSQL 7.1.3 and Python 2.1 or above.
 
 
 Where to get ... ?
@@ -103,11 +103,11 @@ A **NetBSD package** is available in their pkgsrc collection
 A **FreeBSD package** is available in their ports collection
   http://www.freebsd.org/cgi/cvsweb.cgi/ports/databases/py-PyGreSQL/
 A **Win32 package** is available at
-  ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.win32-py2.2.exe
+  ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.1.win32-py2.2.exe
 
-  ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.win32-py2.3.exe
+  ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.1.win32-py2.3.exe
 
-  ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.win32-py2.4.exe
+  ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.1.win32-py2.4.exe
 
 
 Distribution files

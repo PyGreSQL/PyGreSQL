@@ -1,6 +1,6 @@
 #! /bin/sh
 
-BETA=YES
+BETA=NO
 VERSION=3.8.1
 
 # small safety test
@@ -21,7 +21,6 @@ else
 fi
 
 DISTDIR=/usr/ftp/pub/distrib
-DISTDIR=.
 TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
 

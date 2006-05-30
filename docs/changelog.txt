@@ -3,7 +3,7 @@ PyGreSQL ChangeLog
 ==================
 
 
-Version 3.8.1 (beta)
+Version 3.8.1 (2006-06-05)
 --------------------
 - Added the functions escape_string() and escape/unescape_bytea()
   (as suggested by Charlie Dyson and Kavous Bojnourdi a long time ago).

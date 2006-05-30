@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.20 2006-02-23 11:20:35 cito Exp $
+# $Id: setup.py,v 1.21 2006-05-30 18:16:00 darcy Exp $
 
-"""Setup script for PyGreSQL version 3.8
+"""Setup script for PyGreSQL version 3.8.1
 
 Authors and history:
 * PyGreSQL written 1997 by D'Arcy J.M. Cain <darcy@druid.net>
@@ -96,7 +96,7 @@ if sys.platform == "win32":
 
 setup(
 	name = "PyGreSQL",
-	version = "3.8",
+	version = "3.8.1",
 	description = "Python PostgreSQL Interfaces",
 	author = "D'Arcy J. M. Cain",
 	author_email = "darcy@PyGreSQL.org",
