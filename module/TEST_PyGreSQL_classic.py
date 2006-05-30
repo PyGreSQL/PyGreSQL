@@ -15,15 +15,17 @@ except: pass
 db = DB(dbname, dbhost, dbport)
 db.query("SET DATESTYLE TO 'ISO'")
 db.query("SET TIME ZONE 'EST5EDT'")
+db.query("SET DEFAULT_WITH_OIDS=TRUE")
 
 class utility_test(unittest.TestCase):
+
     def setUp(self):
         # create test tables if they don't exist
         for t in ('_test1', '_test2'):
             try: db.query("CREATE SCHEMA " + t)
             except: pass
             try: db.query("CREATE TABLE %s._test_schema "
-							"(%s int PRIMARY KEY)" % (t, t))
+                "(%s int PRIMARY KEY)" % (t, t))
             except: pass
 
         try: db.query("CREATE TABLE _test_schema "
@@ -31,7 +33,7 @@ class utility_test(unittest.TestCase):
         except: pass
 
         try: db.query("CREATE VIEW _test_vschema AS "
-			"SELECT _test, 'abc'::text AS _test2  FROM _test_schema")
+            "SELECT _test, 'abc'::text AS _test2  FROM _test_schema")
         except: pass
 
     def test_invalidname(self):
