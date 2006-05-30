@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.47 2006-05-28 19:18:50 cito Exp $
+# $Id: pg.py,v 1.48 2006-05-30 23:43:30 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -255,7 +255,7 @@ class DB:
 
 	def get_databases(self):
 		"""Get list of databases in the system."""
-		return [s for s, in
+		return [s[0] for s in
 			self.db.query('SELECT datname FROM pg_database').getresult()]
 
 	def get_relations(self, kinds = None):
