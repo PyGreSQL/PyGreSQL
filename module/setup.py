@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.21 2006-05-30 18:16:00 darcy Exp $
+# $Id: setup.py,v 1.22 2006-05-31 00:04:01 cito Exp $
 
 """Setup script for PyGreSQL version 3.8.1
 
@@ -17,7 +17,7 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-Tested with Python 2.4.2 and PostGreSQL 8.1.3. Older version should work
+Tested with Python 2.4.3 and PostGreSQL 8.1.4. Older version should work
 as well, but you will need at least Python 2.1 and PostgreSQL 7.1.3.
 
 Use as follows:
