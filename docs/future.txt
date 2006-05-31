@@ -9,6 +9,8 @@ To Do
 - Support PQescapeStringConn and PQescapeByteaConn
   (see also http://www.postgresql.org/docs/techdocs.49)
 - Use PQescapeStringConn in the _quote() function of pg and pgdb.
+- Support composite primary keys
+  (see http://mailman.vex.net/pipermail/pygresql/2006-May/001688.html)
 - The DB-API module needs docstrings and external documentation.
 - Create separate unit tests for _pg, pg and pgdb.
 - The large object and direct access functions need much more attention.
