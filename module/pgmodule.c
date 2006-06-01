@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.72 2006-05-30 18:16:00 darcy Exp $
+ * $Id: pgmodule.c,v 1.73 2006-06-01 23:14:11 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
