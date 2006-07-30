@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.33 2006-05-28 19:24:43 cito Exp $
+# $Id: pgdb.py,v 1.34 2006-07-30 23:23:50 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -399,32 +399,35 @@ class pgdbType:
 		else:
 			return -1
 
-STRING = pgdbType(
-	'char', 'bpchar', 'name', 'text', 'varchar'
-)
+# Mandatory type objects defined by DB-API 2 specs:
 
-# BLOB support is pg specific
-BINARY = pgdbType()
-INTEGER = pgdbType('int2', 'int4', 'serial')
-NUMBER = pgdbType('int2', 'int4', 'serial', 'int8', 'float4', 'float8', 'numeric')
-LONG = pgdbType('int8')
-FLOAT = pgdbType('float4', 'float8', 'numeric')
-BOOL = pgdbType('bool')
-MONEY = pgdbType('money')
-
+STRING = pgdbType('char', 'bpchar', 'name', 'text', 'varchar', 'bool')
+BINARY = pgdbType() # BLOB support is pg specific
+NUMBER = pgdbType('int2', 'int4', 'serial', 'int8',
+	'float4', 'float8', 'numeric', 'money')
 # this may be problematic as type are quite different ... I hope it won't hurt
-DATETIME = pgdbType(
-	'abstime', 'reltime', 'tinterval', 'date', 'time', 'timespan', 'timestamp', 'timestamptz', 'interval'
-)
-
+DATETIME = pgdbType('date', 'time', 'timetz',
+	'timestamp', 'timestamptz', 'datetime', 'abstime'
+	'interval', 'tinterval', 'timespan', 'reltime')
 # OIDs are used for everything (types, tables, BLOBs, rows, ...). This may cause
 # confusion, but we are unable to find out what exactly is behind the OID (at
 # least not easily enough). Should this be undefined as BLOBs ?
-ROWID = pgdbType(
-	'oid', 'oid8'
-)
+ROWID = pgdbType('oid', 'oid8')
 
-# mandatory type helpers
+# Additional type objects (more specific):
+
+BOOL = pgdbType('bool')
+INTEGER = pgdbType('int2', 'int4', 'serial')
+LONG = pgdbType('int8')
+FLOAT = pgdbType('float4', 'float8', 'numeric')
+MONEY = pgdbType('money')
+DATE = pgdbType('date')
+TIME = pgdbType('time', 'timetz')
+TIMESTAMP = pgdbType('timestamp', 'timestamptz', 'datetime', 'abstime')
+INTERVAL = pgdbType('interval', 'tinterval', 'timespan', 'reltime')
+
+# Mandatory type helpers defined by DB-API 2 specs:
+
 def Date(year, month, day):
 	return DateTime(year, month, day)
 
