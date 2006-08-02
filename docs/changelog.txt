@@ -2,6 +2,9 @@
 PyGreSQL ChangeLog
 ==================
 
+Version ? (?)
+-------------
+- Added new method to get parameter settings
 
 Version 3.8.1 (2006-06-05)
 --------------------------
