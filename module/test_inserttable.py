@@ -6,13 +6,16 @@
 #
 
 from pg import DB, ProgrammingError
-from locale import *
 
 print
 print "PygreSQL inserttable() test."
 
 # Verify inserttable() works with German locale as well:
-setlocale(LC_ALL, 'de_DE')
+import locale
+try:
+    locale.setlocale(locale.LC_ALL, 'de_DE')
+except locale.Error:
+    locale.setlocale(locale.LC_ALL, '')
 
 db = DB('test')
 
