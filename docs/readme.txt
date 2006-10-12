@@ -109,6 +109,8 @@ A **Win32 package** is available at
 
   ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.1.win32-py2.4.exe
 
+  ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-3.8.1.win32-py2.5.exe
+
 
 Distribution files
 ==================
