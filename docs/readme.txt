@@ -84,7 +84,7 @@ Home sites of the different packages
 **Python**:
   http://www.python.org
 
-**PosgreSQL**:
+**PostgreSQL**:
   http://www.postgresql.org
 
 **PyGreSQL**:
@@ -150,7 +150,7 @@ For general information
 **Python**:
   http://www.python.org
 
-**PosgreSQL**:
+**PostgreSQL**:
   http://www.postgresql.org
 
 **PyGreSQL**:
