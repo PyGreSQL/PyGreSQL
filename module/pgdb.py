@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.34 2006-07-30 23:23:50 cito Exp $
+# $Id: pgdb.py,v 1.35 2006-10-24 07:19:26 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -89,16 +89,16 @@ paramstyle = 'pyformat'
 ### internal type handling class
 
 class pgdbTypeCache:
+	"""Cache for database types."""
 
 	def __init__(self, cnx):
-		self.__source = cnx.source()
-		self.__type_cache = {}
+		self._src = cnx.source()
+		self._cache = {}
 
 	def typecast(self, typ, value):
-		# for NULL values, no typecast is necessary
-		if value == None:
+		if value is None:
+			# for NULL values, no typecast is necessary
 			return value
-
 		if typ == STRING:
 			pass
 		elif typ == BINARY:
@@ -124,37 +124,36 @@ class pgdbTypeCache:
 
 	def getdescr(self, oid):
 		try:
-			return self.__type_cache[oid]
+			return self._cache[oid]
 		except:
-			self.__source.execute(
+			self._src.execute(
 				"SELECT typname, typlen "
-				"FROM pg_type WHERE oid = %s" % oid
-			)
-			res = self.__source.fetch(1)[0]
-			# column name is omitted from the return value. It will
-			# have to be prepended by the caller.
-			res = (
-				res[0],
+				"FROM pg_type WHERE oid=%s" % oid)
+			res = self._src.fetch(1)[0]
+			# The column name is omitted from the return value.
+			# It will have to be prepended by the caller.
+			res = (res[0],
 				None, int(res[1]),
-				None, None, None
-			)
-			self.__type_cache[oid] = res
+				None, None, None)
+			self._cache[oid] = res
 			return res
 
-### cursor object
 
 class pgdbCursor:
+	"""Cursor Object."""
 
-	def __init__(self, src, cache):
-		self.__cache = cache
-		self.__source = src
+	def __init__(self, dbcnx):
+		self._dbcnx = dbcnx
+		self._cnx = dbcnx._cnx
+		self._type_cache = dbcnx._type_cache
+		self._src = self._cnx.source()
 		self.description = None
 		self.rowcount = -1
 		self.arraysize = 1
 		self.lastrowid = None
 
 	def close(self):
-		self.__source.close()
+		self._src.close()
 		self.description = None
 		self.rowcount = -1
 		self.lastrowid = None
@@ -162,59 +161,68 @@ class pgdbCursor:
 	def arraysize(self, size):
 		self.arraysize = size
 
-	def execute(self, operation, params = None):
-		# "The parameters may also be specified as list of
+	def execute(self, operation, params=None):
+		"""Prepare and execute a database operation (query or command)."""
+		# The parameters may also be specified as list of
 		# tuples to e.g. insert multiple rows in a single
 		# operation, but this kind of usage is deprecated:
-		if params and isinstance(params, types.ListType) and \
-					isinstance(params[0], types.TupleType):
+		if params and isinstance(params, types.ListType) \
+				and isinstance(params[0], types.TupleType):
 			self.executemany(operation, params)
 		else:
 			# not a list of tuples
 			self.executemany(operation, (params,))
 
 	def executemany(self, operation, param_seq):
+		"""Prepare operation and execute it against a parameter sequence."""
+		if not param_seq:
+			# don't do anything without parameters
+			return
 		self.description = None
 		self.rowcount = -1
-
 		# first try to execute all queries
 		totrows = 0
-		sql = "INIT"
+		sql = "BEGIN"
 		try:
+			if not self._dbcnx._tnx:
+				try:
+					self._cnx.source().execute(sql)
+				except:
+					raise OperationalError, "can't start transaction"
+				self._dbcnx._tnx = 1
 			for params in param_seq:
-				if params != None:
+				if params:
 					sql = _quoteparams(operation, params)
 				else:
 					sql = operation
-				rows = self.__source.execute(sql)
-				if rows != None: # true if __source is not DML
+				rows = self._src.execute(sql)
+				if rows: # true if not DML
 					totrows += rows
 				else:
 					self.rowcount = -1
 		except Error, msg:
-			raise DatabaseError, "error '%s' in '%s'" % ( msg, sql )
+			raise DatabaseError, "error '%s' in '%s'" % (msg, sql)
 		except Exception, err:
-			raise OperationalError, "internal error in '%s': %s" % (sql,err)
+			raise OperationalError, "internal error in '%s': %s" % (sql, err)
 		except:
 			raise OperationalError, "internal error in '%s'" % sql
-
 		# then initialize result raw count and description
-		if self.__source.resulttype == RESULT_DQL:
-			self.rowcount = self.__source.ntuples
+		if self._src.resulttype == RESULT_DQL:
+			self.rowcount = self._src.ntuples
 			d = []
-			for typ in self.__source.listinfo():
+			for typ in self._src.listinfo():
 				# listinfo is a sequence of
 				# (index, column_name, type_oid)
 				# getdescr returns all items needed for a
 				# description tuple except the column_name.
-				desc = typ[1:2]+self.__cache.getdescr(typ[2])
+				desc = typ[1:2] + self._type_cache.getdescr(typ[2])
 				d.append(desc)
 			self.description = d
-			self.lastrowid = self.__source.oidstatus()
+			self.lastrowid = self._src.oidstatus()
 		else:
 			self.rowcount = totrows
 			self.description = None
-			self.lastrowid = self.__source.oidstatus()
+			self.lastrowid = self._src.oidstatus()
 
 	def fetchone(self):
 		res = self.fetchmany(1, 0)
@@ -226,24 +234,20 @@ class pgdbCursor:
 	def fetchall(self):
 		return self.fetchmany(-1, 0)
 
-	def fetchmany(self, size = None, keep = 0):
-		if size == None:
+	def fetchmany(self, size=None, keep=0):
+		if size is None:
 			size = self.arraysize
 		if keep == 1:
 			self.arraysize = size
-
-		try: res = self.__source.fetch(size)
-		except Error, e: raise DatabaseError, str(e)
-
+		try:
+			res = self._src.fetch(size)
+		except Error, e:
+			raise DatabaseError, str(e)
 		result = []
 		for r in res:
 			row = []
-			for i in range(len(r)):
-				row.append(self.__cache.typecast(
-						self.description[i][1],
-						r[i]
-					)
-				)
+			for desc, val in zip(self.description, r):
+				row.append(self._type_cache.typecast(desc[1], val))
 			result.append(row)
 		return result
 
@@ -253,7 +257,7 @@ class pgdbCursor:
 	def setinputsizes(self, sizes):
 		pass
 
-	def setoutputsize(self, size, col = 0):
+	def setoutputsize(self, size, col=0):
 		pass
 
 
@@ -261,12 +265,12 @@ class _quoteitem(dict):
 	def __getitem__(self, key):
 		return _quote(super(_quoteitem, self).__getitem__(key))
 
+
 def _quote(x):
 	if isinstance(x, DateTimeType):
 		x = str(x)
 	elif isinstance(x, unicode):
 		x = x.encode( 'utf-8' )
-
 	if isinstance(x, types.StringType):
 		x = "'%s'" % str(x).replace("\\", "\\\\").replace("'", "''")
 	elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
@@ -279,8 +283,8 @@ def _quote(x):
 		x = x.__pg_repr__()
 	else:
 		raise InterfaceError, 'do not know how to handle type %s' % type(x)
-
 	return x
+
 
 def _quoteparams(s, params):
 	if hasattr(params, 'has_key'):
@@ -290,52 +294,65 @@ def _quoteparams(s, params):
 
 	return s % params
 
-### connection object
 
 class pgdbCnx:
+	"""Connection Object."""
 
 	def __init__(self, cnx):
-		self.__cnx = cnx
-		self.__cache = pgdbTypeCache(cnx)
+		self._cnx = cnx # connection
+		self._tnx = 0 # transaction state
+		self._type_cache = pgdbTypeCache(cnx)
 		try:
-			src = self.__cnx.source()
-			src.execute("BEGIN")
+			self._cnx.source()
 		except:
-			raise OperationalError, "invalid connection."
+			raise OperationalError, "invalid connection"
 
 	def close(self):
-		self.__cnx.close()
+		if self._cnx:
+			self._cnx.close()
+			self._cnx = None
+		else:
+			raise OperationalError, "connection has been closed"
 
 	def commit(self):
-		try:
-			src = self.__cnx.source()
-			src.execute("COMMIT")
-			src.execute("BEGIN")
-		except:
-			raise OperationalError, "can't commit."
+		if self._cnx:
+			if self._tnx:
+				self._tnx = 0
+				try:
+					self._cnx.source().execute("COMMIT")
+				except:
+					raise OperationalError, "can't commit"
+		else:
+			raise OperationalError, "connection has been closed"
 
 	def rollback(self):
-		try:
-			src = self.__cnx.source()
-			src.execute("ROLLBACK")
-			src.execute("BEGIN")
-		except:
-			raise OperationalError, "can't rollback."
+		if self._cnx:
+			if self._tnx:
+				self._tnx = 0
+				try:
+					self._cnx.source().execute("ROLLBACK")
+				except:
+					raise OperationalError, "can't rollback"
+		else:
+			raise OperationalError, "connection has been closed"
 
 	def cursor(self):
-		try:
-			src = self.__cnx.source()
-			return pgdbCursor(src, self.__cache)
-		except:
-			raise OperationalError, "invalid connection."
+		if self._cnx:
+			try:
+				return pgdbCursor(self)
+			except:
+				raise OperationalError, "invalid connection"
+		else:
+			raise OperationalError, "connection has been closed"
 
-### module interface
 
-# connects to a database
+### Module Interface
+
 _connect_ = connect
-def connect(dsn = None,
-	user = None, password = None,
-	host = None, database = None):
+def connect(dsn=None,
+		user=None, password=None,
+		host=None, database=None):
+	"""Connects to a database."""
 	# first get params from DSN
 	dbport = -1
 	dbhost = ""
@@ -356,13 +373,13 @@ def connect(dsn = None,
 		pass
 
 	# override if necessary
-	if user != None:
+	if user is not None:
 		dbuser = user
-	if password != None:
+	if password is not None:
 		dbpasswd = password
-	if database != None:
+	if database is not None:
 		dbbase = database
-	if host != None:
+	if host is not None:
 		try:
 			params = host.split(":")
 			dbhost = params[0]
@@ -381,15 +398,19 @@ def connect(dsn = None,
 		dbtty, dbuser, dbpasswd)
 	return pgdbCnx(cnx)
 
-### types handling
 
-# PostgreSQL is object-oriented: types are dynamic.
-# We must thus use type names as internal type codes.
+### Types Handling
 
 class pgdbType:
+	"""Type class for a couple of PostgreSQL data types.
+
+	PostgreSQL is object-oriented: types are dynamic.
+	We must thus use type names as internal type codes.
+
+	"""
 
 	def __init__(self, *values):
-		self.values=  values
+		self.values = values
 
 	def __cmp__(self, other):
 		if other in self.values:
@@ -398,6 +419,7 @@ class pgdbType:
 			return 1
 		else:
 			return -1
+
 
 # Mandatory type objects defined by DB-API 2 specs:
 
@@ -414,6 +436,7 @@ DATETIME = pgdbType('date', 'time', 'timetz',
 # least not easily enough). Should this be undefined as BLOBs ?
 ROWID = pgdbType('oid', 'oid8')
 
+
 # Additional type objects (more specific):
 
 BOOL = pgdbType('bool')
@@ -425,6 +448,7 @@ DATE = pgdbType('date')
 TIME = pgdbType('time', 'timetz')
 TIMESTAMP = pgdbType('timestamp', 'timestamptz', 'datetime', 'abstime')
 INTERVAL = pgdbType('interval', 'tinterval', 'timespan', 'reltime')
+
 
 # Mandatory type helpers defined by DB-API 2 specs:
 
@@ -449,7 +473,9 @@ def TimestampFromTicks(ticks):
 def Binary(str):
 	return str
 
+
 # if run as script, print some information
+
 if __name__ == '__main__':
 	print 'PyGreSQL version', version
 	print
