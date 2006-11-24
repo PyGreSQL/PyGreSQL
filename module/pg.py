@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.48 2006-05-30 23:43:30 cito Exp $
+# $Id: pg.py,v 1.49 2006-11-24 18:18:01 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -42,6 +42,9 @@ def _quote(d, t):
 		return ("'f'", "'t'")[d]
 	if t in ('date', 'inet', 'cidr'):
 		if d == '': return 'NULL'
+		if d.lower() in ('current_date', 'current_time',
+			'current_timestamp', 'localtime', 'localtimestamp'):
+			return d
 	return "'%s'" % str(d).replace("\\", "\\\\").replace("'", "''")
 
 def _is_quoted(s):

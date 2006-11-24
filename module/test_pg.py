@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.8 2006-05-28 19:18:50 cito Exp $
+# $Id: test_pg.py,v 1.9 2006-11-24 18:18:01 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -28,7 +28,7 @@ import pg
 import unittest
 
 # Try to load german locale for Umlaut tests
-german = True
+german = 1
 try:
 	import locale
 	locale.setlocale(locale.LC_ALL, ('de', 'latin1'))
@@ -36,7 +36,7 @@ except:
 	try:
 		locale.setlocale(locale.LC_ALL, 'german')
 	except:
-		german = False
+		german = 0
 
 def smart_ddl(conn, cmd):
 	"""Execute DDL, but don't complain about minor things."""
@@ -398,13 +398,16 @@ class TestConnectObject(unittest.TestCase):
 		methods = ['cancel', 'close', 'endcopy',
 			'fileno', 'getline', 'getlo', 'getnotify',
 			'inserttable', 'locreate', 'loimport',
-			'putline', 'query', 'reset',
+			'parameter', 'putline', 'query', 'reset',
 			'source', 'transaction']
 		connection_methods = [a for a in dir(self.connection)
 			if callable(eval("self.connection." + a))]
 		if 'transaction' not in connection_methods:
 			# this may be the case for PostgreSQL < 7.4
 			connection_methods.append('transaction')
+		if 'parameter' not in connection_methods:
+			# this may be the case for PostgreSQL < 7.4
+			connection_methods.append('parameter')
 		self.assertEqual(methods, connection_methods)
 
 	def testAttributeDb(self):
@@ -673,8 +676,8 @@ class TestDBClassBasic(unittest.TestCase):
 			'get_databases', 'get_relations', 'get_tables',
 			'getline', 'getlo', 'getnotify', 'host',
 			'insert', 'inserttable', 'locreate', 'loimport',
-			'options', 'pkey', 'port', 'putline', 'query',
-			'reopen', 'reset', 'source', 'status',
+			'options', 'parameter', 'pkey', 'port', 'putline',
+			'query', 'reopen', 'reset', 'source', 'status',
 			'transaction', 'tty', 'unescape_bytea',
 			'update', 'user']
 		db_attributes = [a for a in dir(self.db)
@@ -682,6 +685,9 @@ class TestDBClassBasic(unittest.TestCase):
 		if 'transaction' not in db_attributes:
 			# this may be the case for PostgreSQL < 7.4
 			db_attributes.insert(-4, 'transaction')
+		if 'parameter' not in db_attributes:
+			# this may be the case for PostgreSQL < 7.4
+			db_attributes.insert(-12, 'parameter')
 		self.assertEqual(attributes, db_attributes)
 
 	def testAttributeDb(self):
@@ -918,14 +924,16 @@ class TestDBClass(unittest.TestCase):
 	def testInsert(self):
 		for table in ('insert_test_table', 'test table for insert'):
 			smart_ddl(self.db, 'drop table "%s"' % table)
-			smart_ddl(self.db, 'create table "%s" (' \
-				"i2 smallint, i4 integer, i8 bigint," \
-				"d decimal, f4 real, f8 double precision," \
-				"v4 varchar(4), c4 char(4), t text)" % table)
+			smart_ddl(self.db, 'create table "%s" ('
+				"i2 smallint, i4 integer, i8 bigint,"
+				"d decimal, f4 real, f8 double precision,"
+				"v4 varchar(4), c4 char(4), t text,"
+				"b boolean, ts timestamp)" % table)
 			data = dict(i2 = 2**15 - 1,
 				i4 = int(2**31 - 1), i8 = long(2**31 - 1),
 				d = 1.0 + 1.0/32, f4 = 1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
-				v4 = "1234", c4 = "1234", t = "1234" * 10)
+				v4 = "1234", c4 = "1234", t = "1234" * 10,
+				b = 1, ts = 'current_date')
 			r = self.db.insert(table, data)
 			self.assertEqual(r, data)
 			oid_table = table
@@ -966,6 +974,7 @@ class TestDBClass(unittest.TestCase):
 			self.assertEqual(r, result)
 			r['a'] = r['n'] = 1
 			r['d'] = r['t'] = 'x'
+			r['b']
 			r['oid'] = 1L
 			r = self.db.clear(table, r)
 			result = {'a': 1, 'n': 0, 'b': 'f', 'd': '', 't': '', 'oid': 1L}
