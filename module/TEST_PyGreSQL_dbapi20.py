@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.4 2006-05-28 19:18:50 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.5 2006-12-26 18:16:11 darcy Exp $
 
 import dbapi20
 import unittest
@@ -12,7 +12,7 @@ dbname = 'dbapi20_test'
 dbhost = None
 dbport = 5432
 
-class test_Psycopg(dbapi20.DatabaseAPI20Test):
+class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     driver = pgdb
     connect_args = ()
     connect_kw_args = {'dsn': ':' + dbname}
