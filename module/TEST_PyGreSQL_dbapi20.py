@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.5 2006-12-26 18:16:11 darcy Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.6 2006-12-26 21:06:49 darcy Exp $
 
 import dbapi20
 import unittest
@@ -11,6 +11,8 @@ import popen2
 dbname = 'dbapi20_test'
 dbhost = None
 dbport = 5432
+try: from LOCAL_PyGreSQL import *
+except: pass
 
 class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     driver = pgdb
