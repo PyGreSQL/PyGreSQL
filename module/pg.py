@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.49 2006-11-24 18:18:01 cito Exp $
+# $Id: pg.py,v 1.50 2006-12-30 07:13:24 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -112,7 +112,7 @@ class DB:
 		self.__pkeys = {}
 		self.__args = args, kw
 		self.debug = None # For debugging scripts, this can be set
-			# * to a string format specification (e.g. in a CGI set to "%s<BR>"),
+			# * to a string format specification (e.g. in CGI set to "%s<BR>"),
 			# * to a function which takes a string argument or
 			# * to a file object to write debug statements to.
 
@@ -242,16 +242,16 @@ class DB:
 		# Get all the primary keys at once
 		if self.__pkeys == {} or not self.__pkeys.has_key(qcl):
 			# if not found, check again in case it was added after we started
-			for r in self.db.query("SELECT pg_namespace.nspname"
-				",pg_class.relname,pg_attribute.attname FROM pg_class"
+			self.__pkeys = dict(self.db.query(
+				"SELECT pg_namespace.nspname||'.'||pg_class.relname"
+					",pg_attribute.attname FROM pg_class"
 				" JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace"
-				" AND pg_namespace.nspname NOT LIKE 'pg_%'"
+					" AND pg_namespace.nspname NOT LIKE 'pg_%'"
 				" JOIN pg_attribute ON pg_attribute.attrelid=pg_class.oid"
-				" AND pg_attribute.attisdropped='f'"
+					" AND pg_attribute.attisdropped='f'"
 				" JOIN pg_index ON pg_index.indrelid=pg_class.oid"
-				" AND pg_index.indisprimary='t'"
-				" AND pg_index.indkey[0]=pg_attribute.attnum").getresult():
-				self.__pkeys[_join_parts(r[:2])] = r[2] # build qualified name
+					" AND pg_index.indisprimary='t'"
+					" AND pg_index.indkey[0]=pg_attribute.attnum").getresult())
 			self._do_debug(self.__pkeys)
 		# will raise an exception if primary key doesn't exist
 		return self.__pkeys[qcl]
@@ -275,14 +275,14 @@ class DB:
 		else:
 			where = ''
 
-		return [_join_parts(s) for s in
+		return [s[0] for s in
 			self.db.query(
-				"SELECT pg_namespace.nspname, pg_class.relname "
+				"SELECT pg_namespace.nspname || '.' || pg_class.relname "
 				"FROM pg_class "
 				"JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace "
 				"WHERE %s pg_class.relname !~ '^Inv' AND "
 					"pg_class.relname !~ '^pg_' "
-				"ORDER BY 1,2" % where).getresult()]
+				"ORDER BY 1" % where).getresult()]
 
 	def get_tables(self):
 		"""Return list of tables in connected database."""
