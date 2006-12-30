@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.6 2006-12-26 21:06:49 darcy Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.7 2006-12-30 07:06:49 darcy Exp $
 
 import dbapi20
 import unittest
@@ -26,8 +26,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         # future
         dbapi20.DatabaseAPI20Test.setUp(self)
 
-        con = self._connect()
-        con.close()
         try:
             con = self._connect()
             con.close()
@@ -39,6 +37,19 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
+
+    def test_row_factory(self):
+        class myCursor(pgdb.pgdbCursor):
+            def row_factory(self, row):
+                d = {}
+                for idx, col in enumerate(self.description):
+                    d[col[0]] = row[idx]
+                return d
+
+        con = self._connect()
+        curs = myCursor(con)
+        curs.execute("SELECT 1 AS a, 2 AS b")
+        self.assertEqual(curs.fetchone(), {'a': 1, 'b': 2})
 
     def test_nextset(self): pass
     def test_setoutputsize(self): pass

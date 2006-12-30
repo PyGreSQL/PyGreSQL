@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.35 2006-10-24 07:19:26 cito Exp $
+# $Id: pgdb.py,v 1.36 2006-12-30 07:06:50 darcy Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -152,6 +152,21 @@ class pgdbCursor:
 		self.arraysize = 1
 		self.lastrowid = None
 
+	def row_factory(self, row):
+		"""You can overwrite this with a custom row factory
+			e.g. a dict_factory
+
+            class myCursor(pgdb.pgdbCursor):
+			    def cursor.row_factory(self, row):
+				    d = {}
+				    for idx, col in enumerate(self.description):
+					    d[col[0]] = row[idx]
+				    return d
+			cursor = myCursor(cnx)
+		"""
+
+		return row
+
 	def close(self):
 		self._src.close()
 		self.description = None
@@ -248,7 +263,7 @@ class pgdbCursor:
 			row = []
 			for desc, val in zip(self.description, r):
 				row.append(self._type_cache.typecast(desc[1], val))
-			result.append(row)
+			result.append(self.row_factory(row))
 		return result
 
 	def nextset(self):
