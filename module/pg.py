@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.50 2006-12-30 07:13:24 darcy Exp $
+# $Id: pg.py,v 1.51 2007-01-06 16:45:41 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -398,7 +398,7 @@ class DB:
 			arg[k] = d
 		return arg
 
-	def insert(self, cl, a):
+	def insert(self, cl, d = None, **kw):
 		"""Insert a tuple into a database table.
 
 		This method inserts values into the table specified filling in the
@@ -410,6 +410,10 @@ class DB:
 		although PostgreSQL does.
 
 		"""
+		if d is None: a = {}
+		else: a = d
+		a.update(kw)
+
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		foid = 'oid(%s)' % qcl # build mangled name
 		fnames = self.get_attnames(qcl)
@@ -431,7 +435,7 @@ class DB:
 		except:
 			return None
 
-	def update(self, cl, a):
+	def update(self, cl, d = None, **kw):
 		"""Update an existing row in a database table.
 
 		Similar to insert but updates an existing row.  The update is based
@@ -444,6 +448,15 @@ class DB:
 		# otherwise use the primary key.  Fail if neither.
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		foid = 'oid(%s)' % qcl # build mangled oid
+
+		# Note that we only accept oid key from named args for safety
+		if kw.has_key('oid'):
+			kw[foid] = kw['oid']
+			del kw['oid']
+
+		if d is None: a = {}
+		else: a = d
+		a.update(kw)
 
 		# XXX this code is for backwards compatibility and will be
 		# XXX removed eventually
@@ -503,18 +516,26 @@ class DB:
 				a[k] = ''
 		return a
 
-	def delete(self, cl, a):
+	def delete(self, cl, d = None, **kw):
 		"""Delete an existing row in a database table.
 
 		This method deletes the row from a table.
-		It deletes based on the OID munged as described above.
+		It deletes based on the OID munged as described above."""
 
-		"""
 		# Like update, delete works on the oid.
 		# One day we will be testing that the record to be deleted
 		# isn't referenced somewhere (or else PostgreSQL will).
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		foid = 'oid(%s)' % qcl # build mangled oid
+
+		# Note that we only accept oid key from named args for safety
+		if kw.has_key('oid'):
+			kw[foid] = kw['oid']
+			del kw['oid']
+
+		if d is None: a = {}
+		else: a = d
+		a.update(kw)
 
 		# XXX this code is for backwards compatibility and will be
 		# XXX removed eventually

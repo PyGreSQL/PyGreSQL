@@ -840,11 +840,11 @@ insert - insert a row into a database table
 -------------------------------------------
 Syntax::
 
-  insert(table, a)
+  insert(table, [d,] [key = val, ...])
 
 Parameters:
   :table: name of table
-  :a:     a dictionary of values
+  :d:     optional dictionary of values
 
 Return type:
   :integer: the OID of the newly inserted row
@@ -854,6 +854,11 @@ Description:
   values from the dictionary. It then reloads the dictionary with the
   values from the database. This causes the dictionary to be updated
   with values that are modified by rules, triggers, etc.
+
+  If the optional dictionary is not supplied then the required values
+  must be included as keyword/value pairs.  If a dictionary is supplied
+  then any keywords provided will be added to or replace the entry in
+  the dictionary.
 
   Due to the way that this function works you will find inserts taking
   longer and longer as your table gets bigger. To overcome this problem
@@ -865,11 +870,11 @@ update - update a row in a database table
 -----------------------------------------
 Syntax::
 
-  update(table, a)
+  update(table, [d,] [key = val, ...])
 
 Parameters:
   :table: name of table
-  :a:     a dictionary of values
+  :d:     optional dictionary of values
 
 Return type:
   :dictionary: the new row
@@ -880,6 +885,11 @@ Description:
   one sent modified to reflect any changes caused by the update due
   to triggers, rules, defaults, etc.
 
+  Like insert, the dictionary is optional and updates will be performed
+  on the fields in the keywords.  There must be an OID or primary key
+  either in the dictionary where the OID must be munged, or in the keywords
+  where it can be simply the string "oid".
+
 clear - clears row values in memory
 -----------------------------------
 Syntax::
@@ -888,7 +898,7 @@ Syntax::
 
 Parameters:
   :table: name of table
-  :a:     a dictionary of values
+  :a:     optional dictionary of values
 
 Return type:
   :dictionary: an empty row
@@ -900,22 +910,25 @@ Description:
   If the array argument is present, it is used as the array and any entries
   matching attribute names are cleared with everything else left unchanged.
 
+  If the dictionary is not supplied a new one is created.
+
 delete - delete a row from a database table
 -------------------------------------------
 Syntax::
 
-  delete(table, [a])
+  delete(table, [d,] [key = val, ...])
 
 Parameters:
   :table: name of table
-  :a:     a dictionary of values
+  :d:     optional dictionary of values
 
 Returns:
   None
 
 Description:
   This method deletes the row from a table. It deletes based on the OID
-  as munged as described above.
+  as munged as described above.  Alternatively, the keyword "oid" can
+  be used to specify the OID.
 
 escape_string - escape a string for use within SQL
 --------------------------------------------------

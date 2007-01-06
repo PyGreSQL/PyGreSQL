@@ -29,7 +29,7 @@ class utility_test(unittest.TestCase):
             except: pass
 
         try: db.query("CREATE TABLE _test_schema "
-                       "(_test int PRIMARY KEY, _i interval)")
+                "(_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
         except: pass
 
         try: db.query("CREATE VIEW _test_vschema AS "
@@ -47,12 +47,12 @@ class utility_test(unittest.TestCase):
         # see if they differentiate the table names properly
         self.assertEqual(
             db.get_attnames('_test_schema'),
-            {'_test': 'int', 'oid': 'int', '_i': 'date'}
+            {'_test': 'int', 'oid': 'int', '_i': 'date', 'dvar': 'int'}
         )
 
         self.assertEqual(
             db.get_attnames('public._test_schema'),
-            {'_test': 'int', 'oid': 'int', '_i': 'date'}
+            {'_test': 'int', 'oid': 'int', '_i': 'date', 'dvar': 'int'}
         )
 
         self.assertEqual(
@@ -84,6 +84,36 @@ class utility_test(unittest.TestCase):
         db.get('_test_schema', 1234, keyname = '_test')
         self.failUnlessRaises(KeyError, db.get, '_test_vschema', 1234)
         db.get('_test_vschema', 1234, keyname = '_test')
+
+    def test_insert(self):
+        db.query("DELETE FROM _test_schema")
+
+        d = dict(_test = 1234)
+        db.insert('_test_schema', d)
+        self.assertEqual(d['dvar'], 999)
+
+        db.insert('_test_schema', _test = 1235)
+        self.assertEqual(d['dvar'], 999)
+
+    def test_update(self):
+        try: db.query("INSERT INTO _test_schema VALUES (1234)")
+        except: pass # OK if it already exists
+
+        r = db.get('_test_schema', 1234)
+        r['dvar'] = 123
+        db.update('_test_schema', r)
+        r = db.get('_test_schema', 1234)
+        self.assertEqual(r['dvar'], 123)
+
+        r = db.get('_test_schema', 1234)
+        db.update('_test_schema', _test = 1234, dvar = 456)
+        r = db.get('_test_schema', 1234)
+        self.assertEqual(r['dvar'], 456)
+
+        r = db.get('_test_schema', 1234)
+        db.update('_test_schema', r, dvar = 456)
+        r = db.get('_test_schema', 1234)
+        self.assertEqual(r['dvar'], 456)
 
     def test_quote(self):
         from pg import _quote
