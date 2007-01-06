@@ -707,6 +707,22 @@ The preferred way to use this module is as follows::
 
       print '%(foo)s %(bar)s' % r
 
+This class can be subclassed as in this example::
+
+  import pg
+
+  class DB_ride(pg.DB):
+    """This class encapsulates the database functions and the specific
+       methods for the ride database."""
+
+    def __init__(self):
+        """Opens a database connection to the rides database"""
+
+        pg.DB.__init__(self, dbname = 'ride')
+        self.query("""SET DATESTYLE TO 'ISO'""")
+
+    [Add or override methods here]
+
 The following describes the methods and variables of this class.
 
 Initialization
