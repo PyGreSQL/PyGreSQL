@@ -7,6 +7,7 @@ Version ? (?)
 - Added new method to get parameter settings
 - Added row_factory as suggested by Simon Pamies
 - Separated between mandatory and additional type objects
+- Added keyword args to insert, update and delete methods
 
 Version 3.8.1 (2006-06-05)
 --------------------------
