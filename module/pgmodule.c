@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.74 2006-08-02 17:45:11 cito Exp $
+ * $Id: pgmodule.c,v 1.75 2007-02-24 07:38:59 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -395,11 +395,11 @@ get_type_array(PGresult *result, int nfields)
 		{
 			case INT2OID:
 			case INT4OID:
+			case OIDOID:
 				typ[j] = 1;
 				break;
 
 			case INT8OID:
-			case OIDOID:
 				typ[j] = 2;
 				break;
 
@@ -595,7 +595,7 @@ static char pgsource_oidstatus__doc__[] =
 static PyObject *
 pgsource_oidstatus(pgsourceobject * self, PyObject * args)
 {
-	long		oid;
+	Oid			oid;
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_RESULT))
@@ -611,7 +611,10 @@ pgsource_oidstatus(pgsourceobject * self, PyObject * args)
 
 	/* retrieves oid status */
 	if ((oid = PQoidValue(self->last_result)) == InvalidOid)
-		oid = 0;
+	{
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
 
 	return PyInt_FromLong(oid);
 }
@@ -2286,10 +2289,8 @@ pg_query(pgobject * self, PyObject * args)
 					Py_INCREF(Py_None);
 					return Py_None;
 				}
-
 				/* otherwise, return the oid */
-				return PyLong_FromLongLong(oid);
-
+				return PyInt_FromLong(oid);
 			case PGRES_COPY_OUT:		/* no data will be received */
 			case PGRES_COPY_IN:
 				Py_INCREF(Py_None);
@@ -3381,7 +3382,7 @@ pgsetdefport(PyObject * self, PyObject * args)
 	old = pg_default_port;
 
 	if (port != -1)
-		pg_default_port = PyLong_FromLong(port);
+		pg_default_port = PyInt_FromLong(port);
 	else
 	{
 		Py_INCREF(Py_None);
