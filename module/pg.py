@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.51 2007-01-06 16:45:41 darcy Exp $
+# $Id: pg.py,v 1.52 2007-02-24 07:53:06 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -231,7 +231,6 @@ class DB:
 					self.__pkeys['public.' + x] = newpkey[x]
 				else:
 					self.__pkeys[x] = newpkey[x]
-
 			return self.__pkeys
 
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
@@ -242,8 +241,9 @@ class DB:
 		# Get all the primary keys at once
 		if self.__pkeys == {} or not self.__pkeys.has_key(qcl):
 			# if not found, check again in case it was added after we started
-			self.__pkeys = dict(self.db.query(
-				"SELECT pg_namespace.nspname||'.'||pg_class.relname"
+			self.__pkeys = dict([
+				(_join_parts(r[:2]), r[2]) for r in self.db.query(
+				"SELECT pg_namespace.nspname, pg_class.relname"
 					",pg_attribute.attname FROM pg_class"
 				" JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace"
 					" AND pg_namespace.nspname NOT LIKE 'pg_%'"
@@ -251,7 +251,8 @@ class DB:
 					" AND pg_attribute.attisdropped='f'"
 				" JOIN pg_index ON pg_index.indrelid=pg_class.oid"
 					" AND pg_index.indisprimary='t'"
-					" AND pg_index.indkey[0]=pg_attribute.attnum").getresult())
+					" AND pg_index.indkey[0]=pg_attribute.attnum"
+				).getresult()])
 			self._do_debug(self.__pkeys)
 		# will raise an exception if primary key doesn't exist
 		return self.__pkeys[qcl]
@@ -269,20 +270,15 @@ class DB:
 			specifying which kind of relations you want to list.
 
 		"""
-		if kinds:
-			where = "pg_class.relkind IN (%s) AND" % \
-							','.join(["'%s'" % x for x in kinds])
-		else:
-			where = ''
-
-		return [s[0] for s in
-			self.db.query(
-				"SELECT pg_namespace.nspname || '.' || pg_class.relname "
-				"FROM pg_class "
-				"JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace "
-				"WHERE %s pg_class.relname !~ '^Inv' AND "
-					"pg_class.relname !~ '^pg_' "
-				"ORDER BY 1" % where).getresult()]
+		where = kinds and "pg_class.relkind IN (%s) AND" % ','.join(
+			["'%s'" % x for x in kinds]) or ''
+		return map(_join_parts, self.db.query(
+			"SELECT pg_namespace.nspname, pg_class.relname "
+			"FROM pg_class "
+			"JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace "
+			"WHERE %s pg_class.relname !~ '^Inv' AND "
+				"pg_class.relname !~ '^pg_' "
+			"ORDER BY 1, 2" % where).getresult())
 
 	def get_tables(self):
 		"""Return list of tables in connected database."""
