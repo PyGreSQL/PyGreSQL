@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.9 2006-11-24 18:18:01 cito Exp $
+# $Id: test_pg.py,v 1.10 2007-02-24 07:41:07 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -49,7 +49,9 @@ def smart_ddl(conn, cmd):
 		else:
 			conn.query(cmd)
 	except pg.ProgrammingError:
-		if cmd.startswith('drop table '):
+		if cmd.startswith('drop table ') \
+			or cmd.startswith('set ') \
+			or cmd.startswith('alter database '):
 			pass
 		elif cmd.startswith('create table '):
 			conn.query(cmd)
@@ -890,7 +892,7 @@ class TestDBClass(unittest.TestCase):
 				oid_table = '"%s"' % oid_table
 			oid_table = 'oid(public.%s)' % oid_table
 			self.assert_(oid_table in r)
-			self.assertEqual(type(r[oid_table]), type(1L))
+			self.assert_(isinstance(r[oid_table], int))
 			result = {'t': 'y', 'n': 2, oid_table: r[oid_table]}
 			self.assertEqual(r, result)
 			self.assertEqual(self.db.get(table, r[oid_table], 'oid')['t'], 'y')
@@ -941,7 +943,7 @@ class TestDBClass(unittest.TestCase):
 				oid_table = '"%s"' % oid_table
 			oid_table = 'oid(public.%s)' % oid_table
 			self.assert_(oid_table in r)
-			self.assertEqual(type(r[oid_table]), type(1L))
+			self.assert_(isinstance(r[oid_table], int))
 			s = self.db.query('select oid,* from "%s"' % table).dictresult()[0]
 			s[oid_table] = s['oid']
 			del s['oid']
@@ -1108,6 +1110,11 @@ class DBTestSuite(unittest.TestSuite):
 			pass
 		c.query("create database " + dbname
 			+ " template=template0")
+		for s in ('client_min_messages = warning',
+			'default_with_oids = on',
+			'standard_conforming_strings = off',
+			'escape_string_warning = off'):
+			smart_ddl(c, 'alter database %s set %s' % (dbname, s))
 		c.close()
 		c = pg.connect(dbname)
 		smart_ddl(c, "create table test ("
