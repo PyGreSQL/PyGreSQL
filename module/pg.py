@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.52 2007-02-24 07:53:06 cito Exp $
+# $Id: pg.py,v 1.53 2007-03-02 20:35:55 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -198,8 +198,9 @@ class DB:
 			schemas = self.db.query(query).getresult()[0][0][1:-1].split(',')
 			if schemas: # non-empty path
 				# search schema for this object in the current search path
-				query = ' UNION '.join(["SELECT %d AS n, '%s' AS nspname" % s
-					for s in enumerate(schemas)])
+				query = ' UNION '.join(
+					["SELECT %d::integer AS n, '%s'::name AS nspname"
+						% s for s in enumerate(schemas)])
 				query = ("SELECT nspname FROM pg_class"
 					" JOIN pg_namespace ON pg_class.relnamespace=pg_namespace.oid"
 					" JOIN (%s) AS p USING (nspname)"
