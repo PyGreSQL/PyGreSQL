@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.53 2007-03-02 20:35:55 cito Exp $
+# $Id: pg.py,v 1.54 2007-08-10 15:55:04 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -419,7 +419,7 @@ class DB:
 		for f in fnames.keys():
 			if f != 'oid' and a.has_key(f):
 				t.append(_quote(a[f], fnames[f]))
-				n.append(f)
+				n.append('"%s"' % f)
 		q = 'INSERT INTO %s (%s) VALUES (%s)' % \
 			(qcl, ','.join(n), ','.join(t))
 		self._do_debug(q)

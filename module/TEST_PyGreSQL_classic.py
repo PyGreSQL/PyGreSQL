@@ -95,6 +95,14 @@ class utility_test(unittest.TestCase):
         db.insert('_test_schema', _test = 1235)
         self.assertEqual(d['dvar'], 999)
 
+    def test_mixed_case(self):
+        try: db.query('CREATE TABLE _test_mc ("_Test" int PRIMARY KEY)')
+        except: pass
+
+        db.query("DELETE FROM _test_mc")
+        d = dict(_Test = 1234)
+        db.insert('_test_mc', d)
+
     def test_update(self):
         try: db.query("INSERT INTO _test_schema VALUES (1234)")
         except: pass # OK if it already exists
