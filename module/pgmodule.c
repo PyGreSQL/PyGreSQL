@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.75 2007-02-24 07:38:59 cito Exp $
+ * $Id: pgmodule.c,v 1.76 2007-10-12 12:20:00 darcy Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -2336,7 +2336,11 @@ pg_putline(pgobject * self, PyObject * args)
 	}
 
 	/* sends line to backend */
-	PQputline(self->cnx, line);
+	if (PQputline(self->cnx, line))
+	{
+		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+		return NULL;
+	}
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -2406,7 +2410,11 @@ pg_endcopy(pgobject * self, PyObject * args)
 	}
 
 	/* ends direct copy */
-	PQendcopy(self->cnx);
+	if (PQendcopy(self->cnx))
+	{
+		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+		return NULL;
+	}
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -2619,12 +2627,31 @@ pg_inserttable(pgobject * self, PyObject * args)
 		*bufpt++ = '\n'; *bufpt = '\0';
 
 		/* sends data */
-		PQputline(self->cnx, buffer);
+		if (PQputline(self->cnx, buffer))
+		{
+			PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+			PQendcopy(self->cnx);
+			free(buffer);
+			return NULL;
+		}
 	}
 
 	/* ends query */
-	PQputline(self->cnx, "\\.\n");
-	PQendcopy(self->cnx);
+	if (PQputline(self->cnx, "\\.\n"))
+	{
+		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+		PQendcopy(self->cnx);
+		free(buffer);
+		return NULL;
+	}
+
+	if (PQendcopy(self->cnx))
+	{
+		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+		free(buffer);
+		return NULL;
+	}
+
 	free(buffer);
 
 	/* no error : returns nothing */
