@@ -11,7 +11,9 @@ General
 
 You must first have installed Python and PostgreSQL on your system.
 If you want to access remote database only, you don't need to install
-the full PostgreSQL server, but only the C interface (libpq).
+the full PostgreSQL server, but only the C interface (libpq). If you
+are on Windows, make sure that the directory with libpq.dll is in your
+``PATH`` environment variable.
 
 The current version of PyGreSQL has been tested with Python 2.4.3 and
 PostGreSQL 8.1.4. Older version should work as well, but you will need
