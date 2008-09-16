@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.76 2007-10-12 12:20:00 darcy Exp $
+ * $Id: pgmodule.c,v 1.77 2008-09-16 15:15:20 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -1611,12 +1611,12 @@ pgconnect(pgobject * self, PyObject * args, PyObject * dict)
 	{
 		memset(port_buffer, 0, sizeof(port_buffer));
 		sprintf(port_buffer, "%d", pgport);
-		npgobj->cnx = PQsetdbLogin(pghost, port_buffer,
-			pgopt, pgtty, pgdbname, pguser, pgpasswd);
 	}
-	else
-		npgobj->cnx = PQsetdbLogin(pghost, NULL,
-			pgopt, pgtty, pgdbname, pguser, pgpasswd);
+
+	Py_BEGIN_ALLOW_THREADS
+	npgobj->cnx = PQsetdbLogin(pghost, pgport == -1 ? NULL : port_buffer,
+		pgopt, pgtty, pgdbname, pguser, pgpasswd);
+	Py_END_ALLOW_THREADS
 
 	if (PQstatus(npgobj->cnx) == CONNECTION_BAD)
 	{
