@@ -4,11 +4,14 @@ PyGreSQL ChangeLog
 
 Version 3.8.2 (?)
 -----------------
-- Added new method to get parameter settings
-- Added row_factory as suggested by Simon Pamies
-- Separated between mandatory and additional type objects
+- Added new method to get parameter settings.
+- Added row_factory as suggested by Simon Pamies.
+- Separated between mandatory and additional type objects.
 - Added keyword args to insert, update and delete methods
-- Added exception handling for direct copy
+- Added exception handling for direct copy.
+- Release the GIL while making a connection
+  (as suggested by Peter Schuller).
+- If available, use decimal.Decimal for numeric types.
 
 Version 3.8.1 (2006-06-05)
 --------------------------

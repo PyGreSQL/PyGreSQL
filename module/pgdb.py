@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.36 2006-12-30 07:06:50 darcy Exp $
+# $Id: pgdb.py,v 1.37 2008-09-16 22:29:47 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -63,17 +63,20 @@ Basic usage:
 
 """
 
+from _pg import *
 import types
 import time
-
-from _pg import *
-
 try: # use mx.DateTime module if available
 	from mx.DateTime import DateTime, \
 		TimeDelta, DateTimeType
 except ImportError: # otherwise use standard datetime module
 	from datetime import datetime as DateTime, \
 		timedelta as TimeDelta, datetime as DateTimeType
+try: # use Decimal if available
+	from decimal import Decimal
+	set_decimal(Decimal)
+except ImportError: # otherwise (Python < 2.4)
+	Decimal = float # use float instead of Decimal
 
 ### module constants
 
@@ -111,10 +114,11 @@ class pgdbTypeCache:
 			value = long(value)
 		elif typ == FLOAT:
 			value = float(value)
+		elif typ == NUMERIC:
+			value = Decimal(value)
 		elif typ == MONEY:
-			value = value.replace("$", "")
-			value = value.replace(",", "")
-			value = float(value)
+			value = ''.join(filter(lambda v: v in '0123456789.-', value))
+			value = Decimal(value)
 		elif typ == DATETIME:
 			# format may differ ... we'll give string
 			pass
@@ -156,12 +160,12 @@ class pgdbCursor:
 		"""You can overwrite this with a custom row factory
 			e.g. a dict_factory
 
-            class myCursor(pgdb.pgdbCursor):
-			    def cursor.row_factory(self, row):
-				    d = {}
-				    for idx, col in enumerate(self.description):
-					    d[col[0]] = row[idx]
-				    return d
+			class myCursor(pgdb.pgdbCursor):
+				def cursor.row_factory(self, row):
+					d = {}
+					for idx, col in enumerate(self.description):
+						d[col[0]] = row[idx]
+					return d
 			cursor = myCursor(cnx)
 		"""
 
@@ -294,6 +298,8 @@ def _quote(x):
 		x = 'NULL'
 	elif isinstance(x, (types.ListType, types.TupleType)):
 		x = '(%s)' % ','.join(map(lambda x: str(_quote(x)), x))
+	elif Decimal is not float and isinstance(x, Decimal):
+		pass
 	elif hasattr(x, '__pg_repr__'):
 		x = x.__pg_repr__()
 	else:
@@ -457,7 +463,8 @@ ROWID = pgdbType('oid', 'oid8')
 BOOL = pgdbType('bool')
 INTEGER = pgdbType('int2', 'int4', 'serial')
 LONG = pgdbType('int8')
-FLOAT = pgdbType('float4', 'float8', 'numeric')
+FLOAT = pgdbType('float4', 'float8')
+NUMERIC = pgdbType('numeric')
 MONEY = pgdbType('money')
 DATE = pgdbType('date')
 TIME = pgdbType('time', 'timetz')

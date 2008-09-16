@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.11 2008-09-16 15:10:01 cito Exp $
+# $Id: test_pg.py,v 1.12 2008-09-16 22:29:48 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -38,6 +38,12 @@ except:
 	except:
 		german = 0
 
+try:
+	from decimal import Decimal
+except ImportError:
+	Decimal = float
+
+
 def smart_ddl(conn, cmd):
 	"""Execute DDL, but don't complain about minor things."""
 	try:
@@ -58,6 +64,7 @@ def smart_ddl(conn, cmd):
 		else:
 			raise
 
+
 class TestAuxiliaryFunctions(unittest.TestCase):
 	"""Test the auxiliary functions external to the connection class."""
 
@@ -65,25 +72,27 @@ class TestAuxiliaryFunctions(unittest.TestCase):
 		f = pg._quote
 		self.assertEqual(f(None, None), 'NULL')
 		self.assertEqual(f(None, 'int'), 'NULL')
-		self.assertEqual(f(None, 'decimal'), 'NULL')
+		self.assertEqual(f(None, 'float'), 'NULL')
+		self.assertEqual(f(None, 'num'), 'NULL')
 		self.assertEqual(f(None, 'money'), 'NULL')
 		self.assertEqual(f(None, 'bool'), 'NULL')
 		self.assertEqual(f(None, 'date'), 'NULL')
 		self.assertEqual(f('', 'int'), 'NULL')
 		self.assertEqual(f('', 'seq'), 'NULL')
-		self.assertEqual(f('', 'decimal'), 'NULL')
+		self.assertEqual(f('', 'float'), 'NULL')
+		self.assertEqual(f('', 'num'), 'NULL')
 		self.assertEqual(f('', 'money'), 'NULL')
 		self.assertEqual(f('', 'bool'), 'NULL')
 		self.assertEqual(f('', 'date'), 'NULL')
 		self.assertEqual(f('', 'text'), "''")
 		self.assertEqual(f(123456789, 'int'), '123456789')
 		self.assertEqual(f(123654789, 'seq'), '123654789')
-		self.assertEqual(f(123456987, 'decimal'), '123456987')
-		self.assertEqual(f(1.23654789, 'decimal'), '1.23654789')
-		self.assertEqual(f(12365478.9, 'decimal'), '12365478.9')
-		self.assertEqual(f('123456789', 'decimal'), '123456789')
-		self.assertEqual(f('1.23456789', 'decimal'), '1.23456789')
-		self.assertEqual(f('12345678.9', 'decimal'), '12345678.9')
+		self.assertEqual(f(123456987, 'num'), '123456987')
+		self.assertEqual(f(1.23654789, 'num'), '1.23654789')
+		self.assertEqual(f(12365478.9, 'num'), '12365478.9')
+		self.assertEqual(f('123456789', 'num'), '123456789')
+		self.assertEqual(f('1.23456789', 'num'), '1.23456789')
+		self.assertEqual(f('12345678.9', 'num'), '12345678.9')
 		self.assertEqual(f(123, 'money'), "'123.00'")
 		self.assertEqual(f('123', 'money'), "'123.00'")
 		self.assertEqual(f(123.45, 'money'), "'123.45'")
@@ -617,30 +626,31 @@ class TestInserttable(unittest.TestCase):
 		self.c.close()
 
 	def testInserttable1Row(self):
-		data = [(1, 1, 1L, 1.0, 1.0, 1.0, "1", "1111", "1")]
+		d = Decimal is float and 1.0 or None
+		data = [(1, 1, 1L, d, 1.0, 1.0, d, "1", "1111", "1")]
 		self.c.inserttable("test", data)
 		r = self.c.query("select * from test").getresult()
 		self.assertEqual(r, data)
 
 	def testInserttable4Rows(self):
-		data = [(-1, -1, -1L, -1.0, -1.0, -1.0, "-1", "-1-1", "-1"),
-			(0, 0, 0L, 0.0, 0.0, 0.0, "0", "0000", "0"),
-			(1, 1, 1L, 1.0, 1.0, 1.0, "1", "1111", "1"),
-			(2, 2, 2L, 2.0, 2.0, 2.0, "2", "2222", "2")]
+		data = [(-1, -1, -1L, None, -1.0, -1.0, None, "-1", "-1-1", "-1"),
+			(0, 0, 0L, None, 0.0, 0.0, None, "0", "0000", "0"),
+			(1, 1, 1L, None, 1.0, 1.0, None, "1", "1111", "1"),
+			(2, 2, 2L, None, 2.0, 2.0, None, "2", "2222", "2")]
 		self.c.inserttable("test", data)
 		r = self.c.query("select * from test order by 1").getresult()
 		self.assertEqual(r, data)
 
 	def testInserttableMultipleRows(self):
 		num_rows = 100
-		data = [(1, 1, 1L, 1.0, 1.0, 1.0, "1", "1111", "1")] * num_rows
+		data = [(1, 1, 1L, None, 1.0, 1.0, None, "1", "1111", "1")] * num_rows
 		self.c.inserttable("test", data)
 		r = self.c.query("select count(*) from test").getresult()[0][0]
 		self.assertEqual(r, num_rows)
 
 	def testInserttableMultipleCalls(self):
 		num_rows = 10
-		data = [(1, 1, 1L, 1.0, 1.0, 1.0, "1", "1111", "1")]
+		data = [(1, 1, 1L, None, 1.0, 1.0, None, "1", "1111", "1")]
 		for i in range(num_rows):
 			self.c.inserttable("test", data)
 		r = self.c.query("select count(*) from test").getresult()[0][0]
@@ -648,14 +658,14 @@ class TestInserttable(unittest.TestCase):
 
 	def testInserttableNullValues(self):
 		num_rows = 100
-		data = [(None,) * 9]
+		data = [(None,) * 10]
 		self.c.inserttable("test", data)
 		r = self.c.query("select * from test").getresult()
 		self.assertEqual(r, data)
 
 	def testInserttableMaxValues(self):
 		data = [(2**15 - 1, int(2**31 - 1), long(2**31 - 1),
-			1.0 + 1.0/32, 1.0 + 1.0/32, 1.0 + 1.0/32,
+			None, 1.0 + 1.0/32, 1.0 + 1.0/32, None,
 			"1234", "1234", "1234" * 10)]
 		self.c.inserttable("test", data)
 		r = self.c.query("select * from test").getresult()
@@ -765,6 +775,7 @@ class TestDBClassBasic(unittest.TestCase):
 		self.assertRaises(pg.InternalError, self.db.query, 'select 1')
 		self.db = pg.DB(self.dbname)
 
+
 class TestDBClass(unittest.TestCase):
 	""""Test the methods of the DB class wrapped pg connection."""
 
@@ -870,17 +881,17 @@ class TestDBClass(unittest.TestCase):
 			smart_ddl(self.db, 'drop table "%s"' % table)
 			smart_ddl(self.db, 'create table "%s" ('
 				'a smallint, b integer, c bigint, '
-				'e decimal, f float, f2 double precision, '
+				'e numeric, f float, f2 double precision, m money, '
 				'x smallint, y smallint, z smallint, '
 				'Normal_NaMe smallint, "Special Name" smallint, '
 				't text, u char(2), v varchar(2), '
 				'primary key (y, u))' % table)
 			attributes = self.db.get_attnames(table)
 			result = {'a': 'int', 'c': 'int', 'b': 'int',
-				'e': 'text', 'f': 'decimal', 'f2': 'decimal',
-					'normal_name': 'int', 'Special Name': 'int',
-					'u': 'text', 't': 'text', 'v': 'text',
-					'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int' }
+				'e': 'num', 'f': 'float', 'f2': 'float', 'm': 'money',
+				'normal_name': 'int', 'Special Name': 'int',
+				'u': 'text', 't': 'text', 'v': 'text',
+				'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int' }
 			self.assertEqual(attributes, result)
 
 	def testGet(self):
@@ -934,13 +945,14 @@ class TestDBClass(unittest.TestCase):
 			smart_ddl(self.db, 'drop table "%s"' % table)
 			smart_ddl(self.db, 'create table "%s" ('
 				"i2 smallint, i4 integer, i8 bigint,"
-				"d decimal, f4 real, f8 double precision,"
+				"d numeric, f4 real, f8 double precision, m money, "
 				"v4 varchar(4), c4 char(4), t text,"
 				"b boolean, ts timestamp)" % table)
 			data = dict(i2 = 2**15 - 1,
 				i4 = int(2**31 - 1), i8 = long(2**31 - 1),
-				d = 1.0 + 1.0/32, f4 = 1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
-				v4 = "1234", c4 = "1234", t = "1234" * 10,
+				d = Decimal('123456789.9876543212345678987654321'),
+				f4 = 1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
+				m = "1234.56", v4 = "1234", c4 = "1234", t = "1234" * 10,
 				b = 1, ts = 'current_date')
 			r = self.db.insert(table, data)
 			self.assertEqual(r, data)
@@ -1025,6 +1037,7 @@ class TestDBClass(unittest.TestCase):
 		r = r[0]
 		r = self.db.unescape_bytea(r)
 		self.assertEqual(r, s)
+
 
 class TestSchemas(unittest.TestCase):
 	""""Test correct handling of schemas (namespaces)."""
@@ -1125,7 +1138,7 @@ class DBTestSuite(unittest.TestSuite):
 		c = pg.connect(dbname)
 		smart_ddl(c, "create table test ("
 			"i2 smallint, i4 integer, i8 bigint,"
-			"d decimal, f4 real, f8 double precision,"
+			"d numeric, f4 real, f8 double precision, m money, "
 			"v4 varchar(4), c4 char(4), t text)")
 		c.query("create view test_view as"
 			" select i4, v4 from test")

@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.54 2007-08-10 15:55:04 darcy Exp $
+# $Id: pg.py,v 1.55 2008-09-16 22:29:47 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -20,6 +20,11 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 
 from _pg import *
 from types import *
+try:
+    from decimal import Decimal
+    set_decimal(Decimal)
+except ImportError:
+    pass # Python < 2.4
 
 # Auxiliary functions which are independent from a DB connection:
 
@@ -27,7 +32,7 @@ def _quote(d, t):
 	"""Return quotes if needed."""
 	if d is None:
 		return 'NULL'
-	if t in ('int', 'seq', 'decimal'):
+	if t in ('int', 'seq', 'float', 'num'):
 		if d == '': return 'NULL'
 		return str(d)
 	if t == 'money':
@@ -322,7 +327,9 @@ class DB:
 			elif typ.startswith('oid'):
 				t[att] = 'int'
 			elif typ.startswith('float'):
-				t[att] = 'decimal'
+				t[att] = 'float'
+			elif typ.startswith('numeric'):
+				t[att] = 'num'
 			elif typ.startswith('abstime'):
 				t[att] = 'date'
 			elif typ.startswith('date'):
@@ -505,7 +512,7 @@ class DB:
 		fnames = self.get_attnames(qcl)
 		for k, t in fnames.items():
 			if k == 'oid': continue
-			if t in ['int', 'decimal', 'seq', 'money']:
+			if t in ['int', 'seq', 'float', 'num', 'money']:
 				a[k] = 0
 			elif t == 'bool':
 				a[k] = 'f'
@@ -546,6 +553,7 @@ class DB:
 		self.db.query(q)
 
 # if run as script, print some information
+
 if __name__ == '__main__':
 	print 'PyGreSQL version', version
 	print

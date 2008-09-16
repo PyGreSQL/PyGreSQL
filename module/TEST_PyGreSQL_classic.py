@@ -5,7 +5,7 @@ from pg import *
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
-dbname = 'unittest'
+dbname = 'pygresql_test'
 dbhost = None
 dbport = 5432
 
@@ -128,11 +128,11 @@ class utility_test(unittest.TestCase):
         self.assertEqual(_quote(1, 'int'), "1")
         self.assertEqual(_quote(1, 'text'), "'1'")
         self.assertEqual(_quote(1, 'seq'), "1")
-        self.assertEqual(_quote(1, 'decimal'), "1")
+        self.assertEqual(_quote(1, 'num'), "1")
         self.assertEqual(_quote('1', 'int'), "1")
         self.assertEqual(_quote('1', 'text'), "'1'")
         self.assertEqual(_quote('1', 'seq'), "1")
-        self.assertEqual(_quote('1', 'decimal'), "1")
+        self.assertEqual(_quote('1', 'num'), "1")
         self.assertEqual(_quote(None, 'int'), "NULL")
         self.assertEqual(_quote(1, 'money'), "'1.00'")
         self.assertEqual(_quote('1', 'money'), "'1.00'")

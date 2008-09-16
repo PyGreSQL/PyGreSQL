@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.77 2008-09-16 15:15:20 cito Exp $
+ * $Id: pgmodule.c,v 1.78 2008-09-16 22:29:48 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -120,6 +120,8 @@ static PyObject *pg_default_passwd;		/* default password */
 
 DL_EXPORT(void) init_pg(void);
 int *get_type_array(PGresult *result, int nfields);
+
+static PyObject *decimal = NULL; /* decimal type */
 
 /* --------------------------------------------------------------------- */
 /* OBJECTS DECLARATION */
@@ -405,16 +407,19 @@ get_type_array(PGresult *result, int nfields)
 
 			case FLOAT4OID:
 			case FLOAT8OID:
-			case NUMERICOID:
 				typ[j] = 3;
 				break;
 
-			case CASHOID:
+			case NUMERICOID:
 				typ[j] = 4;
 				break;
 
-			default:
+			case CASHOID:
 				typ[j] = 5;
+				break;
+
+			default:
+				typ[j] = 6;
 				break;
 		}
 	}
@@ -1917,7 +1922,7 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 			int			k;
 			char	   *s = PQgetvalue(self->last_result, i, j);
 			char		cashbuf[64];
-			PyObject   *float_str;
+			PyObject   *tmp_obj;
 
 			if (PQgetisnull(self->last_result, i, j))
 			{
@@ -1936,38 +1941,37 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 						break;
 
 					case 3:
-						float_str = PyString_FromString(s);
-						val = PyFloat_FromString(float_str, NULL);
-						Py_DECREF(float_str);
+						tmp_obj = PyString_FromString(s);
+						val = PyFloat_FromString(tmp_obj, NULL);
+						Py_DECREF(tmp_obj);
 						break;
 
-					case 4:
+					case 5:
+						for (k = 0;
+							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
+							 s++)
 						{
-							int			mult = 1;
-
-							if (*s == '$')		/* there's talk of getting
-												 * rid of it */
-								s++;
-
-							if (*s == '-' || *s == '(')
-							{
-								s++;
-								mult = -1;
-							}
-
-							/* get rid of the '$' and commas */
-							if (*s == '$')		/* Just in case we exposed
-												 * one */
-								s++;
-
-							for (k = 0; *s; s++)
-								if (*s != ',')
-									cashbuf[k++] = *s;
-
-							cashbuf[k] = 0;
-							val = PyFloat_FromDouble(strtod(cashbuf, NULL) * mult);
-							break;
+							if (isdigit(*s) || *s == '.')
+								cashbuf[k++] = *s;
+							else if (*s == '(' || *s == '-')
+								cashbuf[k++] = '-';
 						}
+						cashbuf[k] = 0;
+						s = cashbuf;
+
+					case 4:
+						if (decimal)
+						{
+							tmp_obj = Py_BuildValue("(s)", s);
+							val = PyEval_CallObject(decimal, tmp_obj);
+						}
+						else
+						{
+							tmp_obj = PyString_FromString(s);
+							val = PyFloat_FromString(tmp_obj, NULL);
+						}
+						Py_DECREF(tmp_obj);
+						break;
 
 					default:
 						val = PyString_FromString(s);
@@ -2042,7 +2046,7 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 			int			k;
 			char	   *s = PQgetvalue(self->last_result, i, j);
 			char		cashbuf[64];
-			PyObject   *float_str;
+			PyObject   *tmp_obj;
 
 			if (PQgetisnull(self->last_result, i, j))
 			{
@@ -2061,42 +2065,37 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 						break;
 
 					case 3:
-						float_str = PyString_FromString(s);
-						val = PyFloat_FromString(float_str, NULL);
-						Py_DECREF(float_str);
+						tmp_obj = PyString_FromString(s);
+						val = PyFloat_FromString(tmp_obj, NULL);
+						Py_DECREF(tmp_obj);
 						break;
 
-					case 4:
+					case 5:
+						for (k = 0;
+							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
+							 s++)
 						{
-							int			mult = 1;
-
-							if (*s == '$')		/* there's talk of getting
-												 * rid of it */
-								s++;
-
-							if (*s == '-' || *s == '(')
-							{
-								s++;
-								mult = -1;
-							}
-
-							/* get rid of the '$' and commas */
-							if (*s == '$')		/* Just in case we exposed
-												 * one */
-								s++;
-
-							for (k = 0;
-								 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
-								 s++)
-							{
-								if (*s != ',')
-									cashbuf[k++] = *s;
-							}
-
-							cashbuf[k] = 0;
-							val = PyFloat_FromDouble(strtod(cashbuf, NULL) * mult);
-							break;
+							if (isdigit(*s) || *s == '.')
+								cashbuf[k++] = *s;
+							else if (*s == '(' || *s == '-')
+								cashbuf[k++] = '-';
 						}
+						cashbuf[k] = 0;
+						s = cashbuf;
+
+					case 4:
+						if (decimal)
+						{
+							tmp_obj = Py_BuildValue("(s)", s);
+							val = PyEval_CallObject(decimal, tmp_obj);
+						}
+						else
+						{
+							tmp_obj = PyString_FromString(s);
+							val = PyFloat_FromString(tmp_obj, NULL);
+						}
+						Py_DECREF(tmp_obj);
+						break;
 
 					default:
 						val = PyString_FromString(s);
@@ -3076,6 +3075,29 @@ static PyObject
 	return ret;
 }
 
+/* set decimal */
+static char set_decimal__doc__[] =
+"set_decimal(class) -- set a decimal type to be used for numeric values.";
+
+static PyObject *
+set_decimal(PyObject *dummy, PyObject *args)
+{
+	PyObject *result = NULL;
+	PyObject *temp;
+
+	if (PyArg_ParseTuple(args, "O:set_decimal", &temp))
+	{
+		if (!PyCallable_Check(temp))
+		{
+			PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+			return NULL;
+		}
+		Py_XINCREF(temp); Py_XDECREF(decimal); decimal = temp;
+		Py_INCREF(Py_None); result = Py_None;
+	}
+	return result;
+}
+
 #ifdef DEFAULT_VARS
 
 /* gets default host */
@@ -3431,6 +3453,8 @@ static struct PyMethodDef pg_methods[] = {
 			escape_bytea__doc__},
 	{"unescape_bytea", (PyCFunction) unescape_bytea, METH_VARARGS,
 			unescape_bytea__doc__},
+	{"set_decimal", (PyCFunction) set_decimal, METH_VARARGS,
+			set_decimal__doc__},
 
 #ifdef DEFAULT_VARS
 	{"get_defhost", pggetdefhost, METH_VARARGS, getdefhost__doc__},
