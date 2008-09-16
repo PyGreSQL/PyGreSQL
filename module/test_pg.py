@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.10 2007-02-24 07:41:07 cito Exp $
+# $Id: test_pg.py,v 1.11 2008-09-16 15:10:01 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -416,8 +416,8 @@ class TestConnectObject(unittest.TestCase):
 		self.assertEqual(self.connection.db, self.dbname)
 
 	def testAttributeError(self):
-		no_error = ''
-		self.assertEqual(self.connection.error, no_error)
+		error = self.connection.error
+		self.assert_(not error or 'krb5_' in error)
 
 	def testAttributeHost(self):
 		def_host = 'localhost'
@@ -447,7 +447,10 @@ class TestConnectObject(unittest.TestCase):
 		self.connection.query("select 1+1")
 
 	def testMethodEndcopy(self):
-		self.connection.endcopy()
+		try:
+			self.connection.endcopy()
+		except IOError:
+			pass
 
 	def testMethodClose(self):
 		self.connection.close()
@@ -699,9 +702,9 @@ class TestDBClassBasic(unittest.TestCase):
 		self.assertEqual(self.db.dbname, self.dbname)
 
 	def testAttributeError(self):
-		no_error = ''
-		self.assertEqual(self.db.error, no_error)
-		self.assertEqual(self.db.db.error, no_error)
+		error = self.db.error
+		self.assert_(not error or 'krb5_' in error)
+		self.assertEqual(self.db.error, self.db.db.error)
 
 	def testAttributeHost(self):
 		def_host = 'localhost'
@@ -746,7 +749,10 @@ class TestDBClassBasic(unittest.TestCase):
 		self.db.query("select 1+1")
 
 	def testMethodEndcopy(self):
-		self.db.endcopy()
+		try:
+			self.db.endcopy()
+		except IOError:
+			pass
 
 	def testMethodClose(self):
 		self.db.close()
