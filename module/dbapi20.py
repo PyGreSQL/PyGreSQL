@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-''' Python DB API 2.0 driver compliance unit test suite. 
-    
+''' Python DB API 2.0 driver compliance unit test suite.
+
     This software is Public Domain and may be used without restrictions.
 
  "Now we have booze and barflies entering the discussion, plus rumours of
@@ -11,14 +11,17 @@
     -- Ian Bicking
 '''
 
-__rcs_id__  = '$Id: dbapi20.py,v 1.2 2006-01-22 13:16:48 darcy Exp $'
-__version__ = '$Revision: 1.2 $'[11:-2]
+__rcs_id__  = '$Id: dbapi20.py,v 1.3 2008-09-16 14:35:21 cito Exp $'
+__version__ = '$Revision: 1.3 $'[11:-2]
 __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'
 
 import unittest
 import time
 
 # $Log: not supported by cvs2svn $
+# Revision 1.2  2006/01/22 13:16:48  darcy
+# Make error message a little more explanatory.
+#
 # Revision 1.1  2006/01/19 11:31:25  darcy
 # Add dbapi20 module for testing.
 #
@@ -60,8 +63,8 @@ import time
 class DatabaseAPI20Test(unittest.TestCase):
     ''' Test a database self.driver for DB API 2.0 compatibility.
         This implementation tests Gadfly, but the TestCase
-        is structured so that other self.drivers can subclass this 
-        test case to ensure compiliance with the DB-API. It is 
+        is structured so that other self.drivers can subclass this
+        test case to ensure compiliance with the DB-API. It is
         expected that this TestCase may be expanded in the future
         if ambiguities or edge conditions are discovered.
 
@@ -71,9 +74,9 @@ class DatabaseAPI20Test(unittest.TestCase):
         self.driver, connect_args and connect_kw_args. Class specification
         should be as follows:
 
-        import dbapi20 
+        import dbapi20
         class mytest(dbapi20.DatabaseAPI20Test):
-           [...] 
+           [...]
 
         Don't 'import DatabaseAPI20Test from dbapi20', or you will
         confuse the unit tester - just 'import dbapi20'.
@@ -92,7 +95,7 @@ class DatabaseAPI20Test(unittest.TestCase):
     xddl2 = 'drop table %sbarflys' % table_prefix
 
     lowerfunc = 'lower' # Name of stored procedure to convert string->lowercase
-        
+
     # Some drivers may need to override these helpers, for example adding
     # a 'commit' after the execute.
     def executeDDL1(self,cursor):
@@ -116,10 +119,10 @@ class DatabaseAPI20Test(unittest.TestCase):
         try:
             cur = con.cursor()
             for ddl in (self.xddl1,self.xddl2):
-                try: 
+                try:
                     cur.execute(ddl)
                     con.commit()
-                except self.driver.Error: 
+                except self.driver.Error:
                     # Assume table didn't exist. Other tests will check if
                     # execute is busted.
                     pass
@@ -211,7 +214,7 @@ class DatabaseAPI20Test(unittest.TestCase):
                 con.rollback()
             except self.driver.NotSupportedError:
                 pass
-    
+
     def test_cursor(self):
         con = self._connect()
         try:
@@ -365,7 +368,7 @@ class DatabaseAPI20Test(unittest.TestCase):
                 )
         elif self.driver.paramstyle == 'named':
             cur.execute(
-                'insert into %sbooze values (:beer)' % self.table_prefix, 
+                'insert into %sbooze values (:beer)' % self.table_prefix,
                 {'beer':"Cooper's"}
                 )
         elif self.driver.paramstyle == 'format':
@@ -505,7 +508,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             tests.
         '''
         populate = [
-            "insert into %sbooze values ('%s')" % (self.table_prefix,s) 
+            "insert into %sbooze values ('%s')" % (self.table_prefix,s)
                 for s in self.samples
             ]
         return populate
@@ -567,7 +570,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             self.assertEqual(len(rows),6)
             rows = [r[0] for r in rows]
             rows.sort()
-          
+
             # Make sure we get the right data back out
             for i in range(0,6):
                 self.assertEqual(rows[i],self.samples[i],
@@ -638,10 +641,10 @@ class DatabaseAPI20Test(unittest.TestCase):
                 'cursor.fetchall should return an empty list if '
                 'a select query returns no rows'
                 )
-            
+
         finally:
             con.close()
-    
+
     def test_mixedfetch(self):
         con = self._connect()
         try:
@@ -677,8 +680,8 @@ class DatabaseAPI20Test(unittest.TestCase):
 
     def help_nextset_setUp(self,cur):
         ''' Should create a procedure called deleteme
-            that returns two result sets, first the 
-	    number of rows in booze then "name from booze"
+            that returns two result sets, first the
+            number of rows in booze then "name from booze"
         '''
         raise NotImplementedError,'Helper not implemented'
         #sql="""
