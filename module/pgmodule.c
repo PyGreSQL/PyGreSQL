@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.78 2008-09-16 22:29:48 cito Exp $
+ * $Id: pgmodule.c,v 1.79 2008-09-17 09:00:08 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -3077,25 +3077,30 @@ static PyObject
 
 /* set decimal */
 static char set_decimal__doc__[] =
-"set_decimal(class) -- set a decimal type to be used for numeric values.";
+"set_decimal(cls) -- set a decimal type to be used for numeric values.";
 
 static PyObject *
-set_decimal(PyObject *dummy, PyObject *args)
+set_decimal(PyObject * self, PyObject * args)
 {
-	PyObject *result = NULL;
-	PyObject *temp;
+	PyObject *ret = NULL;
+	PyObject *cls;
 
-	if (PyArg_ParseTuple(args, "O:set_decimal", &temp))
+	if (PyArg_ParseTuple(args, "O", &cls))
 	{
-		if (!PyCallable_Check(temp))
+		if (cls == Py_None)
 		{
-			PyErr_SetString(PyExc_TypeError, "parameter must be callable");
-			return NULL;
+			Py_XDECREF(decimal); decimal = NULL;
+			Py_INCREF(Py_None); ret = Py_None;
 		}
-		Py_XINCREF(temp); Py_XDECREF(decimal); decimal = temp;
-		Py_INCREF(Py_None); result = Py_None;
+		else if (PyCallable_Check(cls))
+		{
+			Py_XINCREF(cls); Py_XDECREF(decimal); decimal = cls;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else
+			PyErr_SetString(PyExc_TypeError, "decimal type must be None or callable");
 	}
-	return result;
+	return ret;
 }
 
 #ifdef DEFAULT_VARS

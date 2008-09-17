@@ -371,10 +371,10 @@ set_decimal -- set a decimal type to be used for numeric values
 ---------------------------------------------------------------
 Syntax::
 
-  set_decimal(class)
+  set_decimal(cls)
 
 Parameters:
-  :class: the Python class to be used for PostgreSQL numeric values
+  :cls: the Python class to be used for PostgreSQL numeric values
 
 Description:
   This function can be used to specify the Python class that shall be
