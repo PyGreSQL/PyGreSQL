@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.79 2008-09-17 09:00:08 cito Exp $
+ * $Id: pgmodule.c,v 1.80 2008-09-22 19:21:01 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -101,6 +101,11 @@ const char *__movename[5] =
    A macro exists in 7.4 for backwards compatibility. */
 #ifndef PQfreeNotify /* must be earlier than 7.4 */
 #define PQfreemem PQfreeNotify
+#endif
+
+/* Before 8.0, PQsetdbLogin was not thread-safe with kerberos. */
+#if defined(PQnoPasswordSupplied) || !(defined(KRB4) || defined(KRB5))
+#define PQsetdbLoginIsThreadSafe 1
 #endif
 
 /* --------------------------------------------------------------------- */
@@ -536,7 +541,7 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 
 	/* gets result */
 	Py_BEGIN_ALLOW_THREADS
-		self->last_result = PQexec(self->pgcnx->cnx, query);
+	self->last_result = PQexec(self->pgcnx->cnx, query);
 	Py_END_ALLOW_THREADS
 
 	/* checks result validity */
@@ -1618,10 +1623,14 @@ pgconnect(pgobject * self, PyObject * args, PyObject * dict)
 		sprintf(port_buffer, "%d", pgport);
 	}
 
+#ifdef PQsetdbLoginIsThreadSafe
 	Py_BEGIN_ALLOW_THREADS
+#endif
 	npgobj->cnx = PQsetdbLogin(pghost, pgport == -1 ? NULL : port_buffer,
 		pgopt, pgtty, pgdbname, pguser, pgpasswd);
+#ifdef PQsetdbLoginIsThreadSafe
 	Py_END_ALLOW_THREADS
+#endif
 
 	if (PQstatus(npgobj->cnx) == CONNECTION_BAD)
 	{
@@ -1640,8 +1649,11 @@ static void
 pg_dealloc(pgobject * self)
 {
 	if (self->cnx)
+	{
+		Py_BEGIN_ALLOW_THREADS
 		PQfinish(self->cnx);
-
+		Py_END_ALLOW_THREADS
+	}
 	PyObject_Del(self);
 }
 
@@ -1668,7 +1680,10 @@ pg_close(pgobject * self, PyObject * args)
 		return NULL;
 	}
 
+	Py_BEGIN_ALLOW_THREADS
 	PQfinish(self->cnx);
+	Py_END_ALLOW_THREADS
+
 	self->cnx = NULL;
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -2157,7 +2172,7 @@ pg_getnotify(pgobject * self, PyObject * args)
 	 * query
 	 */
 	Py_BEGIN_ALLOW_THREADS
-		result = PQexec(self->cnx, " ");
+	result = PQexec(self->cnx, " ");
 	Py_END_ALLOW_THREADS
 
 		if ((notify = PQnotifies(self->cnx)) != NULL)
@@ -2255,7 +2270,7 @@ pg_query(pgobject * self, PyObject * args)
 
 	/* gets result */
 	Py_BEGIN_ALLOW_THREADS
-		result = PQexec(self->cnx, query);
+	result = PQexec(self->cnx, query);
 	Py_END_ALLOW_THREADS
 
 	/* checks result validity */
@@ -2501,7 +2516,7 @@ pg_inserttable(pgobject * self, PyObject * args)
 	sprintf(buffer, "copy %s from stdin", table);
 
 	Py_BEGIN_ALLOW_THREADS
-		result = PQexec(self->cnx, buffer);
+	result = PQexec(self->cnx, buffer);
 	Py_END_ALLOW_THREADS
 
 	if (!result)
