@@ -5,7 +5,7 @@ from pg import *
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
-dbname = 'pygresql_test'
+dbname = 'unittest'
 dbhost = None
 dbport = 5432
 
