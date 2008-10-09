@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.55 2008-09-16 22:29:47 cito Exp $
+# $Id: pg.py,v 1.56 2008-10-09 16:28:23 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -26,6 +26,7 @@ try:
 except ImportError:
     pass # Python < 2.4
 
+
 # Auxiliary functions which are independent from a DB connection:
 
 def _quote(d, t):
@@ -33,20 +34,24 @@ def _quote(d, t):
 	if d is None:
 		return 'NULL'
 	if t in ('int', 'seq', 'float', 'num'):
-		if d == '': return 'NULL'
+		if d == '':
+			return 'NULL'
 		return str(d)
 	if t == 'money':
-		if d == '': return 'NULL'
+		if d == '':
+			return 'NULL'
 		return "'%.2f'" % float(d)
 	if t == 'bool':
 		if type(d) == StringType:
-			if d == '': return 'NULL'
+			if d == '':
+				return 'NULL'
 			d = str(d).lower() in ('t', 'true', '1', 'y', 'yes', 'on')
 		else:
 			d = not not d
 		return ("'f'", "'t'")[d]
 	if t in ('date', 'inet', 'cidr'):
-		if d == '': return 'NULL'
+		if d == '':
+			return 'NULL'
 		if d.lower() in ('current_date', 'current_time',
 			'current_timestamp', 'localtime', 'localtimestamp'):
 			return d
@@ -97,13 +102,15 @@ def _split_parts(s):
 	while s:
 		s = _split_first_part(s)
 		q.append(s[0])
-		if len(s) < 2: break
+		if len(s) < 2:
+			break
 		s = s[1]
 	return q
 
 def _join_parts(s):
 	"""Join all parts of a dot separated string."""
 	return '.'.join([_is_quoted(p) and '"%s"' % p or p for p in s])
+
 
 # The PostGreSQL database connection interface:
 
@@ -113,9 +120,9 @@ class DB:
 	def __init__(self, *args, **kw):
 		self.db = connect(*args, **kw)
 		self.dbname = self.db.db
-		self.__attnames = {}
-		self.__pkeys = {}
-		self.__args = args, kw
+		self._attnames = {}
+		self._pkeys = {}
+		self._args = args, kw
 		self.debug = None # For debugging scripts, this can be set
 			# * to a string format specification (e.g. in CGI set to "%s<BR>"),
 			# * to a function which takes a string argument or
@@ -126,7 +133,7 @@ class DB:
 		if self.db:
 			return getattr(self.db, name)
 		else:
-			raise InternalError, 'Connection is not valid'
+			raise InternalError('Connection is not valid')
 
 	# For convenience, define some module functions as static methods also:
 	escape_string, escape_bytea, unescape_bytea = map(staticmethod,
@@ -134,20 +141,22 @@ class DB:
 
 	def _do_debug(self, s):
 		"""Print a debug message."""
-		if not self.debug: return
-		if isinstance(self.debug, StringType): print self.debug % s
-		if isinstance(self.debug, FunctionType): self.debug(s)
-		if isinstance(self.debug, FileType): print >> self.debug, s
+		if self.debug:
+			if isinstance(self.debug, StringType):
+				print self.debug % s
+			elif isinstance(self.debug, FunctionType):
+				self.debug(s)
+			elif isinstance(self.debug, FileType):
+				print >> self.debug, s
 
 	def close(self):
 		"""Close the database connection."""
 		# Wraps shared library function so we can track state.
-
 		if self.db:
 			self.db.close()
 			self.db = None
 		else:
-			raise InternalError, 'Connection already closed'
+			raise InternalError('Connection already closed')
 
 	def reopen(self):
 		"""Reopen connection to the database.
@@ -159,7 +168,7 @@ class DB:
 		if self.db:
 			self.db.close()
 		try:
-			self.db = connect(*self.__args[0], **self.__args[1])
+			self.db = connect(*self._args[0], **self._args[1])
 		except:
 			self.db = None
 			raise
@@ -177,7 +186,7 @@ class DB:
 		"""
 		# Wraps shared library function for debugging.
 		if not self.db:
-			raise InternalError, 'Connection is not valid'
+			raise InternalError('Connection is not valid')
 		self._do_debug(qstr)
 		return self.db.query(qstr)
 
@@ -194,7 +203,7 @@ class DB:
 		if len(s) > 1: # name already qualfied?
 			# should be database.schema.table or schema.table
 			if len(s) > 3:
-				raise ProgrammingError, 'Too many dots in class name %s' % cl
+				raise ProgrammingError('Too many dots in class name %s' % cl)
 			schema, cl = s[-2:]
 		else:
 			cl = s[0]
@@ -225,29 +234,29 @@ class DB:
 
 		If newpkey is set and is not a dictionary then set that
 		value as the primary key of the class.  If it is a dictionary
-		then replace the __pkeys dictionary with it.
+		then replace the _pkeys dictionary with it.
 
 		"""
 		# First see if the caller is supplying a dictionary
 		if isinstance(newpkey, DictType):
 			# make sure that we have a namespace
-			self.__pkeys = {}
+			self._pkeys = {}
 			for x in newpkey.keys():
 				if x.find('.') == -1:
-					self.__pkeys['public.' + x] = newpkey[x]
+					self._pkeys['public.' + x] = newpkey[x]
 				else:
-					self.__pkeys[x] = newpkey[x]
-			return self.__pkeys
+					self._pkeys[x] = newpkey[x]
+			return self._pkeys
 
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		if newpkey:
-			self.__pkeys[qcl] = newpkey
+			self._pkeys[qcl] = newpkey
 			return newpkey
 
 		# Get all the primary keys at once
-		if self.__pkeys == {} or not self.__pkeys.has_key(qcl):
+		if self._pkeys == {} or not self._pkeys.has_key(qcl):
 			# if not found, check again in case it was added after we started
-			self.__pkeys = dict([
+			self._pkeys = dict([
 				(_join_parts(r[:2]), r[2]) for r in self.db.query(
 				"SELECT pg_namespace.nspname, pg_class.relname"
 					",pg_attribute.attname FROM pg_class"
@@ -259,9 +268,9 @@ class DB:
 					" AND pg_index.indisprimary='t'"
 					" AND pg_index.indkey[0]=pg_attribute.attnum"
 				).getresult()])
-			self._do_debug(self.__pkeys)
+			self._do_debug(self._pkeys)
 		# will raise an exception if primary key doesn't exist
-		return self.__pkeys[qcl]
+		return self._pkeys[qcl]
 
 	def get_databases(self):
 		"""Get list of databases in the system."""
@@ -300,18 +309,18 @@ class DB:
 
 		"""
 		if isinstance(newattnames, DictType):
-			self.__attnames = newattnames
+			self._attnames = newattnames
 			return
 		elif newattnames:
-			raise ProgrammingError, \
-				'If supplied, newattnames must be a dictionary'
+			raise ProgrammingError(
+				'If supplied, newattnames must be a dictionary')
 		cl = self._split_schema(cl) # split into schema and cl
 		qcl = _join_parts(cl) # build qualified name
 		# May as well cache them:
-		if self.__attnames.has_key(qcl):
-			return self.__attnames[qcl]
+		if self._attnames.has_key(qcl):
+			return self._attnames[qcl]
 		if qcl not in self.get_relations('rv'):
-			raise ProgrammingError, 'Class %s does not exist' % qcl
+			raise ProgrammingError('Class %s does not exist' % qcl)
 		t = {}
 		for att, typ in self.db.query("SELECT pg_attribute.attname"
 			",pg_type.typname FROM pg_class"
@@ -344,8 +353,8 @@ class DB:
 				t[att] = 'money'
 			else:
 				t[att] = 'text'
-		self.__attnames[qcl] = t # cache it
-		return self.__attnames[qcl]
+		self._attnames[qcl] = t # cache it
+		return self._attnames[qcl]
 
 	def get(self, cl, arg, keyname = None, view = 0):
 		"""Get a tuple from a database table or view.
@@ -365,7 +374,7 @@ class DB:
 		# To allow users to work with multiple tables,
 		# we munge the name when the key is "oid"
 		foid = 'oid(%s)' % qcl # build mangled name
-		if keyname == None: # use the primary key by default
+		if keyname is None: # use the primary key by default
 			keyname = self.pkey(qcl)
 		fnames = self.get_attnames(qcl)
 		if isinstance(arg, DictType):
@@ -393,9 +402,8 @@ class DB:
 		self._do_debug(q)
 		res = self.db.query(q).dictresult()
 		if not res:
-			raise DatabaseError, \
-				'No such record in %s where %s=%s' % \
-					(qcl, keyname, _quote(k, fnames[keyname]))
+			raise DatabaseError('No such record in %s where %s=%s'
+				% (qcl, keyname, _quote(k, fnames[keyname])))
 		for k, d in res[0].items():
 			if k == 'oid':
 				k = foid
@@ -414,8 +422,10 @@ class DB:
 		although PostgreSQL does.
 
 		"""
-		if d is None: a = {}
-		else: a = d
+		if d is None:
+			a = {}
+		else:
+			a = d
 		a.update(kw)
 
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
@@ -458,8 +468,10 @@ class DB:
 			kw[foid] = kw['oid']
 			del kw['oid']
 
-		if d is None: a = {}
-		else: a = d
+		if d is None:
+			a = {}
+		else:
+			a = d
 		a.update(kw)
 
 		# XXX this code is for backwards compatibility and will be
@@ -475,8 +487,8 @@ class DB:
 			try:
 				pk = self.pkey(qcl)
 			except:
-				raise ProgrammingError, \
-					'Update needs primary key or oid as %s' % foid
+				raise ProgrammingError(
+					'Update needs primary key or oid as %s' % foid)
 			where = "%s='%s'" % (pk, a[pk])
 		v = []
 		k = 0
@@ -506,12 +518,14 @@ class DB:
 
 		"""
 		# At some point we will need a way to get defaults from a table.
-		if a is None: a = {} # empty if argument is not present
+		if a is None:
+			a = {} # empty if argument is not present
 		qcl = _join_parts(self._split_schema(cl)) # build qualified name
 		foid = 'oid(%s)' % qcl # build mangled oid
 		fnames = self.get_attnames(qcl)
 		for k, t in fnames.items():
-			if k == 'oid': continue
+			if k == 'oid':
+				continue
 			if t in ['int', 'seq', 'float', 'num', 'money']:
 				a[k] = 0
 			elif t == 'bool':
@@ -537,8 +551,10 @@ class DB:
 			kw[foid] = kw['oid']
 			del kw['oid']
 
-		if d is None: a = {}
-		else: a = d
+		if d is None:
+			a = {}
+		else:
+			a = d
 		a.update(kw)
 
 		# XXX this code is for backwards compatibility and will be
@@ -551,6 +567,7 @@ class DB:
 		q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[foid])
 		self._do_debug(q)
 		self.db.query(q)
+
 
 # if run as script, print some information
 
