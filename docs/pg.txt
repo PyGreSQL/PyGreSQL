@@ -743,8 +743,16 @@ Initialization
 --------------
 The DB class is initialized with the same arguments as the connect
 function described in section 2. It also initializes a few
-internal variables. The statement ``db = DB()`` will open the
+internal variables. The statement `db = DB()` will open the
 local database with the name of the user just like connect() does.
+
+You can also initialize the DB class with an existing `_pg` or `pgdb`
+connection. Pass this connection as a single unnamed parameter, or as a
+single parameter named `db`. This allows you to use all of the methods
+of the DB class with a DB-API 2 compliant connection. Note that the
+`close()` and `reopen()` methods are inoperative in this case.
+
+
 
 pkey - return the primary key of a table
 ----------------------------------------
