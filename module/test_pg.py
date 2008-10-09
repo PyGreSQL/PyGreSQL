@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.12 2008-09-16 22:29:48 cito Exp $
+# $Id: test_pg.py,v 1.13 2008-10-09 20:45:29 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -774,6 +774,27 @@ class TestDBClassBasic(unittest.TestCase):
 		self.assertRaises(pg.InternalError, self.db.close)
 		self.assertRaises(pg.InternalError, self.db.query, 'select 1')
 		self.db = pg.DB(self.dbname)
+
+	def testExistingConnection(self):
+		db = pg.DB(self.db.db)
+		self.assertEqual(self.db.db, db.db)
+		self.assert_(db.db)
+		db.close()
+		self.assert_(db.db)
+		db.reopen()
+		self.assert_(db.db)
+		db.close()
+		self.assert_(db.db)
+		db = pg.DB(self.db)
+		self.assertEqual(self.db.db, db.db)
+		db = pg.DB(db=self.db.db)
+		self.assertEqual(self.db.db, db.db)
+		class DB2:
+			pass
+		db2 = DB2()
+		db2._cnx = self.db.db
+		db = pg.DB(db2)
+		self.assertEqual(self.db.db, db.db)
 
 
 class TestDBClass(unittest.TestCase):

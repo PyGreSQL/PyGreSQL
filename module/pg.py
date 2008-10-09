@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.56 2008-10-09 16:28:23 cito Exp $
+# $Id: pg.py,v 1.57 2008-10-09 20:45:29 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -118,8 +118,34 @@ class DB:
 	"""Wrapper class for the _pg connection type."""
 
 	def __init__(self, *args, **kw):
-		self.db = connect(*args, **kw)
-		self.dbname = self.db.db
+		"""Create a new connection.
+
+		You can pass either the connection parameters or an existing
+		_pg or pgdb connection. This allows you to use the methods
+		of the classic pg interface with a DB-API 2 pgdb connection.
+
+		"""
+		if not args and len(kw) == 1:
+			db = kw.get('db')
+		elif not kw and len(args) == 1:
+			db = args[0]
+		else:
+			db = None
+		if db:
+			if isinstance(db, DB):
+				db = db.db
+			else:
+				try:
+					db = db._cnx
+				except AttributeError:
+					pass
+		if not db or not hasattr(db, 'db') or not hasattr(db, 'query'):
+			db = connect(*args, **kw)
+			self._closeable = 1
+		else:
+			self._closeable = 0
+		self.db = db
+		self.dbname = db.db
 		self._attnames = {}
 		self._pkeys = {}
 		self._args = args, kw
@@ -152,11 +178,12 @@ class DB:
 	def close(self):
 		"""Close the database connection."""
 		# Wraps shared library function so we can track state.
-		if self.db:
-			self.db.close()
-			self.db = None
-		else:
-			raise InternalError('Connection already closed')
+		if self._closeable:
+			if self.db:
+				self.db.close()
+				self.db = None
+			else:
+				raise InternalError('Connection already closed')
 
 	def reopen(self):
 		"""Reopen connection to the database.
@@ -165,13 +192,15 @@ class DB:
 		Note that we can still reopen a database that we have closed.
 
 		"""
-		if self.db:
-			self.db.close()
-		try:
-			self.db = connect(*self._args[0], **self._args[1])
-		except:
-			self.db = None
-			raise
+		# There is no such shared library function.
+		if self._closeable:
+			if self.db:
+				self.db.close()
+			try:
+				self.db = connect(*self._args[0], **self._args[1])
+			except:
+				self.db = None
+				raise
 
 	def query(self, qstr):
 		"""Executes a SQL command string.
