@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.37 2008-09-16 22:29:47 cito Exp $
+# $Id: pgdb.py,v 1.38 2008-10-10 05:49:34 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -207,7 +207,7 @@ class pgdbCursor:
 				try:
 					self._cnx.source().execute(sql)
 				except:
-					raise OperationalError, "can't start transaction"
+					raise OperationalError("can't start transaction")
 				self._dbcnx._tnx = 1
 			for params in param_seq:
 				if params:
@@ -220,11 +220,11 @@ class pgdbCursor:
 				else:
 					self.rowcount = -1
 		except Error, msg:
-			raise DatabaseError, "error '%s' in '%s'" % (msg, sql)
+			raise DatabaseError("error '%s' in '%s'" % (msg, sql))
 		except Exception, err:
-			raise OperationalError, "internal error in '%s': %s" % (sql, err)
+			raise OperationalError("internal error in '%s': %s" % (sql, err))
 		except:
-			raise OperationalError, "internal error in '%s'" % sql
+			raise OperationalError("internal error in '%s'" % sql)
 		# then initialize result raw count and description
 		if self._src.resulttype == RESULT_DQL:
 			self.rowcount = self._src.ntuples
@@ -261,7 +261,7 @@ class pgdbCursor:
 		try:
 			res = self._src.fetch(size)
 		except Error, e:
-			raise DatabaseError, str(e)
+			raise DatabaseError(str(e))
 		result = []
 		for r in res:
 			row = []
@@ -271,7 +271,7 @@ class pgdbCursor:
 		return result
 
 	def nextset(self):
-		raise NotSupportedError, "nextset() is not supported"
+		raise NotSupportedError("nextset() is not supported")
 
 	def setinputsizes(self, sizes):
 		pass
@@ -303,7 +303,7 @@ def _quote(x):
 	elif hasattr(x, '__pg_repr__'):
 		x = x.__pg_repr__()
 	else:
-		raise InterfaceError, 'do not know how to handle type %s' % type(x)
+		raise InterfaceError('do not know how to handle type %s' % type(x))
 	return x
 
 
@@ -326,14 +326,14 @@ class pgdbCnx:
 		try:
 			self._cnx.source()
 		except:
-			raise OperationalError, "invalid connection"
+			raise OperationalError("invalid connection")
 
 	def close(self):
 		if self._cnx:
 			self._cnx.close()
 			self._cnx = None
 		else:
-			raise OperationalError, "connection has been closed"
+			raise OperationalError("connection has been closed")
 
 	def commit(self):
 		if self._cnx:
@@ -342,9 +342,9 @@ class pgdbCnx:
 				try:
 					self._cnx.source().execute("COMMIT")
 				except:
-					raise OperationalError, "can't commit"
+					raise OperationalError("can't commit")
 		else:
-			raise OperationalError, "connection has been closed"
+			raise OperationalError("connection has been closed")
 
 	def rollback(self):
 		if self._cnx:
@@ -353,18 +353,18 @@ class pgdbCnx:
 				try:
 					self._cnx.source().execute("ROLLBACK")
 				except:
-					raise OperationalError, "can't rollback"
+					raise OperationalError("can't rollback")
 		else:
-			raise OperationalError, "connection has been closed"
+			raise OperationalError("connection has been closed")
 
 	def cursor(self):
 		if self._cnx:
 			try:
 				return pgdbCursor(self)
 			except:
-				raise OperationalError, "invalid connection"
+				raise OperationalError("invalid connection")
 		else:
-			raise OperationalError, "connection has been closed"
+			raise OperationalError("connection has been closed")
 
 
 ### Module Interface
