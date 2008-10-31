@@ -2,8 +2,9 @@
 PyGreSQL ChangeLog
 ==================
 
-Version 3.8.2 (?)
------------------
+Version 4.0 (?)
+---------------
+- Dropped support for Python below 2.3 and PostgreSQL below 7.2
 - Added new method to get parameter settings.
 - Added row_factory as suggested by Simon Pamies.
 - Separated between mandatory and additional type objects.

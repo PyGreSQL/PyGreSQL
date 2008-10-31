@@ -2,13 +2,13 @@
 PyGreSQL Announcements
 ======================
 
----------------------------------
-Release of PyGreSQL version 3.8.1
----------------------------------
+-------------------------------
+Release of PyGreSQL version 4.0
+-------------------------------
 
-PyGreSQL v3.8.1 has been released.
+PyGreSQL v4.0 has been released.
 
-It is available at: ftp://ftp.PyGreSQL.org/pub/distrib/PyGreSQL-3.8.1.tgz.
+It is available at: ftp://ftp.PyGreSQL.org/pub/distrib/PyGreSQL-4.0.tgz.
 
 If you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.

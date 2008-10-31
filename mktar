@@ -1,7 +1,6 @@
 #! /bin/sh
 
-BETA=YES
-VERSION=3.8.2
+VERSION=4.0
 
 # small safety test
 if [ ! -f module/pgmodule.c ]
@@ -10,7 +9,7 @@ then
 	exit 1
 fi
 
-if [ $BETA = "YES" ]
+if [ -f BETA ]
 then
 	VERSION=$VERSION-pre`date +"%y%m%d"`
 	PACKAGE=pygresql.pkg-beta

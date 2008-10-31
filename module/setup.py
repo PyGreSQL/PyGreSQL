@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.23 2008-10-31 17:26:22 cito Exp $
+# $Id: setup.py,v 1.24 2008-10-31 21:13:19 darcy Exp $
 
-"""Setup script for PyGreSQL version 3.8.1
+"""Setup script for PyGreSQL version 4.0
 
 Authors and history:
 * PyGreSQL written 1997 by D'Arcy J.M. Cain <darcy@druid.net>
@@ -17,8 +17,8 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-Tested with Python 2.4.3 and PostGreSQL 8.1.4. Older version should work
-as well, but you will need at least Python 2.1 and PostgreSQL 7.1.3.
+Tested with Python 2.5.2 and PostGreSQL 8.2.10. Older version should work
+as well, but you will need at least Python 2.3 and PostgreSQL 7.2.
 
 Use as follows:
 python setup.py build   # to build the module
@@ -96,7 +96,7 @@ if sys.platform == "win32":
 
 setup(
 	name = "PyGreSQL",
-	version = "3.8.1",
+	version = "4.0",
 	description = "Python PostgreSQL Interfaces",
 	author = "D'Arcy J. M. Cain",
 	author_email = "darcy@PyGreSQL.org",
