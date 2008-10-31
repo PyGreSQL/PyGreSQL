@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.22 2006-05-31 00:04:01 cito Exp $
+# $Id: setup.py,v 1.23 2008-10-31 17:26:22 cito Exp $
 
 """Setup script for PyGreSQL version 3.8.1
 
@@ -63,13 +63,13 @@ def mk_include():
 	for f in os.listdir(pg_include_dir_server):
 		if not f.endswith('.h'):
 			continue
-		d = file(os.path.join(pg_include_dir_server, f)).read()
+		d = open(os.path.join(pg_include_dir_server, f)).read()
 		if f == 'pg_config.h':
 			d += '\n'
 			d += '#undef ENABLE_NLS\n'
 			d += '#undef USE_REPL_SNPRINTF\n'
 			d += '#undef USE_SSL\n'
-		file(os.path.join('include', f), 'w').write(d)
+		open(os.path.join('include', f), 'w').write(d)
 
 def rm_include():
 	"""Remove the temporary local include directory."""
