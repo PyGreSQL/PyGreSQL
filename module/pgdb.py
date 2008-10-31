@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.38 2008-10-10 05:49:34 cito Exp $
+# $Id: pgdb.py,v 1.39 2008-10-31 17:13:50 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -97,34 +97,65 @@ class pgdbTypeCache:
 	def __init__(self, cnx):
 		self._src = cnx.source()
 		self._cache = {}
+		self._casters = {}
 
 	def typecast(self, typ, value):
-		if value is None:
-			# for NULL values, no typecast is necessary
+		return self._typecaster(typ)(value)
+
+	def _typecaster(self, typ):
+		# Type comparisons are very expensive because of the
+		# shear amount of string comparisons it will generate.
+		# Cache type casters for much better performance
+		# when fetching many values.
+		try:
+			return self._casters[typ]
+		except KeyError:
+			caster = self._create_typecaster(typ)
+			self._casters[typ] = caster
+			return caster
+
+	def _create_typecaster(self, typ):
+
+		def no_cast(value):
 			return value
-		if typ == STRING:
-			pass
-		elif typ == BINARY:
-			pass
-		elif typ == BOOL:
-			value = (value[:1] in ['t','T'])
+
+		def cast_bool(value):
+			return value[:1] in ['t','T']
+
+		def cast_money(value):
+			return Decimal(''.join(filter(
+				lambda v: v in '0123456789.-', value)))
+
+		def cast(caster):
+			def cast_if_not_none(value):
+				if value is None:
+					# NULL/None are equivalent regardless of type
+					return None
+				else:
+					return caster(value)
+			return cast_if_not_none
+
+		if typ == BOOL:
+			return cast(cast_bool)
+		elif typ == STRING or typ == BINARY:
+			return no_cast
 		elif typ == INTEGER:
-			value = int(value)
+			return cast(int)
 		elif typ == LONG:
-			value = long(value)
+			return cast(long)
 		elif typ == FLOAT:
-			value = float(value)
+			return cast(float)
 		elif typ == NUMERIC:
-			value = Decimal(value)
+			return cast(Decimal)
 		elif typ == MONEY:
-			value = ''.join(filter(lambda v: v in '0123456789.-', value))
-			value = Decimal(value)
+			return cast(cast_money)
 		elif typ == DATETIME:
 			# format may differ ... we'll give string
-			pass
+			return no_cast
 		elif typ == ROWID:
-			value = long(value)
-		return value
+			return cast(long)
+		else:
+			return no_cast
 
 	def getdescr(self, oid):
 		try:

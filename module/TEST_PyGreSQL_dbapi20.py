@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.7 2006-12-30 07:06:49 darcy Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.8 2008-10-31 17:13:50 cito Exp $
 
 import dbapi20
 import unittest
@@ -51,8 +51,43 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         curs.execute("SELECT 1 AS a, 2 AS b")
         self.assertEqual(curs.fetchone(), {'a': 1, 'b': 2})
 
-    def test_nextset(self): pass
-    def test_setoutputsize(self): pass
+    def test_fetch_2_rows(self):
+        Decimal = pgdb.Decimal
+        values = ['test', 'test', True, 5, 6L, 5.7,
+            Decimal('234.234234'), Decimal('75.45'),
+            '2008-10-20 15:25:35', 7897234L]
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s ("
+                "stringtest varchar,"
+                "binarytest bytea,"
+                "booltest bool,"
+                "integertest int4,"
+                "longtest int8,"
+                "floattest float8,"
+                "numerictest numeric,"
+                "moneytest money,"
+                "datetimetest timestamp,"
+                "rowidtest oid)" % table)
+            for i in range(2):
+                cur.execute("insert into %s values ("
+                    "%%s,%%s,%%s,%%s,%%s,%%s,%%s,"
+                    "'%%s'::money,%%s,%%s)" % table, values)
+            cur.execute("select * from %s" % table)
+            rows = cur.fetchall()
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0], values)
+            self.assertEqual(rows[0], rows[1])
+        finally:
+            con.close()
+
+    def test_nextset(self):
+        pass
+
+    def test_setoutputsize(self):
+        pass
 
 if __name__ == '__main__':
     unittest.main()
