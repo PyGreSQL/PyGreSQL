@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.81 2008-10-31 21:13:19 darcy Exp $
+ * $Id: pgmodule.c,v 1.82 2008-11-01 18:15:53 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -41,11 +41,6 @@
 #undef vsnprintf
 
 #include <Python.h>
-
-/* PyObject_Del does not exist in older versions of Python: */
-#if PY_VERSION_HEX < 0x01060000
-#define PyObject_Del(op) PyMem_DEL((op))
-#endif
 
 static PyObject *Error, *Warning, *InterfaceError,
 	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
