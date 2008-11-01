@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.41 2008-11-01 11:29:46 cito Exp $
+# $Id: pgdb.py,v 1.42 2008-11-01 13:04:07 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -66,6 +66,10 @@ Basic usage:
 from _pg import *
 import types
 import time
+try:
+	frozenset
+except NameError: # Python < 2.4
+	from sets import ImmutableSet as frozenset
 try: # use mx.DateTime module if available
 	from mx.DateTime import DateTime, \
 		TimeDelta, DateTimeType
@@ -109,13 +113,12 @@ _cast = {'bool': _cast_bool,
 	'numeric': Decimal, 'money': _cast_money}
 
 
-class pgdbTypeCache:
+class pgdbTypeCache(dict):
 	"""Cache for database types."""
 
 	def __init__(self, cnx):
 		"""Initialize type cache for connection."""
 		self._src = cnx.source()
-		self._cache = {}
 
 	def typecast(typ, value):
 		"""Cast value to database type."""
@@ -133,7 +136,7 @@ class pgdbTypeCache:
 	def getdescr(self, oid):
 		"""Get name of database type with given oid."""
 		try:
-			return self._cache[oid]
+			return self[oid]
 		except:
 			self._src.execute(
 				"SELECT typname, typlen "
@@ -143,27 +146,30 @@ class pgdbTypeCache:
 			# It will have to be prepended by the caller.
 			res = (res[0], None, int(res[1]),
 				None, None, None)
-			self._cache[oid] = res
+			self[oid] = res
 			return res
 
 
 class _quoteitem(dict):
+	"""Dictionary with auto quoting of its items."""
+
 	def __getitem__(self, key):
 		return _quote(super(_quoteitem, self).__getitem__(key))
 
 
 def _quote(x):
+	"""Quote value depending on its type."""
 	if isinstance(x, DateTimeType):
 		x = str(x)
 	elif isinstance(x, unicode):
 		x = x.encode( 'utf-8' )
-	if isinstance(x, types.StringType):
+	if isinstance(x, str):
 		x = "'%s'" % str(x).replace("\\", "\\\\").replace("'", "''")
-	elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
+	elif isinstance(x, (int, long, float)):
 		pass
 	elif x is None:
 		x = 'NULL'
-	elif isinstance(x, (types.ListType, types.TupleType)):
+	elif isinstance(x, (list, tuple)):
 		x = '(%s)' % ','.join(map(lambda x: str(_quote(x)), x))
 	elif Decimal is not float and isinstance(x, Decimal):
 		pass
@@ -175,6 +181,11 @@ def _quote(x):
 
 
 def _quoteparams(s, params):
+	"""Quote parameters.
+
+	This function works for both mappings and sequences.
+
+	"""
 	if hasattr(params, 'has_key'):
 		params = _quoteitem(params)
 	else:
@@ -184,7 +195,7 @@ def _quoteparams(s, params):
 
 ### Cursor Object
 
-class pgdbCursor:
+class pgdbCursor(object):
 	"""Cursor Object."""
 
 	def __init__(self, dbcnx):
@@ -197,7 +208,7 @@ class pgdbCursor:
 		self.arraysize = 1
 		self.lastrowid = None
 
-	def row_factory(self, row):
+	def row_factory(row):
 		"""You can overwrite this with a custom row factory
 			e.g. a dict_factory
 
@@ -209,8 +220,8 @@ class pgdbCursor:
 					return d
 			cursor = myCursor(cnx)
 		"""
-
 		return row
+	row_factory = staticmethod(row_factory)
 
 	def close(self):
 		self._src.close()
@@ -226,8 +237,8 @@ class pgdbCursor:
 		# The parameters may also be specified as list of
 		# tuples to e.g. insert multiple rows in a single
 		# operation, but this kind of usage is deprecated:
-		if params and isinstance(params, types.ListType) \
-				and isinstance(params[0], types.TupleType):
+		if (params and isinstance(params, list)
+				and isinstance(params[0], tuple)):
 			self.executemany(operation, params)
 		else:
 			# not a list of tuples
@@ -300,30 +311,31 @@ class pgdbCursor:
 		if keep == 1:
 			self.arraysize = size
 		try:
-			res = self._src.fetch(size)
+			result = self._src.fetch(size)
 		except Error, e:
 			raise DatabaseError(str(e))
-		result = []
-		for r in res:
-			row = []
-			for desc, val in zip(self.description, r):
-				row.append(self._type_cache.typecast(desc[1], val))
-			result.append(self.row_factory(row))
-		return result
+		row_factory = self.row_factory
+		typecast = self._type_cache.typecast
+		coltypes = [desc[1] for desc in self.description]
+		return [row_factory([typecast(*args)
+			for args in zip(coltypes, row)]) for row in result]
 
-	def nextset(self):
+	def nextset():
 		raise NotSupportedError("nextset() is not supported")
+	nextset = staticmethod(nextset)
 
-	def setinputsizes(self, sizes):
+	def setinputsizes(sizes):
 		pass
+	setinputsizes = staticmethod(setinputsizes)
 
-	def setoutputsize(self, size, col=0):
+	def setoutputsize(size, col=0):
 		pass
+	setoutputsize = staticmethod(setoutputsize)
 
 
 ### Connection Objects
 
-class pgdbCnx:
+class pgdbCnx(object):
 	"""Connection Object."""
 
 	def __init__(self, cnx):
@@ -429,7 +441,7 @@ def connect(dsn=None,
 
 ### Types Handling
 
-class pgdbType:
+class pgdbType(frozenset):
 	"""Type class for a couple of PostgreSQL data types.
 
 	PostgreSQL is object-oriented: types are dynamic.
@@ -437,46 +449,53 @@ class pgdbType:
 
 	"""
 
-	def __init__(self, *values):
-		self.values = values
+	def __new__(cls, values):
+		# for Python >= 2.4
+		if isinstance(values, basestring):
+			values = values.split()
+		return super(pgdbType, cls).__new__(cls, values)
 
-	def __cmp__(self, other):
-		if other in self.values:
-			return 0
-		if other < self.values:
-			return 1
+	def __init__(self, values):
+		# for Python < 2.4
+		if isinstance(values, basestring):
+			values = values.split()
+		super(pgdbType, self).__init__(values)
+
+	def __eq__(self, other):
+		if isinstance(other, basestring):
+			return other in self
 		else:
-			return -1
+			return super(pgdbType, self).__eq__(other)
+
+	def __ne__(self, other):
+		if isinstance(other, basestring):
+			return other not in self
+		else:
+			return super(pgdbType, self).__ne__(other)
 
 
 # Mandatory type objects defined by DB-API 2 specs:
 
-STRING = pgdbType('char', 'bpchar', 'name', 'text', 'varchar', 'bool')
-BINARY = pgdbType() # BLOB support is pg specific
-NUMBER = pgdbType('int2', 'int4', 'serial', 'int8',
-	'float4', 'float8', 'numeric', 'money')
-# this may be problematic as type are quite different ... I hope it won't hurt
-DATETIME = pgdbType('date', 'time', 'timetz',
-	'timestamp', 'timestamptz', 'datetime', 'abstime'
-	'interval', 'tinterval', 'timespan', 'reltime')
-# OIDs are used for everything (types, tables, BLOBs, rows, ...). This may cause
-# confusion, but we are unable to find out what exactly is behind the OID (at
-# least not easily enough). Should this be undefined as BLOBs ?
-ROWID = pgdbType('oid', 'oid8')
+STRING = pgdbType('char bpchar name text varchar')
+BINARY = pgdbType('bytea')
+NUMBER = pgdbType('int2 int4 serial int8 float4 float8 numeric money')
+DATETIME = pgdbType('date time timetz timestamp timestamptz datetime abstime'
+	' interval tinterval timespan reltime')
+ROWID = pgdbType('oid oid8')
 
 
 # Additional type objects (more specific):
 
 BOOL = pgdbType('bool')
-INTEGER = pgdbType('int2', 'int4', 'serial')
+INTEGER = pgdbType('int2 int4 serial')
 LONG = pgdbType('int8')
-FLOAT = pgdbType('float4', 'float8')
+FLOAT = pgdbType('float4 float8')
 NUMERIC = pgdbType('numeric')
 MONEY = pgdbType('money')
 DATE = pgdbType('date')
-TIME = pgdbType('time', 'timetz')
-TIMESTAMP = pgdbType('timestamp', 'timestamptz', 'datetime', 'abstime')
-INTERVAL = pgdbType('interval', 'tinterval', 'timespan', 'reltime')
+TIME = pgdbType('time timetz')
+TIMESTAMP = pgdbType('timestamp timestamptz datetime abstime')
+INTERVAL = pgdbType('interval tinterval timespan reltime')
 
 
 # Mandatory type helpers defined by DB-API 2 specs:
@@ -491,16 +510,16 @@ def Timestamp(year, month, day, hour, minute, second):
 	return DateTime(year, month, day, hour, minute, second)
 
 def DateFromTicks(ticks):
-	return apply(Date, time.localtime(ticks)[:3])
+	return Date(*time.localtime(ticks)[:3])
 
 def TimeFromTicks(ticks):
-	return apply(Time, time.localtime(ticks)[3:6])
+	return Time(*time.localtime(ticks)[3:6])
 
 def TimestampFromTicks(ticks):
-	return apply(Timestamp, time.localtime(ticks)[:6])
+	return Timestamp(*time.localtime(ticks)[:6])
 
-def Binary(str):
-	return str
+def Binary(value):
+	return value
 
 
 # If run as script, print some information:

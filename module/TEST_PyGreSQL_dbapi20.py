@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.8 2008-10-31 17:13:50 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.9 2008-11-01 13:04:07 cito Exp $
 
 import dbapi20
 import unittest
@@ -84,10 +84,32 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             con.close()
 
     def test_nextset(self):
-        pass
+        pass # not implemented
 
     def test_setoutputsize(self):
-        pass
+        pass # not implemented
+
+    def test_pgdb_type(self):
+        self.assertEqual(pgdb.STRING, pgdb.STRING)
+        self.assertNotEqual(pgdb.STRING, pgdb.INTEGER)
+        self.assertNotEqual(pgdb.STRING, pgdb.BOOL)
+        self.assertNotEqual(pgdb.BOOL, pgdb.INTEGER)
+        self.assertEqual(pgdb.INTEGER, pgdb.INTEGER)
+        self.assertNotEqual(pgdb.INTEGER, pgdb.NUMBER)
+        self.assertEqual('char', pgdb.STRING)
+        self.assertEqual('varchar', pgdb.STRING)
+        self.assertEqual('text', pgdb.STRING)
+        self.assertNotEqual('numeric', pgdb.STRING)
+        self.assertEqual('numeric', pgdb.NUMERIC)
+        self.assertEqual('numeric', pgdb.NUMBER)
+        self.assertEqual('int4', pgdb.NUMBER)
+        self.assertNotEqual('int4', pgdb.NUMERIC)
+        self.assert_('char' in pgdb.STRING)
+        self.assert_(pgdb.NUMERIC <= pgdb.NUMBER)
+        self.assert_(pgdb.NUMBER >= pgdb.INTEGER)
+        self.assert_(pgdb.TIME <= pgdb.DATETIME)
+        self.assert_(pgdb.DATETIME >= pgdb.DATE)
+
 
 if __name__ == '__main__':
     unittest.main()
