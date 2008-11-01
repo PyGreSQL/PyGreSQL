@@ -4,7 +4,10 @@ PyGreSQL ChangeLog
 
 Version 4.0 (?)
 ---------------
-- Dropped support for Python below 2.3 and PostgreSQL below 7.2
+- Dropped support for Python below 2.3 and PostgreSQL below 7.4.
+- Improved performance of fetchall() for large result sets
+  by speeding up the type casts (as suggested by Peter Schuller).
+- Exposed exceptions as attributes of the connection object.
 - Added new method to get parameter settings.
 - Added row_factory as suggested by Simon Pamies.
 - Separated between mandatory and additional type objects.
