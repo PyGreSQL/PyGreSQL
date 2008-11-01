@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.24 2008-10-31 21:13:19 darcy Exp $
+# $Id: setup.py,v 1.25 2008-11-01 18:21:12 cito Exp $
 
 """Setup script for PyGreSQL version 4.0
 
@@ -44,39 +44,39 @@ from distutils.extension import Extension
 import sys, os
 
 def pg_config(s):
-	"""Retrieve information about installed version of PostgreSQL."""
-	f = os.popen("pg_config --%s" % s)
-	d = f.readline().strip()
-	if f.close() is not None:
-		raise Exception, "pg_config tool is not available."
-	if not d:
-		raise Exception, "Could not get %s information." % s
-	return d
+    """Retrieve information about installed version of PostgreSQL."""
+    f = os.popen("pg_config --%s" % s)
+    d = f.readline().strip()
+    if f.close() is not None:
+        raise Exception, "pg_config tool is not available."
+    if not d:
+        raise Exception, "Could not get %s information." % s
+    return d
 
 def mk_include():
-	"""Create a temporary local include directory.
+    """Create a temporary local include directory.
 
-	The directory will contain a copy of the PostgreSQL server header files,
-	where all features which are not necessary for PyGreSQL are disabled.
-	"""
-	os.mkdir('include')
-	for f in os.listdir(pg_include_dir_server):
-		if not f.endswith('.h'):
-			continue
-		d = open(os.path.join(pg_include_dir_server, f)).read()
-		if f == 'pg_config.h':
-			d += '\n'
-			d += '#undef ENABLE_NLS\n'
-			d += '#undef USE_REPL_SNPRINTF\n'
-			d += '#undef USE_SSL\n'
-		open(os.path.join('include', f), 'w').write(d)
+    The directory will contain a copy of the PostgreSQL server header files,
+    where all features which are not necessary for PyGreSQL are disabled.
+    """
+    os.mkdir('include')
+    for f in os.listdir(pg_include_dir_server):
+        if not f.endswith('.h'):
+            continue
+        d = open(os.path.join(pg_include_dir_server, f)).read()
+        if f == 'pg_config.h':
+            d += '\n'
+            d += '#undef ENABLE_NLS\n'
+            d += '#undef USE_REPL_SNPRINTF\n'
+            d += '#undef USE_SSL\n'
+        open(os.path.join('include', f), 'w').write(d)
 
 def rm_include():
-	"""Remove the temporary local include directory."""
-	if os.path.exists('include'):
-		for f in os.listdir('include'):
-			os.remove(os.path.join('include', f))
-		os.rmdir('include')
+    """Remove the temporary local include directory."""
+    if os.path.exists('include'):
+        for f in os.listdir('include'):
+            os.remove(os.path.join('include', f))
+        os.rmdir('include')
 
 pg_include_dir = pg_config('includedir')
 pg_include_dir_server = pg_config('includedir-server')
@@ -92,24 +92,24 @@ library_dirs = [pg_libdir]
 libraries=['pq']
 
 if sys.platform == "win32":
-	include_dirs.append(os.path.join(pg_include_dir_server, 'port/win32'))
+    include_dirs.append(os.path.join(pg_include_dir_server, 'port/win32'))
 
 setup(
-	name = "PyGreSQL",
-	version = "4.0",
-	description = "Python PostgreSQL Interfaces",
-	author = "D'Arcy J. M. Cain",
-	author_email = "darcy@PyGreSQL.org",
-	url = "http://www.pygresql.org",
-	license = "Python",
-	py_modules = ['pg', 'pgdb'],
-	ext_modules = [Extension(
-		'_pg', ['pgmodule.c'],
-		include_dirs = include_dirs,
-		library_dirs = library_dirs,
-		libraries = libraries,
-		extra_compile_args = ['-O2'],
-		)],
-	)
+    name = "PyGreSQL",
+    version = "4.0",
+    description = "Python PostgreSQL Interfaces",
+    author = "D'Arcy J. M. Cain",
+    author_email = "darcy@PyGreSQL.org",
+    url = "http://www.pygresql.org",
+    license = "Python",
+    py_modules = ['pg', 'pgdb'],
+    ext_modules = [Extension(
+        '_pg', ['pgmodule.c'],
+        include_dirs = include_dirs,
+        library_dirs = library_dirs,
+        libraries = libraries,
+        extra_compile_args = ['-O2'],
+        )],
+    )
 
 rm_include()
