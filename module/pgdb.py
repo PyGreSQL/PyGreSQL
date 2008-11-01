@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.42 2008-11-01 13:04:07 cito Exp $
+# $Id: pgdb.py,v 1.43 2008-11-01 15:38:02 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -64,7 +64,6 @@ Basic usage:
 """
 
 from _pg import *
-import types
 import time
 try:
 	frozenset
@@ -118,6 +117,7 @@ class pgdbTypeCache(dict):
 
 	def __init__(self, cnx):
 		"""Initialize type cache for connection."""
+		super(pgdbTypeCache, self).__init__()
 		self._src = cnx.source()
 
 	def typecast(typ, value):
@@ -137,7 +137,7 @@ class pgdbTypeCache(dict):
 		"""Get name of database type with given oid."""
 		try:
 			return self[oid]
-		except:
+		except KeyError:
 			self._src.execute(
 				"SELECT typname, typlen "
 				"FROM pg_type WHERE oid=%s" % oid)
@@ -157,30 +157,30 @@ class _quoteitem(dict):
 		return _quote(super(_quoteitem, self).__getitem__(key))
 
 
-def _quote(x):
+def _quote(val):
 	"""Quote value depending on its type."""
-	if isinstance(x, DateTimeType):
-		x = str(x)
-	elif isinstance(x, unicode):
-		x = x.encode( 'utf-8' )
-	if isinstance(x, str):
-		x = "'%s'" % str(x).replace("\\", "\\\\").replace("'", "''")
-	elif isinstance(x, (int, long, float)):
+	if isinstance(val, DateTimeType):
+		val = str(val)
+	elif isinstance(val, unicode):
+		val = val.encode( 'utf-8' )
+	if isinstance(val, str):
+		val = "'%s'" % str(val).replace("\\", "\\\\").replace("'", "''")
+	elif isinstance(val, (int, long, float)):
 		pass
-	elif x is None:
-		x = 'NULL'
-	elif isinstance(x, (list, tuple)):
-		x = '(%s)' % ','.join(map(lambda x: str(_quote(x)), x))
-	elif Decimal is not float and isinstance(x, Decimal):
+	elif val is None:
+		val = 'NULL'
+	elif isinstance(val, (list, tuple)):
+		val = '(%s)' % ','.join(map(lambda v: str(_quote(v)), val))
+	elif Decimal is not float and isinstance(val, Decimal):
 		pass
-	elif hasattr(x, '__pg_repr__'):
-		x = x.__pg_repr__()
+	elif hasattr(val, '__pg_repr__'):
+		val = val.__pg_repr__()
 	else:
-		raise InterfaceError('do not know how to handle type %s' % type(x))
-	return x
+		raise InterfaceError('do not know how to handle type %s' % type(val))
+	return val
 
 
-def _quoteparams(s, params):
+def _quoteparams(string, params):
 	"""Quote parameters.
 
 	This function works for both mappings and sequences.
@@ -190,7 +190,7 @@ def _quoteparams(s, params):
 		params = _quoteitem(params)
 	else:
 		params = tuple(map(_quote, params))
-	return s % params
+	return string % params
 
 
 ### Cursor Object
@@ -199,6 +199,7 @@ class pgdbCursor(object):
 	"""Cursor Object."""
 
 	def __init__(self, dbcnx):
+		"""Create a cursor object for the database connection."""
 		self._dbcnx = dbcnx
 		self._cnx = dbcnx._cnx
 		self._type_cache = dbcnx._type_cache
@@ -209,28 +210,29 @@ class pgdbCursor(object):
 		self.lastrowid = None
 
 	def row_factory(row):
-		"""You can overwrite this with a custom row factory
-			e.g. a dict_factory
+		"""Process rows before they are returned.
 
-			class myCursor(pgdb.pgdbCursor):
-				def cursor.row_factory(self, row):
-					d = {}
-					for idx, col in enumerate(self.description):
-						d[col[0]] = row[idx]
-					return d
-			cursor = myCursor(cnx)
+		You can overwrite this with a custom row factory,
+		e.g. a dict factory:
+
+		class myCursor(pgdb.pgdbCursor):
+			def cursor.row_factory(self, row):
+				d = {}
+				for idx, col in enumerate(self.description):
+					d[col[0]] = row[idx]
+				return d
+		cursor = myCursor(cnx)
+
 		"""
 		return row
 	row_factory = staticmethod(row_factory)
 
 	def close(self):
+		"""Close the cursor object."""
 		self._src.close()
 		self.description = None
 		self.rowcount = -1
 		self.lastrowid = None
-
-	def arraysize(self, size):
-		self.arraysize = size
 
 	def execute(self, operation, params=None):
 		"""Prepare and execute a database operation (query or command)."""
@@ -260,7 +262,7 @@ class pgdbCursor(object):
 					self._cnx.source().execute(sql)
 				except:
 					raise OperationalError("can't start transaction")
-				self._dbcnx._tnx = 1
+				self._dbcnx._tnx = True
 			for params in param_seq:
 				if params:
 					sql = _quoteparams(operation, params)
@@ -280,15 +282,9 @@ class pgdbCursor(object):
 		# then initialize result raw count and description
 		if self._src.resulttype == RESULT_DQL:
 			self.rowcount = self._src.ntuples
-			d = []
-			for typ in self._src.listinfo():
-				# listinfo is a sequence of
-				# (index, column_name, type_oid)
-				# getdescr returns all items needed for a
-				# description tuple except the column_name.
-				desc = typ[1:2] + self._type_cache.getdescr(typ[2])
-				d.append(desc)
-			self.description = d
+			getdescr = self._type_cache.getdescr
+			coltypes = self._src.listinfo()
+			self.description = [typ[1:2] + getdescr(typ[2]) for typ in coltypes]
 			self.lastrowid = self._src.oidstatus()
 		else:
 			self.rowcount = totrows
@@ -296,24 +292,34 @@ class pgdbCursor(object):
 			self.lastrowid = self._src.oidstatus()
 
 	def fetchone(self):
-		res = self.fetchmany(1, 0)
+		"""Fetch the next row of a query result set."""
+		res = self.fetchmany(1, False)
 		try:
 			return res[0]
-		except:
+		except IndexError:
 			return None
 
 	def fetchall(self):
-		return self.fetchmany(-1, 0)
+		"""Fetch all (remaining) rows of a query result."""
+		return self.fetchmany(-1, False)
 
-	def fetchmany(self, size=None, keep=0):
+	def fetchmany(self, size=None, keep=False):
+		"""Fetch the next set of rows of a query result.
+
+		The number of rows to fetch per call is specified by the
+		size parameter. If it is not given, the cursor's arraysize
+		determines the number of rows to be fetched. If you set
+		the keep parameter to true, this is kept as new arraysize.
+
+		"""
 		if size is None:
 			size = self.arraysize
-		if keep == 1:
+		if keep:
 			self.arraysize = size
 		try:
 			result = self._src.fetch(size)
-		except Error, e:
-			raise DatabaseError(str(e))
+		except Error, err:
+			raise DatabaseError(str(err))
 		row_factory = self.row_factory
 		typecast = self._type_cache.typecast
 		coltypes = [desc[1] for desc in self.description]
@@ -321,14 +327,17 @@ class pgdbCursor(object):
 			for args in zip(coltypes, row)]) for row in result]
 
 	def nextset():
+		"""Not supported."""
 		raise NotSupportedError("nextset() is not supported")
 	nextset = staticmethod(nextset)
 
 	def setinputsizes(sizes):
+		"""Not supported."""
 		pass
 	setinputsizes = staticmethod(setinputsizes)
 
-	def setoutputsize(size, col=0):
+	def setoutputsize(size, column=0):
+		"""Not supported."""
 		pass
 	setoutputsize = staticmethod(setoutputsize)
 
@@ -339,8 +348,9 @@ class pgdbCnx(object):
 	"""Connection Object."""
 
 	def __init__(self, cnx):
+		"""Create a database connection object."""
 		self._cnx = cnx # connection
-		self._tnx = 0 # transaction state
+		self._tnx = False # transaction state
 		self._type_cache = pgdbTypeCache(cnx)
 		try:
 			self._cnx.source()
@@ -348,6 +358,7 @@ class pgdbCnx(object):
 			raise OperationalError("invalid connection")
 
 	def close(self):
+		"""Close the connection object."""
 		if self._cnx:
 			self._cnx.close()
 			self._cnx = None
@@ -355,9 +366,10 @@ class pgdbCnx(object):
 			raise OperationalError("connection has been closed")
 
 	def commit(self):
+		"""Commit any pending transaction to the database."""
 		if self._cnx:
 			if self._tnx:
-				self._tnx = 0
+				self._tnx = False
 				try:
 					self._cnx.source().execute("COMMIT")
 				except:
@@ -366,9 +378,10 @@ class pgdbCnx(object):
 			raise OperationalError("connection has been closed")
 
 	def rollback(self):
+		"""Roll back to the start of any pending transaction."""
 		if self._cnx:
 			if self._tnx:
-				self._tnx = 0
+				self._tnx = False
 				try:
 					self._cnx.source().execute("ROLLBACK")
 				except:
@@ -377,6 +390,7 @@ class pgdbCnx(object):
 			raise OperationalError("connection has been closed")
 
 	def cursor(self):
+		"""Return a new Cursor Object using the connection."""
 		if self._cnx:
 			try:
 				return pgdbCursor(self)
@@ -389,6 +403,7 @@ class pgdbCnx(object):
 ### Module Interface
 
 _connect_ = connect
+
 def connect(dsn=None,
 		user=None, password=None,
 		host=None, database=None):
@@ -409,7 +424,7 @@ def connect(dsn=None,
 		dbpasswd = params[3]
 		dbopt = params[4]
 		dbtty = params[5]
-	except:
+	except (IndexError, TypeError):
 		pass
 
 	# override if necessary
@@ -424,7 +439,7 @@ def connect(dsn=None,
 			params = host.split(":")
 			dbhost = params[0]
 			dbport = int(params[1])
-		except:
+		except (IndexError, TypeError, ValueError):
 			pass
 
 	# empty host is localhost
@@ -449,17 +464,16 @@ class pgdbType(frozenset):
 
 	"""
 
-	def __new__(cls, values):
-		# for Python >= 2.4
-		if isinstance(values, basestring):
-			values = values.split()
-		return super(pgdbType, cls).__new__(cls, values)
-
-	def __init__(self, values):
-		# for Python < 2.4
-		if isinstance(values, basestring):
-			values = values.split()
-		super(pgdbType, self).__init__(values)
+	if frozenset.__module__ == '__builtin__':
+		def __new__(cls, values):
+			if isinstance(values, basestring):
+				values = values.split()
+			return super(pgdbType, cls).__new__(cls, values)
+	else: # Python < 2.4
+		def __init__(self, values):
+			if isinstance(values, basestring):
+				values = values.split()
+			super(pgdbType, self).__init__(values)
 
 	def __eq__(self, other):
 		if isinstance(other, basestring):
@@ -501,24 +515,31 @@ INTERVAL = pgdbType('interval tinterval timespan reltime')
 # Mandatory type helpers defined by DB-API 2 specs:
 
 def Date(year, month, day):
+	"""Construct an object holding a date value."""
 	return DateTime(year, month, day)
 
 def Time(hour, minute, second):
+	"""Construct an object holding a time value."""
 	return TimeDelta(hour, minute, second)
 
 def Timestamp(year, month, day, hour, minute, second):
+	"""construct an object holding a time stamp value."""
 	return DateTime(year, month, day, hour, minute, second)
 
 def DateFromTicks(ticks):
+	"""Construct an object holding a date value from the given ticks value."""
 	return Date(*time.localtime(ticks)[:3])
 
 def TimeFromTicks(ticks):
+	"""construct an object holding a time value from the given ticks value."""
 	return Time(*time.localtime(ticks)[3:6])
 
 def TimestampFromTicks(ticks):
+	"""construct an object holding a time stamp from the given ticks value."""
 	return Timestamp(*time.localtime(ticks)[:6])
 
 def Binary(value):
+	"""construct an object capable of holding a binary (long) string value."""
 	return value
 
 
