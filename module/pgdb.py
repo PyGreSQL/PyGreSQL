@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.44 2008-11-01 18:21:12 cito Exp $
+# $Id: pgdb.py,v 1.45 2008-11-01 18:37:55 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -346,6 +346,17 @@ class pgdbCursor(object):
 
 class pgdbCnx(object):
     """Connection Object."""
+
+    # expose the exceptions as attributes on the connection object
+    Warning = Warning
+    Error = Error
+    InterfaceError = InterfaceError
+    DatabaseError = DatabaseError
+    OperationalError = OperationalError
+    IntegrityError = IntegrityError
+    InternalError = InternalError
+    ProgrammingError = ProgrammingError
+    NotSupportedError = NotSupportedError
 
     def __init__(self, cnx):
         """Create a database connection object."""

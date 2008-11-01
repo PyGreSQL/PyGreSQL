@@ -11,19 +11,20 @@
     -- Ian Bicking
 '''
 
-__rcs_id__  = '$Id: dbapi20.py,v 1.3 2008-09-16 14:35:21 cito Exp $'
-__version__ = '$Revision: 1.3 $'[11:-2]
+__rcs_id__  = '$Id: dbapi20.py,v 1.4 2008-11-01 18:37:55 cito Exp $'
+__version__ = '$Revision: 1.4 $'[11:-2]
 __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'
 
 import unittest
 import time
 
 # $Log: not supported by cvs2svn $
-# Revision 1.2  2006/01/22 13:16:48  darcy
-# Make error message a little more explanatory.
+# Revision 1.10  2003/10/09 03:14:14  zenzen
+# Add test for DB API 2.0 optional extension, where database exceptions
+# are exposed as attributes on the Connection object.
 #
-# Revision 1.1  2006/01/19 11:31:25  darcy
-# Add dbapi20 module for testing.
+# Revision 1.9  2003/08/13 01:16:36  zenzen
+# Minor tweak from Stefan Fleiter
 #
 # Revision 1.8  2003/04/10 00:13:25  zenzen
 # Changes, as per suggestions by M.-A. Lemburg
@@ -112,7 +113,7 @@ class DatabaseAPI20Test(unittest.TestCase):
 
     def tearDown(self):
         ''' self.drivers should override this method to perform required cleanup
-            if any is necessary, such as deleting the dest database.
+            if any is necessary, such as deleting the test database.
             The default drops the tables that may be created.
         '''
         con = self._connect()
@@ -197,6 +198,26 @@ class DatabaseAPI20Test(unittest.TestCase):
             issubclass(self.driver.NotSupportedError,self.driver.Error)
             )
 
+    def test_ExceptionsAsConnectionAttributes(self):
+        # OPTIONAL EXTENSION
+        # Test for the optional DB API 2.0 extension, where the exceptions
+        # are exposed as attributes on the Connection object
+        # I figure this optional extension will be implemented by any
+        # driver author who is using this test suite, so it is enabled
+        # by default.
+        con = self._connect()
+        drv = self.driver
+        self.failUnless(con.Warning is drv.Warning)
+        self.failUnless(con.Error is drv.Error)
+        self.failUnless(con.InterfaceError is drv.InterfaceError)
+        self.failUnless(con.DatabaseError is drv.DatabaseError)
+        self.failUnless(con.OperationalError is drv.OperationalError)
+        self.failUnless(con.IntegrityError is drv.IntegrityError)
+        self.failUnless(con.InternalError is drv.InternalError)
+        self.failUnless(con.ProgrammingError is drv.ProgrammingError)
+        self.failUnless(con.NotSupportedError is drv.NotSupportedError)
+
+
     def test_commit(self):
         con = self._connect()
         try:
@@ -280,8 +301,8 @@ class DatabaseAPI20Test(unittest.TestCase):
             cur = con.cursor()
             self.executeDDL1(cur)
             self.assertEqual(cur.rowcount,-1,
-                'cursor.rowcount should be -1, not %r '
-                'after executing no-result statements' % cur.rowcount
+                'cursor.rowcount should be -1 after executing no-result '
+                'statements'
                 )
             cur.execute("insert into %sbooze values ('Victoria Bitter')" % (
                 self.table_prefix
@@ -528,7 +549,6 @@ class DatabaseAPI20Test(unittest.TestCase):
 
             cur.execute('select name from %sbooze' % self.table_prefix)
             r = cur.fetchmany()
-            import sys
             self.assertEqual(len(r),1,
                 'cursor.fetchmany retrieved incorrect number of rows, '
                 'default of arraysize is one.'
@@ -681,7 +701,7 @@ class DatabaseAPI20Test(unittest.TestCase):
     def help_nextset_setUp(self,cur):
         ''' Should create a procedure called deleteme
             that returns two result sets, first the
-            number of rows in booze then "name from booze"
+	    number of rows in booze then "name from booze"
         '''
         raise NotImplementedError,'Helper not implemented'
         #sql="""
@@ -787,7 +807,7 @@ class DatabaseAPI20Test(unittest.TestCase):
 
     def test_Time(self):
         t1 = self.driver.Time(13,45,30)
-        t2 = self.driver.TimeFromTicks(time.mktime((0,0,0,13,45,30,0,0,0)))
+        t2 = self.driver.TimeFromTicks(time.mktime((2001,1,1,13,45,30,0,0,0)))
         # Can we assume this? API doesn't specify, but it seems implied
         # self.assertEqual(str(t1),str(t2))
 
