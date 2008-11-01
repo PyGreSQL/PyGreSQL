@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.40 2008-11-01 10:37:54 cito Exp $
+# $Id: pgdb.py,v 1.41 2008-11-01 11:29:46 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -117,7 +117,7 @@ class pgdbTypeCache:
 		self._src = cnx.source()
 		self._cache = {}
 
-	def typecast(self, typ, value):
+	def typecast(typ, value):
 		"""Cast value to database type."""
 		if value is None:
 			# for NULL values, no typecast is necessary
@@ -128,7 +128,7 @@ class pgdbTypeCache:
 			return value
 		else:
 			return cast(value)
-		typecast = staticmethod(typecast)
+	typecast = staticmethod(typecast)
 
 	def getdescr(self, oid):
 		"""Get name of database type with given oid."""
