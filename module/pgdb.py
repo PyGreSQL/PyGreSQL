@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.39 2008-10-31 17:13:50 cito Exp $
+# $Id: pgdb.py,v 1.40 2008-11-01 10:37:54 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -78,7 +78,8 @@ try: # use Decimal if available
 except ImportError: # otherwise (Python < 2.4)
 	Decimal = float # use float instead of Decimal
 
-### module constants
+
+### Module Constants
 
 # compliant with DB SIG 2.0
 apilevel = '2.0'
@@ -89,75 +90,48 @@ threadsafety = 1
 # this module use extended python format codes
 paramstyle = 'pyformat'
 
-### internal type handling class
+
+### Internal Types Handling
+
+def _cast_bool(value):
+	return value[:1] in ['t', 'T']
+
+
+def _cast_money(value):
+	return Decimal(''.join(filter(
+		lambda v: v in '0123456789.-', value)))
+
+
+_cast = {'bool': _cast_bool,
+	'int2': int, 'int4': int, 'serial': int,
+	'int8': long, 'oid': long, 'oid8': long,
+	'float4': float, 'float8': float,
+	'numeric': Decimal, 'money': _cast_money}
+
 
 class pgdbTypeCache:
 	"""Cache for database types."""
 
 	def __init__(self, cnx):
+		"""Initialize type cache for connection."""
 		self._src = cnx.source()
 		self._cache = {}
-		self._casters = {}
 
 	def typecast(self, typ, value):
-		return self._typecaster(typ)(value)
-
-	def _typecaster(self, typ):
-		# Type comparisons are very expensive because of the
-		# shear amount of string comparisons it will generate.
-		# Cache type casters for much better performance
-		# when fetching many values.
-		try:
-			return self._casters[typ]
-		except KeyError:
-			caster = self._create_typecaster(typ)
-			self._casters[typ] = caster
-			return caster
-
-	def _create_typecaster(self, typ):
-
-		def no_cast(value):
+		"""Cast value to database type."""
+		if value is None:
+			# for NULL values, no typecast is necessary
+			return None
+		cast = _cast.get(typ)
+		if cast is None:
+			# no typecast available or necessary
 			return value
-
-		def cast_bool(value):
-			return value[:1] in ['t','T']
-
-		def cast_money(value):
-			return Decimal(''.join(filter(
-				lambda v: v in '0123456789.-', value)))
-
-		def cast(caster):
-			def cast_if_not_none(value):
-				if value is None:
-					# NULL/None are equivalent regardless of type
-					return None
-				else:
-					return caster(value)
-			return cast_if_not_none
-
-		if typ == BOOL:
-			return cast(cast_bool)
-		elif typ == STRING or typ == BINARY:
-			return no_cast
-		elif typ == INTEGER:
-			return cast(int)
-		elif typ == LONG:
-			return cast(long)
-		elif typ == FLOAT:
-			return cast(float)
-		elif typ == NUMERIC:
-			return cast(Decimal)
-		elif typ == MONEY:
-			return cast(cast_money)
-		elif typ == DATETIME:
-			# format may differ ... we'll give string
-			return no_cast
-		elif typ == ROWID:
-			return cast(long)
 		else:
-			return no_cast
+			return cast(value)
+		typecast = staticmethod(typecast)
 
 	def getdescr(self, oid):
+		"""Get name of database type with given oid."""
 		try:
 			return self._cache[oid]
 		except:
@@ -167,12 +141,48 @@ class pgdbTypeCache:
 			res = self._src.fetch(1)[0]
 			# The column name is omitted from the return value.
 			# It will have to be prepended by the caller.
-			res = (res[0],
-				None, int(res[1]),
+			res = (res[0], None, int(res[1]),
 				None, None, None)
 			self._cache[oid] = res
 			return res
 
+
+class _quoteitem(dict):
+	def __getitem__(self, key):
+		return _quote(super(_quoteitem, self).__getitem__(key))
+
+
+def _quote(x):
+	if isinstance(x, DateTimeType):
+		x = str(x)
+	elif isinstance(x, unicode):
+		x = x.encode( 'utf-8' )
+	if isinstance(x, types.StringType):
+		x = "'%s'" % str(x).replace("\\", "\\\\").replace("'", "''")
+	elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
+		pass
+	elif x is None:
+		x = 'NULL'
+	elif isinstance(x, (types.ListType, types.TupleType)):
+		x = '(%s)' % ','.join(map(lambda x: str(_quote(x)), x))
+	elif Decimal is not float and isinstance(x, Decimal):
+		pass
+	elif hasattr(x, '__pg_repr__'):
+		x = x.__pg_repr__()
+	else:
+		raise InterfaceError('do not know how to handle type %s' % type(x))
+	return x
+
+
+def _quoteparams(s, params):
+	if hasattr(params, 'has_key'):
+		params = _quoteitem(params)
+	else:
+		params = tuple(map(_quote, params))
+	return s % params
+
+
+### Cursor Object
 
 class pgdbCursor:
 	"""Cursor Object."""
@@ -311,41 +321,7 @@ class pgdbCursor:
 		pass
 
 
-class _quoteitem(dict):
-	def __getitem__(self, key):
-		return _quote(super(_quoteitem, self).__getitem__(key))
-
-
-def _quote(x):
-	if isinstance(x, DateTimeType):
-		x = str(x)
-	elif isinstance(x, unicode):
-		x = x.encode( 'utf-8' )
-	if isinstance(x, types.StringType):
-		x = "'%s'" % str(x).replace("\\", "\\\\").replace("'", "''")
-	elif isinstance(x, (types.IntType, types.LongType, types.FloatType)):
-		pass
-	elif x is None:
-		x = 'NULL'
-	elif isinstance(x, (types.ListType, types.TupleType)):
-		x = '(%s)' % ','.join(map(lambda x: str(_quote(x)), x))
-	elif Decimal is not float and isinstance(x, Decimal):
-		pass
-	elif hasattr(x, '__pg_repr__'):
-		x = x.__pg_repr__()
-	else:
-		raise InterfaceError('do not know how to handle type %s' % type(x))
-	return x
-
-
-def _quoteparams(s, params):
-	if hasattr(params, 'has_key'):
-		params = _quoteitem(params)
-	else:
-		params = tuple(map(_quote, params))
-
-	return s % params
-
+### Connection Objects
 
 class pgdbCnx:
 	"""Connection Object."""
@@ -527,7 +503,7 @@ def Binary(str):
 	return str
 
 
-# if run as script, print some information
+# If run as script, print some information:
 
 if __name__ == '__main__':
 	print 'PyGreSQL version', version
