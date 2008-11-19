@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.45 2008-11-01 18:37:55 cito Exp $
+# $Id: pgdb.py,v 1.46 2008-11-19 18:24:40 darcy Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -69,12 +69,7 @@ try:
     frozenset
 except NameError: # Python < 2.4
     from sets import ImmutableSet as frozenset
-try: # use mx.DateTime module if available
-    from mx.DateTime import DateTime, \
-        TimeDelta, DateTimeType
-except ImportError: # otherwise use standard datetime module
-    from datetime import datetime as DateTime, \
-        timedelta as TimeDelta, datetime as DateTimeType
+from datetime import datetime, timedelta
 try: # use Decimal if available
     from decimal import Decimal
     set_decimal(Decimal)
@@ -159,7 +154,7 @@ class _quoteitem(dict):
 
 def _quote(val):
     """Quote value depending on its type."""
-    if isinstance(val, DateTimeType):
+    if isinstance(val, datetime):
         val = str(val)
     elif isinstance(val, unicode):
         val = val.encode( 'utf-8' )
@@ -527,15 +522,15 @@ INTERVAL = pgdbType('interval tinterval timespan reltime')
 
 def Date(year, month, day):
     """Construct an object holding a date value."""
-    return DateTime(year, month, day)
+    return datetime(year, month, day)
 
 def Time(hour, minute, second):
     """Construct an object holding a time value."""
-    return TimeDelta(hour, minute, second)
+    return timedelta(hour, minute, second)
 
 def Timestamp(year, month, day, hour, minute, second):
     """construct an object holding a time stamp value."""
-    return DateTime(year, month, day, hour, minute, second)
+    return datetime(year, month, day, hour, minute, second)
 
 def DateFromTicks(ticks):
     """Construct an object holding a date value from the given ticks value."""
