@@ -22,7 +22,8 @@ Based heavily on code written by Pascal Andre (andre@chimay.via.ecp.fr)
 
 Copyright (c) 1995, Pascal Andre
 
-Further modifications copyright (c) 1997-2006 by D'Arcy J.M. Cain (darcy@druid.net)
+Further modifications copyright (c) 1997-2008 by D'Arcy J.M. Cain
+(darcy@druid.net)
 
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose, without fee, and without a written agreement
