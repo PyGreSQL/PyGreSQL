@@ -52,12 +52,13 @@ Wish List
 - Make use of PQexecParams() and PQprepare(). This could speed up
   executemany() and allow retrieving binary data directly by setting
   the resultFormat parameter to one.
+- Connection as context manager (see http://tinyurl.com/6j9cef).
 - Users should be able to register their own types with _pg.
 - I would like a new method that returns a dictionary
   of dictionaries from a SELECT.
 - Add support for persistent and pooled connections
-  that can be used in multi-threaded environments (we could simply
-  (add http://www.webwareforpython.org/DBUtils to the distribution).
+  that can be used in multi-threaded environments
+  or just add link to http://www.webwareforpython.org/DBUtils.
 - Make PyGreSQL thread-safe on the connection level.
 - The API documentation could be created with Epydoc.
 - Write a tutorial for beginners and advanced use.
