@@ -19,7 +19,9 @@ Version 4.0 (2008-12-01)
 - Allow DB wrapper to be used with DB-API 2 connections
   (as suggested by Chris Hilton).
 - Made private attributes of DB wrapper accessible.
-- Dropped dependence on mx.DateTime module
+- Dropped dependence on mx.DateTime module.
+- Support for PQescapeStringConn() and PQescapeByteaConn();
+  these are now also used by the internal _quote() functions.
 
 Version 3.8.1 (2006-06-05)
 --------------------------

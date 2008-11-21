@@ -138,7 +138,7 @@ class utility_test(unittest.TestCase):
         self.assertEqual(r['dvar'], 456)
 
     def test_quote(self):
-        from pg import _quote
+        _quote = db._quote
         self.assertEqual(_quote(1, 'int'), "1")
         self.assertEqual(_quote(1, 'text'), "'1'")
         self.assertEqual(_quote(1, 'num'), "1")

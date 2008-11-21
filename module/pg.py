@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.62 2008-11-21 19:25:27 cito Exp $
+# $Id: pg.py,v 1.63 2008-11-21 21:17:53 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -31,58 +31,6 @@ except ImportError:
 
 
 # Auxiliary functions which are independent from a DB connection:
-
-def _quote_text(d):
-    """Quote text value."""
-    if not isinstance(d, basestring):
-        d = str(d)
-    return "'%s'" % d.replace("\\", "\\\\").replace("'", "''")
-
-_bool_true = frozenset('t true 1 y yes on'.split())
-
-def _quote_bool(d):
-    """Quote boolean value."""
-    if isinstance(d, basestring):
-        if not d:
-            return 'NULL'
-        d = d.lower() in _bool_true
-    else:
-        d = bool(d)
-    return ("'f'", "'t'")[d]
-
-_date_literal = frozenset('current_date current_time'
-    ' current_timestamp localtime localtimestamp'.split())
-
-def _quote_date(d):
-    """Quote date value."""
-    if not d:
-        return 'NULL'
-    if isinstance(d, basestring) and d.lower() in _date_literal:
-        return d
-    return _quote_text(d)
-
-def _quote_num(d):
-    """Quote numeric value."""
-    if not d:
-        return 'NULL'
-    return str(d)
-
-def _quote_money(d):
-    """Quote money value."""
-    if not d:
-        return 'NULL'
-    return "'%.2f'" % float(d)
-
-_quote_funcs = dict( # quote functions for each type
-    text=_quote_text, bool=_quote_bool, date=_quote_date,
-    int=_quote_num, num=_quote_num, float=_quote_num, money=_quote_money)
-
-def _quote(d, t):
-    """Return quotes if needed."""
-    if d is None:
-        return 'NULL'
-    else:
-        return _quote_funcs.get(t, _quote_text)(d)
 
 def _is_quoted(s):
     """Check whether this string is a quoted identifier."""
@@ -188,9 +136,7 @@ class DB(object):
         else:
             raise InternalError('Connection is not valid')
 
-    # escape_string and escape_bytea exist as methods,
-    # so we define unescape_bytea as a method as well
-    unescape_bytea = staticmethod(unescape_bytea)
+    # Auxiliary methods
 
     def _do_debug(self, s):
         """Print a debug message."""
@@ -201,6 +147,107 @@ class DB(object):
                 print >> self.debug, s
             elif callable(self.debug):
                 self.debug(s)
+
+    def _quote_text(self, d):
+        """Quote text value."""
+        if not isinstance(d, basestring):
+            d = str(d)
+        return "'%s'" % self.escape_string(d)
+
+    _bool_true = frozenset('t true 1 y yes on'.split())
+
+    def _quote_bool(self, d):
+        """Quote boolean value."""
+        if isinstance(d, basestring):
+            if not d:
+                return 'NULL'
+            d = d.lower() in self._bool_true
+        else:
+            d = bool(d)
+        return ("'f'", "'t'")[d]
+
+    _date_literals = frozenset('current_date current_time'
+        ' current_timestamp localtime localtimestamp'.split())
+
+    def _quote_date(self, d):
+        """Quote date value."""
+        if not d:
+            return 'NULL'
+        if isinstance(d, basestring) and d.lower() in self._date_literals:
+            return d
+        return self._quote_text(d)
+
+    def _quote_num(self, d):
+        """Quote numeric value."""
+        if not d:
+            return 'NULL'
+        return str(d)
+
+    def _quote_money(self, d):
+        """Quote money value."""
+        if not d:
+            return 'NULL'
+        return "'%.2f'" % float(d)
+
+    _quote_funcs = dict( # quote methods for each type
+        text=_quote_text, bool=_quote_bool, date=_quote_date,
+        int=_quote_num, num=_quote_num, float=_quote_num,
+        money=_quote_money)
+
+    def _quote(self, d, t):
+        """Return quotes if needed."""
+        if d is None:
+            return 'NULL'
+        try:
+            quote_func = self._quote_funcs[t]
+        except KeyError:
+            quote_func = self._quote_funcs['text']
+        return quote_func(self, d)
+
+    def _split_schema(self, cl):
+        """Return schema and name of object separately.
+
+        This auxiliary function splits off the namespace (schema)
+        belonging to the class with the name cl. If the class name
+        is not qualified, the function is able to determine the schema
+        of the class, taking into account the current search path.
+
+        """
+        s = _split_parts(cl)
+        if len(s) > 1: # name already qualfied?
+            # should be database.schema.table or schema.table
+            if len(s) > 3:
+                raise ProgrammingError('Too many dots in class name %s' % cl)
+            schema, cl = s[-2:]
+        else:
+            cl = s[0]
+            # determine search path
+            query = 'SELECT current_schemas(TRUE)'
+            schemas = self.db.query(query).getresult()[0][0][1:-1].split(',')
+            if schemas: # non-empty path
+                # search schema for this object in the current search path
+                query = ' UNION '.join(
+                    ["SELECT %d::integer AS n, '%s'::name AS nspname"
+                        % s for s in enumerate(schemas)])
+                query = ("SELECT nspname FROM pg_class"
+                    " JOIN pg_namespace ON pg_class.relnamespace=pg_namespace.oid"
+                    " JOIN (%s) AS p USING (nspname)"
+                    " WHERE pg_class.relname='%s'"
+                    " ORDER BY n LIMIT 1" % (query, cl))
+                schema = self.db.query(query).getresult()
+                if schema: # schema found
+                    schema = schema[0][0]
+                else: # object not found in current search path
+                    schema = 'public'
+            else: # empty path
+                schema = 'public'
+        return schema, cl
+
+    # Public methods
+
+    # escape_string and escape_bytea exist as methods,
+    # so we define unescape_bytea as a method as well
+    unescape_bytea = staticmethod(unescape_bytea)
 
     def close(self):
         """Close the database connection."""
@@ -242,45 +289,6 @@ class DB(object):
             raise InternalError('Connection is not valid')
         self._do_debug(qstr)
         return self.db.query(qstr)
-
-    def _split_schema(self, cl):
-        """Return schema and name of object separately.
-
-        This auxiliary function splits off the namespace (schema)
-        belonging to the class with the name cl. If the class name
-        is not qualified, the function is able to determine the schema
-        of the class, taking into account the current search path.
-
-        """
-        s = _split_parts(cl)
-        if len(s) > 1: # name already qualfied?
-            # should be database.schema.table or schema.table
-            if len(s) > 3:
-                raise ProgrammingError('Too many dots in class name %s' % cl)
-            schema, cl = s[-2:]
-        else:
-            cl = s[0]
-            # determine search path
-            query = 'SELECT current_schemas(TRUE)'
-            schemas = self.db.query(query).getresult()[0][0][1:-1].split(',')
-            if schemas: # non-empty path
-                # search schema for this object in the current search path
-                query = ' UNION '.join(
-                    ["SELECT %d::integer AS n, '%s'::name AS nspname"
-                        % s for s in enumerate(schemas)])
-                query = ("SELECT nspname FROM pg_class"
-                    " JOIN pg_namespace ON pg_class.relnamespace=pg_namespace.oid"
-                    " JOIN (%s) AS p USING (nspname)"
-                    " WHERE pg_class.relname='%s'"
-                    " ORDER BY n LIMIT 1" % (query, cl))
-                schema = self.db.query(query).getresult()
-                if schema: # schema found
-                    schema = schema[0][0]
-                else: # object not found in current search path
-                    schema = 'public'
-            else: # empty path
-                schema = 'public'
-        return schema, cl
 
     def pkey(self, cl, newpkey = None):
         """This method gets or sets the primary key of a class.
@@ -451,12 +459,12 @@ class DB(object):
         else:
             q = 'SELECT %s FROM %s WHERE %s=%s LIMIT 1' % \
                 (','.join(fnames.keys()), qcl, \
-                    keyname, _quote(k, fnames[keyname]))
+                    keyname, self._quote(k, fnames[keyname]))
         self._do_debug(q)
         res = self.db.query(q).dictresult()
         if not res:
             raise DatabaseError('No such record in %s where %s=%s'
-                % (qcl, keyname, _quote(k, fnames[keyname])))
+                % (qcl, keyname, self._quote(k, fnames[keyname])))
         for k, d in res[0].items():
             if k == 'oid':
                 k = foid
@@ -488,7 +496,7 @@ class DB(object):
         n = []
         for f in fnames.keys():
             if f != 'oid' and f in a:
-                t.append(_quote(a[f], fnames[f]))
+                t.append(self._quote(a[f], fnames[f]))
                 n.append('"%s"' % f)
         q = 'INSERT INTO %s (%s) VALUES (%s)' % \
             (qcl, ','.join(n), ','.join(t))
@@ -548,7 +556,7 @@ class DB(object):
         fnames = self.get_attnames(qcl)
         for ff in fnames.keys():
             if ff != 'oid' and ff in a:
-                v.append('%s=%s' % (ff, _quote(a[ff], fnames[ff])))
+                v.append('%s=%s' % (ff, self._quote(a[ff], fnames[ff])))
         if v == []:
             return None
         q = 'UPDATE %s SET %s WHERE %s' % (qcl, ','.join(v), where)

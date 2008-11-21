@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.16 2008-11-21 19:25:27 cito Exp $
+# $Id: test_pg.py,v 1.17 2008-11-21 21:17:53 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -27,15 +27,17 @@ The pg and pgdb modules should be tested against _pg mock functions.
 import pg
 import unittest
 
+debug = 0
+
 # Try to load german locale for Umlaut tests
 german = 1
 try:
     import locale
     locale.setlocale(locale.LC_ALL, ('de', 'latin1'))
-except:
+except Exception:
     try:
         locale.setlocale(locale.LC_ALL, 'german')
-    except:
+    except Exception:
         german = 0
 
 try:
@@ -67,71 +69,6 @@ def smart_ddl(conn, cmd):
 
 class TestAuxiliaryFunctions(unittest.TestCase):
     """Test the auxiliary functions external to the connection class."""
-
-    def testQuote(self):
-        f = pg._quote
-        self.assertEqual(f(None, None), 'NULL')
-        self.assertEqual(f(None, 'int'), 'NULL')
-        self.assertEqual(f(None, 'float'), 'NULL')
-        self.assertEqual(f(None, 'num'), 'NULL')
-        self.assertEqual(f(None, 'money'), 'NULL')
-        self.assertEqual(f(None, 'bool'), 'NULL')
-        self.assertEqual(f(None, 'date'), 'NULL')
-        self.assertEqual(f('', 'int'), 'NULL')
-        self.assertEqual(f('', 'float'), 'NULL')
-        self.assertEqual(f('', 'num'), 'NULL')
-        self.assertEqual(f('', 'money'), 'NULL')
-        self.assertEqual(f('', 'bool'), 'NULL')
-        self.assertEqual(f('', 'date'), 'NULL')
-        self.assertEqual(f('', 'text'), "''")
-        self.assertEqual(f(123456789, 'int'), '123456789')
-        self.assertEqual(f(123456987, 'num'), '123456987')
-        self.assertEqual(f(1.23654789, 'num'), '1.23654789')
-        self.assertEqual(f(12365478.9, 'num'), '12365478.9')
-        self.assertEqual(f('123456789', 'num'), '123456789')
-        self.assertEqual(f('1.23456789', 'num'), '1.23456789')
-        self.assertEqual(f('12345678.9', 'num'), '12345678.9')
-        self.assertEqual(f(123, 'money'), "'123.00'")
-        self.assertEqual(f('123', 'money'), "'123.00'")
-        self.assertEqual(f(123.45, 'money'), "'123.45'")
-        self.assertEqual(f('123.45', 'money'), "'123.45'")
-        self.assertEqual(f(123.454, 'money'), "'123.45'")
-        self.assertEqual(f('123.454', 'money'), "'123.45'")
-        self.assertEqual(f(123.456, 'money'), "'123.46'")
-        self.assertEqual(f('123.456', 'money'), "'123.46'")
-        self.assertEqual(f('f', 'bool'), "'f'")
-        self.assertEqual(f('F', 'bool'), "'f'")
-        self.assertEqual(f('false', 'bool'), "'f'")
-        self.assertEqual(f('False', 'bool'), "'f'")
-        self.assertEqual(f('FALSE', 'bool'), "'f'")
-        self.assertEqual(f(0, 'bool'), "'f'")
-        self.assertEqual(f('0', 'bool'), "'f'")
-        self.assertEqual(f('-', 'bool'), "'f'")
-        self.assertEqual(f('n', 'bool'), "'f'")
-        self.assertEqual(f('N', 'bool'), "'f'")
-        self.assertEqual(f('no', 'bool'), "'f'")
-        self.assertEqual(f('off', 'bool'), "'f'")
-        self.assertEqual(f('t', 'bool'), "'t'")
-        self.assertEqual(f('T', 'bool'), "'t'")
-        self.assertEqual(f('true', 'bool'), "'t'")
-        self.assertEqual(f('True', 'bool'), "'t'")
-        self.assertEqual(f('TRUE', 'bool'), "'t'")
-        self.assertEqual(f(1, 'bool'), "'t'")
-        self.assertEqual(f(2, 'bool'), "'t'")
-        self.assertEqual(f(-1, 'bool'), "'t'")
-        self.assertEqual(f(0.5, 'bool'), "'t'")
-        self.assertEqual(f('1', 'bool'), "'t'")
-        self.assertEqual(f('y', 'bool'), "'t'")
-        self.assertEqual(f('Y', 'bool'), "'t'")
-        self.assertEqual(f('yes', 'bool'), "'t'")
-        self.assertEqual(f('on', 'bool'), "'t'")
-        self.assertEqual(f('01.01.2000', 'date'), "'01.01.2000'")
-        self.assertEqual(f(123, 'text'), "'123'")
-        self.assertEqual(f(1.23, 'text'), "'1.23'")
-        self.assertEqual(f('abc', 'text'), "'abc'")
-        self.assertEqual(f("ab'c", 'text'), "'ab''c'")
-        self.assertEqual(f('ab\\c', 'text'), "'ab\\\\c'")
-        self.assertEqual(f("a\\b'c", 'text'), "'a\\\\b''c'")
 
     def testIsQuoted(self):
         f = pg._is_quoted
@@ -383,11 +320,11 @@ class TestCanConnect(unittest.TestCase):
         dbname = 'template1'
         try:
             connection = pg.connect(dbname)
-        except:
+        except Exception:
             self.fail('Cannot connect to database ' + dbname)
         try:
             connection.close()
-        except:
+        except Exception:
             self.fail('Cannot close the database connection')
 
 
@@ -465,13 +402,13 @@ class TestConnectObject(unittest.TestCase):
         try:
             self.connection.reset()
             fail('Reset should give an error for a closed connection')
-        except:
+        except Exception:
             pass
         self.assertRaises(pg.InternalError, self.connection.close)
         try:
             self.connection.query('select 1')
             self.fail('Query should give an error for a closed connection')
-        except:
+        except Exception:
             pass
         self.connection = pg.connect(self.dbname)
 
@@ -597,7 +534,7 @@ class TestSimpleQueries(unittest.TestCase):
         stdout, sys.stdout = sys.stdout, s
         try:
             print r
-        except:
+        except Exception:
             pass
         sys.stdout = stdout
         s.close()
@@ -775,7 +712,7 @@ class TestDBClassBasic(unittest.TestCase):
         try:
             self.db.reset()
             fail('Reset should give an error for a closed connection')
-        except:
+        except Exception:
             pass
         self.assertRaises(pg.InternalError, self.db.close)
         self.assertRaises(pg.InternalError, self.db.query, 'select 1')
@@ -812,6 +749,8 @@ class TestDBClass(unittest.TestCase):
         dbname = DBTestSuite.dbname
         self.dbname = dbname
         self.db = pg.DB(dbname)
+        if debug:
+            self.db.debug = 'DEBUG: %s'
 
     def tearDown(self):
         self.db.close()
@@ -837,6 +776,71 @@ class TestDBClass(unittest.TestCase):
             "that's k\\344se"), "that's k\xe4se")
         self.assertEqual(pg.unescape_bytea(
             r'O\000ps\377!'), 'O\x00ps\xff!')
+
+    def testQuote(self):
+        f = self.db._quote
+        self.assertEqual(f(None, None), 'NULL')
+        self.assertEqual(f(None, 'int'), 'NULL')
+        self.assertEqual(f(None, 'float'), 'NULL')
+        self.assertEqual(f(None, 'num'), 'NULL')
+        self.assertEqual(f(None, 'money'), 'NULL')
+        self.assertEqual(f(None, 'bool'), 'NULL')
+        self.assertEqual(f(None, 'date'), 'NULL')
+        self.assertEqual(f('', 'int'), 'NULL')
+        self.assertEqual(f('', 'float'), 'NULL')
+        self.assertEqual(f('', 'num'), 'NULL')
+        self.assertEqual(f('', 'money'), 'NULL')
+        self.assertEqual(f('', 'bool'), 'NULL')
+        self.assertEqual(f('', 'date'), 'NULL')
+        self.assertEqual(f('', 'text'), "''")
+        self.assertEqual(f(123456789, 'int'), '123456789')
+        self.assertEqual(f(123456987, 'num'), '123456987')
+        self.assertEqual(f(1.23654789, 'num'), '1.23654789')
+        self.assertEqual(f(12365478.9, 'num'), '12365478.9')
+        self.assertEqual(f('123456789', 'num'), '123456789')
+        self.assertEqual(f('1.23456789', 'num'), '1.23456789')
+        self.assertEqual(f('12345678.9', 'num'), '12345678.9')
+        self.assertEqual(f(123, 'money'), "'123.00'")
+        self.assertEqual(f('123', 'money'), "'123.00'")
+        self.assertEqual(f(123.45, 'money'), "'123.45'")
+        self.assertEqual(f('123.45', 'money'), "'123.45'")
+        self.assertEqual(f(123.454, 'money'), "'123.45'")
+        self.assertEqual(f('123.454', 'money'), "'123.45'")
+        self.assertEqual(f(123.456, 'money'), "'123.46'")
+        self.assertEqual(f('123.456', 'money'), "'123.46'")
+        self.assertEqual(f('f', 'bool'), "'f'")
+        self.assertEqual(f('F', 'bool'), "'f'")
+        self.assertEqual(f('false', 'bool'), "'f'")
+        self.assertEqual(f('False', 'bool'), "'f'")
+        self.assertEqual(f('FALSE', 'bool'), "'f'")
+        self.assertEqual(f(0, 'bool'), "'f'")
+        self.assertEqual(f('0', 'bool'), "'f'")
+        self.assertEqual(f('-', 'bool'), "'f'")
+        self.assertEqual(f('n', 'bool'), "'f'")
+        self.assertEqual(f('N', 'bool'), "'f'")
+        self.assertEqual(f('no', 'bool'), "'f'")
+        self.assertEqual(f('off', 'bool'), "'f'")
+        self.assertEqual(f('t', 'bool'), "'t'")
+        self.assertEqual(f('T', 'bool'), "'t'")
+        self.assertEqual(f('true', 'bool'), "'t'")
+        self.assertEqual(f('True', 'bool'), "'t'")
+        self.assertEqual(f('TRUE', 'bool'), "'t'")
+        self.assertEqual(f(1, 'bool'), "'t'")
+        self.assertEqual(f(2, 'bool'), "'t'")
+        self.assertEqual(f(-1, 'bool'), "'t'")
+        self.assertEqual(f(0.5, 'bool'), "'t'")
+        self.assertEqual(f('1', 'bool'), "'t'")
+        self.assertEqual(f('y', 'bool'), "'t'")
+        self.assertEqual(f('Y', 'bool'), "'t'")
+        self.assertEqual(f('yes', 'bool'), "'t'")
+        self.assertEqual(f('on', 'bool'), "'t'")
+        self.assertEqual(f('01.01.2000', 'date'), "'01.01.2000'")
+        self.assertEqual(f(123, 'text'), "'123'")
+        self.assertEqual(f(1.23, 'text'), "'1.23'")
+        self.assertEqual(f('abc', 'text'), "'abc'")
+        self.assertEqual(f("ab'c", 'text'), "'ab''c'")
+        self.assertEqual(f('ab\\c', 'text'), "'ab\\\\c'")
+        self.assertEqual(f("a\\b'c", 'text'), "'a\\\\b''c'")
 
     def testPkey(self):
         smart_ddl(self.db, 'drop table pkeytest0')

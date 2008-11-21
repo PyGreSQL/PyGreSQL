@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.47 2008-11-21 13:10:51 cito Exp $
+# $Id: pgdb.py,v 1.48 2008-11-21 21:17:53 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -145,47 +145,15 @@ class pgdbTypeCache(dict):
             return res
 
 
-class _quoteitem(dict):
-    """Dictionary with auto quoting of its items."""
+class _quotedict(dict):
+    """Dictionary with auto quoting of its items.
 
-    def __getitem__(self, key):
-        return _quote(super(_quoteitem, self).__getitem__(key))
-
-
-def _quote(val):
-    """Quote value depending on its type."""
-    if isinstance(val, datetime):
-        val = str(val)
-    elif isinstance(val, unicode):
-        val = val.encode( 'utf-8' )
-    if isinstance(val, str):
-        val = "'%s'" % str(val).replace("\\", "\\\\").replace("'", "''")
-    elif isinstance(val, (int, long, float)):
-        pass
-    elif val is None:
-        val = 'NULL'
-    elif isinstance(val, (list, tuple)):
-        val = '(%s)' % ','.join(map(lambda v: str(_quote(v)), val))
-    elif Decimal is not float and isinstance(val, Decimal):
-        pass
-    elif hasattr(val, '__pg_repr__'):
-        val = val.__pg_repr__()
-    else:
-        raise InterfaceError('do not know how to handle type %s' % type(val))
-    return val
-
-
-def _quoteparams(string, params):
-    """Quote parameters.
-
-    This function works for both mappings and sequences.
+    The quote attribute must be set to the desired quote function.
 
     """
-    if hasattr(params, 'has_key'):
-        params = _quoteitem(params)
-    else:
-        params = tuple(map(_quote, params))
-    return string % params
+
+    def __getitem__(self, key):
+        return self.quote(super(_quotedict, self).__getitem__(key))
 
 
 ### Cursor Object
@@ -203,6 +171,41 @@ class pgdbCursor(object):
         self.rowcount = -1
         self.arraysize = 1
         self.lastrowid = None
+
+    def _quote(self, val):
+        """Quote value depending on its type."""
+        if isinstance(val, datetime):
+            val = str(val)
+        elif isinstance(val, unicode):
+            val = val.encode( 'utf8' )
+        if isinstance(val, str):
+            val = "'%s'" % self._cnx.escape_string(val)
+        elif isinstance(val, (int, long, float)):
+            pass
+        elif val is None:
+            val = 'NULL'
+        elif isinstance(val, (list, tuple)):
+            val = '(%s)' % ','.join(map(lambda v: str(self._quote(v)), val))
+        elif Decimal is not float and isinstance(val, Decimal):
+            pass
+        elif hasattr(val, '__pg_repr__'):
+            val = val.__pg_repr__()
+        else:
+            raise InterfaceError('do not know how to handle type %s' % type(val))
+        return val
+
+    def _quoteparams(self, string, params):
+        """Quote parameters.
+
+        This function works for both mappings and sequences.
+
+        """
+        if isinstance(params, dict):
+            params = _quotedict(params)
+            params.quote = self._quote
+        else:
+            params = tuple(map(self._quote, params))
+        return string % params
 
     def row_factory(row):
         """Process rows before they are returned.
@@ -260,7 +263,7 @@ class pgdbCursor(object):
                 self._dbcnx._tnx = True
             for params in param_seq:
                 if params:
-                    sql = _quoteparams(operation, params)
+                    sql = self._quoteparams(operation, params)
                 else:
                     sql = operation
                 rows = self._src.execute(sql)
