@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.26 2008-11-21 13:55:22 cito Exp $
+# $Id: setup.py,v 1.27 2008-11-21 17:08:17 cito Exp $
 
 """Setup script for PyGreSQL version 4.0
 
@@ -9,7 +9,7 @@ Authors and history:
 * setup script created 2000/04 Mark Alexander <mwa@gate.net>
 * tweaked 2000/05 Jeremy Hylton <jeremy@cnri.reston.va.us>
 * win32 support 2001/01 by Gerhard Haering <gerhard@bigfoot.de>
-* tweaked 2006/02 Christoph Zwerschke <cito@online.de>
+* tweaked 2006/02 and 2008/11 by Christoph Zwerschke <cito@online.de>
 
 Prerequisites to be installed:
 * Python including devel package (header files and distutils)
@@ -24,19 +24,15 @@ Use as follows:
 python setup.py build   # to build the module
 python setup.py install # to install it
 
-For Win32, you should have the Microsoft Visual C++ compiler and
-the Microsoft .NET Framework SDK installed and on your search path.
-If you want to use the free Microsoft Visual C++ Toolkit 2003 compiler,
-you need to patch distutils (www.vrplumber.com/programming/mstoolkit/).
-Alternatively, you can use MinGW (www.mingw.org) for building on Win32:
+You should use MinGW (www.mingw.org) for building on Win32:
 python setup.py build -c mingw32 install # use MinGW
-Note that the official Python distribution is now using msvcr71 instead
-of msvcrt as its common runtime library. So, if you are using MinGW to build
-PyGreSQL, you should edit the file "%MinGWpath%/lib/gcc/%MinGWversion%/specs"
+Note that Python newer than version 2.3 is using msvcr71 instead of msvcrt
+as its common runtime library. So, if you are using MinGW to build PyGreSQL,
+you should edit the file "%MinGWpath%/lib/gcc/%MinGWversion%/specs"
 and change the entry that reads -lmsvcrt to -lmsvcr71.
 
-See www.python.org/doc/current/inst/ for more information
-on using distutils to install Python programs.
+See docs.python.org/doc/install/ for more information on
+using distutils to install Python programs.
 
 """
 
@@ -67,6 +63,7 @@ def mk_include():
 
     The directory will contain a copy of the PostgreSQL server header files,
     where all features which are not necessary for PyGreSQL are disabled.
+
     """
     os.mkdir('include')
     for f in os.listdir(pg_include_dir_server):
@@ -74,10 +71,17 @@ def mk_include():
             continue
         d = open(os.path.join(pg_include_dir_server, f)).read()
         if f == 'pg_config.h':
-            d += '\n'
-            d += '#undef ENABLE_NLS\n'
-            d += '#undef USE_REPL_SNPRINTF\n'
-            d += '#undef USE_SSL\n'
+            d += '\n'.join(('',
+                '#undef ENABLE_NLS',
+                '#undef USE_REPL_SNPRINTF',
+                '#undef USE_SSL',
+                '#undef USE_ZLIB',
+                '#undef HAVE_STDINT_H',
+                '#undef HAVE_SYS_TIME_H',
+                '#undef HAVE_UNISTD_H',
+                '#define _CRT_SECURE_NO_WARNINGS 1',
+                '#define _USE_32BIT_TIME_T 1',
+                ''))
         open(os.path.join('include', f), 'w').write(d)
 
 def rm_include():
@@ -115,6 +119,8 @@ setup(
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",
     url="http://www.pygresql.org",
+    download_url = "ftp://ftp.pygresql.org/pub/distrib/",
+    platforms = ["any"],
     license="Python",
     py_modules=['pg', 'pgdb'],
     ext_modules=[Extension(
@@ -132,6 +138,7 @@ setup(
         "Programming Language :: C",
         "Programming Language :: Python",
         "Topic :: Database",
+        "Topic :: Database :: Front-Ends",
         "Topic :: Software Development :: Libraries :: Python Modules"
     ]
 )

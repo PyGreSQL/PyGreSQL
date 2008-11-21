@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.82 2008-11-01 18:15:53 cito Exp $
+ * $Id: pgmodule.c,v 1.83 2008-11-21 17:08:17 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -48,12 +48,18 @@ static PyObject *Error, *Warning, *InterfaceError,
 
 static const char *PyPgVersion = "4.0";
 
+#if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
+typedef int Py_ssize_t;
+#define PY_SSIZE_T_MAX INT_MAX
+#define PY_SSIZE_T_MIN INT_MIN
+#endif
+
 /* taken from fileobject.c */
 #define BUF(v) PyString_AS_STRING((PyStringObject *)(v))
 
 /* default values */
 #define MODULE_NAME			"pgsql"
-#define ARRAYSIZE			1
+#define PG_ARRAYSIZE			1
 
 /* flags for object validity checks */
 #define CHECK_OPEN			1
@@ -82,15 +88,15 @@ const char *__movename[5] =
 
 #ifndef NO_DIRECT
 #define DIRECT_ACCESS	1		/* enables direct access functions */
-#endif /* NO_DIRECT */
+#endif
 
 #ifndef NO_LARGE
 #define LARGE_OBJECTS	1		/* enables large objects support */
-#endif /* NO_LARGE */
+#endif
 
 #ifndef NO_DEF_VAR
 #define DEFAULT_VARS	1		/* enables default variables use */
-#endif /* NO_DEF_VAR */
+#endif
 
 /* In 7.4 PQfreeNotify was deprecated and PQfreemem is used instead.
    A macro exists in 7.4 for backwards compatibility. */
@@ -449,7 +455,7 @@ pgsource_new(pgobject * pgcnx)
 	npgobj->pgcnx = pgcnx;
 	npgobj->last_result = NULL;
 	npgobj->valid = 1;
-	npgobj->arraysize = ARRAYSIZE;
+	npgobj->arraysize = PG_ARRAYSIZE;
 
 	return npgobj;
 }
@@ -2459,8 +2465,8 @@ pg_inserttable(pgobject * self, PyObject * args)
 	PyObject	*list,
 				*sublist,
 				*item;
-	PyObject	*(*getitem) (PyObject *, int);
-	PyObject	*(*getsubitem) (PyObject *, int);
+	PyObject	*(*getitem) (PyObject *, Py_ssize_t);
+	PyObject	*(*getsubitem) (PyObject *, Py_ssize_t);
 	int			i,
 				j,
 				m,

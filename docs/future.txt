@@ -25,11 +25,10 @@ To Do
 - The C module needs to be cleaned up and redundant code merged,
   and should get its own unit test module.
 - The fetch method should use real cursors.
-- What shall we do with the "tutorial" directory?
-  - it's rather a tutorial for Postgres/SQL than for PyGreSQL
-  - it' using only the query method from the classic pg module,
-    no other PyGreSQL functionality
-  - it's rather a demo than a tutorial
+- What shall we do with the "tutorial" directory
+  (it's rather a tutorial for Postgres/SQL than for PyGreSQL,
+  it' using only the query method from the classic pg module and
+  no other PyGreSQL functionality, it's rather a demo than a tutorial)?
 
 
 Proposed Patches

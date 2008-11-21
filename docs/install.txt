@@ -56,13 +56,8 @@ installed as part of the database server feature on Windows systems.
 Building and installing with Distutils
 --------------------------------------
 
-You can build and install PyGreSQL using Distutils.
-
-On a Microsoft Windows system, you should have the Microsoft Visual C++ compiler
-and the Microsoft .NET Framework SDK installed and on your search path.
-If you want to use the free Microsoft Visual C++ Toolkit 2003 compiler,
-you need to `patch distutils <http://www.vrplumber.com/programming/mstoolkit/>`_.
-Alternatively, you can use `MinGW <http://www.mingw.org>`_.
+You can build and install PyGreSQL using
+`Distutils <http://docs.python.org/install/>`_.
 
 Download and unpack the PyGreSQL source tarball if you haven't already done so.
 
@@ -71,12 +66,13 @@ Type the following commands to build and install PyGreSQL::
     python setup.py build
     python setup.py install
 
-Note that the official Python 2.4 distribution for Microsoft Windows is now
-using msvcr71 instead of msvcrt as its common runtime library. So, if you are
-using MinGW to build PyGreSQL for Python 2.4 on a Windows system, you should
-edit the file ``%MinGWpath%/lib/gcc/%MinGWversion%/specs`` and change the entry
-that reads ``-lmsvcrt`` to ``-lmsvcr71``. Then use the following command to
-build and install PyGreSQL::
+If you are using `MinGW <http://www.mingw.org>`_ to build PyGreSQL on a
+Microsoft Windows, please note that Python newer version 2.3 is using msvcr71
+instead of msvcrt as its common runtime library. You can allow for that by
+editing the file ``%MinGWpath%/lib/gcc/%MinGWversion%/specs`` and changing
+the entry that reads ``-lmsvcrt`` to ``-lmsvcr71``. You may also need to copy
+``libpq.lib`` to ``libpq.a`` in the PostgreSQL ``lib`` directory. Then use
+the following command to build and install PyGreSQL::
 
     python setup.py build -c mingw32 install
 
