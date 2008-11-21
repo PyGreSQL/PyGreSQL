@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.25 2008-11-01 18:21:12 cito Exp $
+# $Id: setup.py,v 1.26 2008-11-21 13:55:22 cito Exp $
 
 """Setup script for PyGreSQL version 4.0
 
@@ -17,8 +17,8 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-Tested with Python 2.5.2 and PostGreSQL 8.2.10. Older version should work
-as well, but you will need at least Python 2.3 and PostgreSQL 7.2.
+Tested with Python 2.5.2 and PostGreSQL 8.3.5. Older version should work
+as well, but you will need at least Python 2.3 and PostgreSQL 7.4.
 
 Use as follows:
 python setup.py build   # to build the module
@@ -37,20 +37,29 @@ and change the entry that reads -lmsvcrt to -lmsvcr71.
 
 See www.python.org/doc/current/inst/ for more information
 on using distutils to install Python programs.
+
 """
 
+version = "4.0"
+
+import sys
+
+if not (2, 2) < sys.version_info[:2] < (3, 0):
+    raise Exception("PyGreSQL %s requires a Python 2 version"
+        " newer than 2.2." % version)
+
+import os
 from distutils.core import setup
 from distutils.extension import Extension
-import sys, os
 
 def pg_config(s):
     """Retrieve information about installed version of PostgreSQL."""
     f = os.popen("pg_config --%s" % s)
     d = f.readline().strip()
     if f.close() is not None:
-        raise Exception, "pg_config tool is not available."
+        raise Exception("pg_config tool is not available.")
     if not d:
-        raise Exception, "Could not get %s information." % s
+        raise Exception("Could not get %s information." % s)
     return d
 
 def mk_include():
@@ -95,21 +104,36 @@ if sys.platform == "win32":
     include_dirs.append(os.path.join(pg_include_dir_server, 'port/win32'))
 
 setup(
-    name = "PyGreSQL",
-    version = "4.0",
-    description = "Python PostgreSQL Interfaces",
-    author = "D'Arcy J. M. Cain",
-    author_email = "darcy@PyGreSQL.org",
-    url = "http://www.pygresql.org",
-    license = "Python",
-    py_modules = ['pg', 'pgdb'],
-    ext_modules = [Extension(
+    name="PyGreSQL",
+    version=version,
+    description="Python PostgreSQL Interfaces",
+    long_description = ("PyGreSQL is an open-source Python module"
+        " that interfaces to a PostgreSQL database."
+        " It embeds the PostgreSQL query library to allow easy use"
+        " of the powerful PostgreSQL features from a Python script."),
+    keywords="postgresql database api dbapi",
+    author="D'Arcy J. M. Cain",
+    author_email="darcy@PyGreSQL.org",
+    url="http://www.pygresql.org",
+    license="Python",
+    py_modules=['pg', 'pgdb'],
+    ext_modules=[Extension(
         '_pg', ['pgmodule.c'],
         include_dirs = include_dirs,
         library_dirs = library_dirs,
         libraries = libraries,
-        extra_compile_args = ['-O2'],
-        )],
-    )
+        extra_compile_args = ['-O2']
+    )],
+    classifiers=[
+        "Development Status :: 6 - Mature",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Python Software Foundation License",
+        "Operating System :: OS Independent",
+        "Programming Language :: C",
+        "Programming Language :: Python",
+        "Topic :: Database",
+        "Topic :: Software Development :: Libraries :: Python Modules"
+    ]
+)
 
 rm_include()
