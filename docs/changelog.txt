@@ -23,6 +23,12 @@ Version 4.0 (2008-12-01)
 - Support for PQescapeStringConn() and PQescapeByteaConn();
   these are now also used by the internal _quote() functions.
 - Added 'int8' to INTEGER types. New SMALLINT type.
+- Added a way to find the number of rows affected by a query()
+  with the classic pg module by returning it as a string.
+  For single inserts, query() still returns the oid as an integer.
+  The pgdb module already provides the "rownum" cursor attribute
+  for the same purpose.
+
 
 Version 3.8.1 (2006-06-05)
 --------------------------

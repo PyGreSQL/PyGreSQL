@@ -438,12 +438,15 @@ Exceptions raised:
   :pg.InternalError': error during query processing
 
 Description:
-  This method simply sends a SQL query to the database. If the query is
-  an insert statement, the return value is the OID of the newly
-  inserted row. If it is otherwise a query that does not return a result
-  (i.e., is not a some kind of SELECT statement), it returns `None`.
-  Otherwise, it returns a `pgqueryobject` that can be accessed via the
-  `getresult()` or `dictresult()` method or simply printed.
+  This method simply sends a SQL query to the database. If the query is an
+  insert statement that inserted exactly one row into a table that has OIDs, the
+  return value is the OID of the newly inserted row. If the query is an update
+  or delete statement, or an insert statement that did not insert exactly one
+  row in a table with OIDs, then the numer of rows affected is returned as a
+  string. If it is a select statement that returns a result, this method returns
+  a `pgqueryobject` that can be accessed via the `getresult()` or `dictresult()`
+  method or simply printed. Otherwise, it returns `None`.
+
 
 reset - resets the connection
 -----------------------------

@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.17 2008-11-21 21:17:53 cito Exp $
+# $Id: test_pg.py,v 1.18 2008-11-21 23:24:38 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -524,6 +524,38 @@ class TestSimpleQueries(unittest.TestCase):
         result = 2
         self.assertEqual(r, result)
 
+    def testQuery(self):
+        smart_ddl(self.c, "drop table test_table")
+        q = "create table test_table (n integer) with oids"
+        r = self.c.query(q)
+        self.assert_(r is None)
+        q = "insert into test_table values (1)"
+        r = self.c.query(q)
+        self.assert_(isinstance(r, int)), r
+        q = "insert into test_table select 2"
+        r = self.c.query(q)
+        self.assert_(isinstance(r, int))
+        oid = r
+        q = "select oid from test_table where n=2"
+        r = self.c.query(q).getresult()
+        self.assertEqual(len(r), 1)
+        r = r[0]
+        self.assertEqual(len(r), 1)
+        r = r[0]
+        self.assertEqual(r, oid)
+        q = "insert into test_table select 3 union select 4 union select 5"
+        r = self.c.query(q)
+        self.assert_(isinstance(r, str))
+        self.assertEqual(r, '3')
+        q = "update test_table set n=4 where n<5"
+        r = self.c.query(q)
+        self.assert_(isinstance(r, str))
+        self.assertEqual(r, '4')
+        q = "delete from test_table"
+        r = self.c.query(q)
+        self.assert_(isinstance(r, str))
+        self.assertEqual(r, '5')
+
     def testPrint(self):
         q = "select 1 as a, 'hello' as h, 'w' as world" \
             " union select 2, 'xyz', 'uvw'"
@@ -841,6 +873,38 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(f("ab'c", 'text'), "'ab''c'")
         self.assertEqual(f('ab\\c', 'text'), "'ab\\\\c'")
         self.assertEqual(f("a\\b'c", 'text'), "'a\\\\b''c'")
+
+    def testQuery(self):
+        smart_ddl(self.db, "drop table test_table")
+        q = "create table test_table (n integer) with oids"
+        r = self.db.query(q)
+        self.assert_(r is None)
+        q = "insert into test_table values (1)"
+        r = self.db.query(q)
+        self.assert_(isinstance(r, int)), r
+        q = "insert into test_table select 2"
+        r = self.db.query(q)
+        self.assert_(isinstance(r, int))
+        oid = r
+        q = "select oid from test_table where n=2"
+        r = self.db.query(q).getresult()
+        self.assertEqual(len(r), 1)
+        r = r[0]
+        self.assertEqual(len(r), 1)
+        r = r[0]
+        self.assertEqual(r, oid)
+        q = "insert into test_table select 3 union select 4 union select 5"
+        r = self.db.query(q)
+        self.assert_(isinstance(r, str))
+        self.assertEqual(r, '3')
+        q = "update test_table set n=4 where n<5"
+        r = self.db.query(q)
+        self.assert_(isinstance(r, str))
+        self.assertEqual(r, '4')
+        q = "delete from test_table"
+        r = self.db.query(q)
+        self.assert_(isinstance(r, str))
+        self.assertEqual(r, '5')
 
     def testPkey(self):
         smart_ddl(self.db, 'drop table pkeytest0')

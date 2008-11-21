@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.86 2008-11-21 22:06:34 cito Exp $
+ * $Id: pgmodule.c,v 1.87 2008-11-21 23:24:38 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -507,7 +507,6 @@ static PyObject *
 pgsource_execute(pgsourceobject * self, PyObject * args)
 {
 	char		*query;
-	const char *temp;
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_CNX))
@@ -550,6 +549,7 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 	switch (PQresultStatus(self->last_result))
 	{
 		long	num_rows;
+		char   *temp;
 
 		/* query succeeded */
 		case PGRES_TUPLES_OK:	/* DQL: returns None (DB-SIG compliant) */
@@ -564,7 +564,7 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 			self->result_type = RESULT_DDL;
 			temp = PQcmdTuples(self->last_result);
 			num_rows = -1;
-			if (temp[0] != 0)
+			if (temp[0])
 			{
 				self->result_type = RESULT_DML;
 				num_rows = atol(temp);
@@ -2278,10 +2278,6 @@ pg_query(pgobject * self, PyObject * args)
 	/* checks result status */
 	if ((status = PQresultStatus(result)) != PGRES_TUPLES_OK)
 	{
-		Oid			oid = PQoidValue(result);
-
-		PQclear(result);
-
 		switch (status)
 		{
 			case PGRES_EMPTY_QUERY:
@@ -2292,16 +2288,28 @@ pg_query(pgobject * self, PyObject * args)
 			case PGRES_NONFATAL_ERROR:
 				PyErr_SetString(ProgrammingError, PQerrorMessage(self->cnx));
 				break;
-			case PGRES_COMMAND_OK:		/* could be an INSERT */
-				if (oid == InvalidOid)	/* nope */
-				{
-					Py_INCREF(Py_None);
-					return Py_None;
+			case PGRES_COMMAND_OK:
+				{						/* INSERT, UPDATE, DELETE */
+					Oid		oid = PQoidValue(result);
+					if (oid == InvalidOid)	/* not a single insert */
+					{
+						char	*ret = PQcmdTuples(result);
+
+						PQclear(result);
+						if (ret[0])		/* return number of rows affected */
+						{
+							return PyString_FromString(ret);
+						}
+						Py_INCREF(Py_None);
+						return Py_None;
+					}
+					/* for a single insert, return the oid */
+					PQclear(result);
+					return PyInt_FromLong(oid);
 				}
-				/* otherwise, return the oid */
-				return PyInt_FromLong(oid);
 			case PGRES_COPY_OUT:		/* no data will be received */
 			case PGRES_COPY_IN:
+				PQclear(result);
 				Py_INCREF(Py_None);
 				return Py_None;
 			default:
@@ -2310,6 +2318,7 @@ pg_query(pgobject * self, PyObject * args)
 				break;
 		}
 
+		PQclear(result);
 		return NULL;			/* error detected on query */
 	}
 

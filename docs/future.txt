@@ -13,7 +13,6 @@ To Do
   (see http://mailman.vex.net/pipermail/pygresql/2006-May/001688.html).
 - Documentation for the pgdb module (everything specific to PyGreSQL).
 - The large object and direct access functions need much more attention.
-- An update query should return the number of rows affected.
 - The C module needs to be cleaned up and redundant code merged,
   and should get its own unit test module.
 - The fetch method should use real cursors.
