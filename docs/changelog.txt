@@ -9,7 +9,7 @@ Version 4.0 (2008-12-01)
   by speeding up the type casts (as suggested by Peter Schuller).
 - Exposed exceptions as attributes of the connection object.
 - Added new method to get parameter settings.
-- Added row_factory as suggested by Simon Pamies.
+- Added customizable row_factory as suggested by Simon Pamies.
 - Separated between mandatory and additional type objects.
 - Added keyword args to insert, update and delete methods.
 - Added exception handling for direct copy.

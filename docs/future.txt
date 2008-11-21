@@ -27,8 +27,6 @@ Proposed Patches
 
 - Notice handling
   (http://mailman.vex.net/pipermail/pygresql/2005-November/001530.html)
-- Dict cursors
-  (http://mailman.vex.net/pipermail/pygresql/2006-September/001766.html)
 
 
 Wish List
