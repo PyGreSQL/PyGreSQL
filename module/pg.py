@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.59 2008-11-21 11:18:32 cito Exp $
+# $Id: pg.py,v 1.60 2008-11-21 13:00:21 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -20,6 +20,10 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 
 from _pg import *
 try:
+    frozenset
+except NameError: # Python < 2.4
+    from sets import ImmutableSet as frozenset
+try:
     from decimal import Decimal
     set_decimal(Decimal)
 except ImportError:
@@ -28,33 +32,57 @@ except ImportError:
 
 # Auxiliary functions which are independent from a DB connection:
 
+def _quote_text(d):
+    """Quote text value."""
+    if not isinstance(d, basestring):
+        d = str(d)
+    return "'%s'" % d.replace("\\", "\\\\").replace("'", "''")
+
+_bool_true = frozenset('t true 1 y yes on'.split())
+
+def _quote_bool(d):
+    """Quote boolean value."""
+    if isinstance(d, basestring):
+        if not d:
+            return 'NULL'
+        d = d.lower() in _bool_true
+    else:
+        d = bool(d)
+    return ("'f'", "'t'")[d]
+
+_date_literal = frozenset('current_date current_time'
+    ' current_timestamp localtime localtimestamp'.split())
+
+def _quote_date(d):
+    """Quote date value."""
+    if not d:
+        return 'NULL'
+    if isinstance(d, basestring) and d.lower() in _date_literal:
+        return d
+    return _quote_text(d)
+
+def _quote_num(d):
+    """Quote numeric value."""
+    if not d:
+        return 'NULL'
+    return str(d)
+
+def _quote_money(d):
+    """Quote money value."""
+    if not d:
+        return 'NULL'
+    return "'%.2f'" % float(d)
+
+_quote_funcs = dict( # quote functions for each type
+    text=_quote_text, bool=_quote_bool, date=_quote_date,
+    int=_quote_num, num=_quote_num, float=_quote_num, money=_quote_money)
+
 def _quote(d, t):
     """Return quotes if needed."""
     if d is None:
         return 'NULL'
-    if t in ('int', 'seq', 'float', 'num'):
-        if d == '':
-            return 'NULL'
-        return str(d)
-    if t == 'money':
-        if d == '':
-            return 'NULL'
-        return "'%.2f'" % float(d)
-    if t == 'bool':
-        if isinstance(d, basestring):
-            if d == '':
-                return 'NULL'
-            d = d.lower() in ('t', 'true', '1', 'y', 'yes', 'on')
-        else:
-            d = bool(d)
-        return ("'f'", "'t'")[d]
-    if t in ('date', 'inet', 'cidr'):
-        if d == '':
-            return 'NULL'
-        if d.lower() in ('current_date', 'current_time',
-            'current_timestamp', 'localtime', 'localtimestamp'):
-            return d
-    return "'%s'" % str(d).replace("\\", "\\\\").replace("'", "''")
+    else:
+        return _quote_funcs.get(t, _quote_text)(d)
 
 def _is_quoted(s):
     """Check whether this string is a quoted identifier."""
@@ -361,22 +389,22 @@ class DB(object):
                 % cl).getresult():
             if typ.startswith('bool'):
                 t[att] = 'bool'
-            elif typ.startswith('oid'):
-                t[att] = 'int'
-            elif typ.startswith('float'):
-                t[att] = 'float'
-            elif typ.startswith('numeric'):
-                t[att] = 'num'
             elif typ.startswith('abstime'):
                 t[att] = 'date'
             elif typ.startswith('date'):
                 t[att] = 'date'
             elif typ.startswith('interval'):
                 t[att] = 'date'
-            elif typ.startswith('int'):
-                t[att] = 'int'
             elif typ.startswith('timestamp'):
                 t[att] = 'date'
+            elif typ.startswith('oid'):
+                t[att] = 'int'
+            elif typ.startswith('int'):
+                t[att] = 'int'
+            elif typ.startswith('float'):
+                t[att] = 'float'
+            elif typ.startswith('numeric'):
+                t[att] = 'num'
             elif typ.startswith('money'):
                 t[att] = 'money'
             else:
@@ -554,7 +582,7 @@ class DB(object):
         for k, t in fnames.items():
             if k == 'oid':
                 continue
-            if t in ['int', 'seq', 'float', 'num', 'money']:
+            if t in ('int', 'float', 'num', 'money'):
                 a[k] = 0
             elif t == 'bool':
                 a[k] = 'f'
