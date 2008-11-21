@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.46 2008-11-19 18:24:40 darcy Exp $
+# $Id: pgdb.py,v 1.47 2008-11-21 13:10:51 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -255,7 +255,7 @@ class pgdbCursor(object):
             if not self._dbcnx._tnx:
                 try:
                     self._cnx.source().execute(sql)
-                except:
+                except Exception:
                     raise OperationalError("can't start transaction")
                 self._dbcnx._tnx = True
             for params in param_seq:
@@ -272,8 +272,6 @@ class pgdbCursor(object):
             raise DatabaseError("error '%s' in '%s'" % (msg, sql))
         except Exception, err:
             raise OperationalError("internal error in '%s': %s" % (sql, err))
-        except:
-            raise OperationalError("internal error in '%s'" % sql)
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
             self.rowcount = self._src.ntuples
@@ -360,7 +358,7 @@ class pgdbCnx(object):
         self._type_cache = pgdbTypeCache(cnx)
         try:
             self._cnx.source()
-        except:
+        except Exception:
             raise OperationalError("invalid connection")
 
     def close(self):
@@ -378,7 +376,7 @@ class pgdbCnx(object):
                 self._tnx = False
                 try:
                     self._cnx.source().execute("COMMIT")
-                except:
+                except Exception:
                     raise OperationalError("can't commit")
         else:
             raise OperationalError("connection has been closed")
@@ -390,7 +388,7 @@ class pgdbCnx(object):
                 self._tnx = False
                 try:
                     self._cnx.source().execute("ROLLBACK")
-                except:
+                except Exception:
                     raise OperationalError("can't rollback")
         else:
             raise OperationalError("connection has been closed")
@@ -400,7 +398,7 @@ class pgdbCnx(object):
         if self._cnx:
             try:
                 return pgdbCursor(self)
-            except:
+            except Exception:
                 raise OperationalError("invalid connection")
         else:
             raise OperationalError("connection has been closed")

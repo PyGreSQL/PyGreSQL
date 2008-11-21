@@ -9,8 +9,10 @@ dbname = 'unittest'
 dbhost = None
 dbport = 5432
 
-try: from LOCAL_PyGreSQL import *
-except: pass
+try:
+    from LOCAL_PyGreSQL import *
+except ImportError:
+    pass
 
 db = DB(dbname, dbhost, dbport)
 db.query("SET DATESTYLE TO 'ISO'")
@@ -22,19 +24,25 @@ class utility_test(unittest.TestCase):
     def setUp(self):
         # create test tables if they don't exist
         for t in ('_test1', '_test2'):
-            try: db.query("CREATE SCHEMA " + t)
-            except: pass
-            try: db.query("CREATE TABLE %s._test_schema "
-                "(%s int PRIMARY KEY)" % (t, t))
-            except: pass
-
-        try: db.query("CREATE TABLE _test_schema "
+            try:
+                db.query("CREATE SCHEMA " + t)
+            except Exception:
+                pass
+            try:
+                db.query("CREATE TABLE %s._test_schema "
+                    "(%s int PRIMARY KEY)" % (t, t))
+            except Exception:
+                pass
+        try:
+            db.query("CREATE TABLE _test_schema "
                 "(_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
-        except: pass
-
-        try: db.query("CREATE VIEW _test_vschema AS "
-            "SELECT _test, 'abc'::text AS _test2  FROM _test_schema")
-        except: pass
+        except Exception:
+            pass
+        try:
+            db.query("CREATE VIEW _test_vschema AS "
+                "SELECT _test, 'abc'::text AS _test2  FROM _test_schema")
+        except Exception:
+            pass
 
     def test_invalidname(self):
         """Make sure that invalid table names are caught"""
@@ -77,8 +85,10 @@ class utility_test(unittest.TestCase):
         self.assertEqual(db.pkey('public.test1'), 'a')
 
     def test_get(self):
-        try: db.query("INSERT INTO _test_schema VALUES (1234)")
-        except: pass # OK if it already exists
+        try:
+            db.query("INSERT INTO _test_schema VALUES (1234)")
+        except Exception:
+            pass # OK if it already exists
 
         db.get('_test_schema', 1234)
         db.get('_test_schema', 1234, keyname = '_test')
@@ -96,16 +106,20 @@ class utility_test(unittest.TestCase):
         self.assertEqual(d['dvar'], 999)
 
     def test_mixed_case(self):
-        try: db.query('CREATE TABLE _test_mc ("_Test" int PRIMARY KEY)')
-        except: pass
+        try:
+            db.query('CREATE TABLE _test_mc ("_Test" int PRIMARY KEY)')
+        except Exception:
+            pass
 
         db.query("DELETE FROM _test_mc")
         d = dict(_Test = 1234)
         db.insert('_test_mc', d)
 
     def test_update(self):
-        try: db.query("INSERT INTO _test_schema VALUES (1234)")
-        except: pass # OK if it already exists
+        try:
+            db.query("INSERT INTO _test_schema VALUES (1234)")
+        except Exception:
+            pass # OK if it already exists
 
         r = db.get('_test_schema', 1234)
         r['dvar'] = 123
@@ -127,11 +141,9 @@ class utility_test(unittest.TestCase):
         from pg import _quote
         self.assertEqual(_quote(1, 'int'), "1")
         self.assertEqual(_quote(1, 'text'), "'1'")
-        self.assertEqual(_quote(1, 'seq'), "1")
         self.assertEqual(_quote(1, 'num'), "1")
         self.assertEqual(_quote('1', 'int'), "1")
         self.assertEqual(_quote('1', 'text'), "'1'")
-        self.assertEqual(_quote('1', 'seq'), "1")
         self.assertEqual(_quote('1', 'num'), "1")
         self.assertEqual(_quote(None, 'int'), "NULL")
         self.assertEqual(_quote(1, 'money'), "'1.00'")
@@ -151,11 +163,7 @@ class utility_test(unittest.TestCase):
         self.assertEqual(_quote('true', 'bool'), "'t'")
         self.assertEqual(_quote('y', 'bool'), "'t'")
         self.assertEqual(_quote('', 'date'), "NULL")
-        self.assertEqual(_quote('', 'inet'), "NULL")
-        self.assertEqual(_quote('', 'cidr'), "NULL")
         self.assertEqual(_quote('date', 'date'), "'date'")
-        self.assertEqual(_quote('inet', 'inet'), "'inet'")
-        self.assertEqual(_quote('cidr', 'cidr'), "'cidr'")
         self.assertEqual(_quote('', 'text'), "''")
         self.assertEqual(_quote("\\", 'text'), "'\\\\'")
         self.assertEqual(_quote("'", 'text'), "''''")

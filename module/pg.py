@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.60 2008-11-21 13:00:21 cito Exp $
+# $Id: pg.py,v 1.61 2008-11-21 13:10:51 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -221,13 +221,10 @@ class DB(object):
         """
         # There is no such shared library function.
         if self._closeable:
+            db = connect(*self._args[0], **self._args[1])
             if self.db:
                 self.db.close()
-            try:
-                self.db = connect(*self._args[0], **self._args[1])
-            except:
-                self.db = None
-                raise
+            self.db = db
 
     def query(self, qstr):
         """Executes a SQL command string.
@@ -502,7 +499,7 @@ class DB(object):
         # If no read perms (it can and does happen), return None.
         try:
             return self.get(qcl, a, 'oid')
-        except:
+        except Exception:
             return None
 
     def update(self, cl, d = None, **kw):
@@ -542,7 +539,7 @@ class DB(object):
         else:
             try:
                 pk = self.pkey(qcl)
-            except:
+            except Exception:
                 raise ProgrammingError(
                     'Update needs primary key or oid as %s' % foid)
             where = "%s='%s'" % (pk, a[pk])
