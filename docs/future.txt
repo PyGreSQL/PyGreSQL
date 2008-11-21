@@ -7,7 +7,7 @@ To Do
 -----
 
 - Add check that we have at least Py 2.3 and Pg 7.4,
-  remove or rewrite cruft with old smell (has_key, type() etc.)
+  remove or rewrite old/ineffective code
 - Support PQescapeStringConn and PQescapeByteaConn
   (see also http://www.postgresql.org/docs/techdocs.49).
 - Use PQescapeStringConn in the _quote() function of pg and pgdb

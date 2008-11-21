@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.58 2008-11-01 18:21:12 cito Exp $
+# $Id: pg.py,v 1.59 2008-11-21 11:18:32 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -19,7 +19,6 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 """
 
 from _pg import *
-from types import *
 try:
     from decimal import Decimal
     set_decimal(Decimal)
@@ -42,12 +41,12 @@ def _quote(d, t):
             return 'NULL'
         return "'%.2f'" % float(d)
     if t == 'bool':
-        if type(d) == StringType:
+        if isinstance(d, basestring):
             if d == '':
                 return 'NULL'
-            d = str(d).lower() in ('t', 'true', '1', 'y', 'yes', 'on')
+            d = d.lower() in ('t', 'true', '1', 'y', 'yes', 'on')
         else:
-            d = not not d
+            d = bool(d)
         return ("'f'", "'t'")[d]
     if t in ('date', 'inet', 'cidr'):
         if d == '':
@@ -114,7 +113,7 @@ def _join_parts(s):
 
 # The PostGreSQL database connection interface:
 
-class DB:
+class DB(object):
     """Wrapper class for the _pg connection type."""
 
     def __init__(self, *args, **kw):
@@ -151,8 +150,8 @@ class DB:
         self._args = args, kw
         self.debug = None # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
-            # * to a function which takes a string argument or
-            # * to a file object to write debug statements to.
+            # * to a file object to write debug statements or
+            # * to a callable object which takes a string argument.
 
     def __getattr__(self, name):
         # All undefined members are the same as in the underlying pg connection:
@@ -168,12 +167,12 @@ class DB:
     def _do_debug(self, s):
         """Print a debug message."""
         if self.debug:
-            if isinstance(self.debug, StringType):
+            if isinstance(self.debug, basestring):
                 print self.debug % s
-            elif isinstance(self.debug, FunctionType):
-                self.debug(s)
-            elif isinstance(self.debug, FileType):
+            elif isinstance(self.debug, file):
                 print >> self.debug, s
+            elif callable(self.debug):
+                self.debug(s)
 
     def close(self):
         """Close the database connection."""
@@ -267,7 +266,7 @@ class DB:
 
         """
         # First see if the caller is supplying a dictionary
-        if isinstance(newpkey, DictType):
+        if isinstance(newpkey, dict):
             # make sure that we have a namespace
             self._pkeys = {}
             for x in newpkey.keys():
@@ -283,7 +282,7 @@ class DB:
             return newpkey
 
         # Get all the primary keys at once
-        if self._pkeys == {} or not self._pkeys.has_key(qcl):
+        if qcl not in self._pkeys:
             # if not found, check again in case it was added after we started
             self._pkeys = dict([
                 (_join_parts(r[:2]), r[2]) for r in self.db.query(
@@ -337,7 +336,7 @@ class DB:
         will become the new attribute names dictionary.
 
         """
-        if isinstance(newattnames, DictType):
+        if isinstance(newattnames, dict):
             self._attnames = newattnames
             return
         elif newattnames:
@@ -346,7 +345,7 @@ class DB:
         cl = self._split_schema(cl) # split into schema and cl
         qcl = _join_parts(cl) # build qualified name
         # May as well cache them:
-        if self._attnames.has_key(qcl):
+        if qcl in self._attnames:
             return self._attnames[qcl]
         if qcl not in self.get_relations('rv'):
             raise ProgrammingError('Class %s does not exist' % qcl)
@@ -406,12 +405,12 @@ class DB:
         if keyname is None: # use the primary key by default
             keyname = self.pkey(qcl)
         fnames = self.get_attnames(qcl)
-        if isinstance(arg, DictType):
+        if isinstance(arg, dict):
             # XXX this code is for backwards compatibility and will be
             # XXX removed eventually
-            if not arg.has_key(foid):
+            if foid not in arg:
                 ofoid = 'oid_' + self._split_schema(cl)[-1]
-                if arg.has_key(ofoid):
+                if ofoid in arg:
                     arg[foid] = arg[ofoid]
 
             k = arg[keyname == 'oid' and foid or keyname]
@@ -463,7 +462,7 @@ class DB:
         t = []
         n = []
         for f in fnames.keys():
-            if f != 'oid' and a.has_key(f):
+            if f != 'oid' and f in a:
                 t.append(_quote(a[f], fnames[f]))
                 n.append('"%s"' % f)
         q = 'INSERT INTO %s (%s) VALUES (%s)' % \
@@ -493,7 +492,7 @@ class DB:
         foid = 'oid(%s)' % qcl # build mangled oid
 
         # Note that we only accept oid key from named args for safety
-        if kw.has_key('oid'):
+        if 'oid' in kw:
             kw[foid] = kw['oid']
             del kw['oid']
 
@@ -505,12 +504,12 @@ class DB:
 
         # XXX this code is for backwards compatibility and will be
         # XXX removed eventually
-        if not a.has_key(foid):
+        if foid not in a:
             ofoid = 'oid_' + self._split_schema(cl)[-1]
-            if a.has_key(ofoid):
+            if ofoid in a:
                 a[foid] = a[ofoid]
 
-        if a.has_key(foid):
+        if foid in a:
             where = "oid=%s" % a[foid]
         else:
             try:
@@ -523,7 +522,7 @@ class DB:
         k = 0
         fnames = self.get_attnames(qcl)
         for ff in fnames.keys():
-            if ff != 'oid' and a.has_key(ff):
+            if ff != 'oid' and ff in a:
                 v.append('%s=%s' % (ff, _quote(a[ff], fnames[ff])))
         if v == []:
             return None
@@ -531,7 +530,7 @@ class DB:
         self._do_debug(q)
         self.db.query(q)
         # Reload the dictionary to catch things modified by engine:
-        if a.has_key(foid):
+        if foid in a:
             return self.get(qcl, a, 'oid')
         else:
             return self.get(qcl, a)
@@ -576,7 +575,7 @@ class DB:
         foid = 'oid(%s)' % qcl # build mangled oid
 
         # Note that we only accept oid key from named args for safety
-        if kw.has_key('oid'):
+        if 'oid' in kw:
             kw[foid] = kw['oid']
             del kw['oid']
 
@@ -588,9 +587,9 @@ class DB:
 
         # XXX this code is for backwards compatibility and will be
         # XXX removed eventually
-        if not a.has_key(foid):
+        if foid not in a:
             ofoid = 'oid_' + self._split_schema(cl)[-1]
-            if a.has_key(ofoid):
+            if ofoid in a:
                 a[foid] = a[ofoid]
 
         q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[foid])
