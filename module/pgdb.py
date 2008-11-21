@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.48 2008-11-21 21:17:53 cito Exp $
+# $Id: pgdb.py,v 1.49 2008-11-21 21:30:58 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -508,7 +508,8 @@ ROWID = pgdbType('oid oid8')
 # Additional type objects (more specific):
 
 BOOL = pgdbType('bool')
-INTEGER = pgdbType('int2 int4 serial')
+SMALLINT = pgdbType('int2')
+INTEGER = pgdbType('int2 int4 int8 serial')
 LONG = pgdbType('int8')
 FLOAT = pgdbType('float4 float8')
 NUMERIC = pgdbType('numeric')

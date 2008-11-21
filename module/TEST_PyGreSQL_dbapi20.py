@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.10 2008-11-01 15:38:02 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.11 2008-11-21 21:30:58 cito Exp $
 
 import dbapi20
 import unittest
@@ -107,6 +107,13 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual('numeric', pgdb.NUMBER)
         self.assertEqual('int4', pgdb.NUMBER)
         self.assertNotEqual('int4', pgdb.NUMERIC)
+        self.assertEqual('int2', pgdb.SMALLINT)
+        self.assertNotEqual('int4', pgdb.SMALLINT)
+        self.assertEqual('int2', pgdb.INTEGER)
+        self.assertEqual('int4', pgdb.INTEGER)
+        self.assertEqual('int8', pgdb.INTEGER)
+        self.assertNotEqual('int4', pgdb.LONG)
+        self.assertEqual('int8', pgdb.LONG)
         self.assert_('char' in pgdb.STRING)
         self.assert_(pgdb.NUMERIC <= pgdb.NUMBER)
         self.assert_(pgdb.NUMBER >= pgdb.INTEGER)

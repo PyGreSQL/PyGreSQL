@@ -22,6 +22,7 @@ Version 4.0 (2008-12-01)
 - Dropped dependence on mx.DateTime module.
 - Support for PQescapeStringConn() and PQescapeByteaConn();
   these are now also used by the internal _quote() functions.
+- Added 'int8' to INTEGER types. New SMALLINT type.
 
 Version 3.8.1 (2006-06-05)
 --------------------------
