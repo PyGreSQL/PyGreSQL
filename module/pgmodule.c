@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.83 2008-11-21 17:08:17 cito Exp $
+ * $Id: pgmodule.c,v 1.84 2008-11-21 17:25:28 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -87,21 +87,15 @@ const char *__movename[5] =
 #define MAX_BUFFER_SIZE 8192	/* maximum transaction size */
 
 #ifndef NO_DIRECT
-#define DIRECT_ACCESS	1		/* enables direct access functions */
+#define DIRECT_ACCESS 1			/* enables direct access functions */
 #endif
 
 #ifndef NO_LARGE
-#define LARGE_OBJECTS	1		/* enables large objects support */
+#define LARGE_OBJECTS 1			/* enables large objects support */
 #endif
 
 #ifndef NO_DEF_VAR
-#define DEFAULT_VARS	1		/* enables default variables use */
-#endif
-
-/* In 7.4 PQfreeNotify was deprecated and PQfreemem is used instead.
-   A macro exists in 7.4 for backwards compatibility. */
-#ifndef PQfreeNotify /* must be earlier than 7.4 */
-#define PQfreemem PQfreeNotify
+#define DEFAULT_VARS 1			/* enables default variables use */
 #endif
 
 /* Before 8.0, PQsetdbLogin was not thread-safe with kerberos. */
@@ -115,13 +109,13 @@ const char *__movename[5] =
 
 #ifdef DEFAULT_VARS
 
-static PyObject *pg_default_host;		/* default database host */
-static PyObject *pg_default_base;		/* default database name */
+static PyObject *pg_default_host;	/* default database host */
+static PyObject *pg_default_base;	/* default database name */
 static PyObject *pg_default_opt;	/* default connection options */
 static PyObject *pg_default_tty;	/* default debug tty */
-static PyObject *pg_default_port;		/* default connection port */
-static PyObject *pg_default_user;		/* default username */
-static PyObject *pg_default_passwd;		/* default password */
+static PyObject *pg_default_port;	/* default connection port */
+static PyObject *pg_default_user;	/* default username */
+static PyObject *pg_default_passwd;	/* default password */
 #endif	/* DEFAULT_VARS */
 
 DL_EXPORT(void) init_pg(void);
@@ -2674,8 +2668,6 @@ pg_inserttable(pgobject * self, PyObject * args)
 	return Py_None;
 }
 
-#ifdef PQfreeNotify /* must be 7.4 or later */
-
 /* get transaction state */
 static char pg_transaction__doc__[] =
 "Returns the current transaction status.";
@@ -2731,8 +2723,6 @@ pg_parameter(pgobject * self, PyObject * args)
 	Py_INCREF(Py_None);
 	return Py_None;
 }
-
-#endif /* 7.4 or later */
 
 #ifdef LARGE_OBJECTS
 /* creates large object */
@@ -2844,12 +2834,10 @@ static struct PyMethodDef pgobj_methods[] = {
 			pg_getnotify__doc__},
 	{"inserttable", (PyCFunction) pg_inserttable, METH_VARARGS,
 			pg_inserttable__doc__},
-#ifdef PQfreeNotify /* must be 7.4 or later */
 	{"transaction", (PyCFunction) pg_transaction, METH_VARARGS,
 			pg_transaction__doc__},
 	{"parameter", (PyCFunction) pg_parameter, METH_VARARGS,
 			pg_parameter__doc__},
-#endif
 
 #ifdef DIRECT_ACCESS
 	{"putline", (PyCFunction) pg_putline, 1, pg_putline__doc__},
@@ -3010,7 +2998,6 @@ staticforward PyTypeObject PgQueryType = {
 	0,							/* tp_as_mapping */
 	0,							/* tp_hash */
 };
-
 
 
 /* --------------------------------------------------------------------- */
@@ -3560,14 +3547,12 @@ init_pg(void)
 	PyDict_SetItemString(dict, "RESULT_DDL", PyInt_FromLong(RESULT_DDL));
 	PyDict_SetItemString(dict, "RESULT_DQL", PyInt_FromLong(RESULT_DQL));
 
-#ifdef PQfreeNotify	/* must be 7.4 or later */
 	/* transaction states */
 	PyDict_SetItemString(dict,"TRANS_IDLE",PyInt_FromLong(PQTRANS_IDLE));
 	PyDict_SetItemString(dict,"TRANS_ACTIVE",PyInt_FromLong(PQTRANS_ACTIVE));
 	PyDict_SetItemString(dict,"TRANS_INTRANS",PyInt_FromLong(PQTRANS_INTRANS));
 	PyDict_SetItemString(dict,"TRANS_INERROR",PyInt_FromLong(PQTRANS_INERROR));
 	PyDict_SetItemString(dict,"TRANS_UNKNOWN",PyInt_FromLong(PQTRANS_UNKNOWN));
-#endif
 
 #ifdef LARGE_OBJECTS
 	/* create mode for large objects */
