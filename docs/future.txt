@@ -6,8 +6,6 @@ PyGreSQL future directions
 To Do
 -----
 
-- Support PQescapeStringConn and PQescapeByteaConn
-  (see also http://www.postgresql.org/docs/techdocs.49).
 - Use PQescapeStringConn in the _quote() function of pg and pgdb
   (escaping via backslash is not standard and produces warnings
   in newer PostgreSQL versions).

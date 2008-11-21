@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.61 2008-11-21 13:10:51 cito Exp $
+# $Id: pg.py,v 1.62 2008-11-21 19:25:27 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -188,9 +188,9 @@ class DB(object):
         else:
             raise InternalError('Connection is not valid')
 
-    # For convenience, define some module functions as static methods also:
-    escape_string, escape_bytea, unescape_bytea = map(staticmethod,
-        (escape_string, escape_bytea, unescape_bytea))
+    # escape_string and escape_bytea exist as methods,
+    # so we define unescape_bytea as a method as well
+    unescape_bytea = staticmethod(unescape_bytea)
 
     def _do_debug(self, s):
         """Print a debug message."""

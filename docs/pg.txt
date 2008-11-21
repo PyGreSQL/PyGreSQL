@@ -303,6 +303,8 @@ Description:
   in SQL commands. Certain characters (such as quotes and backslashes)
   must be escaped to prevent them from being interpreted specially
   by the SQL parser. `escape_string` performs this operation.
+  Note that there is also a `pgobject` method with the same name
+  which takes connection properties into account.
 
 .. caution:: It is especially important to do proper escaping when
   handling strings that were received from an untrustworthy source.
@@ -334,6 +336,8 @@ Description:
   Escapes binary data for use within an SQL command with the type `bytea`.
   As with `escape_string`, this is only used when inserting data directly
   into an SQL command string.
+  Note that there is also a `pgobject` method with the same name
+  which takes connection properties into account.
 
 Example::
 
@@ -965,7 +969,9 @@ Return type:
   :str: the escaped string
 
 Description:
-  See the module function with the same name.
+  Similar to the module function with the same name, but the
+  behavior of this method is adjusted depending on the connection properties
+  (such as character encoding).
 
 escape_bytea - escape binary data for use within SQL as type `bytea`
 --------------------------------------------------------------------
@@ -980,7 +986,9 @@ Return type:
   :str: the escaped string
 
 Description:
-  See the module function with the same name.
+  Similar to the module function with the same name, but the
+  behavior of this method is adjusted depending on the connection properties
+  (in particular, whether standard-conforming strings are enabled).
 
 unescape_bytea -- unescape `bytea` data that has been retrieved as text
 -----------------------------------------------------------------------

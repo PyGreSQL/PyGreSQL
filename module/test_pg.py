@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.15 2008-11-21 13:00:21 cito Exp $
+# $Id: test_pg.py,v 1.16 2008-11-21 19:25:27 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -354,18 +354,24 @@ class TestEscapeFunctions(unittest.TestCase):
     """"Test pg escape and unescape functions."""
 
     def testEscapeString(self):
-        self.assertEqual(pg.escape_string('hello'), 'hello')
+        self.assertEqual(pg.escape_string('plain'), 'plain')
+        self.assertEqual(pg.escape_string(
+            "that's k\xe4se"), "that''s k\xe4se")
         self.assertEqual(pg.escape_string(
             r"It's fine to have a \ inside."),
             r"It''s fine to have a \\ inside.")
 
     def testEscapeBytea(self):
-        self.assertEqual(pg.escape_bytea('hello'), 'hello')
+        self.assertEqual(pg.escape_bytea('plain'), 'plain')
+        self.assertEqual(pg.escape_bytea(
+            "that's k\xe4se"), "that''s k\\\\344se")
         self.assertEqual(pg.escape_bytea(
             'O\x00ps\xff!'), r'O\\000ps\\377!')
 
     def testUnescapeBytea(self):
-        self.assertEqual(pg.unescape_bytea('hello'), 'hello')
+        self.assertEqual(pg.unescape_bytea('plain'), 'plain')
+        self.assertEqual(pg.unescape_bytea(
+            "that's k\\344se"), "that's k\xe4se")
         self.assertEqual(pg.unescape_bytea(
             r'O\000ps\377!'), 'O\x00ps\xff!')
 
@@ -405,18 +411,13 @@ class TestConnectObject(unittest.TestCase):
 
     def testAllConnectMethods(self):
         methods = ['cancel', 'close', 'endcopy',
+            'escape_bytea', 'escape_string',
             'fileno', 'getline', 'getlo', 'getnotify',
             'inserttable', 'locreate', 'loimport',
             'parameter', 'putline', 'query', 'reset',
             'source', 'transaction']
         connection_methods = [a for a in dir(self.connection)
             if callable(eval("self.connection." + a))]
-        if 'transaction' not in connection_methods:
-            # this may be the case for PostgreSQL < 7.4
-            connection_methods.append('transaction')
-        if 'parameter' not in connection_methods:
-            # this may be the case for PostgreSQL < 7.4
-            connection_methods.append('parameter')
         self.assertEqual(methods, connection_methods)
 
     def testAttributeDb(self):
@@ -695,12 +696,6 @@ class TestDBClassBasic(unittest.TestCase):
             'update', 'user']
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
-        if 'transaction' not in db_attributes:
-            # this may be the case for PostgreSQL < 7.4
-            db_attributes.insert(-4, 'transaction')
-        if 'parameter' not in db_attributes:
-            # this may be the case for PostgreSQL < 7.4
-            db_attributes.insert(-12, 'parameter')
         self.assertEqual(attributes, db_attributes)
 
     def testAttributeDb(self):
@@ -745,13 +740,26 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertEqual(self.db.db.user, def_user)
 
     def testMethodEscapeString(self):
-        self.assertEqual(self.db.escape_string('hello'), 'hello')
+        self.assertEqual(self.db.escape_string("plain"), "plain")
+        self.assertEqual(self.db.escape_string(
+            "that's k\xe4se"), "that''s k\xe4se")
+        self.assertEqual(self.db.escape_string(
+            r"It's fine to have a \ inside."),
+            r"It''s fine to have a \\ inside.")
 
     def testMethodEscapeBytea(self):
-        self.assertEqual(self.db.escape_bytea('hello'), 'hello')
+        self.assertEqual(self.db.escape_bytea("plain"), "plain")
+        self.assertEqual(self.db.escape_bytea(
+            "that's k\xe4se"), "that''s k\\\\344se")
+        self.assertEqual(self.db.escape_bytea(
+            'O\x00ps\xff!'), r'O\\000ps\\377!')
 
     def testMethodUnescapeBytea(self):
-        self.assertEqual(self.db.unescape_bytea('hello'), 'hello')
+        self.assertEqual(self.db.unescape_bytea("plain"), "plain")
+        self.assertEqual(self.db.unescape_bytea(
+            "that's k\\344se"), "that's k\xe4se")
+        self.assertEqual(pg.unescape_bytea(
+            r'O\000ps\377!'), 'O\x00ps\xff!')
 
     def testMethodQuery(self):
         self.db.query("select 1+1")
@@ -809,16 +817,25 @@ class TestDBClass(unittest.TestCase):
         self.db.close()
 
     def testEscapeString(self):
+        self.assertEqual(self.db.escape_string("plain"), "plain")
+        self.assertEqual(self.db.escape_string(
+            "that's k\xe4se"), "that''s k\xe4se")
         self.assertEqual(self.db.escape_string(
             r"It's fine to have a \ inside."),
             r"It''s fine to have a \\ inside.")
 
     def testEscapeBytea(self):
+        self.assertEqual(self.db.escape_bytea("plain"), "plain")
+        self.assertEqual(self.db.escape_bytea(
+            "that's k\xe4se"), "that''s k\\\\344se")
         self.assertEqual(self.db.escape_bytea(
             'O\x00ps\xff!'), r'O\\000ps\\377!')
 
     def testUnescapeBytea(self):
+        self.assertEqual(self.db.unescape_bytea("plain"), "plain")
         self.assertEqual(self.db.unescape_bytea(
+            "that's k\\344se"), "that's k\xe4se")
+        self.assertEqual(pg.unescape_bytea(
             r'O\000ps\377!'), 'O\x00ps\xff!')
 
     def testPkey(self):

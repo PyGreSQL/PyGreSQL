@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.84 2008-11-21 17:25:28 cito Exp $
+ * $Id: pgmodule.c,v 1.85 2008-11-21 19:25:27 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -2724,6 +2724,59 @@ pg_parameter(pgobject * self, PyObject * args)
 	return Py_None;
 }
 
+/* escape string */
+static char pg_escape_string__doc__[] =
+"pg_escape_string(str) -- escape a string for use within SQL.";
+
+static PyObject *
+pg_escape_string(pgobject *self, PyObject *args) {
+	char *from; /* our string argument */
+	char *to=NULL; /* the result */
+	int from_length; /* length of string */
+	int to_length; /* length of result */
+	PyObject *ret; /* string object to return */
+
+	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+		return NULL;
+	to_length = 2*from_length + 1;
+	if (to_length < from_length) { /* overflow */
+		to_length = from_length;
+		from_length = (from_length - 1)/2;
+	}
+	to = (char *)malloc(to_length);
+	to_length = (int)PQescapeStringConn(self->cnx,
+		to, from, (size_t)from_length, NULL);
+	ret = Py_BuildValue("s#", to, to_length);
+	if (to)
+		free(to);
+	if (!ret) /* pass on exception */
+		return NULL;
+	return ret;
+}
+
+/* escape bytea */
+static char pg_escape_bytea__doc__[] =
+"pg_escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
+
+static PyObject *
+pg_escape_bytea(pgobject *self, PyObject *args) {
+	unsigned char *from; /* our string argument */
+	unsigned char *to; /* the result */
+	int from_length; /* length of string */
+	size_t to_length; /* length of result */
+	PyObject *ret; /* string object to return */
+
+	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+		return NULL;
+	to = PQescapeByteaConn(self->cnx, from, (int)from_length, &to_length);
+	ret = Py_BuildValue("s", to);
+	if (to)
+		PQfreemem((void *)to);
+	if (!ret) /* pass on exception */
+		return NULL;
+	return ret;
+}
+
 #ifdef LARGE_OBJECTS
 /* creates large object */
 static char pg_locreate__doc__[] =
@@ -2821,7 +2874,6 @@ pg_loimport(pgobject * self, PyObject * args)
 }
 #endif /* LARGE_OBJECTS */
 
-
 /* connection object methods */
 static struct PyMethodDef pgobj_methods[] = {
 	{"source", (PyCFunction) pg_source, METH_VARARGS, pg_source__doc__},
@@ -2838,6 +2890,10 @@ static struct PyMethodDef pgobj_methods[] = {
 			pg_transaction__doc__},
 	{"parameter", (PyCFunction) pg_parameter, METH_VARARGS,
 			pg_parameter__doc__},
+	{"escape_string", (PyCFunction) pg_escape_string, METH_VARARGS,
+			pg_escape_string__doc__},
+	{"escape_bytea", (PyCFunction) pg_escape_bytea, METH_VARARGS,
+			pg_escape_bytea__doc__},
 
 #ifdef DIRECT_ACCESS
 	{"putline", (PyCFunction) pg_putline, 1, pg_putline__doc__},
