@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.85 2008-11-21 19:25:27 cito Exp $
+ * $Id: pgmodule.c,v 1.86 2008-11-21 22:06:34 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -540,7 +540,7 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 	Py_END_ALLOW_THREADS
 
 	/* checks result validity */
-		if (!self->last_result)
+	if (!self->last_result)
 	{
 		PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->pgcnx->cnx));
 		return NULL;
@@ -549,9 +549,9 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 	/* checks result status */
 	switch (PQresultStatus(self->last_result))
 	{
-			long		num_rows;
+		long	num_rows;
 
-			/* query succeeded */
+		/* query succeeded */
 		case PGRES_TUPLES_OK:	/* DQL: returns None (DB-SIG compliant) */
 			self->result_type = RESULT_DQL;
 			self->max_row = PQntuples(self->last_result);
@@ -571,7 +571,7 @@ pgsource_execute(pgsourceobject * self, PyObject * args)
 			}
 			return PyInt_FromLong(num_rows);
 
-			/* query failed */
+		/* query failed */
 		case PGRES_EMPTY_QUERY:
 			PyErr_SetString(PyExc_ValueError, "empty query.");
 			break;
@@ -2269,7 +2269,7 @@ pg_query(pgobject * self, PyObject * args)
 	Py_END_ALLOW_THREADS
 
 	/* checks result validity */
-		if (!result)
+	if (!result)
 	{
 		PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
 		return NULL;

@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.49 2008-11-21 21:30:58 cito Exp $
+# $Id: pgdb.py,v 1.50 2008-11-21 22:06:34 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -431,7 +431,7 @@ def connect(dsn=None,
         dbpasswd = params[3]
         dbopt = params[4]
         dbtty = params[5]
-    except (IndexError, TypeError):
+    except (AttributeError, IndexError, TypeError):
         pass
 
     # override if necessary
@@ -446,7 +446,7 @@ def connect(dsn=None,
             params = host.split(":")
             dbhost = params[0]
             dbport = int(params[1])
-        except (IndexError, TypeError, ValueError):
+        except (AttributeError, IndexError, TypeError, ValueError):
             pass
 
     # empty host is localhost
