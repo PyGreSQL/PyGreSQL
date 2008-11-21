@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.63 2008-11-21 21:17:53 cito Exp $
+# $Id: pg.py,v 1.64 2008-11-21 23:38:17 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -290,7 +290,7 @@ class DB(object):
         self._do_debug(qstr)
         return self.db.query(qstr)
 
-    def pkey(self, cl, newpkey = None):
+    def pkey(self, cl, newpkey=None):
         """This method gets or sets the primary key of a class.
 
         If newpkey is set and is not a dictionary then set that
@@ -338,7 +338,7 @@ class DB(object):
         return [s[0] for s in
             self.db.query('SELECT datname FROM pg_database').getresult()]
 
-    def get_relations(self, kinds = None):
+    def get_relations(self, kinds=None):
         """Get list of relations in connected database of specified kinds.
 
             If kinds is None or empty, all kinds of relations are returned.
@@ -360,7 +360,7 @@ class DB(object):
         """Return list of tables in connected database."""
         return self.get_relations('r')
 
-    def get_attnames(self, cl, newattnames = None):
+    def get_attnames(self, cl, newattnames=None):
         """Given the name of a table, digs out the set of attribute names.
 
         Returns a dictionary of attribute names (the names are the keys,
@@ -417,7 +417,7 @@ class DB(object):
         self._attnames[qcl] = t # cache it
         return self._attnames[qcl]
 
-    def get(self, cl, arg, keyname = None, view = 0):
+    def get(self, cl, arg, keyname=None, view=0):
         """Get a tuple from a database table or view.
 
         This method is the basic mechanism to get a single row.  It assumes
@@ -455,7 +455,7 @@ class DB(object):
             q = 'SELECT * FROM %s WHERE oid=%s LIMIT 1' % (qcl, k)
         elif view:
             q = 'SELECT * FROM %s WHERE %s=%s LIMIT 1' % \
-                (qcl, keyname, _quote(k, fnames[keyname]))
+                (qcl, keyname, self._quote(k, fnames[keyname]))
         else:
             q = 'SELECT %s FROM %s WHERE %s=%s LIMIT 1' % \
                 (','.join(fnames.keys()), qcl, \
@@ -471,7 +471,7 @@ class DB(object):
             arg[k] = d
         return arg
 
-    def insert(self, cl, d = None, **kw):
+    def insert(self, cl, d=None, **kw):
         """Insert a tuple into a database table.
 
         This method inserts values into the table specified filling in the
@@ -510,7 +510,7 @@ class DB(object):
         except Exception:
             return None
 
-    def update(self, cl, d = None, **kw):
+    def update(self, cl, d=None, **kw):
         """Update an existing row in a database table.
 
         Similar to insert but updates an existing row.  The update is based
@@ -552,7 +552,6 @@ class DB(object):
                     'Update needs primary key or oid as %s' % foid)
             where = "%s='%s'" % (pk, a[pk])
         v = []
-        k = 0
         fnames = self.get_attnames(qcl)
         for ff in fnames.keys():
             if ff != 'oid' and ff in a:
@@ -568,7 +567,7 @@ class DB(object):
         else:
             return self.get(qcl, a)
 
-    def clear(self, cl, a = None):
+    def clear(self, cl, a=None):
         """
 
         This method clears all the attributes to values determined by the types.
@@ -582,7 +581,6 @@ class DB(object):
         if a is None:
             a = {} # empty if argument is not present
         qcl = _join_parts(self._split_schema(cl)) # build qualified name
-        foid = 'oid(%s)' % qcl # build mangled oid
         fnames = self.get_attnames(qcl)
         for k, t in fnames.items():
             if k == 'oid':
@@ -595,7 +593,7 @@ class DB(object):
                 a[k] = ''
         return a
 
-    def delete(self, cl, d = None, **kw):
+    def delete(self, cl, d=None, **kw):
         """Delete an existing row in a database table.
 
         This method deletes the row from a table.
