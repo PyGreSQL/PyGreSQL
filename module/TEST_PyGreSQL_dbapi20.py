@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.14 2008-11-23 13:11:21 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.15 2008-11-23 13:14:05 cito Exp $
 
 import dbapi20
 import unittest
@@ -51,13 +51,13 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
         con = self._connect()
         curs = myCursor(con)
-        curs.execute("SELECT 1 AS a, 2 AS b")
+        curs.execute("select 1 as a, 2 as b")
         self.assertEqual(curs.fetchone(), {'a': 1, 'b': 2})
 
     def test_cursor_iteration(self):
         con = self._connect()
         curs = con.cursor()
-        curs.execute("SELECT 1 union select 2 union select 3")
+        curs.execute("select 1 union select 2 union select 3")
         self.assertEqual([r[0] for r in curs], range(1, 4))
 
     def test_fetch_2_rows(self):
