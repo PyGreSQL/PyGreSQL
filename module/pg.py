@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.64 2008-11-21 23:38:17 cito Exp $
+# $Id: pg.py,v 1.65 2008-11-23 14:32:18 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -597,8 +597,9 @@ class DB(object):
         """Delete an existing row in a database table.
 
         This method deletes the row from a table.
-        It deletes based on the OID munged as described above."""
+        It deletes based on the OID munged as described above.
 
+        """
         # Like update, delete works on the oid.
         # One day we will be testing that the record to be deleted
         # isn't referenced somewhere (or else PostgreSQL will).

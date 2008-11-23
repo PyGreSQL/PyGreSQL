@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.53 2008-11-23 13:11:21 cito Exp $
+# $Id: pgdb.py,v 1.54 2008-11-23 14:32:18 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -204,7 +204,8 @@ class pgdbCursor(object):
         elif hasattr(val, '__pg_repr__'):
             val = val.__pg_repr__()
         else:
-            raise InterfaceError('do not know how to handle type %s' % type(val))
+            raise InterfaceError(
+                'do not know how to handle type %s' % type(val))
         return val
 
     def _quoteparams(self, string, params):

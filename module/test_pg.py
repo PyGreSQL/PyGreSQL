@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.20 2008-11-23 14:07:35 cito Exp $
+# $Id: test_pg.py,v 1.21 2008-11-23 14:32:18 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -172,17 +172,22 @@ class TestAuxiliaryFunctions(unittest.TestCase):
         self.assertEqual(f('a B.c'), ['a B', 'c'])
         self.assertEqual(f('"A".b.c'), ['A', 'b', 'c'])
         self.assertEqual(f('"A""B".c'), ['A"B', 'c'])
-        self.assertEqual(f('a.b.c.d.e.f.g'), ['a', 'b', 'c', 'd', 'e', 'f', 'g'])
-        self.assertEqual(f('"a.b.c.d.e.f".g'), ['a.b.c.d.e.f', 'g'])
-        self.assertEqual(f('a.B.c.D.e.F.g'), ['a', 'b', 'c', 'd', 'e', 'f', 'g'])
-        self.assertEqual(f('A.b.C.d.E.f.G'), ['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+        self.assertEqual(f('a.b.c.d.e.f.g'),
+            ['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+        self.assertEqual(f('"a.b.c.d.e.f".g'),
+            ['a.b.c.d.e.f', 'g'])
+        self.assertEqual(f('a.B.c.D.e.F.g'),
+            ['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+        self.assertEqual(f('A.b.C.d.E.f.G'),
+            ['a', 'b', 'c', 'd', 'e', 'f', 'g'])
 
     def testJoinParts(self):
         f = pg._join_parts
         self.assertEqual(f(('a',)), 'a')
         self.assertEqual(f(('a', 'b')), 'a.b')
         self.assertEqual(f(('a', 'b', 'c')), 'a.b.c')
-        self.assertEqual(f(('a', 'b', 'c', 'd', 'e', 'f', 'g')), 'a.b.c.d.e.f.g')
+        self.assertEqual(f(('a', 'b', 'c', 'd', 'e', 'f', 'g')),
+            'a.b.c.d.e.f.g')
         self.assertEqual(f(('A', 'b')), '"A".b')
         self.assertEqual(f(('a', 'B')), 'a."B"')
         self.assertEqual(f(('a b', 'c')), '"a b".c')
@@ -193,7 +198,8 @@ class TestAuxiliaryFunctions(unittest.TestCase):
         self.assertEqual(f(('0_', 'a')), '"0_".a')
         self.assertEqual(f(('_0', 'a')), '_0.a')
         self.assertEqual(f(('_a', 'b')), '_a.b')
-        self.assertEqual(f(('a', 'B', '0', 'c0', 'C0', 'd e', 'f_g', 'h.i', 'jklm', 'nopq')),
+        self.assertEqual(f(('a', 'B', '0', 'c0', 'C0',
+            'd e', 'f_g', 'h.i', 'jklm', 'nopq')),
             'a."B"."0".c0."C0"."d e".f_g."h.i".jklm.nopq')
 
 
@@ -401,7 +407,7 @@ class TestConnectObject(unittest.TestCase):
         self.connection.close()
         try:
             self.connection.reset()
-            fail('Reset should give an error for a closed connection')
+            self.fail('Reset should give an error for a closed connection')
         except Exception:
             pass
         self.assertRaises(pg.InternalError, self.connection.close)
@@ -449,7 +455,7 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testGet3Cols(self):
         q = "select 1,2,3"
-        result = [(1,2,3)]
+        result = [(1, 2, 3)]
         r = self.c.query(q).getresult()
         self.assertEqual(r, result)
 
@@ -758,7 +764,7 @@ class TestDBClassBasic(unittest.TestCase):
         self.db.close()
         try:
             self.db.reset()
-            fail('Reset should give an error for a closed connection')
+            self.fail('Reset should give an error for a closed connection')
         except Exception:
             pass
         self.assertRaises(pg.InternalError, self.db.close)
