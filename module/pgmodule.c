@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.87 2008-11-21 23:24:38 cito Exp $
+ * $Id: pgmodule.c,v 1.88 2008-11-23 14:07:35 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -2142,9 +2142,6 @@ static PyObject *
 pg_getnotify(pgobject * self, PyObject * args)
 {
 	PGnotify   *notify;
-	PGresult   *result;
-	PyObject   *notify_result,
-			   *temp;
 
 	if (!self->cnx)
 	{
@@ -2160,27 +2157,22 @@ pg_getnotify(pgobject * self, PyObject * args)
 		return NULL;
 	}
 
-	/* gets notify and builds result */
+	/* checks for NOTIFY messages */
+	PQconsumeInput(self->cnx);
 
-	/*
-	 * notifies only come back as result of a query, so I send an empty
-	 * query
-	 */
-	Py_BEGIN_ALLOW_THREADS
-	result = PQexec(self->cnx, " ");
-	Py_END_ALLOW_THREADS
-
-		if ((notify = PQnotifies(self->cnx)) != NULL)
+	if ((notify = PQnotifies(self->cnx)) == NULL)
 	{
-		if ((notify_result = PyTuple_New(2)) == NULL)
-		{
-			PQclear(result);
-			return NULL;
-		}
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	else
+	{
+		PyObject   *notify_result,
+				   *temp;
 
-		if ((temp = PyString_FromString(notify->relname)) == NULL)
+		if ((notify_result = PyTuple_New(2)) == NULL ||
+			(temp = PyString_FromString(notify->relname)) == NULL)
 		{
-			PQclear(result);
 			return NULL;
 		}
 
@@ -2188,24 +2180,14 @@ pg_getnotify(pgobject * self, PyObject * args)
 
 		if ((temp = PyInt_FromLong(notify->be_pid)) == NULL)
 		{
-			PQclear(result);
 			Py_DECREF(notify_result);
 			return NULL;
 		}
 
 		PyTuple_SET_ITEM(notify_result, 1, temp);
 		PQfreemem(notify);
+		return notify_result;
 	}
-	else
-	{
-		Py_INCREF(Py_None);
-		notify_result = Py_None;
-	}
-
-	PQclear(result);
-
-	/* returns result */
-	return notify_result;
 }
 
 /* source creation */

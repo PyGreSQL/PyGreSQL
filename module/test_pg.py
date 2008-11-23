@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.19 2008-11-21 23:38:17 cito Exp $
+# $Id: test_pg.py,v 1.20 2008-11-23 14:07:35 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -578,6 +578,21 @@ class TestSimpleQueries(unittest.TestCase):
             '1|hello|w    ',
             '2|xyz  |uvw  ',
             '(2 rows)'])
+
+    def testGetNotify(self):
+        self.assert_(self.c.getnotify() is None)
+        self.c.query('listen test_notify')
+        try:
+            self.assert_(self.c.getnotify() is None)
+            self.c.query('notify test_notify')
+            r = self.c.getnotify()
+            self.assert_(isinstance(r, tuple))
+            self.assertEqual(len(r), 2)
+            self.assert_(isinstance(r[0], str))
+            self.assert_(isinstance(r[1], int))
+            self.assertEqual(r[0], 'test_notify')
+        finally:
+            self.c.query('unlisten test_notify')
 
 
 class TestInserttable(unittest.TestCase):

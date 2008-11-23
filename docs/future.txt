@@ -25,8 +25,9 @@ To Do
 Proposed Patches
 ----------------
 
-- Notice handling
-  (http://mailman.vex.net/pipermail/pygresql/2005-November/001530.html)
+- Notice handling with PQsetNoticeReceiver and PQsetNoticeProcessor
+  (one possible implementation was already suggested by Dmitry Dvoinikov
+  http://mailman.vex.net/pipermail/pygresql/2005-November/001530.html)
 
 
 Wish List

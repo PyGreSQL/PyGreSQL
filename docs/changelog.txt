@@ -30,7 +30,8 @@ Version 4.0 (2008-12-01)
   For single inserts, query() still returns the oid as an integer.
   The pgdb module already provides the "rowcount" cursor attribute
   for the same purpose.
-
+- Improved getnotify() by calling PQconsumeInput() instead of
+  submitting an empty command.
 
 Version 3.8.1 (2006-06-05)
 --------------------------
