@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.11 2008-11-21 21:30:58 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.12 2008-11-23 11:45:54 cito Exp $
 
 import dbapi20
 import unittest
@@ -91,6 +91,11 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def test_setoutputsize(self):
         pass # not implemented
+
+    def test_cursor_connection(self):
+        con = self._connect()
+        curs = con.cursor()
+        self.assertEqual(curs.connection, con)
 
     def test_pgdb_type(self):
         self.assertEqual(pgdb.STRING, pgdb.STRING)

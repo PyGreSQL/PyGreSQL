@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.50 2008-11-21 22:06:34 cito Exp $
+# $Id: pgdb.py,v 1.51 2008-11-23 11:45:54 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -163,7 +163,7 @@ class pgdbCursor(object):
 
     def __init__(self, dbcnx):
         """Create a cursor object for the database connection."""
-        self._dbcnx = dbcnx
+        self.connection = self._dbcnx = dbcnx
         self._cnx = dbcnx._cnx
         self._type_cache = dbcnx._type_cache
         self._src = self._cnx.source()

@@ -8,6 +8,7 @@ Version 4.0 (2008-12-01)
 - Improved performance of fetchall() for large result sets
   by speeding up the type casts (as suggested by Peter Schuller).
 - Exposed exceptions as attributes of the connection object.
+- Exposed connection as attribute of the cursor object.
 - Added new method to get parameter settings.
 - Added customizable row_factory as suggested by Simon Pamies.
 - Separated between mandatory and additional type objects.
@@ -26,7 +27,7 @@ Version 4.0 (2008-12-01)
 - Added a way to find the number of rows affected by a query()
   with the classic pg module by returning it as a string.
   For single inserts, query() still returns the oid as an integer.
-  The pgdb module already provides the "rownum" cursor attribute
+  The pgdb module already provides the "rowcount" cursor attribute
   for the same purpose.
 
 
