@@ -32,19 +32,16 @@ Proposed Patches
 Wish List
 ---------
 
-- Support for the new insert/update ... returning ... feature
-  (see http://jakub.fedyczak.net/post/10/).
 - Make SQLSTATE error codes available.
 - Make use of PQexecParams() and PQprepare(). This could speed up
   executemany() and allow retrieving binary data directly by setting
   the resultFormat parameter to one.
+- Support .errorhandler extension.
 - Connection as context manager (see http://tinyurl.com/6j9cef).
 - Users should be able to register their own types with _pg.
-- I would like a new method that returns a dictionary
-  of dictionaries from a SELECT.
-- Add support for persistent and pooled connections
-  that can be used in multi-threaded environments
-  or just add link to http://www.webwareforpython.org/DBUtils.
+- New methods in the classic module, similar to getresult() and
+  dictresult(), but returning dictionaries of rows instead of lists
+  of rows (with primary key or oids as keys).
 - Make PyGreSQL thread-safe on the connection level.
 - The API documentation could be created with Epydoc.
 - Write a tutorial for beginners and advanced use.

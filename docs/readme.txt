@@ -184,13 +184,17 @@ You may either choose to use the "classic" PyGreSQL interface
 provided by the `pg` module or else the newer DB-API 2.0
 compliant interface provided by the `pgdb` module.
 
-`DB-API 2.0 <http://www.python.org/peps/pep-0249.html>`_
+`DB-API 2.0 <http://www.python.org/dev/peps/pep-0249/>`_
 (Python Database API Specification v2.0)
 is a specification for connecting to databases (not only PostGreSQL)
 from Python that has been developed by the Python DB-SIG in 1999.
 
 The programming information is available in the files
 `pg.txt <pg.html>`_ and `pgdb.txt <pgdb.html>`_.
+
+Note that PyGreSQL is not thread-safe on the connection level. Therefore
+we recommend using `DBUtils <http://www.webwareforpython.org/DBUtils>`
+for multi-threaded environments, which supports both PyGreSQL interfaces.
 
 
 ChangeLog and Future
