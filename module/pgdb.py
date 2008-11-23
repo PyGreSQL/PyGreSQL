@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.52 2008-11-23 12:19:21 cito Exp $
+# $Id: pgdb.py,v 1.53 2008-11-23 13:11:21 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -181,6 +181,10 @@ class pgdbCursor(object):
         self.arraysize = 1
         self.lastrowid = None
 
+    def __iter__(self):
+        """Return self to make cursors compatible to the iteration protocol."""
+        return self
+
     def _quote(self, val):
         """Quote value depending on its type."""
         if isinstance(val, datetime):
@@ -330,6 +334,13 @@ class pgdbCursor(object):
         coltypes = [desc[1] for desc in self.description]
         return [row_factory([typecast(*args)
             for args in zip(coltypes, row)]) for row in result]
+
+    def next(self):
+        """Return the next row (support for the iteration protocol)."""
+        res = self.fetchone()
+        if res is None:
+            raise StopIteration
+        return res
 
     def nextset():
         """Not supported."""

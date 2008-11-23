@@ -9,6 +9,7 @@ Version 4.0 (2008-12-01)
   by speeding up the type casts (as suggested by Peter Schuller).
 - Exposed exceptions as attributes of the connection object.
 - Exposed connection as attribute of the cursor object.
+- Cursors now support the iteration protocol.
 - Added new method to get parameter settings.
 - Added customizable row_factory as suggested by Simon Pamies.
 - Separated between mandatory and additional type objects.
