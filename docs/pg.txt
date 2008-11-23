@@ -448,7 +448,6 @@ Description:
   method returns a `pgqueryobject` that can be accessed via the `getresult()`
   or `dictresult()` method or simply printed. Otherwise, it returns `None`.
 
-
 reset - resets the connection
 -----------------------------
 Syntax::

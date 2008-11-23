@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.12 2008-11-23 11:45:54 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.13 2008-11-23 12:19:21 cito Exp $
 
 import dbapi20
 import unittest
@@ -55,7 +55,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(curs.fetchone(), {'a': 1, 'b': 2})
 
     def test_fetch_2_rows(self):
-        Decimal = pgdb.Decimal
+        Decimal = pgdb.decimal_type()
         values = ['test', 'test', True, 5, 6L, 5.7,
             Decimal('234.234234'), Decimal('75.45'),
             '2008-10-20 15:25:35', 7897234L]
@@ -91,6 +91,19 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def test_setoutputsize(self):
         pass # not implemented
+
+    def test_connection_errors(self):
+        con = self._connect()
+        self.assertEqual(con.Error, pgdb.Error)
+        self.assertEqual(con.Warning, pgdb.Warning)
+        self.assertEqual(con.InterfaceError, pgdb.InterfaceError)
+        self.assertEqual(con.DatabaseError, pgdb.DatabaseError)
+        self.assertEqual(con.InternalError, pgdb.InternalError)
+        self.assertEqual(con.OperationalError, pgdb.OperationalError)
+        self.assertEqual(con.ProgrammingError, pgdb.ProgrammingError)
+        self.assertEqual(con.IntegrityError, pgdb.IntegrityError)
+        self.assertEqual(con.DataError, pgdb.DataError)
+        self.assertEqual(con.NotSupportedError, pgdb.NotSupportedError)
 
     def test_cursor_connection(self):
         con = self._connect()

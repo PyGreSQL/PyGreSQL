@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.51 2008-11-23 11:45:54 cito Exp $
+# $Id: pgdb.py,v 1.52 2008-11-23 12:19:21 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -90,6 +90,15 @@ paramstyle = 'pyformat'
 
 
 ### Internal Types Handling
+
+def decimal_type(decimal_type=None):
+    """Get or set global type to be used for decimal values."""
+    global Decimal
+    if decimal_type is not None:
+        Decimal = decimal_type
+        set_decimal(decimal_type)
+    return Decimal
+
 
 def _cast_bool(value):
     return value[:1] in ['t', 'T']
@@ -344,14 +353,15 @@ class pgdbCnx(object):
     """Connection Object."""
 
     # expose the exceptions as attributes on the connection object
-    Warning = Warning
     Error = Error
+    Warning = Warning
     InterfaceError = InterfaceError
     DatabaseError = DatabaseError
-    OperationalError = OperationalError
-    IntegrityError = IntegrityError
     InternalError = InternalError
+    OperationalError = OperationalError
     ProgrammingError = ProgrammingError
+    IntegrityError = IntegrityError
+    DataError = DataError
     NotSupportedError = NotSupportedError
 
     def __init__(self, cnx):
