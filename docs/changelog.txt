@@ -2,7 +2,7 @@
 PyGreSQL ChangeLog
 ==================
 
-Version 4.0 (2008-12-01)
+Version 4.0 (2009-01-01)
 ------------------------
 - Dropped support for Python below 2.3 and PostgreSQL below 7.4.
 - Improved performance of fetchall() for large result sets
