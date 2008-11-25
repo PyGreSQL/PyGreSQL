@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.65 2008-11-23 14:32:18 cito Exp $
+# $Id: pg.py,v 1.66 2008-11-25 18:15:23 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -439,13 +439,6 @@ class DB(object):
             keyname = self.pkey(qcl)
         fnames = self.get_attnames(qcl)
         if isinstance(arg, dict):
-            # XXX this code is for backwards compatibility and will be
-            # XXX removed eventually
-            if foid not in arg:
-                ofoid = 'oid_' + self._split_schema(cl)[-1]
-                if ofoid in arg:
-                    arg[foid] = arg[ofoid]
-
             k = arg[keyname == 'oid' and foid or keyname]
         else:
             k = arg
@@ -535,13 +528,6 @@ class DB(object):
             a = d
         a.update(kw)
 
-        # XXX this code is for backwards compatibility and will be
-        # XXX removed eventually
-        if foid not in a:
-            ofoid = 'oid_' + self._split_schema(cl)[-1]
-            if ofoid in a:
-                a[foid] = a[ofoid]
-
         if foid in a:
             where = "oid=%s" % a[foid]
         else:
@@ -616,13 +602,6 @@ class DB(object):
         else:
             a = d
         a.update(kw)
-
-        # XXX this code is for backwards compatibility and will be
-        # XXX removed eventually
-        if foid not in a:
-            ofoid = 'oid_' + self._split_schema(cl)[-1]
-            if ofoid in a:
-                a[foid] = a[ofoid]
 
         q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[foid])
         self._do_debug(q)
