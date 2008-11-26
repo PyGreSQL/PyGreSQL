@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.66 2008-11-25 18:15:23 darcy Exp $
+# $Id: pg.py,v 1.67 2008-11-26 10:37:26 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -425,8 +425,9 @@ class DB(object):
         then the primary key for the table is used.  If arg is a dictionary
         then the value for the key is taken from it and it is modified to
         include the new values, replacing existing values where necessary.
-        The OID is also put into the dictionary, but in order to allow the
-        caller to work with multiple tables, it is munged as oid(schema.table).
+        The OID is also put into the dictionary if the table has one, but
+        in order to allow the caller to work with multiple tables, it is
+        munged as oid(schema.table).
 
         """
         if cl.endswith('*'): # scan descendant tables?
@@ -496,7 +497,7 @@ class DB(object):
         self._do_debug(q)
         a[foid] = self.db.query(q)
         # Reload the dictionary to catch things modified by engine.
-        # Note that get() changes 'oid' below to oid_schema_table.
+        # Note that get() changes 'oid' below to oid(schema.table).
         # If no read perms (it can and does happen), return None.
         try:
             return self.get(qcl, a, 'oid')
