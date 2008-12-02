@@ -32,8 +32,9 @@ Version 4.0 (2009-01-01)
   for the same purpose.
 - Improved getnotify() by calling PQconsumeInput() instead of
   submitting an empty command.
-- Removed compatibility code for old OID munging style
+- Removed compatibility code for old OID munging style.
 - Added "return_changes" flag to insert method.
+- Added protocol_version() and server_version() methods.
 
 Version 3.8.1 (2006-06-05)
 --------------------------
