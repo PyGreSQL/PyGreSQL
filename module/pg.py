@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.67 2008-11-26 10:37:26 darcy Exp $
+# $Id: pg.py,v 1.68 2008-12-02 16:50:54 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -465,13 +465,17 @@ class DB(object):
             arg[k] = d
         return arg
 
-    def insert(self, cl, d=None, **kw):
+    def insert(self, cl, d=None, return_changes=True, **kw):
         """Insert a tuple into a database table.
 
-        This method inserts values into the table specified filling in the
-        values from the dictionary.  It then reloads the dictionary with the
-        values from the database.  This causes the dictionary to be updated
-        with values that are modified by rules, triggers, etc.
+        This method inserts a row into a table.  If a dictionary is
+        supplied it starts with that.  Otherwise it uses a blank dictionary.
+        Either way the dictionary is updated from the keywords.
+
+        The dictionary is then reloaded with the values actually inserted
+        in order to pick up values modified by rules, triggers, etc.  If
+        the optional flag return_changes is set to False this reload will
+        be skipped.
 
         Note: The method currently doesn't support insert into views
         although PostgreSQL does.
@@ -488,21 +492,22 @@ class DB(object):
         fnames = self.get_attnames(qcl)
         t = []
         n = []
+
         for f in fnames.keys():
             if f != 'oid' and f in a:
                 t.append(self._quote(a[f], fnames[f]))
                 n.append('"%s"' % f)
+
         q = 'INSERT INTO %s (%s) VALUES (%s)' % \
             (qcl, ','.join(n), ','.join(t))
         self._do_debug(q)
         a[foid] = self.db.query(q)
+
         # Reload the dictionary to catch things modified by engine.
         # Note that get() changes 'oid' below to oid(schema.table).
-        # If no read perms (it can and does happen), return None.
-        try:
-            return self.get(qcl, a, 'oid')
-        except Exception:
-            return None
+        if return_changes: self.get(qcl, a, 'oid')
+
+        return a
 
     def update(self, cl, d=None, **kw):
         """Update an existing row in a database table.

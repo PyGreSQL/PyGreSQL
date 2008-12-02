@@ -870,31 +870,35 @@ insert - insert a row into a database table
 -------------------------------------------
 Syntax::
 
-  insert(table, [d,] [key = val, ...])
+  insert(table, [d,] [return_changes,] [key = val, ...])
 
 Parameters:
-  :table: name of table
-  :d:     optional dictionary of values
+  :table:          name of table
+  :d:              optional dictionary of values
+  :return_changes: Return values in new row - default True
 
 Return type:
-  :integer: the OID of the newly inserted row
+  :dictionary:     The dictionary of values inserted
 
 Description:
-  This method inserts values into the table specified filling in the
-  values from the dictionary. It then reloads the dictionary with the
-  values from the database. This causes the dictionary to be updated
-  with values that are modified by rules, triggers, etc.
+  This method inserts a row into a table.  If the optional dictionary is
+  not supplied then the required values must be included as keyword/value
+  pairs.  If a dictionary is supplied then any keywords provided will be
+  added to or replace the entry in the dictionary.
 
-  If the optional dictionary is not supplied then the required values
-  must be included as keyword/value pairs.  If a dictionary is supplied
-  then any keywords provided will be added to or replace the entry in
-  the dictionary.
+  The dictionary is then reloaded with the values actually inserted
+  in order to pick up values modified by rules, triggers, etc.  If
+  the optional flag return_changes is set to False this reload will
+  be skipped. 
 
   Due to the way that this function works you will find inserts taking
   longer and longer as your table gets bigger. To overcome this problem
   simply add an index onto the OID of any table that you think may get
   large over time. You may also consider using the inserttable() method
   described in section 3.
+
+  Note: The method currently doesn't support insert into views
+  although PostgreSQL does.
 
 update - update a row in a database table
 -----------------------------------------
