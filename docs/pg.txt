@@ -862,8 +862,9 @@ Description:
   then the primary key for the table is used. If `arg` is a dictionary
   then the value for the key is taken from it and it is modified to
   include the new values, replacing existing values where necessary.
-  The OID is also put into the dictionary, but in order to allow the
-  caller to work with multiple tables, it is munged as `oid(schema.table)`.
+  The OID is also put into the dictionary if the table has one, but in
+  order to allow the caller to work with multiple tables, it is munged
+  as `oid(schema.table)`.
 
 insert - insert a row into a database table
 -------------------------------------------
