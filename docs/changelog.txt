@@ -34,7 +34,8 @@ Version 4.0 (2009-01-01)
   submitting an empty command.
 - Removed compatibility code for old OID munging style.
 - Added "return_changes" flag to insert method.
-- Added protocol_version() and server_version() methods.
+- Added "protocol_version" and "server_version" attributes.
+- Revived the "user" attribute.
 
 Version 3.8.1 (2006-06-05)
 --------------------------

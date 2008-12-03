@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.89 2008-12-02 22:39:56 cito Exp $
+ * $Id: pgmodule.c,v 1.90 2008-12-03 00:17:15 cito Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -1783,58 +1783,6 @@ pg_fileno(pgobject * self, PyObject * args)
 #endif
 }
 
-/* get protocol version */
-static char pg_protocol_version__doc__[] =
-"protocol_version() -- interrogate the frontend/backend protocol being used.";
-
-static PyObject *
-pg_protocol_version(pgobject * self, PyObject * args)
-{
-	if (!self->cnx)
-	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
-		return NULL;
-	}
-
-	/* checks args */
-	if (!PyArg_ParseTuple(args, ""))
-	{
-		PyErr_SetString(PyExc_TypeError,
-			"method server_version() takes no parameters.");
-		return NULL;
-	}
-
-	return PyInt_FromLong(PQprotocolVersion(self->cnx));
-}
-
-/* get backend version */
-static char pg_server_version__doc__[] =
-"server_version() -- return an integer representing the backend version.";
-
-static PyObject *
-pg_server_version(pgobject * self, PyObject * args)
-{
-	if (!self->cnx)
-	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
-		return NULL;
-	}
-
-	/* checks args */
-	if (!PyArg_ParseTuple(args, ""))
-	{
-		PyErr_SetString(PyExc_TypeError,
-			"method server_version() takes no parameters.");
-		return NULL;
-	}
-
-#if PG_VERSION_NUM < 80000
-	return PyInt_FromLong(PG_VERSION_NUM);
-#else
-	return PyInt_FromLong(PQserverVersion(self->cnx));
-#endif
-}
-
 /* get number of rows */
 static char pgquery_ntuples__doc__[] =
 "ntuples() -- returns number of tuples returned by query.";
@@ -2933,10 +2881,6 @@ static struct PyMethodDef pgobj_methods[] = {
 	{"cancel", (PyCFunction) pg_cancel, METH_VARARGS, pg_cancel__doc__},
 	{"close", (PyCFunction) pg_close, METH_VARARGS, pg_close__doc__},
 	{"fileno", (PyCFunction) pg_fileno, METH_VARARGS, pg_fileno__doc__},
-	{"protocol_version", (PyCFunction) pg_protocol_version, METH_VARARGS,
-			pg_protocol_version__doc__},
-	{"server_version", (PyCFunction) pg_server_version, METH_VARARGS,
-			pg_server_version__doc__},
 	{"getnotify", (PyCFunction) pg_getnotify, METH_VARARGS,
 			pg_getnotify__doc__},
 	{"inserttable", (PyCFunction) pg_inserttable, METH_VARARGS,
@@ -3018,13 +2962,24 @@ pg_getattr(pgobject * self, char *name)
 
 	/* provided user name */
 	if (!strcmp(name, "user"))
-		return PyString_FromString("Deprecated facility");
-	/* return PyString_FromString(fe_getauthname("<unknown user>")); */
+		return PyString_FromString(PQuser(self->cnx));
+
+	/* protocol version */
+	if (!strcmp(name, "protocol_version"))
+		return PyInt_FromLong(PQprotocolVersion(self->cnx));
+
+	/* backend version */
+	if (!strcmp(name, "server_version"))
+#if PG_VERSION_NUM < 80000
+		return PyInt_FromLong(PG_VERSION_NUM);
+#else
+		return PyInt_FromLong(PQserverVersion(self->cnx));
+#endif
 
 	/* attributes list */
 	if (!strcmp(name, "__members__"))
 	{
-		PyObject *list = PyList_New(8);
+		PyObject *list = PyList_New(10);
 
 		if (list)
 		{
@@ -3036,6 +2991,8 @@ pg_getattr(pgobject * self, char *name)
 			PyList_SET_ITEM(list, 5, PyString_FromString("error"));
 			PyList_SET_ITEM(list, 6, PyString_FromString("status"));
 			PyList_SET_ITEM(list, 7, PyString_FromString("user"));
+			PyList_SET_ITEM(list, 8, PyString_FromString("protocol_version"));
+			PyList_SET_ITEM(list, 9, PyString_FromString("server_version"));
 		}
 
 		return list;

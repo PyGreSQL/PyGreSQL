@@ -522,45 +522,6 @@ Description:
   This method returns the underlying socket id used to connect
   to the database. This is useful for use in select calls, etc.
 
-protocol_version - interrogates the frontend/backend protocol being used
-------------------------------------------------------------------------
-Syntax::
-
-  protocol_version()
-
-Parameters:
-  None
-
-Exceptions raised:
-  :TypeError: too many (any) arguments
-
-Description:
-  Applications might wish to use this to determine whether certain
-  features are supported. Currently, the possible values are 2
-  (2.0 protocol), 3 (3.0 protocol), or zero (connection bad).
-  This will not change after connection startup is complete,
-  but it could theoretically change during a connection reset.
-
-server_version - interrogates the frontend/backend protocol being used
-----------------------------------------------------------------------
-Syntax::
-
-  server_version()
-
-Parameters:
-  None
-
-Exceptions raised:
-  :TypeError: too many (any) arguments
-
-Description:
-  Applications might use this to determine the version of the database
-  server they are connected to. The number is formed by converting
-  the major, minor, and revision numbers into two-decimal-digit numbers
-  and appending them together. For example, version 8.1.5 will be returned
-  as 80105, and version 8.2 will be returned as 80200 (leading zeroes are
-  not shown). Zero is returned if the connection is bad.
-
 getnotify - gets the last notify from the server
 ------------------------------------------------
 Syntax::
@@ -740,14 +701,16 @@ Object attributes
 Every `pgobject` defines a set of read-only attributes that describe the
 connection and its status. These attributes are:
 
-  :host:    the host name of the server (string)
-  :port:    the port of the server (integer)
-  :db:      the selected database (string)
-  :options: the connection options (string)
-  :tty:     the connection debug terminal (string)
-  :user:    user name on the database system (string)
-  :status:  the status of the connection (integer: 1 - OK, 0 - bad)
-  :error:   the last warning/error message from the server (string)
+  :host:             the host name of the server (string)
+  :port:             the port of the server (integer)
+  :db:               the selected database (string)
+  :options:          the connection options (string)
+  :tty:              the connection debug terminal (string)
+  :user:             user name on the database system (string)
+  :protocol_version: the frontend/backend protocol being used (integer)
+  :server_version:   the backend version (integer, e.g. 80305 for 8.3.5)
+  :status:           the status of the connection (integer: 1 - OK, 0 - bad)
+  :error:            the last warning/error message from the server (string)
 
 
 The DB wrapper class

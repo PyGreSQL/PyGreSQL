@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.69 2008-12-02 22:39:56 cito Exp $
+# $Id: pg.py,v 1.70 2008-12-03 00:17:15 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -249,22 +249,6 @@ class DB(object):
     # so we define unescape_bytea as a method as well
     unescape_bytea = staticmethod(unescape_bytea)
 
-    def server_version(self):
-        """Return an integer representing the backend version."""
-        try:
-            return self._server_version
-        except AttributeError:
-            self._server_version = self.db.server_version()
-            return self._server_version
-
-    def protocol_version(self):
-        """Interrogate the frontend/backend protocol being used."""
-        try:
-            return self._protocol_version
-        except AttributeError:
-            self._protocol_version = self.db.protocol_version()
-            return self._protocol_version
-
     def close(self):
         """Close the database connection."""
         # Wraps shared library function so we can track state.
@@ -283,7 +267,6 @@ class DB(object):
 
         """
         self.db.reset()
-        delattr(self, '_protocol_version')
 
     def reopen(self):
         """Reopen connection to the database.
@@ -298,8 +281,6 @@ class DB(object):
             if self.db:
                 self.db.close()
             self.db = db
-            delattr(self, '_server_version')
-            delattr(self, '_protocol_version')
 
     def query(self, qstr):
         """Executes a SQL command string.

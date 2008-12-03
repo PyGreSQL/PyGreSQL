@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.21 2008-11-23 14:32:18 cito Exp $
+# $Id: test_pg.py,v 1.22 2008-12-03 00:17:15 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -346,19 +346,17 @@ class TestConnectObject(unittest.TestCase):
         self.connection.close()
 
     def testAllConnectAttributes(self):
-        attributes = ['db', 'error', 'host', 'options',
-            'port', 'status', 'tty', 'user']
+        attributes = ['db', 'error', 'host', 'options', 'port',
+            'protocol_version', 'server_version', 'status', 'tty', 'user']
         connection_attributes = [a for a in dir(self.connection)
             if not callable(eval("self.connection." + a))]
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
-        methods = ['cancel', 'close', 'endcopy',
-            'escape_bytea', 'escape_string',
-            'fileno', 'getline', 'getlo', 'getnotify',
-            'inserttable', 'locreate', 'loimport',
-            'parameter', 'putline', 'query', 'reset',
-            'source', 'transaction']
+        methods = ['cancel', 'close', 'endcopy', 'escape_bytea',
+            'escape_string', 'fileno', 'getline', 'getlo', 'getnotify',
+            'inserttable', 'locreate', 'loimport', 'parameter', 'putline',
+            'query', 'reset', 'source', 'transaction']
         connection_methods = [a for a in dir(self.connection)
             if callable(eval("self.connection." + a))]
         self.assertEqual(methods, connection_methods)
@@ -382,6 +380,16 @@ class TestConnectObject(unittest.TestCase):
         def_port = 5432
         self.assertEqual(self.connection.port, def_port)
 
+    def testAttributeProtocolVersion(self):
+        protocol_version = self.connection.protocol_version
+        self.assert_(isinstance(protocol_version, int))
+        self.assert_(2 <= protocol_version < 4)
+
+    def testAttributeServerVersion(self):
+        server_version = self.connection.server_version
+        self.assert_(isinstance(server_version, int))
+        self.assert_(70400 <= server_version < 90000)
+
     def testAttributeStatus(self):
         status_ok = 1
         self.assertEqual(self.connection.status, status_ok)
@@ -391,8 +399,10 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(self.connection.tty, def_tty)
 
     def testAttributeUser(self):
-        def_user = 'Deprecated facility'
-        self.assertEqual(self.connection.user, def_user)
+        no_user = 'Deprecated facility'
+        user = self.connection.user
+        self.assert_(self.connection.user)
+        self.assertNotEqual(self.connection.user, no_user)
 
     def testMethodQuery(self):
         self.connection.query("select 1+1")
@@ -673,17 +683,14 @@ class TestDBClassBasic(unittest.TestCase):
         self.db.close()
 
     def testAllDBAttributes(self):
-        attributes = ['cancel', 'clear', 'close',
-            'db', 'dbname', 'debug', 'delete', 'endcopy',
-            'error', 'escape_bytea', 'escape_string',
-            'fileno', 'get', 'get_attnames',
-            'get_databases', 'get_relations', 'get_tables',
-            'getline', 'getlo', 'getnotify', 'host',
-            'insert', 'inserttable', 'locreate', 'loimport',
-            'options', 'parameter', 'pkey', 'port', 'putline',
-            'query', 'reopen', 'reset', 'source', 'status',
-            'transaction', 'tty', 'unescape_bytea',
-            'update', 'user']
+        attributes = ['cancel', 'clear', 'close', 'db', 'dbname', 'debug',
+            'delete', 'endcopy', 'error', 'escape_bytea', 'escape_string',
+            'fileno', 'get', 'get_attnames', 'get_databases', 'get_relations',
+            'get_tables', 'getline', 'getlo', 'getnotify', 'host', 'insert',
+            'inserttable', 'locreate', 'loimport', 'options', 'parameter',
+            'pkey', 'port', 'protocol_version', 'putline', 'query', 'reopen',
+            'reset', 'server_version', 'source', 'status', 'transaction',
+            'tty', 'unescape_bytea', 'update', 'user']
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)
@@ -701,33 +708,52 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testAttributeHost(self):
         def_host = 'localhost'
-        self.assertEqual(self.db.host, def_host)
-        self.assertEqual(self.db.db.host, def_host)
+        host = self.db.host
+        self.assertEqual(host, def_host)
+        self.assertEqual(host, self.db.db.host)
 
     def testAttributeOptions(self):
         no_options = ''
-        self.assertEqual(self.db.options, no_options)
-        self.assertEqual(self.db.db.options, no_options)
+        options = self.db.options
+        self.assertEqual(options, no_options)
+        self.assertEqual(options, self.db.db.options)
 
     def testAttributePort(self):
         def_port = 5432
-        self.assertEqual(self.db.port, def_port)
-        self.assertEqual(self.db.db.port, def_port)
+        port = self.db.port
+        self.assertEqual(port, def_port)
+        self.assertEqual(port, self.db.db.port)
+
+    def testAttributeProtocolVersion(self):
+        protocol_version = self.db.protocol_version
+        self.assert_(isinstance(protocol_version, int))
+        self.assert_(2 <= protocol_version < 4)
+        self.assertEqual(protocol_version, self.db.db.protocol_version)
+
+    def testAttributeServerVersion(self):
+        server_version = self.db.server_version
+        self.assert_(isinstance(server_version, int))
+        self.assert_(70400 <= server_version < 90000)
+        self.assertEqual(server_version, self.db.db.server_version)
 
     def testAttributeStatus(self):
         status_ok = 1
-        self.assertEqual(self.db.status, status_ok)
-        self.assertEqual(self.db.db.status, status_ok)
+        status = self.db.status
+        self.assertEqual(status, status_ok)
+        self.assertEqual(status, self.db.db.status)
 
     def testAttributeTty(self):
         def_tty = ''
-        self.assertEqual(self.db.tty, def_tty)
-        self.assertEqual(self.db.db.tty, def_tty)
+        tty = self.db.tty
+        self.assertEqual(tty, def_tty)
+        self.assertEqual(tty, self.db.db.tty)
 
     def testAttributeUser(self):
-        def_user = 'Deprecated facility'
-        self.assertEqual(self.db.user, def_user)
-        self.assertEqual(self.db.db.user, def_user)
+        no_user = 'Deprecated facility'
+        user = self.db.user
+        self.assert_(user)
+        self.assertNotEqual(user, no_user)
+        self.assertEqual(user, self.db.db.user)
 
     def testMethodEscapeString(self):
         self.assertEqual(self.db.escape_string("plain"), "plain")
