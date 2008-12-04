@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.72 2008-12-04 20:28:06 cito Exp $
+# $Id: pg.py,v 1.73 2008-12-04 21:11:54 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -395,7 +395,7 @@ class DB(object):
             raise ProgrammingError('Class %s does not exist' % qcl)
         t = {}
         for att, typ in self.db.query("SELECT pg_attribute.attname"
-            ",pg_type.typname FROM pg_class"
+            ", pg_type.typname FROM pg_class"
             " JOIN pg_namespace ON pg_class.relnamespace=pg_namespace.oid"
             " JOIN pg_attribute ON pg_attribute.attrelid=pg_class.oid"
             " JOIN pg_type ON pg_type.oid=pg_attribute.atttypid"
@@ -428,7 +428,7 @@ class DB(object):
         self._attnames[qcl] = t # cache it
         return self._attnames[qcl]
 
-    def get(self, cl, arg, keyname=None, view=0):
+    def get(self, cl, arg, keyname=None):
         """Get a tuple from a database table or view.
 
         This method is the basic mechanism to get a single row.  It assumes
@@ -446,34 +446,31 @@ class DB(object):
         qcl = _join_parts(self._split_schema(cl)) # build qualified name
         # To allow users to work with multiple tables,
         # we munge the name when the key is "oid"
-        foid = 'oid(%s)' % qcl # build mangled name
+        qoid = 'oid(%s)' % qcl # build mangled name
         if keyname is None: # use the primary key by default
             keyname = self.pkey(qcl)
-        fnames = self.get_attnames(qcl)
         if isinstance(arg, dict):
-            k = arg[keyname == 'oid' and foid or keyname]
+            keyvalue = arg[keyname == 'oid' and qoid or keyname]
         else:
-            k = arg
-            arg = {}
+            keyvalue, arg = arg, {}
         # We want the oid for later updates if that isn't the key
         if keyname == 'oid':
-            q = 'SELECT * FROM %s WHERE oid=%s LIMIT 1' % (qcl, k)
-        elif view:
-            q = 'SELECT * FROM %s WHERE %s=%s LIMIT 1' % \
-                (qcl, keyname, self._quote(k, fnames[keyname]))
+            attnames = '*'
         else:
-            q = 'SELECT %s FROM %s WHERE %s=%s LIMIT 1' % \
-                (','.join(fnames), qcl, \
-                    keyname, self._quote(k, fnames[keyname]))
+            attnames = self.get_attnames(qcl)
+            keyvalue = self._quote(keyvalue, attnames[keyname])
+            attnames = ','.join(attnames)
+        q = 'SELECT %s FROM %s WHERE %s=%s LIMIT 1' % (
+                attnames, qcl, keyname, keyvalue)
         self._do_debug(q)
         res = self.db.query(q).dictresult()
         if not res:
             raise DatabaseError('No such record in %s where %s=%s'
-                % (qcl, keyname, self._quote(k, fnames[keyname])))
-        for k, d in res[0].iteritems():
-            if k == 'oid':
-                k = foid
-            arg[k] = d
+                % (qcl, keyname, keyvalue))
+        for att, value in res[0].iteritems():
+            if att == 'oid':
+                att = qoid
+            arg[att] = value
         return arg
 
     def insert(self, cl, d=None, return_changes=True, **kw):
@@ -499,7 +496,7 @@ class DB(object):
         a.update(kw)
 
         qcl = _join_parts(self._split_schema(cl)) # build qualified name
-        foid = 'oid(%s)' % qcl # build mangled name
+        qoid = 'oid(%s)' % qcl # build mangled name
         fnames = self.get_attnames(qcl)
         t = []
         n = []
@@ -512,7 +509,7 @@ class DB(object):
         q = 'INSERT INTO %s (%s) VALUES (%s)' % \
             (qcl, ','.join(n), ','.join(t))
         self._do_debug(q)
-        a[foid] = self.db.query(q)
+        a[qoid] = self.db.query(q)
 
         # Reload the dictionary to catch things modified by engine.
         # Note that get() changes 'oid' below to oid(schema.table).
@@ -532,11 +529,11 @@ class DB(object):
         # Update always works on the oid which get returns if available,
         # otherwise use the primary key.  Fail if neither.
         qcl = _join_parts(self._split_schema(cl)) # build qualified name
-        foid = 'oid(%s)' % qcl # build mangled oid
+        qoid = 'oid(%s)' % qcl # build mangled oid
 
         # Note that we only accept oid key from named args for safety
         if 'oid' in kw:
-            kw[foid] = kw['oid']
+            kw[qoid] = kw['oid']
             del kw['oid']
 
         if d is None:
@@ -545,14 +542,14 @@ class DB(object):
             a = d
         a.update(kw)
 
-        if foid in a:
-            where = "oid=%s" % a[foid]
+        if qoid in a:
+            where = "oid=%s" % a[qoid]
         else:
             try:
                 pk = self.pkey(qcl)
             except Exception:
                 raise ProgrammingError(
-                    'Update needs primary key or oid as %s' % foid)
+                    'Update needs primary key or oid as %s' % qoid)
             where = "%s='%s'" % (pk, a[pk])
         v = []
         fnames = self.get_attnames(qcl)
@@ -565,7 +562,7 @@ class DB(object):
         self._do_debug(q)
         self.db.query(q)
         # Reload the dictionary to catch things modified by engine:
-        if foid in a:
+        if qoid in a:
             return self.get(qcl, a, 'oid')
         else:
             return self.get(qcl, a)
@@ -607,11 +604,11 @@ class DB(object):
         # One day we will be testing that the record to be deleted
         # isn't referenced somewhere (or else PostgreSQL will).
         qcl = _join_parts(self._split_schema(cl)) # build qualified name
-        foid = 'oid(%s)' % qcl # build mangled oid
+        qoid = 'oid(%s)' % qcl # build mangled oid
 
         # Note that we only accept oid key from named args for safety
         if 'oid' in kw:
-            kw[foid] = kw['oid']
+            kw[qoid] = kw['oid']
             del kw['oid']
 
         if d is None:
@@ -620,7 +617,7 @@ class DB(object):
             a = d
         a.update(kw)
 
-        q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[foid])
+        q = 'DELETE FROM %s WHERE oid=%s' % (qcl, a[qoid])
         self._do_debug(q)
         self.db.query(q)
 

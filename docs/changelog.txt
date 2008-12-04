@@ -36,6 +36,8 @@ Version 4.0 (2009-01-01)
 - Added "return_changes" flag to insert method.
 - Added "protocol_version" and "server_version" attributes.
 - Revived the "user" attribute.
+- Removed the undocumented and actually unnecessary "view" parameter
+  from the get() method.
 
 Version 3.8.1 (2006-06-05)
 --------------------------

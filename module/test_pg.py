@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.23 2008-12-04 20:12:53 cito Exp $
+# $Id: test_pg.py,v 1.24 2008-12-04 21:11:54 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -1094,9 +1094,6 @@ class TestDBClass(unittest.TestCase):
         self.db.query('insert into test (i4, v4) values('
             "14, 'abc4')")
         r = self.db.get('test_view', 14, 'i4')
-        self.assert_('v4' in r)
-        self.assertEqual(r['v4'], 'abc4')
-        r = self.db.get('test_view', 14, 'i4', view=True)
         self.assert_('v4' in r)
         self.assertEqual(r['v4'], 'abc4')
 
