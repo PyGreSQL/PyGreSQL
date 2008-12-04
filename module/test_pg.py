@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.24 2008-12-04 21:11:54 cito Exp $
+# $Id: test_pg.py,v 1.25 2008-12-04 21:22:18 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -1067,6 +1067,7 @@ class TestDBClass(unittest.TestCase):
             oid_table = 'oid(public.%s)' % oid_table
             self.assert_(oid_table in r)
             self.assert_(isinstance(r[oid_table], int))
+            self.assertEqual(self.db.get(table + ' *', 2, 'n'), r)
             result = {'t': 'y', 'n': 2, oid_table: r[oid_table]}
             self.assertEqual(r, result)
             self.assertEqual(self.db.get(table, r[oid_table], 'oid')['t'], 'y')
