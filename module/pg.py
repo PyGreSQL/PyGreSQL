@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.71 2008-12-04 20:12:52 cito Exp $
+# $Id: pg.py,v 1.72 2008-12-04 20:28:06 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -328,13 +328,15 @@ class DB(object):
             self._pkeys = dict([
                 (_join_parts(r[:2]), r[2]) for r in self.db.query(
                 "SELECT pg_namespace.nspname, pg_class.relname"
-                    ",pg_attribute.attname FROM pg_class"
+                    ", pg_attribute.attname FROM pg_class"
                 " JOIN pg_namespace ON pg_namespace.oid=pg_class.relnamespace"
                     " AND pg_namespace.nspname NOT LIKE 'pg_%'"
                 " JOIN pg_attribute ON pg_attribute.attrelid=pg_class.oid"
                     " AND pg_attribute.attisdropped='f'"
                 " JOIN pg_index ON pg_index.indrelid=pg_class.oid"
                     " AND pg_index.indisprimary='t'"
+                    # note that this gets only the first attribute
+                    # of composite primary keys
                     " AND pg_index.indkey[0]=pg_attribute.attnum"
                 ).getresult()])
             self._do_debug(self._pkeys)
