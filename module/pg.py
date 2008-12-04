@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.70 2008-12-03 00:17:15 cito Exp $
+# $Id: pg.py,v 1.71 2008-12-04 20:12:52 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -304,21 +304,20 @@ class DB(object):
 
         If newpkey is set and is not a dictionary then set that
         value as the primary key of the class.  If it is a dictionary
-        then replace the _pkeys dictionary with it.
+        then replace the _pkeys dictionary with a copy of it.
 
         """
         # First see if the caller is supplying a dictionary
         if isinstance(newpkey, dict):
-            # make sure that we have a namespace
-            self._pkeys = {}
-            for x in newpkey.keys():
-                if x.find('.') == -1:
-                    self._pkeys['public.' + x] = newpkey[x]
-                else:
-                    self._pkeys[x] = newpkey[x]
+            # make sure that all classes have a namespace
+            self._pkeys = dict([
+                ('.' in cl and cl or 'public.' + cl, pkey)
+                for cl, pkey in newpkey.iteritems()])
             return self._pkeys
 
-        qcl = _join_parts(self._split_schema(cl)) # build qualified name
+        # Build qualified name for the given class
+        qcl = _join_parts(self._split_schema(cl))
+        # Check if the caller is supplying a new primary key for that class
         if newpkey:
             self._pkeys[qcl] = newpkey
             return newpkey
@@ -339,6 +338,7 @@ class DB(object):
                     " AND pg_index.indkey[0]=pg_attribute.attnum"
                 ).getresult()])
             self._do_debug(self._pkeys)
+
         # will raise an exception if primary key doesn't exist
         return self._pkeys[qcl]
 
@@ -461,14 +461,14 @@ class DB(object):
                 (qcl, keyname, self._quote(k, fnames[keyname]))
         else:
             q = 'SELECT %s FROM %s WHERE %s=%s LIMIT 1' % \
-                (','.join(fnames.keys()), qcl, \
+                (','.join(fnames), qcl, \
                     keyname, self._quote(k, fnames[keyname]))
         self._do_debug(q)
         res = self.db.query(q).dictresult()
         if not res:
             raise DatabaseError('No such record in %s where %s=%s'
                 % (qcl, keyname, self._quote(k, fnames[keyname])))
-        for k, d in res[0].items():
+        for k, d in res[0].iteritems():
             if k == 'oid':
                 k = foid
             arg[k] = d
@@ -502,7 +502,7 @@ class DB(object):
         t = []
         n = []
 
-        for f in fnames.keys():
+        for f in fnames:
             if f != 'oid' and f in a:
                 t.append(self._quote(a[f], fnames[f]))
                 n.append('"%s"' % f)
@@ -554,7 +554,7 @@ class DB(object):
             where = "%s='%s'" % (pk, a[pk])
         v = []
         fnames = self.get_attnames(qcl)
-        for ff in fnames.keys():
+        for ff in fnames:
             if ff != 'oid' and ff in a:
                 v.append('%s=%s' % (ff, self._quote(a[ff], fnames[ff])))
         if v == []:
@@ -583,7 +583,7 @@ class DB(object):
             a = {} # empty if argument is not present
         qcl = _join_parts(self._split_schema(cl)) # build qualified name
         fnames = self.get_attnames(qcl)
-        for k, t in fnames.items():
+        for k, t in fnames.iteritems():
             if k == 'oid':
                 continue
             if t in ('int', 'float', 'num', 'money'):

@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.22 2008-12-03 00:17:15 cito Exp $
+# $Id: test_pg.py,v 1.23 2008-12-04 20:12:53 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -954,7 +954,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, '5')
 
     def testPkey(self):
-        smart_ddl(self.db, 'drop table pkeytest0')
+        smart_ddl(self.db, "drop table pkeytest0")
         smart_ddl(self.db, "create table pkeytest0 ("
             "a smallint)")
         smart_ddl(self.db, 'drop table pkeytest1')
@@ -963,15 +963,21 @@ class TestDBClass(unittest.TestCase):
         smart_ddl(self.db, 'drop table pkeytest2')
         smart_ddl(self.db, "create table pkeytest2 ("
             "c smallint, d smallint primary key)")
-        smart_ddl(self.db, 'drop table pkeytest3')
+        smart_ddl(self.db, "drop table pkeytest3")
         smart_ddl(self.db, "create table pkeytest3 ("
             "e smallint, f smallint, g smallint, "
             "h smallint, i smallint, "
             "primary key (f,h))")
-        self.assertRaises(KeyError, self.db.pkey, "pkeytest0")
-        self.assertEqual(self.db.pkey("pkeytest1"), "b")
-        self.assertEqual(self.db.pkey("pkeytest2"), "d")
-        self.assertEqual(self.db.pkey("pkeytest3"), "f")
+        self.assertRaises(KeyError, self.db.pkey, 'pkeytest0')
+        self.assertEqual(self.db.pkey('pkeytest1'), 'b')
+        self.assertEqual(self.db.pkey('pkeytest2'), 'd')
+        self.assertEqual(self.db.pkey('pkeytest3'), 'f')
+        self.assertEqual(self.db.pkey('pkeytest0', 'none'), 'none')
+        self.assertEqual(self.db.pkey('pkeytest0'), 'none')
+        self.db.pkey(None, {'t': 'a', 'n.t': 'b'})
+        self.assertEqual(self.db.pkey('t'), 'a')
+        self.assertEqual(self.db.pkey('n.t'), 'b')
+        self.assertRaises(KeyError, self.db.pkey, 'pkeytest0')
 
     def testGetDatabases(self):
         databases = self.db.get_databases()
