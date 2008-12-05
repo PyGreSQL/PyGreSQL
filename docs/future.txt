@@ -36,6 +36,9 @@ Wish List
 - Support optional cursor and connection attribute "messages".
 - Connection as context manager (see http://tinyurl.com/6j9cef).
 - Users should be able to register their own types with _pg.
+- Let pg and pgdb support namedtuples (as available in Py 2.6).
+  pg could get a new method namedresult(), and pgdb could provide
+  a row factory for namedtuples (similar to sqlite3).
 - New methods in the classic module, similar to getresult() and
   dictresult(), but returning dictionaries of rows instead of lists
   of rows (with primary key or oids as keys).
