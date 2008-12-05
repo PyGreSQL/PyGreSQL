@@ -33,7 +33,10 @@ Version 4.0 (2009-01-01)
 - Improved getnotify() by calling PQconsumeInput() instead of
   submitting an empty command.
 - Removed compatibility code for old OID munging style.
-- Added "return_changes" flag to insert method.
+- The insert() and update() methods now use the "returning" clause
+  if possible to get all changed values, and they also check in advance
+  whether a subsequent select is possible, so that ongoing transactions
+  won't break if there is no select privilege.
 - Added "protocol_version" and "server_version" attributes.
 - Revived the "user" attribute.
 - The pg module now works correctly with composite primary keys;
@@ -42,6 +45,9 @@ Version 4.0 (2009-01-01)
   from the get() method.
 - get() raises a nicer ProgrammingError instead of a KeyError
   if no primary key was found.
+- delete() now also works based on the primary key if no oid available
+  and returns whether the row existed or not.
+
 
 Version 3.8.1 (2006-06-05)
 --------------------------

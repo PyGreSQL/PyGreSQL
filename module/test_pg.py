@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.26 2008-12-05 02:05:28 cito Exp $
+# $Id: test_pg.py,v 1.27 2008-12-05 15:00:19 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -12,15 +12,16 @@
 The testing is done against a real local PostgreSQL database.
 
 There are a few drawbacks:
-* A local PostgreSQL database must be up and running, and
-the user who is running the tests must be a trusted superuser.
-* The performance of the API is not tested.
-* Connecting to a remote host is not tested.
-* Passing user, password and options is not tested.
-* Status and error messages from the connection are not tested.
-* It would be more reasonable to create a test for the underlying
-shared library functions in the _pg module and assume they are ok.
-The pg and pgdb modules should be tested against _pg mock functions.
+  * A local PostgreSQL database must be up and running, and
+    the user who is running the tests must be a trusted superuser.
+  * The performance of the API is not tested.
+  * Connecting to a remote host is not tested.
+  * Passing user, password and options is not tested.
+  * Table privilege problems (e.g. insert but no select) are not tested.
+  * Status and error messages from the connection are not tested.
+  * It would be more reasonable to create a test for the underlying
+    shared library functions in the _pg module and assume they are ok.
+    The pg and pgdb modules should be tested against _pg mock functions.
 
 """
 
@@ -355,17 +356,16 @@ class TestConnectObject(unittest.TestCase):
         self.connection.close()
 
     def testAllConnectAttributes(self):
-        attributes = ['db', 'error', 'host', 'options', 'port',
-            'protocol_version', 'server_version', 'status', 'tty', 'user']
+        attributes = '''db error host options port
+            protocol_version server_version status tty user'''.split()
         connection_attributes = [a for a in dir(self.connection)
             if not callable(eval("self.connection." + a))]
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
-        methods = ['cancel', 'close', 'endcopy', 'escape_bytea',
-            'escape_string', 'fileno', 'getline', 'getlo', 'getnotify',
-            'inserttable', 'locreate', 'loimport', 'parameter', 'putline',
-            'query', 'reset', 'source', 'transaction']
+        methods = '''cancel close endcopy escape_bytea escape_string fileno
+            getline getlo getnotify inserttable locreate loimport parameter
+            putline query reset source transaction'''.split()
         connection_methods = [a for a in dir(self.connection)
             if callable(eval("self.connection." + a))]
         self.assertEqual(methods, connection_methods)
@@ -442,7 +442,7 @@ class TestSimpleQueries(unittest.TestCase):
     """"Test simple queries via a basic pg connection."""
 
     def setUp(self):
-        dbname = 'template1'
+        dbname = 'test'
         self.c = pg.connect(dbname)
 
     def tearDown(self):
@@ -692,14 +692,13 @@ class TestDBClassBasic(unittest.TestCase):
         self.db.close()
 
     def testAllDBAttributes(self):
-        attributes = ['cancel', 'clear', 'close', 'db', 'dbname', 'debug',
-            'delete', 'endcopy', 'error', 'escape_bytea', 'escape_string',
-            'fileno', 'get', 'get_attnames', 'get_databases', 'get_relations',
-            'get_tables', 'getline', 'getlo', 'getnotify', 'host', 'insert',
-            'inserttable', 'locreate', 'loimport', 'options', 'parameter',
-            'pkey', 'port', 'protocol_version', 'putline', 'query', 'reopen',
-            'reset', 'server_version', 'source', 'status', 'transaction',
-            'tty', 'unescape_bytea', 'update', 'user']
+        attributes = '''cancel clear close db dbname debug delete endcopy
+            error escape_bytea escape_string fileno  get get_attnames
+            get_databases get_relations get_tables getline getlo getnotify
+            has_table_privilege host insert inserttable locreate loimport
+            options parameter pkey port protocol_version putline query
+            reopen reset server_version source status transaction tty
+            unescape_bytea update user'''.split()
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)
@@ -1060,6 +1059,18 @@ class TestDBClass(unittest.TestCase):
                 'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int' }
             self.assertEqual(attributes, result)
 
+    def testHasTablePrivilege(self):
+        can = self.db.has_table_privilege
+        self.assertEqual(can('test'), True)
+        self.assertEqual(can('test', 'select'), True)
+        self.assertEqual(can('test', 'SeLeCt'), True)
+        self.assertEqual(can('test', 'SELECT'), True)
+        self.assertEqual(can('test', 'insert'), True)
+        self.assertEqual(can('test', 'update'), True)
+        self.assertEqual(can('test', 'delete'), True)
+        self.assertRaises(pg.ProgrammingError, can, 'test', 'foobar')
+        self.assertRaises(pg.ProgrammingError, can, 'table_does_not_exist')
+
     def testGet(self):
         for table in ('get_test_table', 'test table for get'):
             smart_ddl(self.db, 'drop table "%s"' % table)
@@ -1178,7 +1189,7 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(r, 'u')
 
     def testUpdateWithCompositeKey(self):
-        table = 'get_update_table_1'
+        table = 'update_test_table_1'
         smart_ddl(self.db, "drop table %s" % table)
         smart_ddl(self.db, "create table %s ("
             "n integer, t text, primary key (n))" % table)
@@ -1191,7 +1202,7 @@ class TestDBClass(unittest.TestCase):
         r = self.db.query('select t from "%s" where n=2' % table
             ).getresult()[0][0]
         self.assertEqual(r, 'd')
-        table = 'get_test_update_2'
+        table = 'update_test_table_2'
         smart_ddl(self.db, "drop table %s" % table)
         smart_ddl(self.db, "create table %s ("
             "n integer, m integer, t text, primary key (n, m))" % table)
@@ -1235,8 +1246,12 @@ class TestDBClass(unittest.TestCase):
             self.assertRaises(pg.ProgrammingError, self.db.get, table, 2)
             r = self.db.get(table, 1, 'n')
             s = self.db.delete(table, r)
+            self.assertEqual(s, 1)
             r = self.db.get(table, 3, 'n')
             s = self.db.delete(table, r)
+            self.assertEqual(s, 1)
+            s = self.db.delete(table, r)
+            self.assertEqual(s, 0)
             r = self.db.query('select * from "%s"' % table).dictresult()
             self.assertEqual(len(r), 1)
             r = r[0]
@@ -1244,7 +1259,52 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(r, result)
             r = self.db.get(table, 2, 'n')
             s = self.db.delete(table, r)
+            self.assertEqual(s, 1)
+            s = self.db.delete(table, r)
+            self.assertEqual(s, 0)
             self.assertRaises(pg.DatabaseError, self.db.get, table, 2, 'n')
+
+    def testDeleteWithCompositeKey(self):
+        table = 'delete_test_table_1'
+        smart_ddl(self.db, "drop table %s" % table)
+        smart_ddl(self.db, "create table %s ("
+            "n integer, t text, primary key (n))" % table)
+        for n, t in enumerate('abc'):
+            self.db.query("insert into %s values("
+                "%d, '%s')" % (table, n+1, t))
+        self.assertRaises(pg.ProgrammingError, self.db.delete,
+            table, dict(t='b'))
+        self.assertEqual(self.db.delete(table, dict(n=2)), 1)
+        r = self.db.query('select t from "%s" where n=2' % table
+            ).getresult()
+        self.assertEqual(r, [])
+        self.assertEqual(self.db.delete(table, dict(n=2)), 0)
+        r = self.db.query('select t from "%s" where n=3' % table
+            ).getresult()[0][0]
+        self.assertEqual(r, 'c')
+        table = 'delete_test_table_2'
+        smart_ddl(self.db, "drop table %s" % table)
+        smart_ddl(self.db, "create table %s ("
+            "n integer, m integer, t text, primary key (n, m))" % table)
+        for n in range(3):
+            for m in range(2):
+                t = chr(ord('a') + 2*n +m)
+                self.db.query("insert into %s values("
+                    "%d, %d, '%s')" % (table, n+1, m+1, t))
+        self.assertRaises(pg.ProgrammingError, self.db.delete,
+            table, dict(n=2, t='b'))
+        self.assertEqual(self.db.delete(table, dict(n=2, m=2)), 1)
+        r = [r[0] for r in self.db.query('select t from "%s" where n=2'
+            ' order by m' % table).getresult()]
+        self.assertEqual(r, ['c'])
+        self.assertEqual(self.db.delete(table, dict(n=2, m=2)), 0)
+        r = [r[0] for r in self.db.query('select t from "%s" where n=3'
+            ' order by m' % table).getresult()]
+        self.assertEqual(r, ['e', 'f'])
+        self.assertEqual(self.db.delete(table, dict(n=3, m=1)), 1)
+        r = [r[0] for r in self.db.query('select t from "%s" where n=3'
+            ' order by m' % table).getresult()]
+        self.assertEqual(r, ['f'])
 
     def testBytea(self):
         smart_ddl(self.db, 'drop table bytea_test')

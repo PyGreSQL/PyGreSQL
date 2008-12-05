@@ -844,6 +844,19 @@ Returns:
 Description:
   Given the name of a table, digs out the set of attribute names.
 
+has_table_privilege - check whether current user has specified table privilege
+------------------------------------------------------------------------------
+Syntax::
+
+    has_table_privilege(table, privilege)
+
+Parameters:
+  :table:     name of table
+  :privilege: privilege to be checked - default is 'select'
+
+Description:
+  Returns True if the current user has the specified privilege for the table.
+
 get - get a row from a database table or view
 ---------------------------------------------
 Syntax::
@@ -890,10 +903,8 @@ Description:
   pairs.  If a dictionary is supplied then any keywords provided will be
   added to or replace the entry in the dictionary.
 
-  The dictionary is then reloaded with the values actually inserted
-  in order to pick up values modified by rules, triggers, etc.  If
-  the optional flag return_changes is set to False this reload will
-  be skipped.
+  The dictionary is then, if possible, reloaded with the values actually
+  inserted in order to pick up values modified by rules, triggers, etc.
 
   Due to the way that this function works you will find inserts taking
   longer and longer as your table gets bigger. To overcome this problem
@@ -918,10 +929,10 @@ Return type:
   :dictionary: the new row
 
 Description:
-  Similar to insert but updates an existing row. The update is based
-  on the OID value as munged by get. The array returned is the
-  one sent modified to reflect any changes caused by the update due
-  to triggers, rules, defaults, etc.
+  Similar to insert but updates an existing row.  The update is based on the
+  OID value as munged by get or passed as keyword, or on the primary key of
+  the table.  The dictionary is modified, if possible, to reflect any changes
+  caused by the update due to triggers, rules, default values, etc.
 
   Like insert, the dictionary is optional and updates will be performed
   on the fields in the keywords.  There must be an OID or primary key
@@ -964,9 +975,10 @@ Returns:
   None
 
 Description:
-  This method deletes the row from a table. It deletes based on the OID
-  as munged as described above.  Alternatively, the keyword "oid" can
-  be used to specify the OID.
+  This method deletes the row from a table.  It deletes based on the OID value
+  as munged by get or passed as keyword, or on the primary key of the table.
+  The return value is the number of deleted rows (i.e. 0 if the row did not
+  exist and 1 if the row was deleted).
 
 escape_string - escape a string for use within SQL
 --------------------------------------------------

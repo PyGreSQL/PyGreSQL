@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.75 2008-12-05 02:08:15 cito Exp $
+# $Id: pg.py,v 1.76 2008-12-05 15:00:19 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -127,6 +127,7 @@ class DB(object):
         self.dbname = db.db
         self._attnames = {}
         self._pkeys = {}
+        self._privileges = {}
         self._args = args, kw
         self.debug = None # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
@@ -226,19 +227,19 @@ class DB(object):
         else:
             cl = s[0]
             # determine search path
-            query = 'SELECT current_schemas(TRUE)'
-            schemas = self.db.query(query).getresult()[0][0][1:-1].split(',')
+            q = 'SELECT current_schemas(TRUE)'
+            schemas = self.db.query(q).getresult()[0][0][1:-1].split(',')
             if schemas: # non-empty path
                 # search schema for this object in the current search path
-                query = ' UNION '.join(
+                q = ' UNION '.join(
                     ["SELECT %d::integer AS n, '%s'::name AS nspname"
                         % s for s in enumerate(schemas)])
-                query = ("SELECT nspname FROM pg_class"
+                q = ("SELECT nspname FROM pg_class"
                     " JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid"
                     " JOIN (%s) AS p USING (nspname)"
                     " WHERE pg_class.relname = '%s'"
-                    " ORDER BY n LIMIT 1" % (query, cl))
-                schema = self.db.query(query).getresult()
+                    " ORDER BY n LIMIT 1" % (q, cl))
+                schema = self.db.query(q).getresult()
                 if schema: # schema found
                     schema = schema[0][0]
                 else: # object not found in current search path
@@ -294,11 +295,15 @@ class DB(object):
         """Executes a SQL command string.
 
         This method simply sends a SQL query to the database. If the query is
-        an insert statement, the return value is the OID of the newly
-        inserted row.  If it is otherwise a query that does not return a result
-        (ie. is not a some kind of SELECT statement), it returns None.
-        Otherwise, it returns a pgqueryobject that can be accessed via the
-        getresult or dictresult method or simply printed.
+        an insert statement that inserted exactly one row into a table that
+        has OIDs, the return value is the OID of the newly inserted row.
+        If the query is an update or delete statement, or an insert statement
+        that did not insert exactly one row in a table with OIDs, then the
+        numer of rows affected is returned as a string. If it is a statement
+        that returns rows as a result (usually a select statement, but maybe
+        also an "insert/update ... returning" statement), this method returns
+        a pgqueryobject that can be accessed via getresult() or dictresult()
+        or simply printed. Otherwise, it returns `None`.
 
         """
         # Wraps shared library function for debugging.
@@ -446,6 +451,18 @@ class DB(object):
         self._attnames[qcl] = t # cache it
         return self._attnames[qcl]
 
+    def has_table_privilege(self, cl, privilege='select'):
+        """Check whether current user has specified table privilege."""
+        qcl = self._add_schema(cl)
+        privilege = privilege.lower()
+        try:
+            return self._privileges[(qcl, privilege)]
+        except KeyError:
+            q = "SELECT has_table_privilege('%s', '%s')" % (qcl, privilege)
+            ret = self.db.query(q).getresult()[0][0] == 't'
+            self._privileges[(qcl, privilege)] = ret
+            return ret
+
     def get(self, cl, arg, keyname=None):
         """Get a tuple from a database table or view.
 
@@ -502,27 +519,25 @@ class DB(object):
             arg[att == 'oid' and qoid or att] = value
         return arg
 
-    def insert(self, cl, d=None, return_changes=True, **kw):
+    def insert(self, cl, d=None, **kw):
         """Insert a tuple into a database table.
 
         This method inserts a row into a table.  If a dictionary is
         supplied it starts with that.  Otherwise it uses a blank dictionary.
         Either way the dictionary is updated from the keywords.
 
-        The dictionary is then reloaded with the values actually inserted
-        in order to pick up values modified by rules, triggers, etc.  If
-        the optional flag return_changes is set to False this reload will
-        be skipped.
+        The dictionary is then, if possible, reloaded with the values actually
+        inserted in order to pick up values modified by rules, triggers, etc.
 
         Note: The method currently doesn't support insert into views
         although PostgreSQL does.
 
         """
+        qcl = self._add_schema(cl)
+        qoid = _oid_key(qcl)
         if d is None:
             d = {}
         d.update(kw)
-        qcl = self._add_schema(cl)
-        qoid = _oid_key(qcl)
         attnames = self.get_attnames(qcl)
         names, values = [], []
         for n in attnames:
@@ -530,44 +545,62 @@ class DB(object):
                 names.append('"%s"' % n)
                 values.append(self._quote(d[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
-        q = 'INSERT INTO %s (%s) VALUES (%s)' % (qcl, names, values)
+        selectable = self.has_table_privilege(qcl)
+        if selectable and self.server_version >= 80200:
+            ret = ' RETURNING %s*' % ('oid' in attnames and 'oid, ' or '')
+        else:
+            ret = ''
+        q = 'INSERT INTO %s (%s) VALUES (%s)%s' % (qcl, names, values, ret)
         self._do_debug(q)
-        d[qoid] = self.db.query(q)
-        # Reload the dictionary to catch things modified by engine.
-        # Note that get() changes 'oid' below to oid(schema.table).
-        if return_changes:
-            self.get(qcl, d, 'oid')
+        res = self.db.query(q)
+        if ret:
+            res = res.dictresult()
+            for att, value in res[0].iteritems():
+                d[att == 'oid' and qoid or att] = value
+        elif isinstance(res, int):
+            d[qoid] = res
+            if selectable:
+                self.get(qcl, d, 'oid')
+        elif selectable:
+            if qoid in d:
+                self.get(qcl, d, 'oid')
+            else:
+                try:
+                    self.get(qcl, d)
+                except ProgrammingError:
+                    pass # table has no primary key
         return d
 
     def update(self, cl, d=None, **kw):
         """Update an existing row in a database table.
 
         Similar to insert but updates an existing row.  The update is based
-        on the OID value as munged by get.  The array returned is the
-        one sent modified to reflect any changes caused by the update due
-        to triggers, rules, defaults, etc.
+        on the OID value as munged by get or passed as keyword, or on the
+        primary key of the table.  The dictionary is modified, if possible,
+        to reflect any changes caused by the update due to triggers, rules,
+        default values, etc.
 
         """
         # Update always works on the oid which get returns if available,
         # otherwise use the primary key.  Fail if neither.
         # Note that we only accept oid key from named args for safety
+        qcl = self._add_schema(cl)
+        qoid = _oid_key(qcl)
         if 'oid' in kw:
             kw[qoid] = kw['oid']
             del kw['oid']
         if d is None:
             d = {}
         d.update(kw)
-        qcl = self._add_schema(cl)
-        qoid = _oid_key(qcl)
         attnames = self.get_attnames(qcl)
         if qoid in d:
             where = 'oid = %s' % d[qoid]
             keyname = ()
         else:
             try:
-               keyname = self.pkey(qcl)
+                keyname = self.pkey(qcl)
             except KeyError:
-               raise ProgrammingError('Class %s has no primary key' % qcl)
+                raise ProgrammingError('Class %s has no primary key' % qcl)
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
             try:
@@ -582,14 +615,26 @@ class DB(object):
         if not values:
             return d
         values = ', '.join(values)
-        q = 'UPDATE %s SET %s WHERE %s' % (qcl, values, where)
-        self._do_debug(q)
-        self.db.query(q)
-        # Reload the dictionary to catch things modified by engine:
-        if qoid in d:
-            return self.get(qcl, d, 'oid')
+        selectable = self.has_table_privilege(qcl)
+        if selectable and self.server_version >= 880200:
+            ret = ' RETURNING %s*' % ('oid' in attnames and 'oid, ' or '')
         else:
-            return self.get(qcl, d)
+            ret = ''
+        q = 'UPDATE %s SET %s WHERE %s%s' % (qcl, values, where, ret)
+        self._do_debug(q)
+        res = self.db.query(q)
+        if ret:
+            res = self.db.query(q).dictresult()
+            for att, value in res[0].iteritems():
+                d[att == 'oid' and qoid or att] = value
+        else:
+            self.db.query(q)
+            if selectable:
+                if qoid in d:
+                    self.get(qcl, d, 'oid')
+                else:
+                    self.get(qcl, d)
+        return d
 
     def clear(self, cl, a=None):
         """
@@ -602,9 +647,9 @@ class DB(object):
 
         """
         # At some point we will need a way to get defaults from a table.
+        qcl = self._add_schema(cl)
         if a is None:
             a = {} # empty if argument is not present
-        qcl = self._add_schema(cl)
         attnames = self.get_attnames(qcl)
         for n, t in attnames.iteritems():
             if n == 'oid':
@@ -620,25 +665,42 @@ class DB(object):
     def delete(self, cl, d=None, **kw):
         """Delete an existing row in a database table.
 
-        This method deletes the row from a table.
-        It deletes based on the OID munged as described above.
+        This method deletes the row from a table.  It deletes based on the
+        OID value as munged by get or passed as keyword, or on the primary
+        key of the table.  The return value is the number of deleted rows
+        (i.e. 0 if the row did not exist and 1 if the row was deleted).
 
         """
         # Like update, delete works on the oid.
         # One day we will be testing that the record to be deleted
         # isn't referenced somewhere (or else PostgreSQL will).
         # Note that we only accept oid key from named args for safety
+        qcl = self._add_schema(cl)
+        qoid = _oid_key(qcl)
         if 'oid' in kw:
             kw[qoid] = kw['oid']
             del kw['oid']
         if d is None:
             d = {}
         d.update(kw)
-        qcl = self._add_schema(cl)
-        qoid = _oid_key(qcl)
-        q = 'DELETE FROM %s WHERE oid=%s' % (qcl, d[qoid])
+        if qoid in d:
+            where = 'oid = %s' % d[qoid]
+        else:
+            try:
+                keyname = self.pkey(qcl)
+            except KeyError:
+                raise ProgrammingError('Class %s has no primary key' % qcl)
+            if isinstance(keyname, basestring):
+                keyname = (keyname,)
+            attnames = self.get_attnames(qcl)
+            try:
+                where = ' AND '.join(['%s = %s'
+                    % (k, self._quote(d[k], attnames[k])) for k in keyname])
+            except KeyError:
+                raise ProgrammingError('Delete needs primary key or oid.')
+        q = 'DELETE FROM %s WHERE %s' % (qcl, where)
         self._do_debug(q)
-        self.db.query(q)
+        return int(self.db.query(q))
 
 
 # if run as script, print some information
