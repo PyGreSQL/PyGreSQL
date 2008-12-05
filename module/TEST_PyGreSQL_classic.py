@@ -92,7 +92,7 @@ class utility_test(unittest.TestCase):
 
         db.get('_test_schema', 1234)
         db.get('_test_schema', 1234, keyname = '_test')
-        self.failUnlessRaises(KeyError, db.get, '_test_vschema', 1234)
+        self.failUnlessRaises(ProgrammingError, db.get, '_test_vschema', 1234)
         db.get('_test_vschema', 1234, keyname = '_test')
 
     def test_insert(self):

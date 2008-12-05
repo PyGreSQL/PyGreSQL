@@ -776,8 +776,9 @@ Return type:
   :string: Name of the field which is the primary key of the table
 
 Description:
-  This method returns the primary key of a table. Note that this raises
-  an exception if the table does not have a primary key.
+  This method returns the primary key of a table. For composite primary
+  keys, the return value will be a frozenset. Note that this raises an
+  exception if the table does not have a primary key.
 
 get_databases - get list of databases in the system
 ---------------------------------------------------
@@ -860,10 +861,11 @@ Return type:
 
 Description:
   This method is the basic mechanism to get a single row. It assumes
-  that the key specifies a unique row. If keyname is not specified
+  that the key specifies a unique row. If `keyname` is not specified
   then the primary key for the table is used. If `arg` is a dictionary
   then the value for the key is taken from it and it is modified to
   include the new values, replacing existing values where necessary.
+  For a composite key, `keyname` can also be a sequence of key names.
   The OID is also put into the dictionary if the table has one, but in
   order to allow the caller to work with multiple tables, it is munged
   as `oid(schema.table)`.

@@ -10,9 +10,9 @@ To Do
   (at least docs should recommend setting default_with_oids=true).
 - The insert() method in pg should use a `returning *` clause instead of
   the subsequent get() when the PostgreSQL version is >= 8.2.
-- Support composite primary keys and generally reconsider the pkey() method,
-  (see http://mailman.vex.net/pipermail/pygresql/2006-May/001688.html,
-  http://mailman.vex.net/pipermail/pygresql/2004-February/001282.html).
+- Before getting the values back after insert() and update(), check
+  with has_table_privilege(table, 'select') whether this is possible.
+  Otherwise we might break an ongoing transaction.
 - Documentation for the pgdb module (everything specific to PyGreSQL).
 - The large object and direct access functions need much more attention.
 - The C module needs to be cleaned up and redundant code merged,

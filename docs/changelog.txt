@@ -36,8 +36,12 @@ Version 4.0 (2009-01-01)
 - Added "return_changes" flag to insert method.
 - Added "protocol_version" and "server_version" attributes.
 - Revived the "user" attribute.
+- The pg module now works correctly with composite primary keys;
+  these are represented as frozensets.
 - Removed the undocumented and actually unnecessary "view" parameter
   from the get() method.
+- get() raises a nicer ProgrammingError instead of a KeyError
+  if no primary key was found.
 
 Version 3.8.1 (2006-06-05)
 --------------------------

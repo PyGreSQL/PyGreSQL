@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.25 2008-12-04 21:22:18 cito Exp $
+# $Id: test_pg.py,v 1.26 2008-12-05 02:05:28 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -41,8 +41,12 @@ except Exception:
         german = 0
 
 try:
+    frozenset
+except NameError: # Python < 2.4
+    from sets import ImmutableSet as frozenset
+try:
     from decimal import Decimal
-except ImportError:
+except ImportError: # Python < 2.4
     Decimal = float
 
 
@@ -201,6 +205,11 @@ class TestAuxiliaryFunctions(unittest.TestCase):
         self.assertEqual(f(('a', 'B', '0', 'c0', 'C0',
             'd e', 'f_g', 'h.i', 'jklm', 'nopq')),
             'a."B"."0".c0."C0"."d e".f_g."h.i".jklm.nopq')
+
+    def testOidKey(self):
+        f = pg._oid_key
+        self.assertEqual(f('a'), 'oid(a)')
+        self.assertEqual(f('a.b'), 'oid(a.b)')
 
 
 class TestHasConnect(unittest.TestCase):
@@ -971,7 +980,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(KeyError, self.db.pkey, 'pkeytest0')
         self.assertEqual(self.db.pkey('pkeytest1'), 'b')
         self.assertEqual(self.db.pkey('pkeytest2'), 'd')
-        self.assertEqual(self.db.pkey('pkeytest3'), 'f')
+        self.assertEqual(self.db.pkey('pkeytest3'), frozenset('fh'))
         self.assertEqual(self.db.pkey('pkeytest0', 'none'), 'none')
         self.assertEqual(self.db.pkey('pkeytest0'), 'none')
         self.db.pkey(None, {'t': 'a', 'n.t': 'b'})
@@ -1059,18 +1068,19 @@ class TestDBClass(unittest.TestCase):
             for n, t in enumerate('xyz'):
                 self.db.query('insert into "%s" values('
                     "%d, '%s')" % (table, n+1, t))
-            self.assertRaises(KeyError, self.db.get, table, 2)
+            self.assertRaises(pg.ProgrammingError, self.db.get, table, 2)
             r = self.db.get(table, 2, 'n')
             oid_table = table
             if ' ' in table:
                 oid_table = '"%s"' % oid_table
             oid_table = 'oid(public.%s)' % oid_table
             self.assert_(oid_table in r)
-            self.assert_(isinstance(r[oid_table], int))
-            self.assertEqual(self.db.get(table + ' *', 2, 'n'), r)
-            result = {'t': 'y', 'n': 2, oid_table: r[oid_table]}
+            oid = r[oid_table]
+            self.assert_(isinstance(oid, int))
+            result = {'t': 'y', 'n': 2, oid_table: oid}
             self.assertEqual(r, result)
-            self.assertEqual(self.db.get(table, r[oid_table], 'oid')['t'], 'y')
+            self.assertEqual(self.db.get(table + ' *', 2, 'n'), r)
+            self.assertEqual(self.db.get(table, oid, 'oid')['t'], 'y')
             self.assertEqual(self.db.get(table, 1, 'n')['t'], 'x')
             self.assertEqual(self.db.get(table, 3, 'n')['t'], 'z')
             self.assertEqual(self.db.get(table, 2, 'n')['t'], 'y')
@@ -1089,6 +1099,31 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(self.db.get(table, r)['t'], 'z')
             r['n'] = 2
             self.assertEqual(self.db.get(table, r)['t'], 'y')
+
+    def testGetWithCompositeKey(self):
+        table = 'get_test_table_1'
+        smart_ddl(self.db, "drop table %s" % table)
+        smart_ddl(self.db, "create table %s ("
+            "n integer, t text, primary key (n))" % table)
+        for n, t in enumerate('abc'):
+            self.db.query("insert into %s values("
+                "%d, '%s')" % (table, n+1, t))
+        self.assertEqual(self.db.get(table, 2)['t'], 'b')
+        table = 'get_test_table_2'
+        smart_ddl(self.db, "drop table %s" % table)
+        smart_ddl(self.db, "create table %s ("
+            "n integer, m integer, t text, primary key (n, m))" % table)
+        for n in range(3):
+            for m in range(2):
+                t = chr(ord('a') + 2*n +m)
+                self.db.query("insert into %s values("
+                    "%d, %d, '%s')" % (table, n+1, m+1, t))
+        self.assertRaises(pg.ProgrammingError, self.db.get, table, 2)
+        self.assertEqual(self.db.get(table, dict(n=2, m=2))['t'], 'd')
+        self.assertEqual(self.db.get(table, dict(n=1, m=2),
+            ('n', 'm'))['t'], 'b')
+        self.assertEqual(self.db.get(table, dict(n=3, m=2),
+            frozenset(['n', 'm']))['t'], 'f')
 
     def testGetFromView(self):
         self.db.query('delete from test where i4=14')
@@ -1133,7 +1168,7 @@ class TestDBClass(unittest.TestCase):
             for n, t in enumerate('xyz'):
                 self.db.query('insert into "%s" values('
                     "%d, '%s')" % (table, n+1, t))
-            self.assertRaises(KeyError, self.db.get, table, 2)
+            self.assertRaises(pg.ProgrammingError, self.db.get, table, 2)
             r = self.db.get(table, 2, 'n')
             r['t'] = 'u'
             s = self.db.update(table, r)
@@ -1141,6 +1176,37 @@ class TestDBClass(unittest.TestCase):
             r = self.db.query('select t from "%s" where n=2' % table
                 ).getresult()[0][0]
             self.assertEqual(r, 'u')
+
+    def testUpdateWithCompositeKey(self):
+        table = 'get_update_table_1'
+        smart_ddl(self.db, "drop table %s" % table)
+        smart_ddl(self.db, "create table %s ("
+            "n integer, t text, primary key (n))" % table)
+        for n, t in enumerate('abc'):
+            self.db.query("insert into %s values("
+                "%d, '%s')" % (table, n+1, t))
+        self.assertRaises(pg.ProgrammingError, self.db.update,
+            table, dict(t='b'))
+        self.assertEqual(self.db.update(table, dict(n=2, t='d'))['t'], 'd')
+        r = self.db.query('select t from "%s" where n=2' % table
+            ).getresult()[0][0]
+        self.assertEqual(r, 'd')
+        table = 'get_test_update_2'
+        smart_ddl(self.db, "drop table %s" % table)
+        smart_ddl(self.db, "create table %s ("
+            "n integer, m integer, t text, primary key (n, m))" % table)
+        for n in range(3):
+            for m in range(2):
+                t = chr(ord('a') + 2*n +m)
+                self.db.query("insert into %s values("
+                    "%d, %d, '%s')" % (table, n+1, m+1, t))
+        self.assertRaises(pg.ProgrammingError, self.db.update,
+            table, dict(n=2, t='b'))
+        self.assertEqual(self.db.update(table,
+            dict(n=2, m=2, t='x'))['t'], 'x')
+        r = [r[0] for r in self.db.query('select t from "%s" where n=2'
+            ' order by m' % table).getresult()]
+        self.assertEqual(r, ['c', 'x'])
 
     def testClear(self):
         for table in ('clear_test_table', 'test table for clear'):
@@ -1166,7 +1232,7 @@ class TestDBClass(unittest.TestCase):
             for n, t in enumerate('xyz'):
                 self.db.query('insert into "%s" values('
                     "%d, '%s')" % (table, n+1, t))
-            self.assertRaises(KeyError, self.db.get, table, 2)
+            self.assertRaises(pg.ProgrammingError, self.db.get, table, 2)
             r = self.db.get(table, 1, 'n')
             s = self.db.delete(table, r)
             r = self.db.get(table, 3, 'n')
