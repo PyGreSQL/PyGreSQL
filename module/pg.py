@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.74 2008-12-05 02:05:28 cito Exp $
+# $Id: pg.py,v 1.75 2008-12-05 02:08:15 cito Exp $
 #
 
 """PyGreSQL classic interface.
@@ -310,7 +310,7 @@ class DB(object):
     def pkey(self, cl, newpkey=None):
         """This method gets or sets the primary key of a class.
 
-        A composite primary keys is represented as a frozenset. Note that
+        Composite primary keys are represented as frozensets. Note that
         this raises an exception if the table does not have a primary key.
 
         If newpkey is set and is not a dictionary then set that
