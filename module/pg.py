@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.76 2008-12-05 15:00:19 cito Exp $
+# $Id: pg.py,v 1.77 2008-12-30 16:40:00 darcy Exp $
 #
 
 """PyGreSQL classic interface.
@@ -184,7 +184,7 @@ class DB(object):
 
     def _quote_num(self, d):
         """Quote numeric value."""
-        if not d:
+        if not d and d != 0:
             return 'NULL'
         return str(d)
 

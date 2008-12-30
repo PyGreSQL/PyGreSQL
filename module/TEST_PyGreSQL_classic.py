@@ -139,6 +139,10 @@ class utility_test(unittest.TestCase):
 
     def test_quote(self):
         _quote = db._quote
+        self.assertEqual(_quote(0, 'int'), "0")
+        self.assertEqual(_quote(0, 'num'), "0")
+        self.assertEqual(_quote('0', 'int'), "0")
+        self.assertEqual(_quote('0', 'num'), "0")
         self.assertEqual(_quote(1, 'int'), "1")
         self.assertEqual(_quote(1, 'text'), "'1'")
         self.assertEqual(_quote(1, 'num'), "1")
