@@ -104,10 +104,10 @@ A **NetBSD package** is available in their pkgsrc collection
 A **FreeBSD package** is available in their ports collection
   * http://www.freebsd.org/cgi/cvsweb.cgi/ports/databases/py-PyGreSQL/
 A **Win32 package** for various Python versions is available at
-  * ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-4.0.win32-py2.2.exe
   * ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-4.0.win32-py2.3.exe
   * ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-4.0.win32-py2.4.exe
   * ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-4.0.win32-py2.5.exe
+  * ftp://ftp.pygresql.org/pub/distrib/PyGreSQL-4.0.win32-py2.6.exe
 You can also find PyGreSQL on the **Python Package Index** at
  * http://pypi.python.org/pypi/PyGreSQL/
 
