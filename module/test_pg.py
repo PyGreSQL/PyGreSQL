@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.27 2008-12-05 15:00:19 cito Exp $
+# $Id: test_pg.py,v 1.28 2009-01-02 11:02:39 cito Exp $
 #
 
 """Test the classic PyGreSQL interface in the pg module.
@@ -880,6 +880,12 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(f('', 'bool'), 'NULL')
         self.assertEqual(f('', 'date'), 'NULL')
         self.assertEqual(f('', 'text'), "''")
+        self.assertEqual(f(0, 'int'), '0')
+        self.assertEqual(f(0, 'num'), '0')
+        self.assertEqual(f(1, 'int'), '1')
+        self.assertEqual(f(1, 'num'), '1')
+        self.assertEqual(f(-1, 'int'), '-1')
+        self.assertEqual(f(-1, 'num'), '-1')
         self.assertEqual(f(123456789, 'int'), '123456789')
         self.assertEqual(f(123456987, 'num'), '123456987')
         self.assertEqual(f(1.23654789, 'num'), '1.23654789')
