@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.54 2008-11-23 14:32:18 cito Exp $
+# $Id: pgdb.py,v 1.55 2009-04-02 22:18:59 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -248,15 +248,16 @@ class pgdbCursor(object):
 
     def execute(self, operation, params=None):
         """Prepare and execute a database operation (query or command)."""
+
         # The parameters may also be specified as list of
         # tuples to e.g. insert multiple rows in a single
         # operation, but this kind of usage is deprecated:
         if (params and isinstance(params, list)
                 and isinstance(params[0], tuple)):
-            self.executemany(operation, params)
+            return self.executemany(operation, params)
         else:
             # not a list of tuples
-            self.executemany(operation, (params,))
+            return self.executemany(operation, [params])
 
     def executemany(self, operation, param_seq):
         """Prepare operation and execute it against a parameter sequence."""
@@ -295,11 +296,14 @@ class pgdbCursor(object):
             getdescr = self._type_cache.getdescr
             coltypes = self._src.listinfo()
             self.description = [typ[1:2] + getdescr(typ[2]) for typ in coltypes]
-            self.lastrowid = self._src.oidstatus()
+            self.lastrowid = None
         else:
             self.rowcount = totrows
             self.description = None
             self.lastrowid = self._src.oidstatus()
+        # return the cursor object, so you can write statements such as
+        # "cursor.execute(...).fetchall()" or "for row in cursor.execute(...)"
+        return self
 
     def fetchone(self):
         """Fetch the next row of a query result set."""

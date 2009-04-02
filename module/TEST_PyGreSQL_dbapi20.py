@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.15 2008-11-23 13:14:05 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.16 2009-04-02 22:18:59 cito Exp $
 
 import dbapi20
 import unittest
@@ -51,7 +51,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
         con = self._connect()
         curs = myCursor(con)
-        curs.execute("select 1 as a, 2 as b")
+        ret = curs.execute("select 1 as a, 2 as b")
+        self.assert_(ret is curs, 'execute() should return cursor')
         self.assertEqual(curs.fetchone(), {'a': 1, 'b': 2})
 
     def test_cursor_iteration(self):

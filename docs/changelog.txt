@@ -2,6 +2,12 @@
 PyGreSQL ChangeLog
 ==================
 
+Version 4.x
+-----------
+- The execute() and executemany() methods now return the cursor object,
+  so you can now write statemens like "for row in cursor.execute(...)"
+  (as suggested by Adam Frederick).
+
 Version 4.0 (2009-01-01)
 ------------------------
 - Dropped support for Python below 2.3 and PostgreSQL below 7.4.

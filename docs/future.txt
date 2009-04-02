@@ -8,9 +8,10 @@ To Do
 
 - Documentation for the pgdb module (everything specific to PyGreSQL).
 - The large object and direct access functions need much more attention.
+- The fetch method should use real cursors.
 - The C module needs to be cleaned up and redundant code merged,
   and should get its own unit test module.
-- The fetch method should use real cursors.
+- Clean up test_pg.py and merge it with TEST_PyGreSQL_classic.py.
 - What shall we do with the "tutorial" directory
   (it's rather a tutorial for Postgres/SQL than for PyGreSQL,
   it's using only the query method from the classic pg module and
