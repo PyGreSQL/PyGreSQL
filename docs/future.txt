@@ -33,6 +33,8 @@ Wish List
 - Make use of PQexecParams() and PQprepare(). This could speed up
   executemany() and allow retrieving binary data directly by setting
   the resultFormat parameter to one.
+- Enhance cursor.description attribute, delivering more information
+  available with PQfmod() or PQftable() for instance.
 - Support optional "errorhandler" extension.
 - Support optional cursor and connection attribute "messages".
 - Connection as context manager (see http://tinyurl.com/6j9cef).
