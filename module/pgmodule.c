@@ -1,5 +1,5 @@
 /*
- * $Id: pgmodule.c,v 1.90 2008-12-03 00:17:15 cito Exp $
+ * $Id: pgmodule.c,v 1.91 2009-10-17 14:56:01 darcy Exp $
  * PyGres, version 2.2 A Python interface for PostgreSQL database. Written by
  * D'Arcy J.M. Cain, (darcy@druid.net).  Based heavily on code written by
  * Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
@@ -1977,6 +1977,7 @@ pgquery_getresult(pgqueryobject * self, PyObject * args)
 						cashbuf[k] = 0;
 						s = cashbuf;
 
+                    /* FALLTHROUGH */
 					case 4:
 						if (decimal)
 						{
@@ -2101,6 +2102,7 @@ pgquery_dictresult(pgqueryobject * self, PyObject * args)
 						cashbuf[k] = 0;
 						s = cashbuf;
 
+                    /* FALLTHROUGH */
 					case 4:
 						if (decimal)
 						{
