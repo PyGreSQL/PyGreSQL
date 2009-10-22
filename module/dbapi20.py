@@ -11,14 +11,17 @@
     -- Ian Bicking
 '''
 
-__rcs_id__  = '$Id: dbapi20.py,v 1.4 2008-11-01 18:37:55 cito Exp $'
-__version__ = '$Revision: 1.4 $'[11:-2]
+__rcs_id__  = '$Id: dbapi20.py,v 1.5 2009-10-22 17:46:45 cito Exp $'
+__version__ = '$Revision: 1.5 $'[11:-2]
 __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'
 
 import unittest
 import time
 
 # $Log: not supported by cvs2svn $
+# Revision 1.4  2008/11/01 18:37:55  cito
+# Updated the dbapi20 test module. Exposed the exceptions as attributes of the connection.
+#
 # Revision 1.10  2003/10/09 03:14:14  zenzen
 # Add test for DB API 2.0 optional extension, where database exceptions
 # are exposed as attributes on the Connection object.
@@ -106,16 +109,16 @@ class DatabaseAPI20Test(unittest.TestCase):
         cursor.execute(self.ddl2)
 
     def setUp(self):
-        ''' self.drivers should override this method to perform required setup
+        """self.drivers should override this method to perform required setup
             if any is necessary, such as creating the database.
-        '''
+        """
         pass
 
     def tearDown(self):
-        ''' self.drivers should override this method to perform required cleanup
+        """self.drivers should override this method to perform required cleanup
             if any is necessary, such as deleting the test database.
             The default drops the tables that may be created.
-        '''
+        """
         con = self._connect()
         try:
             cur = con.cursor()
@@ -172,8 +175,9 @@ class DatabaseAPI20Test(unittest.TestCase):
             self.fail("Driver doesn't define paramstyle")
 
     def test_Exceptions(self):
-        # Make sure required exceptions exist, and are in the
-        # defined heirarchy.
+        """Make sure required exceptions exist, and are in the
+        defined hierarchy.
+        """
         self.failUnless(issubclass(self.driver.Warning,StandardError))
         self.failUnless(issubclass(self.driver.Error,StandardError))
         self.failUnless(
@@ -199,12 +203,14 @@ class DatabaseAPI20Test(unittest.TestCase):
             )
 
     def test_ExceptionsAsConnectionAttributes(self):
-        # OPTIONAL EXTENSION
-        # Test for the optional DB API 2.0 extension, where the exceptions
-        # are exposed as attributes on the Connection object
-        # I figure this optional extension will be implemented by any
-        # driver author who is using this test suite, so it is enabled
-        # by default.
+        """Optional extension
+
+        Test for the optional DB API 2.0 extension, where the exceptions
+        are exposed as attributes on the Connection object
+        I figure this optional extension will be implemented by any
+        driver author who is using this test suite, so it is enabled
+        by default.
+        """
         con = self._connect()
         drv = self.driver
         self.failUnless(con.Warning is drv.Warning)
@@ -216,7 +222,6 @@ class DatabaseAPI20Test(unittest.TestCase):
         self.failUnless(con.InternalError is drv.InternalError)
         self.failUnless(con.ProgrammingError is drv.ProgrammingError)
         self.failUnless(con.NotSupportedError is drv.NotSupportedError)
-
 
     def test_commit(self):
         con = self._connect()
@@ -525,9 +530,9 @@ class DatabaseAPI20Test(unittest.TestCase):
         ]
 
     def _populate(self):
-        ''' Return a list of sql commands to setup the DB for the fetch
+        """Return a list of sql commands to setup the DB for the fetch
             tests.
-        '''
+        """
         populate = [
             "insert into %sbooze values ('%s')" % (self.table_prefix,s)
                 for s in self.samples
@@ -699,10 +704,10 @@ class DatabaseAPI20Test(unittest.TestCase):
             con.close()
 
     def help_nextset_setUp(self,cur):
-        ''' Should create a procedure called deleteme
+        """Should create a procedure called deleteme
             that returns two result sets, first the
-	    number of rows in booze then "name from booze"
-        '''
+            number of rows in booze then "name from booze"
+        """
         raise NotImplementedError,'Helper not implemented'
         #sql="""
         #    create procedure deleteme as
@@ -714,7 +719,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         #cur.execute(sql)
 
     def help_nextset_tearDown(self,cur):
-        'If cleaning up is needed after nextSetTest'
+        """If cleaning up is needed after nextSetTest"""
         raise NotImplementedError,'Helper not implemented'
         #cur.execute("drop procedure deleteme")
 
@@ -751,7 +756,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         raise NotImplementedError,'Drivers need to override this test'
 
     def test_arraysize(self):
-        # Not much here - rest of the tests for this are in test_fetchmany
+        """Not much here - rest of the tests for this are in test_fetchmany"""
         con = self._connect()
         try:
             cur = con.cursor()
@@ -771,7 +776,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             con.close()
 
     def test_setoutputsize_basic(self):
-        # Basic test is to make sure setoutputsize doesn't blow up
+        """Basic test is to make sure setoutputsize doesn't blow up"""
         con = self._connect()
         try:
             cur = con.cursor()
@@ -782,7 +787,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             con.close()
 
     def test_setoutputsize(self):
-        # Real test for setoutputsize is driver dependant
+        """Real test for setoutputsize is driver dependant"""
         raise NotImplementedError,'Driver need to override this test'
 
     def test_None(self):

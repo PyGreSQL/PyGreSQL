@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.16 2009-04-02 22:18:59 cito Exp $
+# $Id: TEST_PyGreSQL_dbapi20.py,v 1.17 2009-10-22 17:46:45 cito Exp $
 
 import dbapi20
 import unittest
@@ -63,8 +63,9 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def test_fetch_2_rows(self):
         Decimal = pgdb.decimal_type()
-        values = ['test', 'test', True, 5, 6L, 5.7,
-            Decimal('234.234234'), Decimal('75.45'),
+        values = ['test', pgdb.Binary('\xff\x52\xb2'),
+            True, 5, 6L,
+            5.7, Decimal('234.234234'), Decimal('75.45'),
             '2008-10-20 15:25:35', 7897234L]
         table = self.table_prefix + 'booze'
         con = self._connect()

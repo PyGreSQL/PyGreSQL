@@ -7,6 +7,7 @@ Version 4.x
 - The execute() and executemany() methods now return the cursor object,
   so you can now write statemens like "for row in cursor.execute(...)"
   (as suggested by Adam Frederick).
+- Binary objects are now automatically escaped and unescaped.
 
 Version 4.0 (2009-01-01)
 ------------------------

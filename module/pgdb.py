@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.55 2009-04-02 22:18:59 cito Exp $
+# $Id: pgdb.py,v 1.56 2009-10-22 17:46:45 cito Exp $
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
@@ -109,7 +109,11 @@ def _cast_money(value):
         lambda v: v in '0123456789.-', value)))
 
 
-_cast = {'bool': _cast_bool,
+def _cast_bytea(value):
+    return unescape_bytea(value)
+
+
+_cast = {'bool': _cast_bool, 'bytea': _cast_bytea,
     'int2': int, 'int4': int, 'serial': int,
     'int8': long, 'oid': long, 'oid8': long,
     'float4': float, 'float8': float,
@@ -192,7 +196,11 @@ class pgdbCursor(object):
         elif isinstance(val, unicode):
             val = val.encode( 'utf8' )
         if isinstance(val, str):
-            val = "'%s'" % self._cnx.escape_string(val)
+            if isinstance(val, Binary):
+                # the 'E' notation exists only since PostgreSQL 8.1
+                val = "E'%s'" % self._cnx.escape_bytea(val)
+            else:
+                val = "'%s'" % self._cnx.escape_string(val)
         elif isinstance(val, (int, long, float)):
             pass
         elif val is None:
@@ -572,9 +580,8 @@ def TimestampFromTicks(ticks):
     """construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*time.localtime(ticks)[:6])
 
-def Binary(value):
+class Binary(str):
     """construct an object capable of holding a binary (long) string value."""
-    return value
 
 
 # If run as script, print some information:
