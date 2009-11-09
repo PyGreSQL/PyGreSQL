@@ -22,6 +22,7 @@ Version 4.0 (2009-01-01)
 - Separated between mandatory and additional type objects.
 - Added keyword args to insert, update and delete methods.
 - Added exception handling for direct copy.
+- Start transactions only when necessary, not after every commit().
 - Release the GIL while making a connection
   (as suggested by Peter Schuller).
 - If available, use decimal.Decimal for numeric types.
