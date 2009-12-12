@@ -12,6 +12,9 @@ To Do
 - The C module needs to be cleaned up and redundant code merged,
   and should get its own unit test module.
 - Clean up test_pg.py and merge it with TEST_PyGreSQL_classic.py.
+- The test suite for the classic module should also check that quoted
+  mixed-case identifiers can be used everywhere - currently they can't.
+  Improve pg.py accordingly, adding quotes etc. as needed.
 - What shall we do with the "tutorial" directory
   (it's rather a tutorial for Postgres/SQL than for PyGreSQL,
   it's using only the query method from the classic pg module and
