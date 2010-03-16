@@ -204,99 +204,6 @@ staticforward PyTypeObject PglargeType;
 /* INTERNAL FUNCTIONS */
 
 
-/* prints result (mostly useful for debugging) */
-/* Note: This is a simplified version of the Postgres function PQprint().
- * PQprint() is not used because handing over a stream from Python to
- * Postgres can be problematic if they use different libs for streams.
- * Also, PQprint() is considered obsolete and may be removed sometime.
- */
-static void
-print_result(FILE *fout, const PGresult *res)
-{
-	int n = PQnfields(res);
-	if (n > 0)
-	{
-		int i, j;
-		int *fieldMax = NULL;
-		char **fields = NULL;
-		const char **fieldNames;
-		int m = PQntuples(res);
-		if (!(fieldNames = (const char **) calloc(n, sizeof(char *))))
-		{
-			fprintf(stderr, "out of memory\n"); exit(1);
-		}
-		if (!(fieldMax = (int *) calloc(n, sizeof(int))))
-		{
-			fprintf(stderr, "out of memory\n"); exit(1);
-		}
-		for (j = 0; j < n; j++)
-		{
-			const char *s = PQfname(res, j);
-			fieldNames[j] = s;
-			fieldMax[j] = s ? (int) strlen(s) : 0;
-		}
-		if (!(fields = (char **) calloc(n * (m + 1), sizeof(char *))))
-		{
-			fprintf(stderr, "out of memory\n"); exit(1);
-		}
-		for (i = 0; i < m; i++)
-		{
-			for (j = 0; j < n; j++)
-			{
-				const char *val;
-				int len;
-				len = PQgetlength(res, i, j);
-				val = PQgetvalue(res, i, j);
-				if (len > 0 && val && *val)
-				{
-					if (len > fieldMax[j])
-						fieldMax[j] = len;
-					if (!(fields[i * n + j] = (char *) malloc(len + 1)))
-					{
-						fprintf(stderr, "out of memory\n"); exit(1);
-					}
-					strcpy(fields[i * n + j], val);
-				}
-			}
-		}
-		for (j = 0; j < n; j++)
-		{
-			const char *s = PQfname(res, j);
-			int len = (int) strlen(s);
-			if (len > fieldMax[j])
-				fieldMax[j] = len;
-			fprintf(fout, "%-*s", fieldMax[j], s);
-			if (j + 1 < n)
-				fputc('|', fout);
-		}
-		fputc('\n', fout);
-		for (j = 0; j < n; j++)
-		{
-			for (i = fieldMax[j]; i--; fputc('-', fout));
-			if (j + 1 < n)
-				fputc('+', fout);
-		}
-		fputc('\n', fout);
-		for (i = 0; i < m; i++)
-		{
-			for (j = 0; j < n; j++)
-			{
-				char *s = fields[i * n + j];
-				fprintf(fout, "%-*s", fieldMax[j], s ? s : "");
-				if (j + 1 < n)
-					fputc('|', fout);
-				if (s)
-					free(s);
-			}
-			fputc('\n', fout);
-		}
-		free(fields);
-		fprintf(fout, "(%d row%s)\n\n", m, m == 1 ? "" : "s");
-		free(fieldMax);
-		free((void *) fieldNames);
-	}
-}
-
 /* checks connection validity */
 static int
 check_cnx_obj(pgobject * self)
@@ -422,6 +329,174 @@ get_type_array(PGresult *result, int nfields)
 	return typ;
 }
 
+/* format result (mostly useful for debugging) */
+/* Note: This is similar to the Postgres function PQprint().
+ * PQprint() is not used because handing over a stream from Python to
+ * Postgres can be problematic if they use different libs for streams
+ * and because using PQprint() and tp_print is not recommended any more.
+ */
+
+static PyObject *
+format_result(const PGresult *res)
+{
+	const int n = PQnfields(res);
+
+	if (n > 0)
+	{
+		char * const aligns = (char *) malloc(n * sizeof(char));
+		int * const sizes = (int *) malloc(n * sizeof(int));
+
+		if (aligns && sizes)
+		{
+			const int m = PQntuples(res);
+			int i, j;
+			size_t size;
+			char *buffer;
+
+			/* calculate sizes and alignments */
+			for (j = 0; j < n; j++)
+			{
+				const char * const s = PQfname(res, j);
+				const int format = PQfformat(res, j);
+
+				sizes[j] = s ? strlen(s) : 0;
+				if (format)
+				{
+					aligns[j] = '\0';
+					if (m && sizes[j] < 8)
+						/* "<binary>" must fit */
+						sizes[j] = 8;
+				}
+				else
+				{
+					const Oid ftype = PQftype(res, j);
+
+					switch (ftype)
+					{
+						case INT2OID:
+						case INT4OID:
+						case INT8OID:
+						case FLOAT4OID:
+						case FLOAT8OID:
+						case NUMERICOID:
+						case OIDOID:
+						case XIDOID:
+						case CIDOID:
+						case CASHOID:
+							aligns[j] = 'r';
+							break;
+						default:
+							aligns[j] = 'l';
+							break;
+					}
+				}
+			}
+			for (i = 0; i < m; i++)
+			{
+				for (j = 0; j < n; j++)
+				{
+					if (aligns[j])
+					{
+						const int k = PQgetlength(res, i, j);
+
+						if (sizes[j] < k)
+							/* value must fit */
+							sizes[j] = k;
+					}
+				}
+			}
+			size = 0;
+			/* size of one row */
+			for (j = 0; j < n; j++) size += sizes[j] + 1;
+			/* times number of rows incl. heading  */
+			size *= (m + 2);
+			/* plus size of footer */
+			size += 40;
+			/* is the buffer size that needs to be allocated */
+			buffer = (char *) malloc(size);
+			if (buffer)
+			{
+				char *p = buffer;
+				PyObject *result;
+
+				/* create the header */
+				for (j = 0; j < n; j++)
+				{
+					const char const *s = PQfname(res, j);
+					const int k = sizes[j];
+					const int h = (k - strlen(s)) / 2;
+
+					sprintf(p, "%*s", h, "");
+					sprintf(p + h, "%-*s", k - h, s);
+					p += k;
+					if (j + 1 < n)
+						*p++ = '|';
+				}
+				*p++ = '\n';
+				for (j = 0; j < n; j++)
+				{
+					int k = sizes[j];
+
+					while (k--)
+						*p++ = '-';
+					if (j + 1 < n)
+						*p++ = '+';
+				}
+				*p++ = '\n';
+				/* create the body */
+				for (i = 0; i < m; i++)
+				{
+					for (j = 0; j < n; j++)
+					{
+						const char align = aligns[j];
+						const int k = sizes[j];
+
+						if (align) {
+							sprintf(p, align == 'r' ?
+								"%*s" : "%-*s", k,
+								PQgetvalue(res, i, j));
+						}
+						else
+						{
+							sprintf(p, "%-*s", k,
+								PQgetisnull(res, i, j) ?
+								"" : "<binary>");
+						}
+						p += k;
+						if (j + 1 < n)
+							*p++ = '|';
+					}
+					*p++ = '\n';
+				}
+				/* free memory */
+				free(aligns);
+				free(sizes);
+				/* create the footer */
+				sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
+				/* return the result */
+				result = PyString_FromString(buffer);
+				free(buffer);
+				return result;
+			}
+			else
+			{
+				PyErr_SetString(PyExc_MemoryError,
+					"Not enough memory for formatting the query result.");
+				return NULL;
+			}
+		} else {
+			if (aligns)
+				free(aligns);
+			if (sizes)
+				free(aligns);
+			PyErr_SetString(PyExc_MemoryError,
+				"Not enough memory for formatting the query result.");
+			return NULL;
+		}
+	}
+	else
+		return PyString_FromString("(nothing selected)");
+}
 
 /* prototypes for constructors */
 static pgsourceobject *pgsource_new(pgobject * pgcnx);
@@ -1025,47 +1100,50 @@ pgsource_setattr(pgsourceobject * self, char *name, PyObject * v)
 	return -1;
 }
 
-/* prints query object in human readable format */
+static PyObject *
+pgsource_repr(pgsourceobject * self)
+{
+	return PyString_FromString("<pg source object>");
+}
 
-static int
-pgsource_print(pgsourceobject * self, FILE *fp, int flags)
+/* returns source object as string in human readable format */
+
+static PyObject *
+pgsource_str(pgsourceobject * self)
 {
 	switch (self->result_type)
 	{
 		case RESULT_DQL:
-			print_result(fp, self->last_result);
-			break;
+			return format_result(self->last_result);
 		case RESULT_DDL:
 		case RESULT_DML:
-			fputs(PQcmdStatus(self->last_result), fp);
-			break;
+			return PyString_FromString(PQcmdStatus(self->last_result));
 		case RESULT_EMPTY:
 		default:
-			fputs("Empty PostgreSQL source object.", fp);
-			break;
+			return PyString_FromString("(empty PostgreSQL source object)");
 	}
-
-	return 0;
 }
 
 /* query type definition */
 staticforward PyTypeObject PgSourceType = {
 	PyObject_HEAD_INIT(NULL)
-	0,							/* ob_size */
-	"pgsourceobject",			/* tp_name */
-	sizeof(pgsourceobject),		/* tp_basicsize */
-	0,							/* tp_itemsize */
+	0,								/* ob_size */
+	"pgsourceobject",				/* tp_name */
+	sizeof(pgsourceobject),			/* tp_basicsize */
+	0,								/* tp_itemsize */
 	/* methods */
-	(destructor) pgsource_dealloc,		/* tp_dealloc */
-	(printfunc) pgsource_print, /* tp_print */
-	(getattrfunc) pgsource_getattr,		/* tp_getattr */
-	(setattrfunc) pgsource_setattr,		/* tp_setattr */
-	0,							/* tp_compare */
-	0,							/* tp_repr */
-	0,							/* tp_as_number */
-	0,							/* tp_as_sequence */
-	0,							/* tp_as_mapping */
-	0,							/* tp_hash */
+	(destructor) pgsource_dealloc,	/* tp_dealloc */
+	0,								/* tp_print */
+	(getattrfunc) pgsource_getattr,	/* tp_getattr */
+	(setattrfunc) pgsource_setattr,	/* tp_setattr */
+	0,								/* tp_compare */
+	(reprfunc) pgsource_repr,		/* tp_repr */
+	0,								/* tp_as_number */
+	0,								/* tp_as_sequence */
+	0,								/* tp_as_mapping */
+	0,								/* tp_hash */
+	0,								/* tp_call */
+	(reprfunc) pgsource_str,		/* tp_str */
 };
 
 /* --------------------------------------------------------------------- */
@@ -2416,18 +2494,16 @@ pg_endcopy(pgobject * self, PyObject * args)
 }
 #endif /* DIRECT_ACCESS */
 
-
-static PyObject *
-pgquery_print(pgqueryobject * self, FILE *fp, int flags)
-{
-	print_result(fp, self->last_result);
-	return 0;
-}
-
 static PyObject *
 pgquery_repr(pgqueryobject * self)
 {
 	return PyString_FromString("<pg query result>");
+}
+
+static PyObject *
+pgquery_str(pgqueryobject * self)
+{
+	return format_result(self->last_result);
 }
 
 /* insert table */
@@ -3038,21 +3114,23 @@ pgquery_getattr(pgqueryobject * self, char *name)
 /* query type definition */
 staticforward PyTypeObject PgQueryType = {
 	PyObject_HEAD_INIT(NULL)
-	0,							/* ob_size */
-	"pgqueryobject",			/* tp_name */
-	sizeof(pgqueryobject),		/* tp_basicsize */
-	0,							/* tp_itemsize */
+	0,								/* ob_size */
+	"pgqueryobject",				/* tp_name */
+	sizeof(pgqueryobject),			/* tp_basicsize */
+	0,								/* tp_itemsize */
 	/* methods */
-	(destructor) pgquery_dealloc,		/* tp_dealloc */
-	(printfunc) pgquery_print,	/* tp_print */
-	(getattrfunc) pgquery_getattr,		/* tp_getattr */
-	0,							/* tp_setattr */
-	0,							/* tp_compare */
-	(reprfunc) pgquery_repr,	/* tp_repr */
-	0,							/* tp_as_number */
-	0,							/* tp_as_sequence */
-	0,							/* tp_as_mapping */
-	0,							/* tp_hash */
+	(destructor) pgquery_dealloc,	/* tp_dealloc */
+	0,								/* tp_print */
+	(getattrfunc) pgquery_getattr,	/* tp_getattr */
+	0,								/* tp_setattr */
+	0,								/* tp_compare */
+	(reprfunc) pgquery_repr,		/* tp_repr */
+	0,								/* tp_as_number */
+	0,								/* tp_as_sequence */
+	0,								/* tp_as_mapping */
+	0,								/* tp_hash */
+	0,								/* tp_call */
+	(reprfunc) pgquery_str			/* tp_str */
 };
 
 
