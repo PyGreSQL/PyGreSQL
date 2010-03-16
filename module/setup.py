@@ -40,9 +40,9 @@ version = "4.0"
 
 import sys
 
-if not (2, 2) < sys.version_info[:2] < (3, 0):
-    raise Exception("PyGreSQL %s requires a Python 2 version"
-        " newer than 2.2." % version)
+if not (2, 3) <= sys.version_info[:2] < (3, 0):
+    raise Exception("Sorry, PyGreSQL %s"
+        " does not support this Python version" % version)
 
 import os
 from distutils.core import setup
@@ -58,54 +58,15 @@ def pg_config(s):
         raise Exception("Could not get %s information." % s)
     return d
 
-def mk_include():
-    """Create a temporary local include directory.
-
-    The directory will contain a copy of the PostgreSQL server header files,
-    where all features which are not necessary for PyGreSQL are disabled.
-
-    """
-    os.mkdir('include')
-    for f in os.listdir(pg_include_dir_server):
-        if not f.endswith('.h'):
-            continue
-        d = open(os.path.join(pg_include_dir_server, f)).read()
-        if f == 'pg_config.h':
-            d += '\n'.join(('',
-                '#undef ENABLE_NLS',
-                '#undef USE_REPL_SNPRINTF',
-                '#undef USE_SSL',
-                '#undef USE_ZLIB',
-                '#undef HAVE_STDINT_H',
-                '#undef HAVE_SYS_TIME_H',
-                '#undef HAVE_UNISTD_H',
-                '#define _CRT_SECURE_NO_WARNINGS 1',
-                '#define _USE_32BIT_TIME_T 1',
-                ''))
-        open(os.path.join('include', f), 'w').write(d)
-
-def rm_include():
-    """Remove the temporary local include directory."""
-    if os.path.exists('include'):
-        for f in os.listdir('include'):
-            os.remove(os.path.join('include', f))
-        os.rmdir('include')
-
 pg_include_dir = pg_config('includedir')
-pg_include_dir_server = pg_config('includedir-server')
 
-rm_include()
-mk_include()
-
-include_dirs = ['include', pg_include_dir,  pg_include_dir_server]
+include_dirs = [pg_include_dir]
 
 pg_libdir = pg_config('libdir')
+
 library_dirs = [pg_libdir]
 
 libraries=['pq']
-
-if sys.platform == "win32":
-    include_dirs.append(os.path.join(pg_include_dir_server, 'port/win32'))
 
 setup(
     name="PyGreSQL",
@@ -142,5 +103,3 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules"
     ]
 )
-
-rm_include()

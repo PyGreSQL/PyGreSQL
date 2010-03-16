@@ -29,18 +29,13 @@
 
 /* Note: This should be linked against the same C runtime lib as Python */
 
-#include "postgres.h"
-#include "libpq-fe.h"
-#include "libpq/libpq-fs.h"
-#include "catalog/pg_type.h"
-
-/* these will be defined in Python.h again: */
-#undef _POSIX_C_SOURCE
-#undef HAVE_STRERROR
-#undef snprintf
-#undef vsnprintf
-
 #include <Python.h>
+#include <libpq-fe.h>
+
+/* some definitions from <libpq/libpq-fs.h> */
+#include "pgfs.h"
+/* the type definitions from <catalog/pg_type.h> */
+#include "pgtypes.h"
 
 static PyObject *Error, *Warning, *InterfaceError,
 	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
@@ -52,6 +47,10 @@ static const char *PyPgVersion = "4.0";
 typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
 #define PY_SSIZE_T_MIN INT_MIN
+#endif
+
+#if SIZEOF_SIZE_T != SIZEOF_INT
+#define Py_InitModule4 Py_InitModule4_64
 #endif
 
 /* taken from fileobject.c */
@@ -246,7 +245,7 @@ print_result(FILE *fout, const PGresult *res)
 		{
 			const char *s = PQfname(res, j);
 			fieldNames[j] = s;
-			fieldMax[j] = s ? strlen(s) : 0;
+			fieldMax[j] = s ? (int) strlen(s) : 0;
 		}
 		if (!(fields = (char **) calloc(n * (m + 1), sizeof(char *))))
 		{
@@ -260,7 +259,7 @@ print_result(FILE *fout, const PGresult *res)
 				int len;
 				len = PQgetlength(res, i, j);
 				val = PQgetvalue(res, i, j);
-				if (len >= 1 && val && *val)
+				if (len > 0 && val && *val)
 				{
 					if (len > fieldMax[j])
 						fieldMax[j] = len;
@@ -275,7 +274,7 @@ print_result(FILE *fout, const PGresult *res)
 		for (j = 0; j < n; j++)
 		{
 			const char *s = PQfname(res, j);
-			int len = strlen(s);
+			int len = (int) strlen(s);
 			if (len > fieldMax[j])
 				fieldMax[j] = len;
 			fprintf(fout, "%-*s", fieldMax[j], s);
@@ -1064,7 +1063,6 @@ pgsource_print(pgsourceobject * self, FILE *fp, int flags)
 /* query type definition */
 staticforward PyTypeObject PgSourceType = {
 	PyObject_HEAD_INIT(NULL)
-
 	0,							/* ob_size */
 	"pgsourceobject",			/* tp_name */
 	sizeof(pgsourceobject),		/* tp_basicsize */
@@ -2462,7 +2460,7 @@ pg_inserttable(pgobject * self, PyObject * args)
 				*item;
 	PyObject	*(*getitem) (PyObject *, Py_ssize_t);
 	PyObject	*(*getsubitem) (PyObject *, Py_ssize_t);
-	int			i,
+	Py_ssize_t	i,
 				j,
 				m,
 				n;
