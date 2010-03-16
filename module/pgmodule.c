@@ -41,7 +41,7 @@ static PyObject *Error, *Warning, *InterfaceError,
 	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
 	*IntegrityError, *DataError, *NotSupportedError;
 
-static const char *PyPgVersion = "4.0";
+static const char *PyPgVersion = PYGRESQL_VERSION;
 
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;
@@ -49,7 +49,7 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
 
-#if SIZEOF_SIZE_T != SIZEOF_INT
+#if PY_VERSION_HEX >= 0x02050000 && SIZEOF_SIZE_T != SIZEOF_INT
 #define Py_InitModule4 Py_InitModule4_64
 #endif
 
@@ -84,18 +84,6 @@ const char *__movename[5] =
 {"", "movefirst", "movelast", "movenext", "moveprev"};
 
 #define MAX_BUFFER_SIZE 8192	/* maximum transaction size */
-
-#ifndef NO_DIRECT
-#define DIRECT_ACCESS 1			/* enables direct access functions */
-#endif
-
-#ifndef NO_LARGE
-#define LARGE_OBJECTS 1			/* enables large objects support */
-#endif
-
-#ifndef NO_DEF_VAR
-#define DEFAULT_VARS 1			/* enables default variables use */
-#endif
 
 #ifndef PG_VERSION_NUM
 #ifdef PQnoPasswordSupplied
