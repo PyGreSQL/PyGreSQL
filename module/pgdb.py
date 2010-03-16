@@ -4,7 +4,7 @@
 #
 # Written by D'Arcy J.M. Cain
 #
-# $Id: pgdb.py,v 1.56 2009-10-22 17:46:45 cito Exp $
+# $Id$
 #
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.

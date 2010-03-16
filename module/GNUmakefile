@@ -1,5 +1,5 @@
 # $Header: /usr/cvs/Public/pygresql/module/GNUmakefile,v 1.19 2005-01-11 12:13:38 darcy Exp $
-# $Id: GNUmakefile,v 1.19 2005-01-11 12:13:38 darcy Exp $
+# $Id$
 
 subdir = src/interfaces/python
 top_builddir = ../../..

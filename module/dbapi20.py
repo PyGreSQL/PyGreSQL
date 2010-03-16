@@ -11,7 +11,7 @@
     -- Ian Bicking
 '''
 
-__rcs_id__  = '$Id: dbapi20.py,v 1.5 2009-10-22 17:46:45 cito Exp $'
+__rcs_id__  = '$Id$'
 __version__ = '$Revision: 1.5 $'[11:-2]
 __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'
 

@@ -5,7 +5,7 @@
 # Written by D'Arcy J.M. Cain
 # Improved by Christoph Zwerschke
 #
-# $Id: pg.py,v 1.77 2008-12-30 16:40:00 darcy Exp $
+# $Id$
 #
 
 """PyGreSQL classic interface.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: setup.py,v 1.27 2008-11-21 17:08:17 cito Exp $
+# $Id$
 
 """Setup script for PyGreSQL version 4.0
 

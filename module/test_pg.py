@@ -4,7 +4,7 @@
 #
 # Written by Christoph Zwerschke
 #
-# $Id: test_pg.py,v 1.28 2009-01-02 11:02:39 cito Exp $
+# $Id$
 #
 
 """Test the classic PyGreSQL interface in the pg module.

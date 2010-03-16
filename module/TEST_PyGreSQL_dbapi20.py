@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# $Id: TEST_PyGreSQL_dbapi20.py,v 1.17 2009-10-22 17:46:45 cito Exp $
+# $Id$
 
 import dbapi20
 import unittest
