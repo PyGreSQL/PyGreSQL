@@ -33,6 +33,7 @@ Wish List
 ---------
 
 - Make SQLSTATE error codes available.
+- Support the new listen/notify infrastructure of PostgreSQL 9.0.
 - Make use of PQexecParams() and PQprepare(). This could speed up
   executemany() and allow retrieving binary data directly by setting
   the resultFormat parameter to one.
