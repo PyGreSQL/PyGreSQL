@@ -359,7 +359,7 @@ format_result(const PGresult *res)
 				const char * const s = PQfname(res, j);
 				const int format = PQfformat(res, j);
 
-				sizes[j] = s ? strlen(s) : 0;
+				sizes[j] = s ? (int)strlen(s) : 0;
 				if (format)
 				{
 					aligns[j] = '\0';
@@ -422,9 +422,9 @@ format_result(const PGresult *res)
 				/* create the header */
 				for (j = 0; j < n; j++)
 				{
-					const char const *s = PQfname(res, j);
+					const char * const s = PQfname(res, j);
 					const int k = sizes[j];
-					const int h = (k - strlen(s)) / 2;
+					const int h = (k - (int)strlen(s)) / 2;
 
 					sprintf(p, "%*s", h, "");
 					sprintf(p + h, "%-*s", k - h, s);
