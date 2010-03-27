@@ -126,10 +126,11 @@ class build_pg_ext(build_ext):
                         include_dirs.insert(0, include_dir)
                     libraries[0] += 'dll' # libpqdll instead of libpq
                     break
-            if self.compiler == 'mingw32': # MinGW
+            compiler = self.get_compiler()
+            if compiler == 'mingw32': # MinGW
                 if bits == '64bit': # needs MinGW-w64
                     define_macros.append(('MS_WIN64', None))
-            elif self.compiler == 'msvc': # Microsoft Visual C++
+            elif compiler == 'msvc': # Microsoft Visual C++
                 libraries[0] = 'lib' + libraries[0]
 
 
