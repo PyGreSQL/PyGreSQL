@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys, unittest
+from decimal import Decimal
 from pg import *
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
@@ -154,6 +155,11 @@ class utility_test(unittest.TestCase):
         self.assertEqual(_quote('1', 'money'), "'1.00'")
         self.assertEqual(_quote(1.234, 'money'), "'1.23'")
         self.assertEqual(_quote('1.234', 'money'), "'1.23'")
+        self.assertEqual(_quote(0, 'money'), "'0.00'")
+        self.assertEqual(_quote(0.00, 'money'), "'0.00'")
+        self.assertEqual(_quote(Decimal('0.00'), 'money'), "'0.00'")
+        self.assertEqual(_quote(None, 'money'), "NULL")
+        self.assertEqual(_quote('', 'money'), "NULL")
         self.assertEqual(_quote(0, 'bool'), "'f'")
         self.assertEqual(_quote('', 'bool'), "NULL")
         self.assertEqual(_quote('f', 'bool'), "'f'")

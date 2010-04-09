@@ -190,7 +190,7 @@ class DB(object):
 
     def _quote_money(self, d):
         """Quote money value."""
-        if not d:
+        if d is None or d == '':
             return 'NULL'
         return "'%.2f'" % float(d)
 
