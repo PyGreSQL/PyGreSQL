@@ -4,7 +4,6 @@
 import dbapi20
 import unittest
 import pgdb
-import popen2
 
 # We need a database to test against.
 # If LOCAL_PyGreSQL.py exists we will get our information from that.
@@ -33,10 +32,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             con = self._connect()
             con.close()
         except Exception:
-            cmd = "psql -c 'create database dbapi20_test'"
-            cout, cin = popen2.popen2(cmd)
-            cin.close()
-            cout.read()
+            import pg
+            pg.DB().query('create database ' + dbname)
 
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
