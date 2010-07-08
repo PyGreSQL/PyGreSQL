@@ -178,8 +178,8 @@ class DatabaseAPI20Test(unittest.TestCase):
         """Make sure required exceptions exist, and are in the
         defined hierarchy.
         """
-        self.failUnless(issubclass(self.driver.Warning,StandardError))
-        self.failUnless(issubclass(self.driver.Error,StandardError))
+        self.failUnless(issubclass(self.driver.Warning,Exception))
+        self.failUnless(issubclass(self.driver.Error,Exception))
         self.failUnless(
             issubclass(self.driver.InterfaceError,self.driver.Error)
             )
@@ -708,7 +708,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             that returns two result sets, first the
             number of rows in booze then "name from booze"
         """
-        raise NotImplementedError,'Helper not implemented'
+        raise NotImplementedError('Helper not implemented')
         #sql="""
         #    create procedure deleteme as
         #    begin
@@ -720,7 +720,7 @@ class DatabaseAPI20Test(unittest.TestCase):
 
     def help_nextset_tearDown(self,cur):
         """If cleaning up is needed after nextSetTest"""
-        raise NotImplementedError,'Helper not implemented'
+        raise NotImplementedError('Helper not implemented')
         #cur.execute("drop procedure deleteme")
 
     def test_nextset(self):
@@ -753,7 +753,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             con.close()
 
     def test_nextset(self):
-        raise NotImplementedError,'Drivers need to override this test'
+        raise NotImplementedError('Drivers need to override this test')
 
     def test_arraysize(self):
         """Not much here - rest of the tests for this are in test_fetchmany"""
@@ -788,7 +788,7 @@ class DatabaseAPI20Test(unittest.TestCase):
 
     def test_setoutputsize(self):
         """Real test for setoutputsize is driver dependant"""
-        raise NotImplementedError,'Driver need to override this test'
+        raise NotImplementedError('Driver needs to override this test')
 
     def test_None(self):
         con = self._connect()

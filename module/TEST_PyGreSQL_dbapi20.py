@@ -56,14 +56,14 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         curs = con.cursor()
         curs.execute("select 1 union select 2 union select 3")
-        self.assertEqual([r[0] for r in curs], range(1, 4))
+        self.assertEqual([r[0] for r in curs], [1,2,3])
 
     def test_fetch_2_rows(self):
         Decimal = pgdb.decimal_type()
         values = ['test', pgdb.Binary('\xff\x52\xb2'),
-            True, 5, 6L,
+            True, 5, 6,
             5.7, Decimal('234.234234'), Decimal('75.45'),
-            '2008-10-20 15:25:35', 7897234L]
+            '2008-10-20 15:25:35', 7897234]
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:

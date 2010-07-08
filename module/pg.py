@@ -147,9 +147,9 @@ class DB(object):
         """Print a debug message."""
         if self.debug:
             if isinstance(self.debug, basestring):
-                print self.debug % s
+                sys.stdout.write((self.debug % s) + '\n')
             elif isinstance(self.debug, file):
-                print >> self.debug, s
+                file.write(s + '\n')
             elif callable(self.debug):
                 self.debug(s)
 
@@ -706,6 +706,6 @@ class DB(object):
 # if run as script, print some information
 
 if __name__ == '__main__':
-    print 'PyGreSQL version', version
-    print
-    print __doc__
+    print('PyGreSQL version' + version)
+    print('')
+    print(__doc__)

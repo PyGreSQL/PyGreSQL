@@ -64,7 +64,7 @@ Basic usage:
 """
 
 from _pg import *
-import time
+import time, sys
 try:
     frozenset
 except NameError: # Python < 2.4
@@ -294,9 +294,11 @@ class pgdbCursor(object):
                     totrows += rows
                 else:
                     self.rowcount = -1
-        except Error, msg:
+        except Error:
+            msg = sys.exc_info()[1]
             raise DatabaseError("error '%s' in '%s'" % (msg, sql))
-        except Exception, err:
+        except Exception:
+            err = sys.exc_info()[1]
             raise OperationalError("internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
@@ -340,7 +342,8 @@ class pgdbCursor(object):
             self.arraysize = size
         try:
             result = self._src.fetch(size)
-        except Error, err:
+        except Error:
+            err = sys.exc_info()[1]
             raise DatabaseError(str(err))
         row_factory = self.row_factory
         typecast = self._type_cache.typecast
@@ -587,6 +590,6 @@ class Binary(str):
 # If run as script, print some information:
 
 if __name__ == '__main__':
-    print 'PyGreSQL version', version
-    print
-    print __doc__
+    print('PyGreSQL version', version)
+    print('')
+    print(__doc__)
