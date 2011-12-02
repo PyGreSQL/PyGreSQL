@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # $Id$
 
-"""Setup script for PyGreSQL version 4.0
+"""Setup script for PyGreSQL version 4.1
 
 PyGreSQL is an open-source Python module that interfaces to a
 PostgreSQL database. It embeds the PostgreSQL query library to allow
@@ -35,7 +35,7 @@ using distutils to install Python programs.
 
 """
 
-version = '4.0'
+version = '4.1'
 
 
 import sys
@@ -70,8 +70,8 @@ def pg_config(s):
 py_modules = ['pg', 'pgdb']
 libraries = ['pq']
 include_dirs = [pg_config('includedir')]
-library_dirs=[pg_config('libdir')]
-define_macros = [('PYGRESQL_VERSION', '\\"%s\\"' % version)]
+library_dirs = [pg_config('libdir')]
+define_macros = [('PYGRESQL_VERSION', r'\"%s\"' % version)]
 undef_macros = []
 extra_compile_args = ['-O2']
 
@@ -138,7 +138,7 @@ setup(
     name="PyGreSQL",
     version=version,
     description="Python PostgreSQL Interfaces",
-    long_description = __doc__.split('\n\n', 2)[1], # first passage
+    long_description=__doc__.split('\n\n', 2)[1], # first passage
     keywords="pygresql postgresql database api dbapi",
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",

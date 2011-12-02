@@ -624,11 +624,10 @@ class DB(object):
         self._do_debug(q)
         res = self.db.query(q)
         if ret:
-            res = self.db.query(q).dictresult()
-            for att, value in res[0].iteritems():
+            res = res.dictresult()[0]
+            for att, value in res.iteritems():
                 d[att == 'oid' and qoid or att] = value
         else:
-            self.db.query(q)
             if selectable:
                 if qoid in d:
                     self.get(qcl, d, 'oid')

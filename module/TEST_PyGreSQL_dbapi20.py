@@ -9,7 +9,7 @@ import pgdb
 # If LOCAL_PyGreSQL.py exists we will get our information from that.
 # Otherwise we use the defaults.
 dbname = 'dbapi20_test'
-dbhost = None
+dbhost = ''
 dbport = 5432
 try:
     from LOCAL_PyGreSQL import *
@@ -21,7 +21,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     driver = pgdb
     connect_args = ()
-    connect_kw_args = {'dsn': ':' + dbname}
+    connect_kw_args = {'dsn': dbhost + ':' + dbname}
 
     lower_func = 'lower' # For stored procedure test
 
@@ -61,9 +61,9 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def test_fetch_2_rows(self):
         Decimal = pgdb.decimal_type()
         values = ['test', pgdb.Binary('\xff\x52\xb2'),
-            True, 5, 6,
-            5.7, Decimal('234.234234'), Decimal('75.45'),
-            '2008-10-20 15:25:35', 7897234]
+            True, 5, 6, 5.7, Decimal('234.234234'), Decimal('75.45'),
+            '2011-07-17', '15:47:42', '2008-10-20 15:25:35', '15:31:05',
+            7897234]
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
@@ -77,12 +77,17 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 "floattest float8,"
                 "numerictest numeric,"
                 "moneytest money,"
+                "datetest date,"
+                "timetest time,"
                 "datetimetest timestamp,"
+                "intervaltest interval,"
                 "rowidtest oid)" % table)
+            for s in ('numeric', 'monetary', 'time'):
+                cur.execute("set lc_%s to 'C'" % s)
             for i in range(2):
                 cur.execute("insert into %s values ("
                     "%%s,%%s,%%s,%%s,%%s,%%s,%%s,"
-                    "'%%s'::money,%%s,%%s)" % table, values)
+                    "'%%s'::money,%%s,%%s,%%s,%%s,%%s)" % table, values)
             cur.execute("select * from %s" % table)
             rows = cur.fetchall()
             self.assertEqual(len(rows), 2)
@@ -90,6 +95,75 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(rows[0], rows[1])
         finally:
             con.close()
+
+    def test_float(self):
+        from math import pi, e
+        try:
+            nan = float('nan')
+        except ValueError: # Python < 2.6
+            nan = 3.0e999 - 1.5e999999
+        try:
+            inf = float('inf')
+        except ValueError: # Python < 2.6
+            inf = 3.0e999 * 1.5e999999
+        try:
+            from math import isnan, isinf
+        except ImportError: # Python < 2.6
+            isnan = lambda x: x != x
+            isinf = lambda x: not isnan(x) and isnan(x * 0)
+        try:
+            from math import isnan, isinf
+        except ImportError: # Python < 2.6
+            isnan = lambda x: x != x
+            isinf = lambda x: not isnan(x) and isnan(x * 0)
+        self.assert_(isnan(nan) and not isinf(nan))
+        self.assert_(isinf(inf) and not isnan(inf))
+        values = [0, 1, 0.03125, -42.53125, nan, inf, -inf]
+        table = self.table_prefix + 'float'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s (floattest float)" % table)
+            params = [(val,) for val in values]
+            cur.executemany("insert into %s values(%%s)" % table, params)
+            cur.execute("select * from %s" % table)
+            rows = cur.fetchall()
+            self.assertEqual(len(rows), len(values))
+            rows = [row[0] for row in rows]
+            for inval, outval in zip(values, rows):
+                if isinf(inval):
+                    self.assert_(isinf(outval))
+                    if inval < 0:
+                        self.assert_(outval < 0)
+                    else:
+                        self.assert_(outval > 0)
+                elif isnan(inval):
+                    self.assert_(isnan(outval))
+                else:
+                    self.assertEqual(inval, outval)
+        finally:
+            con.close()
+
+    def test_set_decimal_type(self):
+        decimal_type = pgdb.decimal_type()
+        self.assert_(decimal_type is not None and callable(decimal_type))
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            self.assert_(pgdb.decimal_type(int) is int)
+            cur.execute('select 42')
+            value = cur.fetchone()[0]
+            self.assert_(isinstance(value, int))
+            self.assertEqual(value, 42)
+            self.assert_(pgdb.decimal_type(float) is float)
+            cur.execute('select 4.25')
+            value = cur.fetchone()[0]
+            self.assert_(isinstance(value, float))
+            self.assertEqual(value, 4.25)
+        finally:
+            con.close()
+            pgdb.decimal_type(decimal_type)
+        self.assert_(pgdb.decimal_type() is decimal_type)
 
     def test_nextset(self):
         pass # not implemented

@@ -435,7 +435,7 @@ Exceptions raised:
   :TypeError: bad argument type, or too many arguments
   :ValueError: empty SQL query or lost connection
   :pg.ProgrammingError: error in query
-  :pg.InternalError': error during query processing
+  :pg.InternalError: error during query processing
 
 Description:
   This method simply sends a SQL query to the database. If the query is an
@@ -574,6 +574,56 @@ Description:
 .. caution:: *Be very careful*:
   This method doesn't typecheck the fields according to the table definition;
   it just look whether or not it knows how to handle such types.
+
+set_notice_receiver - set a custom notice receiver
+--------------------------------------------------
+Syntax::
+
+  set_notice_receiver(proc)
+
+Parameters:
+  :proc: the custom notice receiver callback function
+
+Return type:
+  None
+
+Exceptions raised:
+  :TypeError: the specified notice receiver is not callable
+
+Description:
+  This method allows setting a custom notice receiver callback function.
+  When a notice or warning message is received from the server,
+  or generated internally by libpq, and the message level is below
+  the one set with `client_min_messages`, the specified notice receiver
+  function will be called. This function must take one parameter,
+  the `pgnotice` object, which provides the following read-only attributes:
+
+    :pgcnx: the connection
+    :message: the full message with a trailing newline
+    :severity: the level of the message, e.g. 'NOTICE' or 'WARNING'
+    :primary: the primary human-readable error message
+    :detail: an optional secondary error message
+    :hint: an optional suggestion what to do about the problem
+
+get_notice_receiver - get the current notice receiver
+-----------------------------------------------------
+Syntax::
+
+  get_notice_receiver()
+
+Parameters:
+  None
+
+Return type:
+  :callable, None: the current notice receiver callable
+
+Exceptions raised:
+  :TypeError: too many (any) arguments
+
+Description:
+  This method gets the custom notice receiver callback function that has
+  been set with `set_notice_receiver()`, or `None` if no custom notice
+  receiver has ever been set on the connection.
 
 putline - writes a line to the server socket [DA]
 -------------------------------------------------
@@ -911,7 +961,7 @@ Description:
   bigger.  If this happens and it is a table with OID but no primary key
   you can overcome this problem by simply adding an index onto the OID of
   any table that you think may get large over time. You may also consider
-  using the inserttable() method described in section 3.  
+  using the inserttable() method described in section 3.
 
   Note: With PostgreSQL versions before 8.2 the table being inserted to
   must have a primary key or an OID to use this method properly.  If not

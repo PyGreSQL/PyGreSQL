@@ -11,11 +11,17 @@ print
 print "PygreSQL inserttable() test."
 
 # Verify inserttable() works with German locale as well:
-import locale
+german = True
 try:
-    locale.setlocale(locale.LC_ALL, 'de_DE')
-except locale.Error:
-    locale.setlocale(locale.LC_ALL, '')
+    import locale
+    locale.setlocale(locale.LC_ALL, ('de', 'latin1'))
+except Exception:
+    try:
+        locale.setlocale(locale.LC_ALL, 'german')
+    except Exception:
+        import warning
+        warning.warn('Cannot set German locale.')
+        german = False
 
 db = DB('test')
 

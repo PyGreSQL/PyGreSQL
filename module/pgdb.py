@@ -64,17 +64,29 @@ Basic usage:
 """
 
 from _pg import *
-import time, sys
+import sys
 try:
     frozenset
 except NameError: # Python < 2.4
     from sets import ImmutableSet as frozenset
-from datetime import datetime, timedelta
+from datetime import date, time, datetime, timedelta
+from time import localtime
 try: # use Decimal if available
     from decimal import Decimal
     set_decimal(Decimal)
 except ImportError: # otherwise (Python < 2.4)
     Decimal = float # use float instead of Decimal
+try:
+    from math import isnan, isinf
+except ImportError: # Python < 2.6
+    isnan = lambda x: x != x
+    isinf = lambda x: not isnan(x) and isnan(x * 0)
+try:
+    inf = float('inf')
+    nan = float('nan')
+except ValueError: # Python < 2.6
+    inf = 1.0e999
+    nan = inf * 0
 
 
 ### Module Constants
@@ -95,13 +107,13 @@ def decimal_type(decimal_type=None):
     """Get or set global type to be used for decimal values."""
     global Decimal
     if decimal_type is not None:
-        Decimal = decimal_type
-        set_decimal(decimal_type)
+        _cast['numeric'] = Decimal = decimal_type
+        set_decimal(Decimal)
     return Decimal
 
 
 def _cast_bool(value):
-    return value[:1] in ['t', 'T']
+    return value[:1] in ('t', 'T')
 
 
 def _cast_money(value):
@@ -113,10 +125,23 @@ def _cast_bytea(value):
     return unescape_bytea(value)
 
 
+def _cast_float(value):
+    try:
+        return float(value)
+    except ValueError:
+        if value == 'NaN':
+            return nan
+        elif value == 'Infinity':
+            return inf
+        elif value == '-Infinity':
+            return -inf
+        raise
+
+
 _cast = {'bool': _cast_bool, 'bytea': _cast_bytea,
     'int2': int, 'int4': int, 'serial': int,
     'int8': long, 'oid': long, 'oid8': long,
-    'float4': float, 'float8': float,
+    'float4': _cast_float, 'float8': _cast_float,
     'numeric': Decimal, 'money': _cast_money}
 
 
@@ -191,7 +216,7 @@ class pgdbCursor(object):
 
     def _quote(self, val):
         """Quote value depending on its type."""
-        if isinstance(val, datetime):
+        if isinstance(val, (datetime, date, time, timedelta)):
             val = str(val)
         elif isinstance(val, unicode):
             val = val.encode( 'utf8' )
@@ -201,8 +226,13 @@ class pgdbCursor(object):
                 val = "E'%s'" % self._cnx.escape_bytea(val)
             else:
                 val = "'%s'" % self._cnx.escape_string(val)
-        elif isinstance(val, (int, long, float)):
+        elif isinstance(val, (int, long)):
             pass
+        elif isinstance(val, float):
+            if isinf(val):
+                return val < 0 and "'-Infinity'" or "'Infinity'"
+            elif isnan(val):
+                return "'NaN'"
         elif val is None:
             val = 'NULL'
         elif isinstance(val, (list, tuple)):
@@ -561,27 +591,27 @@ INTERVAL = pgdbType('interval tinterval timespan reltime')
 
 def Date(year, month, day):
     """Construct an object holding a date value."""
-    return datetime(year, month, day)
+    return date(year, month, day)
 
-def Time(hour, minute, second):
+def Time(hour, minute=0, second=0, microsecond=0):
     """Construct an object holding a time value."""
-    return timedelta(hour, minute, second)
+    return time(hour, minute, second, microsecond)
 
-def Timestamp(year, month, day, hour, minute, second):
+def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0):
     """construct an object holding a time stamp value."""
-    return datetime(year, month, day, hour, minute, second)
+    return datetime(year, month, day, hour, minute, second, microsecond)
 
 def DateFromTicks(ticks):
     """Construct an object holding a date value from the given ticks value."""
-    return Date(*time.localtime(ticks)[:3])
+    return Date(*localtime(ticks)[:3])
 
 def TimeFromTicks(ticks):
     """construct an object holding a time value from the given ticks value."""
-    return Time(*time.localtime(ticks)[3:6])
+    return Time(*localtime(ticks)[3:6])
 
 def TimestampFromTicks(ticks):
     """construct an object holding a time stamp from the given ticks value."""
-    return Timestamp(*time.localtime(ticks)[:6])
+    return Timestamp(*localtime(ticks)[:6])
 
 class Binary(str):
     """construct an object capable of holding a binary (long) string value."""

@@ -13,7 +13,7 @@ The testing is done against a real local PostgreSQL database.
 
 There are a few drawbacks:
   * A local PostgreSQL database must be up and running, and
-    the user who is running the tests must be a trusted superuser.
+    the database user who is running the tests must be a trusted superuser.
   * The performance of the API is not tested.
   * Connecting to a remote host is not tested.
   * Passing user, password and options is not tested.
@@ -28,10 +28,10 @@ There are a few drawbacks:
 import pg
 import unittest
 
-debug = 0
+debug = False
 
-# Try to load german locale for Umlaut tests
-german = 1
+# Try to load German locale for umlaut tests
+german = True
 try:
     import locale
     locale.setlocale(locale.LC_ALL, ('de', 'latin1'))
@@ -39,7 +39,9 @@ except Exception:
     try:
         locale.setlocale(locale.LC_ALL, 'german')
     except Exception:
-        german = 0
+        import warning
+        warning.warn('Cannot set German locale.')
+        german = False
 
 try:
     frozenset
@@ -363,9 +365,11 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
-        methods = '''cancel close endcopy escape_bytea escape_string fileno
-            getline getlo getnotify inserttable locreate loimport parameter
-            putline query reset source transaction'''.split()
+        methods = '''cancel close endcopy
+            escape_bytea escape_identifier escape_literal escape_string
+            fileno get_notice_receiver getline getlo getnotify
+            inserttable locreate loimport parameter putline query reset
+            set_notice_receiver source transaction'''.split()
         connection_methods = [a for a in dir(self.connection)
             if callable(eval("self.connection." + a))]
         self.assertEqual(methods, connection_methods)
@@ -397,7 +401,7 @@ class TestConnectObject(unittest.TestCase):
     def testAttributeServerVersion(self):
         server_version = self.connection.server_version
         self.assert_(isinstance(server_version, int))
-        self.assert_(70400 <= server_version < 90000)
+        self.assert_(70400 <= server_version < 100000)
 
     def testAttributeStatus(self):
         status_ok = 1
@@ -598,11 +602,11 @@ class TestSimpleQueries(unittest.TestCase):
         r = filter(bool, open(t, 'r').read().splitlines())
         os.remove(t)
         self.assertEqual(r,
-            ['a|h    |world',
-            '-+-----+-----',
-            '1|hello|w    ',
-            '2|xyz  |uvw  ',
-            '(2 rows)'])
+            ['a|  h  |world',
+             '-+-----+-----',
+             '1|hello|w    ',
+             '2|xyz  |uvw  ',
+             '(2 rows)'])
 
     def testGetNotify(self):
         self.assert_(self.c.getnotify() is None)
@@ -680,6 +684,64 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(r, data)
 
 
+class TestNoticeReceiver(unittest.TestCase):
+    """"Test notice receiver support."""
+
+    # Test database needed: must be run as a DBTestSuite.
+
+    def setUp(self):
+        self.dbname = DBTestSuite.dbname
+
+    def testGetNoticeReceiver(self):
+        c = pg.connect(self.dbname)
+        try:
+            self.assert_(c.get_notice_receiver() is None)
+        finally:
+            c.close()
+
+    def testSetNoticeReceiver(self):
+        c = pg.connect(self.dbname)
+        try:
+            self.assertRaises(TypeError, c.set_notice_receiver, None)
+            self.assertRaises(TypeError, c.set_notice_receiver, 42)
+            self.assert_(c.set_notice_receiver(lambda notice: None) is None)
+        finally:
+            c.close()
+
+    def testSetandGetNoticeReceiver(self):
+        c = pg.connect(self.dbname)
+        try:
+            r = lambda notice: None
+            self.assert_(c.set_notice_receiver(r) is None)
+            self.assert_(c.get_notice_receiver() is r)
+        finally:
+            c.close()
+
+    def testNoticeReceiver(self):
+        c = pg.connect(self.dbname)
+        try:
+            c.query('''create function bilbo_notice() returns void AS $$
+                begin
+                    raise warning 'Bilbo was here!';
+                end;
+                $$ language plpgsql''')
+            try:
+                received = {}
+                def notice_receiver(notice):
+                    for attr in dir(notice):
+                        received[attr] = getattr(notice, attr)
+                c.set_notice_receiver(notice_receiver)
+                c.query('''select bilbo_notice()''')
+                self.assertEqual(received, dict(
+                    pgcnx=c, message='WARNING:  Bilbo was here!\n',
+                    severity='WARNING', primary='Bilbo was here!',
+                    detail=None, hint=None))
+            finally:
+                c.query('''drop function bilbo_notice();''')
+        finally:
+            c.close()
+
+
 class TestDBClassBasic(unittest.TestCase):
     """"Test existence of the DB class wrapped pg connection methods."""
 
@@ -693,12 +755,13 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testAllDBAttributes(self):
         attributes = '''cancel clear close db dbname debug delete endcopy
-            error escape_bytea escape_string fileno  get get_attnames
-            get_databases get_relations get_tables getline getlo getnotify
+            error escape_bytea escape_identifier escape_literal escape_string
+            fileno get get_attnames get_databases get_notice_receiver
+            get_relations get_tables getline getlo getnotify
             has_table_privilege host insert inserttable locreate loimport
             options parameter pkey port protocol_version putline query
-            reopen reset server_version source status transaction tty
-            unescape_bytea update user'''.split()
+            reopen reset server_version set_notice_receiver source status
+            transaction tty unescape_bytea update user'''.split()
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)
@@ -741,7 +804,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testAttributeServerVersion(self):
         server_version = self.db.server_version
         self.assert_(isinstance(server_version, int))
-        self.assert_(70400 <= server_version < 90000)
+        self.assert_(70400 <= server_version < 100000)
         self.assertEqual(server_version, self.db.db.server_version)
 
     def testAttributeStatus(self):
@@ -763,6 +826,28 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertNotEqual(user, no_user)
         self.assertEqual(user, self.db.db.user)
 
+    def testMethodEscapeLiteral(self):
+        self.assertEqual(self.db.escape_literal("plain"), "'plain'")
+        self.assertEqual(self.db.escape_literal(
+            "that's k\xe4se"), "'that''s k\xe4se'")
+        self.assertEqual(self.db.escape_literal(
+            r"It's fine to have a \ inside."),
+            r" E'It''s fine to have a \\ inside.'")
+        self.assertEqual(self.db.escape_literal(
+            'No "quotes" must be escaped.'),
+            "'No \"quotes\" must be escaped.'")
+
+    def testMethodEscapeIdentifier(self):
+        self.assertEqual(self.db.escape_identifier("plain"), '"plain"')
+        self.assertEqual(self.db.escape_identifier(
+            "that's k\xe4se"), '"that\'s k\xe4se"')
+        self.assertEqual(self.db.escape_identifier(
+            r"It's fine to have a \ inside."),
+            '"It\'s fine to have a \\ inside."')
+        self.assertEqual(self.db.escape_identifier(
+            'All "quotes" must be escaped.'),
+            '"All ""quotes"" must be escaped."')
+
     def testMethodEscapeString(self):
         self.assertEqual(self.db.escape_string("plain"), "plain")
         self.assertEqual(self.db.escape_string(
@@ -772,18 +857,42 @@ class TestDBClassBasic(unittest.TestCase):
             r"It''s fine to have a \\ inside.")
 
     def testMethodEscapeBytea(self):
-        self.assertEqual(self.db.escape_bytea("plain"), "plain")
-        self.assertEqual(self.db.escape_bytea(
-            "that's k\xe4se"), "that''s k\\\\344se")
-        self.assertEqual(self.db.escape_bytea(
-            'O\x00ps\xff!'), r'O\\000ps\\377!')
+        output = self.db.query("show bytea_output").getresult()[0][0]
+        self.assert_(output in ('escape', 'hex'))
+        if output == 'escape':
+            self.assertEqual(self.db.escape_bytea("plain"), "plain")
+            self.assertEqual(self.db.escape_bytea(
+                "that's k\xe4se"), "that''s k\\\\344se")
+            self.assertEqual(self.db.escape_bytea(
+                'O\x00ps\xff!'), r'O\\000ps\\377!')
+        else:
+            self.assertEqual(self.db.escape_bytea("plain"), r"\\x706c61696e")
+            self.assertEqual(self.db.escape_bytea(
+                "that's k\xe4se"), r"\\x746861742773206be47365")
+            self.assertEqual(self.db.escape_bytea(
+                'O\x00ps\xff!'), r"\\x4f007073ff21")
 
     def testMethodUnescapeBytea(self):
+        standard_conforming = self.db.query(
+            "show standard_conforming_strings").getresult()[0][0]
+        self.assert_(standard_conforming in ('on', 'off'))
         self.assertEqual(self.db.unescape_bytea("plain"), "plain")
         self.assertEqual(self.db.unescape_bytea(
             "that's k\\344se"), "that's k\xe4se")
         self.assertEqual(pg.unescape_bytea(
             r'O\000ps\377!'), 'O\x00ps\xff!')
+        if standard_conforming == 'on':
+            self.assertEqual(self.db.unescape_bytea(r"\\x706c61696e"), "plain")
+            self.assertEqual(self.db.unescape_bytea(
+                r"\\x746861742773206be47365"), "that's k\xe4se")
+            self.assertEqual(pg.unescape_bytea(
+                r"\\x4f007073ff21"), 'O\x00ps\xff!')
+        else:
+            self.assertEqual(self.db.unescape_bytea(r"\x706c61696e"), "plain")
+            self.assertEqual(self.db.unescape_bytea(
+                r"\x746861742773206be47365"), "that's k\xe4se")
+            self.assertEqual(pg.unescape_bytea(
+                r"\x4f007073ff21"), 'O\x00ps\xff!')
 
     def testMethodQuery(self):
         self.db.query("select 1+1")
@@ -851,18 +960,42 @@ class TestDBClass(unittest.TestCase):
             r"It''s fine to have a \\ inside.")
 
     def testEscapeBytea(self):
-        self.assertEqual(self.db.escape_bytea("plain"), "plain")
-        self.assertEqual(self.db.escape_bytea(
-            "that's k\xe4se"), "that''s k\\\\344se")
-        self.assertEqual(self.db.escape_bytea(
-            'O\x00ps\xff!'), r'O\\000ps\\377!')
+        output = self.db.query("show bytea_output").getresult()[0][0]
+        self.assert_(output in ('escape', 'hex'))
+        if output == 'escape':
+            self.assertEqual(self.db.escape_bytea("plain"), "plain")
+            self.assertEqual(self.db.escape_bytea(
+                "that's k\xe4se"), "that''s k\\\\344se")
+            self.assertEqual(self.db.escape_bytea(
+                'O\x00ps\xff!'), r'O\\000ps\\377!')
+        else:
+            self.assertEqual(self.db.escape_bytea("plain"), r"\\x706c61696e")
+            self.assertEqual(self.db.escape_bytea(
+                "that's k\xe4se"), r"\\x746861742773206be47365")
+            self.assertEqual(self.db.escape_bytea(
+                'O\x00ps\xff!'), r"\\x4f007073ff21")
 
     def testUnescapeBytea(self):
+        standard_conforming = self.db.query(
+            "show standard_conforming_strings").getresult()[0][0]
+        self.assert_(standard_conforming in ('on', 'off'))
         self.assertEqual(self.db.unescape_bytea("plain"), "plain")
         self.assertEqual(self.db.unescape_bytea(
             "that's k\\344se"), "that's k\xe4se")
         self.assertEqual(pg.unescape_bytea(
             r'O\000ps\377!'), 'O\x00ps\xff!')
+        if standard_conforming == 'on':
+            self.assertEqual(self.db.unescape_bytea(r"\\x706c61696e"), "plain")
+            self.assertEqual(self.db.unescape_bytea(
+                r"\\x746861742773206be47365"), "that's k\xe4se")
+            self.assertEqual(pg.unescape_bytea(
+                r"\\x4f007073ff21"), 'O\x00ps\xff!')
+        else:
+            self.assertEqual(self.db.unescape_bytea(r"\x706c61696e"), "plain")
+            self.assertEqual(self.db.unescape_bytea(
+                r"\x746861742773206be47365"), "that's k\xe4se")
+            self.assertEqual(pg.unescape_bytea(
+                r"\x4f007073ff21"), 'O\x00ps\xff!')
 
     def testQuote(self):
         f = self.db._quote
@@ -1420,6 +1553,7 @@ class DBTestSuite(unittest.TestSuite):
         c.query("create database " + dbname
             + " template=template0")
         for s in ('client_min_messages = warning',
+            'lc_messages = C',
             'default_with_oids = on',
             'standard_conforming_strings = off',
             'escape_string_warning = off'):
@@ -1477,6 +1611,7 @@ if __name__ == '__main__':
     # All tests that need a test database:
     TestSuite2 = DBTestSuite((
         unittest.makeSuite(TestInserttable),
+        unittest.makeSuite(TestNoticeReceiver),
         unittest.makeSuite(TestDBClass),
         unittest.makeSuite(TestSchemas),
         ))
@@ -1484,7 +1619,7 @@ if __name__ == '__main__':
     # All tests together in one test suite:
     TestSuite = unittest.TestSuite((
         TestSuite1,
-        TestSuite2
+        TestSuite2,
     ))
 
     unittest.TextTestRunner(verbosity=2).run(TestSuite)
