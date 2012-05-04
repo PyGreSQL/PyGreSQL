@@ -849,22 +849,39 @@ class TestDBClassBasic(unittest.TestCase):
             '"All ""quotes"" must be escaped."')
 
     def testMethodEscapeString(self):
+        standard_conforming = self.db.query(
+            "show standard_conforming_strings").getresult()[0][0]
+        self.assert_(standard_conforming in ('on', 'off'))
         self.assertEqual(self.db.escape_string("plain"), "plain")
         self.assertEqual(self.db.escape_string(
             "that's k\xe4se"), "that''s k\xe4se")
-        self.assertEqual(self.db.escape_string(
-            r"It's fine to have a \ inside."),
-            r"It''s fine to have a \\ inside.")
+        if standard_conforming == 'on':
+            self.assertEqual(self.db.escape_string(
+                r"It's fine to have a \ inside."),
+                r"It''s fine to have a \ inside.")
+        else:
+            self.assertEqual(self.db.escape_string(
+                r"It's fine to have a \ inside."),
+                r"It''s fine to have a \\ inside.")
 
     def testMethodEscapeBytea(self):
         output = self.db.query("show bytea_output").getresult()[0][0]
         self.assert_(output in ('escape', 'hex'))
+        standard_conforming = self.db.query(
+            "show standard_conforming_strings").getresult()[0][0]
+        self.assert_(standard_conforming in ('on', 'off'))
         if output == 'escape':
             self.assertEqual(self.db.escape_bytea("plain"), "plain")
             self.assertEqual(self.db.escape_bytea(
                 "that's k\xe4se"), "that''s k\\\\344se")
             self.assertEqual(self.db.escape_bytea(
                 'O\x00ps\xff!'), r'O\\000ps\\377!')
+        elif standard_conforming == 'on':
+            self.assertEqual(self.db.escape_bytea("plain"), r"\x706c61696e")
+            self.assertEqual(self.db.escape_bytea(
+                "that's k\xe4se"), r"\x746861742773206be47365")
+            self.assertEqual(self.db.escape_bytea(
+                'O\x00ps\xff!'), r"\x4f007073ff21")
         else:
             self.assertEqual(self.db.escape_bytea("plain"), r"\\x706c61696e")
             self.assertEqual(self.db.escape_bytea(
@@ -881,18 +898,11 @@ class TestDBClassBasic(unittest.TestCase):
             "that's k\\344se"), "that's k\xe4se")
         self.assertEqual(pg.unescape_bytea(
             r'O\000ps\377!'), 'O\x00ps\xff!')
-        if standard_conforming == 'on':
-            self.assertEqual(self.db.unescape_bytea(r"\\x706c61696e"), "plain")
-            self.assertEqual(self.db.unescape_bytea(
-                r"\\x746861742773206be47365"), "that's k\xe4se")
-            self.assertEqual(pg.unescape_bytea(
-                r"\\x4f007073ff21"), 'O\x00ps\xff!')
-        else:
-            self.assertEqual(self.db.unescape_bytea(r"\x706c61696e"), "plain")
-            self.assertEqual(self.db.unescape_bytea(
-                r"\x746861742773206be47365"), "that's k\xe4se")
-            self.assertEqual(pg.unescape_bytea(
-                r"\x4f007073ff21"), 'O\x00ps\xff!')
+        self.assertEqual(self.db.unescape_bytea(r"\x706c61696e"), "plain")
+        self.assertEqual(self.db.unescape_bytea(
+            r"\x746861742773206be47365"), "that's k\xe4se")
+        self.assertEqual(pg.unescape_bytea(
+            r"\x4f007073ff21"), 'O\x00ps\xff!')
 
     def testMethodQuery(self):
         self.db.query("select 1+1")

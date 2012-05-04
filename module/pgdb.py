@@ -222,10 +222,10 @@ class pgdbCursor(object):
             val = val.encode( 'utf8' )
         if isinstance(val, str):
             if isinstance(val, Binary):
-                # the 'E' notation exists only since PostgreSQL 8.1
-                val = "E'%s'" % self._cnx.escape_bytea(val)
+                val = self._cnx.escape_bytea(val)
             else:
-                val = "'%s'" % self._cnx.escape_string(val)
+                val = self._cnx.escape_string(val)
+            val = "'%s'" % val
         elif isinstance(val, (int, long)):
             pass
         elif isinstance(val, float):
