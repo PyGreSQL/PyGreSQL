@@ -424,7 +424,7 @@ format_result(const PGresult *res)
 			size = 0;
 			/* size of one row */
 			for (j = 0; j < n; j++) size += sizes[j] + 1;
-			/* times number of rows incl. heading  */
+			/* times number of rows incl. heading */
 			size *= (m + 2);
 			/* plus size of footer */
 			size += 40;
@@ -3253,7 +3253,7 @@ pgnotice_getattr(pgnoticeobject *self, char *name)
 		if (self->pgcnx && check_cnx_obj(self->pgcnx))
 		{
 			Py_INCREF(self->pgcnx);
-			return self->pgcnx;
+			return (PyObject *) self->pgcnx;
 		}
 		else
 		{
@@ -3262,11 +3262,11 @@ pgnotice_getattr(pgnoticeobject *self, char *name)
 		}
 	}
 
-    /* full message */
+	/* full message */
 	if (!strcmp(name, "message"))
 		return PyString_FromString(PQresultErrorMessage(res));
 
-    /* other possible fields */
+	/* other possible fields */
 	int fieldcode = 0;
 	if (!strcmp(name, "severity"))
 		fieldcode = PG_DIAG_SEVERITY;
@@ -3303,8 +3303,8 @@ pgnotice_getattr(pgnoticeobject *self, char *name)
 		return list;
 	}
 
-    PyErr_Format(PyExc_AttributeError,
-        "'pgnoticeobject' has no attribute %s", name);
+	PyErr_Format(PyExc_AttributeError,
+		"'pgnoticeobject' has no attribute %s", name);
 	return NULL;
 }
 
