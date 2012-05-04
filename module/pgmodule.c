@@ -28,8 +28,8 @@
  */
 
 /* Note: This should be linked against the same C runtime lib as Python */
-
 #include <Python.h>
+
 #include <libpq-fe.h>
 
 /* some definitions from <libpq/libpq-fs.h> */
@@ -2136,7 +2136,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						cashbuf[k] = 0;
 						s = cashbuf;
 
-                    /* FALLTHROUGH */
+					/* FALLTHROUGH */ /* no break */
 					case 4:
 						if (decimal)
 						{
@@ -2261,7 +2261,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						cashbuf[k] = 0;
 						s = cashbuf;
 
-                    /* FALLTHROUGH */
+					/* FALLTHROUGH */ /* no break */
 					case 4:
 						if (decimal)
 						{
