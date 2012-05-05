@@ -19,6 +19,7 @@ db = DB(dbname, dbhost, dbport)
 db.query("SET DATESTYLE TO 'ISO'")
 db.query("SET TIME ZONE 'EST5EDT'")
 db.query("SET DEFAULT_WITH_OIDS=TRUE")
+db.query("SET STANDARD_CONFORMING_STRINGS=FALSE")
 
 class utility_test(unittest.TestCase):
 
@@ -175,8 +176,9 @@ class utility_test(unittest.TestCase):
         self.assertEqual(_quote('', 'date'), "NULL")
         self.assertEqual(_quote('date', 'date'), "'date'")
         self.assertEqual(_quote('', 'text'), "''")
-        self.assertEqual(_quote("\\", 'text'), "'\\\\'")
         self.assertEqual(_quote("'", 'text'), "''''")
+        self.assertEqual(_quote("\\", 'text'), "'\\\\'")
+
 
 if __name__ == '__main__':
     unittest.main()
