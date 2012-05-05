@@ -128,7 +128,6 @@ typedef struct
 	PyObject_HEAD
 	int			valid;				/* validity flag */
 	PGconn		*cnx;				/* PostGres connection handle */
-	PGresult	*last_result;		/* last result content */
 	PyObject	*notice_receiver;	/* current notice receiver */
 }	pgobject;
 
@@ -145,7 +144,6 @@ pgobject_New(void)
 		return NULL;
 
 	pgobj->valid = 1;
-	pgobj->last_result = NULL;
 	pgobj->cnx = NULL;
 	pgobj->notice_receiver = NULL;
 
@@ -170,7 +168,7 @@ staticforward PyTypeObject PgNoticeType;
 typedef struct
 {
 	PyObject_HEAD
-	PGresult	*last_result;	/* last result content */
+	PGresult	*result;		/* result content */
 	int			result_type;	/* type of previous result */
 	long		current_pos;	/* current position in last result */
 	long		num_rows;		/* number of (affected) rows */
@@ -187,7 +185,7 @@ typedef struct
 	PyObject_HEAD
 	int			valid;			/* validity flag */
 	pgobject	*pgcnx;			/* parent connection object */
-	PGresult	*last_result;	/* last result content */
+	PGresult	*result;		/* result content */
 	int			result_type;	/* result type (DDL/DML/DQL) */
 	long		arraysize;		/* array size for fetch method */
 	int			current_row;	/* current selected row */
@@ -278,7 +276,7 @@ check_source_obj(pgsourceobject *self, int level)
 		return 0;
 	}
 
-	if ((level & CHECK_RESULT) && self->last_result == NULL)
+	if ((level & CHECK_RESULT) && self->result == NULL)
 	{
 		PyErr_SetString(DatabaseError, "no result.");
 		return 0;
@@ -533,7 +531,7 @@ pgsource_new(pgobject *pgcnx)
 	/* initializes internal parameters */
 	Py_XINCREF(pgcnx);
 	npgobj->pgcnx = pgcnx;
-	npgobj->last_result = NULL;
+	npgobj->result = NULL;
 	npgobj->valid = 1;
 	npgobj->arraysize = PG_ARRAYSIZE;
 
@@ -544,8 +542,8 @@ pgsource_new(pgobject *pgcnx)
 static void
 pgsource_dealloc(pgsourceobject *self)
 {
-	if (self->last_result)
-		PQclear(self->last_result);
+	if (self->result)
+		PQclear(self->result);
 
 	Py_XDECREF(self->pgcnx);
 	PyObject_Del(self);
@@ -567,11 +565,11 @@ pgsource_close(pgsourceobject *self, PyObject *args)
 	}
 
 	/* frees result if necessary and invalidates object */
-	if (self->last_result)
+	if (self->result)
 	{
-		PQclear(self->last_result);
+		PQclear(self->result);
 		self->result_type = RESULT_EMPTY;
-		self->last_result = NULL;
+		self->result = NULL;
 	}
 
 	self->valid = 0;
@@ -610,10 +608,10 @@ pgsource_execute(pgsourceobject *self, PyObject *args)
 	}
 
 	/* frees previous result */
-	if (self->last_result)
+	if (self->result)
 	{
-		PQclear(self->last_result);
-		self->last_result = NULL;
+		PQclear(self->result);
+		self->result = NULL;
 	}
 	self->max_row = 0;
 	self->current_row = 0;
@@ -621,18 +619,18 @@ pgsource_execute(pgsourceobject *self, PyObject *args)
 
 	/* gets result */
 	Py_BEGIN_ALLOW_THREADS
-	self->last_result = PQexec(self->pgcnx->cnx, query);
+	self->result = PQexec(self->pgcnx->cnx, query);
 	Py_END_ALLOW_THREADS
 
 	/* checks result validity */
-	if (!self->last_result)
+	if (!self->result)
 	{
 		PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->pgcnx->cnx));
 		return NULL;
 	}
 
 	/* checks result status */
-	switch (PQresultStatus(self->last_result))
+	switch (PQresultStatus(self->result))
 	{
 		long	num_rows;
 		char   *temp;
@@ -640,15 +638,15 @@ pgsource_execute(pgsourceobject *self, PyObject *args)
 		/* query succeeded */
 		case PGRES_TUPLES_OK:	/* DQL: returns None (DB-SIG compliant) */
 			self->result_type = RESULT_DQL;
-			self->max_row = PQntuples(self->last_result);
-			self->num_fields = PQnfields(self->last_result);
+			self->max_row = PQntuples(self->result);
+			self->num_fields = PQnfields(self->result);
 			Py_INCREF(Py_None);
 			return Py_None;
 		case PGRES_COMMAND_OK:	/* other requests */
 		case PGRES_COPY_OUT:
 		case PGRES_COPY_IN:
 			self->result_type = RESULT_DDL;
-			temp = PQcmdTuples(self->last_result);
+			temp = PQcmdTuples(self->result);
 			num_rows = -1;
 			if (temp[0])
 			{
@@ -673,8 +671,8 @@ pgsource_execute(pgsourceobject *self, PyObject *args)
 	}
 
 	/* frees result and returns error */
-	PQclear(self->last_result);
-	self->last_result = NULL;
+	PQclear(self->result);
+	self->result = NULL;
 	self->result_type = RESULT_EMPTY;
 	return NULL;
 }
@@ -701,7 +699,7 @@ pgsource_oidstatus(pgsourceobject *self, PyObject *args)
 	}
 
 	/* retrieves oid status */
-	if ((oid = PQoidValue(self->last_result)) == InvalidOid)
+	if ((oid = PQoidValue(self->result)) == InvalidOid)
 	{
 		Py_INCREF(Py_None);
 		return Py_None;
@@ -759,13 +757,13 @@ pgsource_fetch(pgsourceobject *self, PyObject *args)
 
 		for (j = 0; j < self->num_fields; j++)
 		{
-			if (PQgetisnull(self->last_result, self->current_row, j))
+			if (PQgetisnull(self->result, self->current_row, j))
 			{
 				Py_INCREF(Py_None);
 				str = Py_None;
 			}
 			else
-				str = PyString_FromString(PQgetvalue(self->last_result, self->current_row, j));
+				str = PyString_FromString(PQgetvalue(self->result, self->current_row, j));
 
 			PyTuple_SET_ITEM(rowtuple, j, str);
 		}
@@ -871,7 +869,7 @@ pgsource_fieldindex(pgsourceobject *self, PyObject *param, const char *usage)
 
 	/* gets field number */
 	if (PyString_Check(param))
-		num = PQfnumber(self->last_result, PyString_AsString(param));
+		num = PQfnumber(self->result, PyString_AsString(param));
 	else if (PyInt_Check(param))
 		num = PyInt_AsLong(param);
 	else
@@ -904,9 +902,9 @@ pgsource_buildinfo(pgsourceobject *self, int num)
 	/* affects field information */
 	PyTuple_SET_ITEM(result, 0, PyInt_FromLong(num));
 	PyTuple_SET_ITEM(result, 1,
-		PyString_FromString(PQfname(self->last_result, num)));
+		PyString_FromString(PQfname(self->result, num)));
 	PyTuple_SET_ITEM(result, 2,
-		PyInt_FromLong(PQftype(self->last_result, num)));
+		PyInt_FromLong(PQftype(self->result, num)));
 
 	return result;
 }
@@ -1005,7 +1003,7 @@ pgsource_field(pgsourceobject *self, PyObject *args)
 	if ((num = pgsource_fieldindex(self, param, short_usage)) == -1)
 		return NULL;
 
-	return PyString_FromString(PQgetvalue(self->last_result,
+	return PyString_FromString(PQgetvalue(self->result,
 									self->current_row, num));
 }
 
@@ -1130,10 +1128,10 @@ pgsource_str(pgsourceobject *self)
 	switch (self->result_type)
 	{
 		case RESULT_DQL:
-			return format_result(self->last_result);
+			return format_result(self->result);
 		case RESULT_DDL:
 		case RESULT_DML:
-			return PyString_FromString(PQcmdStatus(self->last_result));
+			return PyString_FromString(PQcmdStatus(self->result));
 		case RESULT_EMPTY:
 		default:
 			return PyString_FromString("(empty PostgreSQL source object)");
@@ -1805,8 +1803,8 @@ pg_close(pgobject *self, PyObject *args)
 static void
 pgquery_dealloc(pgqueryobject *self)
 {
-	if (self->last_result)
-		PQclear(self->last_result);
+	if (self->result)
+		PQclear(self->result);
 
 	PyObject_Del(self);
 }
@@ -1957,7 +1955,7 @@ pgquery_ntuples(pgqueryobject *self, PyObject *args)
 		return NULL;
 	}
 
-	return PyInt_FromLong((long) PQntuples(self->last_result));
+	return PyInt_FromLong((long) PQntuples(self->result));
 }
 
 /* list fields names from query result */
@@ -1982,12 +1980,12 @@ pgquery_listfields(pgqueryobject *self, PyObject *args)
 	}
 
 	/* builds tuple */
-	n = PQnfields(self->last_result);
+	n = PQnfields(self->result);
 	fieldstuple = PyTuple_New(n);
 
 	for (i = 0; i < n; i++)
 	{
-		name = PQfname(self->last_result, i);
+		name = PQfname(self->result, i);
 		str = PyString_FromString(name);
 		PyTuple_SET_ITEM(fieldstuple, i, str);
 	}
@@ -2014,14 +2012,14 @@ pgquery_fieldname(pgqueryobject *self, PyObject *args)
 	}
 
 	/* checks number validity */
-	if (i >= PQnfields(self->last_result))
+	if (i >= PQnfields(self->result))
 	{
 		PyErr_SetString(PyExc_ValueError, "invalid field number.");
 		return NULL;
 	}
 
 	/* gets fields name and builds object */
-	name = PQfname(self->last_result, i);
+	name = PQfname(self->result, i);
 	return PyString_FromString(name);
 }
 
@@ -2043,7 +2041,7 @@ pgquery_fieldnum(pgqueryobject *self, PyObject *args)
 	}
 
 	/* gets field number */
-	if ((num = PQfnumber(self->last_result, name)) == -1)
+	if ((num = PQfnumber(self->result, name)) == -1)
 	{
 		PyErr_SetString(PyExc_ValueError, "Unknown field.");
 		return NULL;
@@ -2079,11 +2077,11 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 	}
 
 	/* stores result in tuple */
-	m = PQntuples(self->last_result);
-	n = PQnfields(self->last_result);
+	m = PQntuples(self->result);
+	n = PQnfields(self->result);
 	reslist = PyList_New(m);
 
-	typ = get_type_array(self->last_result, n);
+	typ = get_type_array(self->result, n);
 
 	for (i = 0; i < m; i++)
 	{
@@ -2097,11 +2095,11 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 		for (j = 0; j < n; j++)
 		{
 			int			k;
-			char	   *s = PQgetvalue(self->last_result, i, j);
+			char	   *s = PQgetvalue(self->result, i, j);
 			char		cashbuf[64];
 			PyObject   *tmp_obj;
 
-			if (PQgetisnull(self->last_result, i, j))
+			if (PQgetisnull(self->result, i, j))
 			{
 				Py_INCREF(Py_None);
 				val = Py_None;
@@ -2204,11 +2202,11 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 	}
 
 	/* stores result in list */
-	m = PQntuples(self->last_result);
-	n = PQnfields(self->last_result);
+	m = PQntuples(self->result);
+	n = PQnfields(self->result);
 	reslist = PyList_New(m);
 
-	typ = get_type_array(self->last_result, n);
+	typ = get_type_array(self->result, n);
 
 	for (i = 0; i < m; i++)
 	{
@@ -2222,11 +2220,11 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 		for (j = 0; j < n; j++)
 		{
 			int			k;
-			char	   *s = PQgetvalue(self->last_result, i, j);
+			char	   *s = PQgetvalue(self->result, i, j);
 			char		cashbuf[64];
 			PyObject   *tmp_obj;
 
-			if (PQgetisnull(self->last_result, i, j))
+			if (PQgetisnull(self->result, i, j))
 			{
 				Py_INCREF(Py_None);
 				val = Py_None;
@@ -2289,7 +2287,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 				goto exit;
 			}
 
-			PyDict_SetItemString(dict, PQfname(self->last_result, j), val);
+			PyDict_SetItemString(dict, PQfname(self->result, j), val);
 			Py_DECREF(val);
 		}
 
@@ -2407,13 +2405,6 @@ pg_query(pgobject *self, PyObject *args)
 		return NULL;
 	}
 
-	/* frees previous result */
-	if (self->last_result)
-	{
-		PQclear(self->last_result);
-		self->last_result = NULL;
-	}
-
 	/* gets result */
 	Py_BEGIN_ALLOW_THREADS
 	result = PQexec(self->cnx, query);
@@ -2477,7 +2468,7 @@ pg_query(pgobject *self, PyObject *args)
 		return NULL;
 
 	/* stores result and returns object */
-	npgobj->last_result = result;
+	npgobj->result = result;
 	return (PyObject *) npgobj;
 }
 
@@ -2598,7 +2589,7 @@ pgquery_repr(pgqueryobject *self)
 static PyObject *
 pgquery_str(pgqueryobject *self)
 {
-	return format_result(self->last_result);
+	return format_result(self->result);
 }
 
 /* insert table */
