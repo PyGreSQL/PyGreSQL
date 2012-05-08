@@ -21,13 +21,13 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 from _pg import *
 try:
     frozenset
-except NameError: # Python < 2.4
+except NameError:  # Python < 2.4
     from sets import ImmutableSet as frozenset
 try:
     from decimal import Decimal
     set_decimal(Decimal)
 except ImportError:
-    pass # Python < 2.4
+    pass  # Python < 2.4
 
 
 # Auxiliary functions which are independent from a DB connection:
@@ -37,10 +37,12 @@ def _is_quoted(s):
     s = s.replace('_', 'a')
     return not s.isalnum() or s[:1].isdigit() or s != s.lower()
 
+
 def _is_unquoted(s):
     """Check whether this string is an unquoted identifier."""
     s = s.replace('_', 'a')
     return s.isalnum() and not s[:1].isdigit()
+
 
 def _split_first_part(s):
     """Split the first part of a dot separated string."""
@@ -71,6 +73,7 @@ def _split_first_part(s):
         p[0] = s
     return p
 
+
 def _split_parts(s):
     """Split all parts of a dot separated string."""
     q = []
@@ -82,13 +85,16 @@ def _split_parts(s):
         s = s[1]
     return q
 
+
 def _join_parts(s):
     """Join all parts of a dot separated string."""
     return '.'.join([_is_quoted(p) and '"%s"' % p or p for p in s])
 
+
 def _oid_key(qcl):
     """Build oid key from qualified class name."""
     return 'oid(%s)' % qcl
+
 
 def _db_error(msg, cls=DatabaseError):
     """Returns DatabaseError with empty sqlstate attribute."""
@@ -96,9 +102,11 @@ def _db_error(msg, cls=DatabaseError):
     error.sqlstate = None
     return error
 
+
 def _int_error(msg):
     """Returns InternalError."""
     return _db_error(msg, InternalError)
+
 
 def _prg_error(msg):
     """Returns ProgrammingError."""
@@ -143,13 +151,13 @@ class DB(object):
         self._pkeys = {}
         self._privileges = {}
         self._args = args, kw
-        self.debug = None # For debugging scripts, this can be set
+        self.debug = None  # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
             # * to a file object to write debug statements or
             # * to a callable object which takes a string argument.
 
     def __getattr__(self, name):
-        # All undefined members are the same as in the underlying pg connection:
+        # All undefined members are same as in underlying pg connection:
         if self.db:
             return getattr(self.db, name)
         else:
@@ -161,7 +169,7 @@ class DB(object):
         """Print a debug message."""
         if self.debug:
             if isinstance(self.debug, basestring):
-                sys.stdout.write((self.debug % s) + '\n')
+                print self.debug % s
             elif isinstance(self.debug, file):
                 file.write(s + '\n')
             elif callable(self.debug):
@@ -208,7 +216,7 @@ class DB(object):
             return 'NULL'
         return "'%.2f'" % float(d)
 
-    _quote_funcs = dict( # quote methods for each type
+    _quote_funcs = dict(  # quote methods for each type
         text=_quote_text, bool=_quote_bool, date=_quote_date,
         int=_quote_num, num=_quote_num, float=_quote_num,
         money=_quote_money)
@@ -233,7 +241,7 @@ class DB(object):
 
         """
         s = _split_parts(cl)
-        if len(s) > 1: # name already qualfied?
+        if len(s) > 1:  # name already qualfied?
             # should be database.schema.table or schema.table
             if len(s) > 3:
                 raise _prg_error('Too many dots in class name %s' % cl)
@@ -243,22 +251,23 @@ class DB(object):
             # determine search path
             q = 'SELECT current_schemas(TRUE)'
             schemas = self.db.query(q).getresult()[0][0][1:-1].split(',')
-            if schemas: # non-empty path
+            if schemas:  # non-empty path
                 # search schema for this object in the current search path
                 q = ' UNION '.join(
                     ["SELECT %d::integer AS n, '%s'::name AS nspname"
                         % s for s in enumerate(schemas)])
                 q = ("SELECT nspname FROM pg_class"
-                    " JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid"
+                    " JOIN pg_namespace"
+                    " ON pg_class.relnamespace = pg_namespace.oid"
                     " JOIN (%s) AS p USING (nspname)"
                     " WHERE pg_class.relname = '%s'"
                     " ORDER BY n LIMIT 1" % (q, cl))
                 schema = self.db.query(q).getresult()
-                if schema: # schema found
+                if schema:  # schema found
                     schema = schema[0][0]
-                else: # object not found in current search path
+                else:  # object not found in current search path
                     schema = 'public'
-            else: # empty path
+            else:  # empty path
                 schema = 'public'
         return schema, cl
 
@@ -289,7 +298,10 @@ class DB(object):
         will not be usable after this call.
 
         """
-        self.db.reset()
+        if self.db:
+            self.db.reset()
+        else:
+            raise _int_error('Connection already closed')
 
     def reopen(self):
         """Reopen connection to the database.
@@ -345,7 +357,7 @@ class DB(object):
                 for cl, pkey in newpkey.iteritems()])
             return self._pkeys
 
-        qcl = self._add_schema(cl) # build fully qualified class name
+        qcl = self._add_schema(cl)  # build fully qualified class name
         # Check if the caller is supplying a new primary key for the class
         if newpkey:
             self._pkeys[qcl] = newpkey
@@ -364,7 +376,8 @@ class DB(object):
             for r in self.db.query(
                 "SELECT pg_namespace.nspname, pg_class.relname,"
                     " pg_attribute.attname FROM pg_class"
-                " JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace"
+                " JOIN pg_namespace"
+                    " ON pg_namespace.oid = pg_class.relnamespace"
                     " AND pg_namespace.nspname NOT LIKE 'pg_%'"
                 " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
                     " AND pg_attribute.attisdropped = 'f'"
@@ -422,8 +435,8 @@ class DB(object):
             return
         elif newattnames:
             raise _prg_error('If supplied, newattnames must be a dictionary')
-        cl = self._split_schema(cl) # split into schema and class
-        qcl = _join_parts(cl) # build fully qualified name
+        cl = self._split_schema(cl)  # split into schema and class
+        qcl = _join_parts(cl)  # build fully qualified name
         # May as well cache them:
         if qcl in self._attnames:
             return self._attnames[qcl]
@@ -461,7 +474,7 @@ class DB(object):
                 t[att] = 'money'
             else:
                 t[att] = 'text'
-        self._attnames[qcl] = t # cache it
+        self._attnames[qcl] = t  # cache it
         return self._attnames[qcl]
 
     def has_table_privilege(self, cl, privilege='select'):
@@ -490,8 +503,8 @@ class DB(object):
         munged as oid(schema.table).
 
         """
-        if cl.endswith('*'): # scan descendant tables?
-            cl = cl[:-1].rstrip() # need parent table name
+        if cl.endswith('*'):  # scan descendant tables?
+            cl = cl[:-1].rstrip()  # need parent table name
         # build qualified class name
         qcl = self._add_schema(cl)
         # To allow users to work with multiple tables,
@@ -581,7 +594,7 @@ class DB(object):
                 try:
                     self.get(qcl, d)
                 except ProgrammingError:
-                    pass # table has no primary key
+                    pass  # table has no primary key
         return d
 
     def update(self, cl, d=None, **kw):
@@ -649,9 +662,8 @@ class DB(object):
         return d
 
     def clear(self, cl, a=None):
-        """
+        """Clear all the attributes to values determined by the types.
 
-        This method clears all the attributes to values determined by the types.
         Numeric types are set to 0, Booleans are set to 'f', and everything
         else is set to the empty string.  If the array argument is present,
         it is used as the array and any entries matching attribute names are
@@ -661,7 +673,7 @@ class DB(object):
         # At some point we will need a way to get defaults from a table.
         qcl = self._add_schema(cl)
         if a is None:
-            a = {} # empty if argument is not present
+            a = {}  # empty if argument is not present
         attnames = self.get_attnames(qcl)
         for n, t in attnames.iteritems():
             if n == 'oid':

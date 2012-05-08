@@ -140,7 +140,7 @@ pgobject_New(void)
 {
 	pgobject	*pgobj;
 
-	if ((pgobj = PyObject_NEW(pgobject, &PgType)) == NULL)
+	if (!(pgobj = PyObject_NEW(pgobject, &PgType)))
 		return NULL;
 
 	pgobj->valid = 1;
@@ -225,14 +225,13 @@ set_dberror(PyObject *type, const char *msg, PGresult *result)
 	PyObject *err = NULL;
 	PyObject *str;
 
-	str = PyString_FromString(msg);
-	if (str)
+	if (!(str = PyString_FromString(msg)))
+		err = NULL;
+	else
 	{
 		err = PyObject_CallFunctionObjArgs(type, str, NULL);
 		Py_DECREF(str);
 	}
-	else
-		err = NULL;
 	if (err)
 	{
 		if (result) {
@@ -314,7 +313,7 @@ check_source_obj(pgsourceobject *self, int level)
 		return 0;
 	}
 
-	if ((level & CHECK_RESULT) && self->result == NULL)
+	if ((level & CHECK_RESULT) && !self->result)
 	{
 		set_dberror(DatabaseError, "no result.", NULL);
 		return 0;
@@ -340,7 +339,7 @@ get_type_array(PGresult *result, int nfields)
 	int *typ;
 	int j;
 
-	if ((typ = malloc(sizeof(int) * nfields)) == NULL)
+	if (!(typ = malloc(sizeof(int) * nfields)))
 	{
 		PyErr_SetString(PyExc_MemoryError, "memory error in getresult().");
 		return NULL;
@@ -564,7 +563,7 @@ pgsource_new(pgobject *pgcnx)
 	pgsourceobject *npgobj;
 
 	/* allocates new query object */
-	if ((npgobj = PyObject_NEW(pgsourceobject, &PgSourceType)) == NULL)
+	if (!(npgobj = PyObject_NEW(pgsourceobject, &PgSourceType)))
 		return NULL;
 
 	/* initializes internal parameters */
@@ -731,7 +730,7 @@ pgsource_oidstatus(pgsourceobject *self, PyObject *args)
 		return NULL;
 
 	/* checks args */
-	if ((args != NULL) && (!PyArg_ParseTuple(args, "")))
+	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
 			"method oidstatus() takes no parameters.");
@@ -783,13 +782,13 @@ pgsource_fetch(pgsourceobject *self, PyObject *args)
 		size = self->max_row - self->current_row;
 
 	/* allocate list for result */
-	if ((reslist = PyList_New(0)) == NULL)
+	if (!(reslist = PyList_New(0)))
 		return NULL;
 
 	/* builds result */
 	for (i = 0; i < size; ++i)
 	{
-		if ((rowtuple = PyTuple_New(self->num_fields)) == NULL)
+		if (!(rowtuple = PyTuple_New(self->num_fields)))
 		{
 			Py_DECREF(reslist);
 			return NULL;
@@ -974,7 +973,7 @@ pgsource_listinfo(pgsourceobject *self, PyObject *args)
 	}
 
 	/* builds result */
-	if ((result = PyTuple_New(self->num_fields)) == NULL)
+	if (!(result = PyTuple_New(self->num_fields)))
 		return NULL;
 
 	for (i = 0; i < self->num_fields; i++)
@@ -1211,7 +1210,7 @@ pglarge_new(pgobject *pgcnx, Oid oid)
 {
 	pglargeobject *npglo;
 
-	if ((npglo = PyObject_NEW(pglargeobject, &PglargeType)) == NULL)
+	if (!(npglo = PyObject_NEW(pglargeobject, &PglargeType)))
 		return NULL;
 
 	Py_XINCREF(pgcnx);
@@ -1736,7 +1735,7 @@ pgconnect(pgobject *self, PyObject *args, PyObject *dict)
 		pgpasswd = PyString_AsString(pg_default_passwd);
 #endif /* DEFAULT_VARS */
 
-	if ((npgobj = (pgobject *) pgobject_New()) == NULL)
+	if (!(npgobj = (pgobject *) pgobject_New()))
 		return NULL;
 
 	if (pgport != -1)
@@ -2109,7 +2108,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 			   *typ;
 
 	/* checks args (args == NULL for an internal call) */
-	if ((args != NULL) && (!PyArg_ParseTuple(args, "")))
+	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
 			"method getresult() takes no parameters.");
@@ -2125,7 +2124,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 
 	for (i = 0; i < m; i++)
 	{
-		if ((rowtuple = PyTuple_New(n)) == NULL)
+		if (!(rowtuple = PyTuple_New(n)))
 		{
 			Py_DECREF(reslist);
 			reslist = NULL;
@@ -2194,7 +2193,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						break;
 				}
 
-			if (val == NULL)
+			if (!val)
 			{
 				Py_DECREF(reslist);
 				Py_DECREF(rowtuple);
@@ -2234,7 +2233,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 			   *typ;
 
 	/* checks args (args == NULL for an internal call) */
-	if ((args != NULL) && (!PyArg_ParseTuple(args, "")))
+	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
 			"method getresult() takes no parameters.");
@@ -2250,7 +2249,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 
 	for (i = 0; i < m; i++)
 	{
-		if ((dict = PyDict_New()) == NULL)
+		if (!(dict = PyDict_New()))
 		{
 			Py_DECREF(reslist);
 			reslist = NULL;
@@ -2319,7 +2318,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						break;
 				}
 
-			if (val == NULL)
+			if (!val)
 			{
 				Py_DECREF(dict);
 				Py_DECREF(reslist);
@@ -2367,7 +2366,7 @@ pg_getnotify(pgobject *self, PyObject *args)
 	/* checks for NOTIFY messages */
 	PQconsumeInput(self->cnx);
 
-	if ((notify = PQnotifies(self->cnx)) == NULL)
+	if (!(notify = PQnotifies(self->cnx)))
 	{
 		Py_INCREF(Py_None);
 		return Py_None;
@@ -2377,15 +2376,15 @@ pg_getnotify(pgobject *self, PyObject *args)
 		PyObject   *notify_result,
 				   *temp;
 
-		if ((notify_result = PyTuple_New(2)) == NULL ||
-			(temp = PyString_FromString(notify->relname)) == NULL)
+		if (!(notify_result = PyTuple_New(2)) ||
+			!(temp = PyString_FromString(notify->relname)))
 		{
 			return NULL;
 		}
 
 		PyTuple_SET_ITEM(notify_result, 0, temp);
 
-		if ((temp = PyInt_FromLong(notify->be_pid)) == NULL)
+		if (!(temp = PyInt_FromLong(notify->be_pid)))
 		{
 			Py_DECREF(notify_result);
 			return NULL;
@@ -2505,7 +2504,7 @@ pg_query(pgobject *self, PyObject *args)
 		return NULL;			/* error detected on query */
 	}
 
-	if ((npgobj = PyObject_NEW(pgqueryobject, &PgQueryType)) == NULL)
+	if (!(npgobj = PyObject_NEW(pgqueryobject, &PgQueryType)))
 		return NULL;
 
 	/* stores result and returns object */

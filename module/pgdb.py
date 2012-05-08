@@ -64,27 +64,26 @@ Basic usage:
 """
 
 from _pg import *
-import sys
 try:
     frozenset
-except NameError: # Python < 2.4
+except NameError:  # Python < 2.4
     from sets import ImmutableSet as frozenset
 from datetime import date, time, datetime, timedelta
 from time import localtime
-try: # use Decimal if available
+try:  # use Decimal if available
     from decimal import Decimal
     set_decimal(Decimal)
-except ImportError: # otherwise (Python < 2.4)
-    Decimal = float # use float instead of Decimal
+except ImportError:  # otherwise (Python < 2.4)
+    Decimal = float  # use float instead of Decimal
 try:
     from math import isnan, isinf
-except ImportError: # Python < 2.6
+except ImportError:  # Python < 2.6
     isnan = lambda x: x != x
     isinf = lambda x: not isnan(x) and isnan(x * 0)
 try:
     inf = float('inf')
     nan = float('nan')
-except ValueError: # Python < 2.6
+except ValueError:  # Python < 2.6
     inf = 1.0e999
     nan = inf * 0
 
@@ -334,7 +333,7 @@ class pgdbCursor(object):
                 else:
                     sql = operation
                 rows = self._src.execute(sql)
-                if rows: # true if not DML
+                if rows:  # true if not DML
                     totrows += rows
                 else:
                     self.rowcount = -1
@@ -349,7 +348,8 @@ class pgdbCursor(object):
             self.rowcount = self._src.ntuples
             getdescr = self._type_cache.getdescr
             coltypes = self._src.listinfo()
-            self.description = [typ[1:2] + getdescr(typ[2]) for typ in coltypes]
+            self.description = [
+                typ[1:2] + getdescr(typ[2]) for typ in coltypes]
             self.lastrowid = None
         else:
             self.rowcount = totrows
@@ -438,8 +438,8 @@ class pgdbCnx(object):
 
     def __init__(self, cnx):
         """Create a database connection object."""
-        self._cnx = cnx # connection
-        self._tnx = False # transaction state
+        self._cnx = cnx  # connection
+        self._tnx = False  # transaction state
         self._type_cache = pgdbTypeCache(cnx)
         try:
             self._cnx.source()
@@ -562,7 +562,7 @@ class pgdbType(frozenset):
             if isinstance(values, basestring):
                 values = values.split()
             return super(pgdbType, cls).__new__(cls, values)
-    else: # Python < 2.4
+    else:  # Python < 2.4
         def __init__(self, values):
             if isinstance(values, basestring):
                 values = values.split()
@@ -612,25 +612,31 @@ def Date(year, month, day):
     """Construct an object holding a date value."""
     return date(year, month, day)
 
+
 def Time(hour, minute=0, second=0, microsecond=0):
     """Construct an object holding a time value."""
     return time(hour, minute, second, microsecond)
+
 
 def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0):
     """construct an object holding a time stamp value."""
     return datetime(year, month, day, hour, minute, second, microsecond)
 
+
 def DateFromTicks(ticks):
     """Construct an object holding a date value from the given ticks value."""
     return Date(*localtime(ticks)[:3])
+
 
 def TimeFromTicks(ticks):
     """construct an object holding a time value from the given ticks value."""
     return Time(*localtime(ticks)[3:6])
 
+
 def TimestampFromTicks(ticks):
     """construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*localtime(ticks)[:6])
+
 
 class Binary(str):
     """construct an object capable of holding a binary (long) string value."""

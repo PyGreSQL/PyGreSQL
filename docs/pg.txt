@@ -433,6 +433,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: bad argument type, or too many arguments
+  :TypeError: invalid connection
   :ValueError: empty SQL query or lost connection
   :pg.ProgrammingError: error in query
   :pg.InternalError: error during query processing
@@ -466,6 +467,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: too many (any) arguments
+  :TypeError: invalid connection
 
 Description:
   This method resets the current database connection.
@@ -484,6 +486,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: too many (any) arguments
+  :TypeError: invalid connection
 
 Description:
   This method requests that the server abandon processing
@@ -521,6 +524,7 @@ Parameters:
 
 Exceptions raised:
   :TypeError: too many (any) arguments
+  :TypeError: invalid connection
 
 Description:
   This method returns the underlying socket id used to connect

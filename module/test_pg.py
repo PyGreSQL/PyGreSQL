@@ -39,17 +39,17 @@ except Exception:
     try:
         locale.setlocale(locale.LC_ALL, 'german')
     except Exception:
-        import warning
-        warning.warn('Cannot set German locale.')
+        import warnings
+        warnings.warn('Cannot set German locale.')
         german = False
 
 try:
     frozenset
-except NameError: # Python < 2.4
+except NameError:  # Python < 2.4
     from sets import ImmutableSet as frozenset
 try:
     from decimal import Decimal
-except ImportError: # Python < 2.4
+except ImportError:  # Python < 2.4
     Decimal = float
 
 
@@ -338,11 +338,11 @@ class TestCanConnect(unittest.TestCase):
         dbname = 'template1'
         try:
             connection = pg.connect(dbname)
-        except Exception:
+        except pg.Error:
             self.fail('Cannot connect to database ' + dbname)
         try:
             connection.close()
-        except Exception:
+        except pg.Error:
             self.fail('Cannot close the database connection')
 
 
@@ -414,8 +414,8 @@ class TestConnectObject(unittest.TestCase):
     def testAttributeUser(self):
         no_user = 'Deprecated facility'
         user = self.connection.user
-        self.assert_(self.connection.user)
-        self.assertNotEqual(self.connection.user, no_user)
+        self.assert_(user)
+        self.assertNotEqual(user, no_user)
 
     def testMethodQuery(self):
         self.connection.query("select 1+1")
@@ -430,15 +430,17 @@ class TestConnectObject(unittest.TestCase):
         self.connection.close()
         try:
             self.connection.reset()
-            self.fail('Reset should give an error for a closed connection')
-        except Exception:
+        except (pg.Error, TypeError):
             pass
+        else:
+            self.fail('Reset should give an error for a closed connection')
         self.assertRaises(pg.InternalError, self.connection.close)
         try:
             self.connection.query('select 1')
-            self.fail('Query should give an error for a closed connection')
-        except Exception:
+        except (pg.Error, TypeError):
             pass
+        else:
+            self.fail('Query should give an error for a closed connection')
         self.connection = pg.connect(self.dbname)
 
 
@@ -591,7 +593,7 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q)
         t = '~test_pg_testPrint_temp.tmp'
         s = open(t, 'w')
-        import sys, os
+        import os, sys
         stdout, sys.stdout = sys.stdout, s
         try:
             print r
@@ -669,8 +671,7 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(r, num_rows)
 
     def testInserttableNullValues(self):
-        num_rows = 100
-        data = [(None,) * 10]
+        data = [(None,) * 10] * 10
         self.c.inserttable("test", data)
         r = self.c.query("select * from test").getresult()
         self.assertEqual(r, data)
@@ -925,9 +926,10 @@ class TestDBClassBasic(unittest.TestCase):
         self.db.close()
         try:
             self.db.reset()
-            self.fail('Reset should give an error for a closed connection')
-        except Exception:
+        except pg.Error:
             pass
+        else:
+            self.fail('Reset should give an error for a closed connection')
         self.assertRaises(pg.InternalError, self.db.close)
         self.assertRaises(pg.InternalError, self.db.query, 'select 1')
         self.db = pg.DB(self.dbname)
@@ -1104,7 +1106,7 @@ class TestDBClass(unittest.TestCase):
         self.assert_(r is None)
         q = "insert into test_table values (1)"
         r = self.db.query(q)
-        self.assert_(isinstance(r, int)), r
+        self.assert_(isinstance(r, int))
         q = "insert into test_table select 2"
         r = self.db.query(q)
         self.assert_(isinstance(r, int))
@@ -1230,7 +1232,7 @@ class TestDBClass(unittest.TestCase):
                 'e': 'num', 'f': 'float', 'f2': 'float', 'm': 'money',
                 'normal_name': 'int', 'Special Name': 'int',
                 'u': 'text', 't': 'text', 'v': 'text',
-                'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int' }
+                'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int'}
             self.assertEqual(attributes, result)
 
     def testHasTablePrivilege(self):
@@ -1300,7 +1302,7 @@ class TestDBClass(unittest.TestCase):
             "n integer, m integer, t text, primary key (n, m))" % table)
         for n in range(3):
             for m in range(2):
-                t = chr(ord('a') + 2*n +m)
+                t = chr(ord('a') + 2*n + m)
                 self.db.query("insert into %s values("
                     "%d, %d, '%s')" % (table, n+1, m+1, t))
         self.assertRaises(pg.ProgrammingError, self.db.get, table, 2)
@@ -1403,7 +1405,7 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(r, result)
             r['a'] = r['n'] = 1
             r['d'] = r['t'] = 'x'
-            r['b']
+            r['b'] = 't'
             r['oid'] = 1L
             r = self.db.clear(table, r)
             result = {'a': 1, 'n': 0, 'b': 'f', 'd': '', 't': '', 'oid': 1L}
@@ -1539,21 +1541,22 @@ class TestSchemas(unittest.TestCase):
         self.assertEqual(r, result_m)
 
     def testGet(self):
+        PrgError = pg.ProgrammingError
         self.assertEqual(self.db.get("t", 1, 'n')['d'], 0)
         self.assertEqual(self.db.get("t0", 1, 'n')['d'], 0)
         self.assertEqual(self.db.get("public.t", 1, 'n')['d'], 0)
         self.assertEqual(self.db.get("public.t0", 1, 'n')['d'], 0)
-        self.assertRaises(pg.ProgrammingError, self.db.get, "public.t1", 1, 'n')
+        self.assertRaises(PrgError, self.db.get, "public.t1", 1, 'n')
         self.assertEqual(self.db.get("s1.t1", 1, 'n')['d'], 1)
         self.assertEqual(self.db.get("s3.t", 1, 'n')['d'], 3)
         self.db.query("set search_path to s2,s4")
-        self.assertRaises(pg.ProgrammingError, self.db.get, "t1", 1, 'n')
+        self.assertRaises(PrgError, self.db.get, "t1", 1, 'n')
         self.assertEqual(self.db.get("t4", 1, 'n')['d'], 4)
         self.assertRaises(pg.ProgrammingError, self.db.get, "t3", 1, 'n')
         self.assertEqual(self.db.get("t", 1, 'n')['d'], 2)
         self.assertEqual(self.db.get("s3.t3", 1, 'n')['d'], 3)
         self.db.query("set search_path to s1,s3")
-        self.assertRaises(pg.ProgrammingError, self.db.get, "t2", 1, 'n')
+        self.assertRaises(PrgError, self.db.get, "t2", 1, 'n')
         self.assertEqual(self.db.get("t3", 1, 'n')['d'], 3)
         self.assertRaises(pg.ProgrammingError, self.db.get, "t4", 1, 'n')
         self.assertEqual(self.db.get("t", 1, 'n')['d'], 1)

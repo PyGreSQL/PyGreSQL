@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # $Id$
 
-import dbapi20
 import unittest
+import dbapi20
 import pgdb
 
 # We need a database to test against.
@@ -23,7 +23,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     connect_args = ()
     connect_kw_args = {'dsn': dbhost + ':' + dbname}
 
-    lower_func = 'lower' # For stored procedure test
+    lower_func = 'lower'  # For stored procedure test
 
     def setUp(self):
         # Call superclass setUp in case this does something in the future
@@ -31,7 +31,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         try:
             con = self._connect()
             con.close()
-        except Exception:
+        except pgdb.Error:
             import pg
             pg.DB().query('create database ' + dbname)
 
@@ -107,23 +107,22 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(error.sqlstate, '22012')
 
     def test_float(self):
-        from math import pi, e
         try:
             nan = float('nan')
-        except ValueError: # Python < 2.6
+        except ValueError:  # Python < 2.6
             nan = 3.0e999 - 1.5e999999
         try:
             inf = float('inf')
-        except ValueError: # Python < 2.6
+        except ValueError:  # Python < 2.6
             inf = 3.0e999 * 1.5e999999
         try:
             from math import isnan, isinf
-        except ImportError: # Python < 2.6
+        except ImportError:  # Python < 2.6
             isnan = lambda x: x != x
             isinf = lambda x: not isnan(x) and isnan(x * 0)
         try:
             from math import isnan, isinf
-        except ImportError: # Python < 2.6
+        except ImportError:  # Python < 2.6
             isnan = lambda x: x != x
             isinf = lambda x: not isnan(x) and isnan(x * 0)
         self.assert_(isnan(nan) and not isinf(nan))
@@ -176,10 +175,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assert_(pgdb.decimal_type() is decimal_type)
 
     def test_nextset(self):
-        pass # not implemented
+        pass  # not implemented
 
     def test_setoutputsize(self):
-        pass # not implemented
+        pass  # not implemented
 
     def test_connection_errors(self):
         con = self._connect()

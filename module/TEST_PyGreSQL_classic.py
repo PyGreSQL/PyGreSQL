@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-import sys, unittest
-from decimal import Decimal
+import unittest
 from pg import *
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
@@ -29,22 +28,22 @@ class UtilityTest(unittest.TestCase):
         for t in ('_test1', '_test2'):
             try:
                 db.query("CREATE SCHEMA " + t)
-            except Exception:
+            except Error:
                 pass
             try:
                 db.query("CREATE TABLE %s._test_schema "
                     "(%s int PRIMARY KEY)" % (t, t))
-            except Exception:
+            except Error:
                 db.query("DELETE FROM %s._test_schema" % t)
         try:
             db.query("CREATE TABLE _test_schema "
                 "(_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
-        except Exception:
+        except Error:
             db.query("DELETE FROM _test_schema")
         try:
             db.query("CREATE VIEW _test_vschema AS "
                 "SELECT _test, 'abc'::text AS _test2  FROM _test_schema")
-        except Exception:
+        except Error:
             pass
 
     def test_invalidname(self):
@@ -109,7 +108,7 @@ class UtilityTest(unittest.TestCase):
     def test_mixed_case(self):
         try:
             db.query('CREATE TABLE _test_mc ("_Test" int PRIMARY KEY)')
-        except Exception:
+        except Error:
             db.query("DELETE FROM _test_mc")
         d = dict(_Test=1234)
         db.insert('_test_mc', d)
