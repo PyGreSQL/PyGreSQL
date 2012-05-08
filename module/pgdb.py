@@ -145,6 +145,18 @@ _cast = {'bool': _cast_bool, 'bytea': _cast_bytea,
     'numeric': Decimal, 'money': _cast_money}
 
 
+def _db_error(msg, cls=DatabaseError):
+    """Returns DatabaseError with empty sqlstate attribute."""
+    error = cls(msg)
+    error.sqlstate = None
+    return error
+
+
+def _op_error(msg):
+    """Returns OperationalError."""
+    return _db_error(msg, OperationalError)
+
+
 class pgdbTypeCache(dict):
     """Cache for database types."""
 
@@ -219,7 +231,7 @@ class pgdbCursor(object):
         if isinstance(val, (datetime, date, time, timedelta)):
             val = str(val)
         elif isinstance(val, unicode):
-            val = val.encode( 'utf8' )
+            val = val.encode('utf8')
         if isinstance(val, str):
             if isinstance(val, Binary):
                 val = self._cnx.escape_bytea(val)
@@ -311,8 +323,10 @@ class pgdbCursor(object):
             if not self._dbcnx._tnx:
                 try:
                     self._cnx.source().execute(sql)
+                except DatabaseError:
+                    raise
                 except Exception:
-                    raise OperationalError("can't start transaction")
+                    raise _op_error("can't start transaction")
                 self._dbcnx._tnx = True
             for params in param_seq:
                 if params:
@@ -324,12 +338,12 @@ class pgdbCursor(object):
                     totrows += rows
                 else:
                     self.rowcount = -1
-        except Error:
-            msg = sys.exc_info()[1]
-            raise DatabaseError("error '%s' in '%s'" % (msg, sql))
-        except Exception:
-            err = sys.exc_info()[1]
-            raise OperationalError("internal error in '%s': %s" % (sql, err))
+        except DatabaseError:
+            raise
+        except Error, err:
+            raise _db_error("error '%s' in '%s'" % (err, sql))
+        except Exception, err:
+            raise _op_error("internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
             self.rowcount = self._src.ntuples
@@ -372,9 +386,10 @@ class pgdbCursor(object):
             self.arraysize = size
         try:
             result = self._src.fetch(size)
-        except Error:
-            err = sys.exc_info()[1]
-            raise DatabaseError(str(err))
+        except DatabaseError:
+            raise
+        except Error, err:
+            raise _db_error(str(err))
         row_factory = self.row_factory
         typecast = self._type_cache.typecast
         coltypes = [desc[1] for desc in self.description]
@@ -429,7 +444,7 @@ class pgdbCnx(object):
         try:
             self._cnx.source()
         except Exception:
-            raise OperationalError("invalid connection")
+            raise _op_error("invalid connection")
 
     def close(self):
         """Close the connection object."""
@@ -437,7 +452,7 @@ class pgdbCnx(object):
             self._cnx.close()
             self._cnx = None
         else:
-            raise OperationalError("connection has been closed")
+            raise _op_error("connection has been closed")
 
     def commit(self):
         """Commit any pending transaction to the database."""
@@ -446,10 +461,12 @@ class pgdbCnx(object):
                 self._tnx = False
                 try:
                     self._cnx.source().execute("COMMIT")
+                except DatabaseError:
+                    raise
                 except Exception:
-                    raise OperationalError("can't commit")
+                    raise _op_error("can't commit")
         else:
-            raise OperationalError("connection has been closed")
+            raise _op_error("connection has been closed")
 
     def rollback(self):
         """Roll back to the start of any pending transaction."""
@@ -458,10 +475,12 @@ class pgdbCnx(object):
                 self._tnx = False
                 try:
                     self._cnx.source().execute("ROLLBACK")
+                except DatabaseError:
+                    raise
                 except Exception:
-                    raise OperationalError("can't rollback")
+                    raise _op_error("can't rollback")
         else:
-            raise OperationalError("connection has been closed")
+            raise _op_error("connection has been closed")
 
     def cursor(self):
         """Return a new Cursor Object using the connection."""
@@ -469,9 +488,9 @@ class pgdbCnx(object):
             try:
                 return pgdbCursor(self)
             except Exception:
-                raise OperationalError("invalid connection")
+                raise _op_error("invalid connection")
         else:
-            raise OperationalError("connection has been closed")
+            raise _op_error("connection has been closed")
 
 
 ### Module Interface

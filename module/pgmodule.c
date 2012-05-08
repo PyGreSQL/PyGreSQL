@@ -217,6 +217,44 @@ staticforward PyTypeObject PglargeType;
 /* --------------------------------------------------------------------- */
 /* INTERNAL FUNCTIONS */
 
+/* sets database error with sqlstate attribute */
+/* This should be used when raising a subclass of DatabaseError */
+static void
+set_dberror(PyObject *type, const char *msg, PGresult *result)
+{
+	PyObject *err = NULL;
+	PyObject *str;
+
+	str = PyString_FromString(msg);
+	if (str)
+	{
+		err = PyObject_CallFunctionObjArgs(type, str, NULL);
+		Py_DECREF(str);
+	}
+	else
+		err = NULL;
+	if (err)
+	{
+		if (result) {
+			char *sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
+			str = sqlstate ? PyString_FromStringAndSize(sqlstate, 5) : NULL;
+		}
+		else
+			str = NULL;
+		if (!str)
+		{
+			Py_INCREF(Py_None);
+			str = Py_None;
+		}
+		PyObject_SetAttrString(err, "sqlstate", str);
+		Py_DECREF(str);
+		PyErr_SetObject(type, err);
+		Py_DECREF(err);
+	}
+	else
+		PyErr_SetString(type, msg);
+}
+
 
 /* checks connection validity */
 static int
@@ -224,7 +262,7 @@ check_cnx_obj(pgobject *self)
 {
 	if (!self->valid)
 	{
-		PyErr_SetString(IntegrityError, "connection has been closed.");
+		set_dberror(OperationalError, "connection has been closed.", NULL);
 		return 0;
 	}
 	return 1;
@@ -240,7 +278,7 @@ check_lo_obj(pglargeobject *self, int level)
 
 	if (!self->lo_oid)
 	{
-		PyErr_SetString(IntegrityError, "object is not valid (null oid).");
+		set_dberror(IntegrityError, "object is not valid (null oid).", NULL);
 		return 0;
 	}
 
@@ -272,19 +310,20 @@ check_source_obj(pgsourceobject *self, int level)
 {
 	if (!self->valid)
 	{
-		PyErr_SetString(IntegrityError, "object has been closed");
+		set_dberror(OperationalError, "object has been closed", NULL);
 		return 0;
 	}
 
 	if ((level & CHECK_RESULT) && self->result == NULL)
 	{
-		PyErr_SetString(DatabaseError, "no result.");
+		set_dberror(DatabaseError, "no result.", NULL);
 		return 0;
 	}
 
 	if ((level & CHECK_DQL) && self->result_type != RESULT_DQL)
 	{
-		PyErr_SetString(DatabaseError, "last query did not return tuples.");
+		set_dberror(DatabaseError,
+			"last query did not return tuples.", self->result);
 		return 0;
 	}
 
@@ -662,11 +701,12 @@ pgsource_execute(pgsourceobject *self, PyObject *args)
 		case PGRES_BAD_RESPONSE:
 		case PGRES_FATAL_ERROR:
 		case PGRES_NONFATAL_ERROR:
-			PyErr_SetString(ProgrammingError, PQerrorMessage(self->pgcnx->cnx));
+			set_dberror(ProgrammingError,
+				PQerrorMessage(self->pgcnx->cnx), self->result);
 			break;
 		default:
-			PyErr_SetString(InternalError, "internal error: "
-				"unknown result status.");
+			set_dberror(InternalError, "internal error: "
+				"unknown result status.", self->result);
 			break;
 	}
 
@@ -1278,7 +1318,7 @@ pglarge_read(pglargeobject *self, PyObject *args)
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &size))
 	{
-		PyErr_SetString(PyExc_TypeError, "read(size), wih size (integer).");
+		PyErr_SetString(PyExc_TypeError, "read(size), with size (integer).");
 		return NULL;
 	}
 
@@ -1716,7 +1756,7 @@ pgconnect(pgobject *self, PyObject *args, PyObject *dict)
 
 	if (PQstatus(npgobj->cnx) == CONNECTION_BAD)
 	{
-		PyErr_SetString(InternalError, PQerrorMessage(npgobj->cnx));
+		set_dberror(InternalError, PQerrorMessage(npgobj->cnx), NULL);
 		Py_XDECREF(npgobj);
 		return NULL;
 	}
@@ -1787,7 +1827,7 @@ pg_close(pgobject *self, PyObject *args)
 	/* connection object cannot already be closed */
 	if (!self->cnx)
 	{
-		PyErr_SetString(InternalError, "Connection already closed");
+		set_dberror(InternalError, "Connection already closed", NULL);
 		return NULL;
 	}
 
@@ -2428,7 +2468,8 @@ pg_query(pgobject *self, PyObject *args)
 			case PGRES_BAD_RESPONSE:
 			case PGRES_FATAL_ERROR:
 			case PGRES_NONFATAL_ERROR:
-				PyErr_SetString(ProgrammingError, PQerrorMessage(self->cnx));
+				set_dberror(ProgrammingError,
+					PQerrorMessage(self->cnx), result);
 				break;
 			case PGRES_COMMAND_OK:
 				{						/* INSERT, UPDATE, DELETE */
@@ -2455,8 +2496,8 @@ pg_query(pgobject *self, PyObject *args)
 				Py_INCREF(Py_None);
 				return Py_None;
 			default:
-				PyErr_SetString(InternalError, "internal error: "
-					"unknown result status.");
+				set_dberror(InternalError,
+					"internal error: unknown result status.", result);
 				break;
 		}
 
@@ -2997,7 +3038,7 @@ pg_locreate(pgobject *self, PyObject *args)
 	lo_oid = lo_creat(self->cnx, mode);
 	if (lo_oid == 0)
 	{
-		PyErr_SetString(OperationalError, "can't create large object.");
+		set_dberror(OperationalError, "can't create large object.", NULL);
 		return NULL;
 	}
 
@@ -3059,7 +3100,7 @@ pg_loimport(pgobject *self, PyObject *args)
 	lo_oid = lo_import(self->cnx, name);
 	if (lo_oid == 0)
 	{
-		PyErr_SetString(OperationalError, "can't create large object.");
+		set_dberror(OperationalError, "can't create large object.", NULL);
 		return NULL;
 	}
 

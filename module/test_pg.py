@@ -909,6 +909,12 @@ class TestDBClassBasic(unittest.TestCase):
     def testMethodQuery(self):
         self.db.query("select 1+1")
 
+    def testMethodQueryProgrammingError(self):
+        try:
+            self.db.query("select 1/0")
+        except pg.ProgrammingError, error:
+            self.assertEqual(error.sqlstate, '22012')
+
     def testMethodEndcopy(self):
         try:
             self.db.endcopy()
@@ -1122,6 +1128,12 @@ class TestDBClass(unittest.TestCase):
         r = self.db.query(q)
         self.assert_(isinstance(r, str))
         self.assertEqual(r, '5')
+
+    def testQueryProgrammingError(self):
+        try:
+            self.db.query("select 1/0")
+        except pg.ProgrammingError, error:
+            self.assertEqual(error.sqlstate, '22012')
 
     def testPkey(self):
         smart_ddl(self.db, "drop table pkeytest0")

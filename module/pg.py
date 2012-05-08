@@ -90,6 +90,20 @@ def _oid_key(qcl):
     """Build oid key from qualified class name."""
     return 'oid(%s)' % qcl
 
+def _db_error(msg, cls=DatabaseError):
+    """Returns DatabaseError with empty sqlstate attribute."""
+    error = cls(msg)
+    error.sqlstate = None
+    return error
+
+def _int_error(msg):
+    """Returns InternalError."""
+    return _db_error(msg, InternalError)
+
+def _prg_error(msg):
+    """Returns ProgrammingError."""
+    return _db_error(msg, ProgrammingError)
+
 
 # The PostGreSQL database connection interface:
 
@@ -139,7 +153,7 @@ class DB(object):
         if self.db:
             return getattr(self.db, name)
         else:
-            raise InternalError('Connection is not valid')
+            raise _int_error('Connection is not valid')
 
     # Auxiliary methods
 
@@ -222,7 +236,7 @@ class DB(object):
         if len(s) > 1: # name already qualfied?
             # should be database.schema.table or schema.table
             if len(s) > 3:
-                raise ProgrammingError('Too many dots in class name %s' % cl)
+                raise _prg_error('Too many dots in class name %s' % cl)
             schema, cl = s[-2:]
         else:
             cl = s[0]
@@ -266,7 +280,7 @@ class DB(object):
                 self.db.close()
                 self.db = None
             else:
-                raise InternalError('Connection already closed')
+                raise _int_error('Connection already closed')
 
     def reset(self):
         """Reset connection with current parameters.
@@ -308,7 +322,7 @@ class DB(object):
         """
         # Wraps shared library function for debugging.
         if not self.db:
-            raise InternalError('Connection is not valid')
+            raise _int_error('Connection is not valid')
         self._do_debug(qstr)
         return self.db.query(qstr)
 
@@ -407,15 +421,14 @@ class DB(object):
             self._attnames = newattnames
             return
         elif newattnames:
-            raise ProgrammingError(
-                'If supplied, newattnames must be a dictionary')
+            raise _prg_error('If supplied, newattnames must be a dictionary')
         cl = self._split_schema(cl) # split into schema and class
         qcl = _join_parts(cl) # build fully qualified name
         # May as well cache them:
         if qcl in self._attnames:
             return self._attnames[qcl]
         if qcl not in self.get_relations('rv'):
-            raise ProgrammingError('Class %s does not exist' % qcl)
+            raise _prg_error('Class %s does not exist' % qcl)
         t = {}
         for att, typ in self.db.query("SELECT pg_attribute.attname,"
             " pg_type.typname FROM pg_class"
@@ -487,14 +500,14 @@ class DB(object):
         if not keyname:
             # use the primary key by default
             try:
-               keyname = self.pkey(qcl)
+                keyname = self.pkey(qcl)
             except KeyError:
-               raise ProgrammingError('Class %s has no primary key' % qcl)
+                raise _prg_error('Class %s has no primary key' % qcl)
         # We want the oid for later updates if that isn't the key
         if keyname == 'oid':
             if isinstance(arg, dict):
                 if qoid not in arg:
-                    raise ProgrammingError('%s not in arg' % qoid)
+                    raise _db_error('%s not in arg' % qoid)
             else:
                 arg = {qoid: arg}
             where = 'oid = %s' % arg[qoid]
@@ -505,7 +518,7 @@ class DB(object):
                 keyname = (keyname,)
             if not isinstance(arg, dict):
                 if len(keyname) > 1:
-                    raise ProgrammingError('Composite key needs dict as arg')
+                    raise _prg_error('Composite key needs dict as arg')
                 arg = dict([(k, arg) for k in keyname])
             where = ' AND '.join(['%s = %s'
                 % (k, self._quote(arg[k], attnames[k])) for k in keyname])
@@ -514,7 +527,7 @@ class DB(object):
         self._do_debug(q)
         res = self.db.query(q).dictresult()
         if not res:
-            raise DatabaseError('No such record in %s where %s' % (qcl, where))
+            raise _db_error('No such record in %s where %s' % (qcl, where))
         for att, value in res[0].iteritems():
             arg[att == 'oid' and qoid or att] = value
         return arg
@@ -600,14 +613,14 @@ class DB(object):
             try:
                 keyname = self.pkey(qcl)
             except KeyError:
-                raise ProgrammingError('Class %s has no primary key' % qcl)
+                raise _prg_error('Class %s has no primary key' % qcl)
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
             try:
                 where = ' AND '.join(['%s = %s'
                     % (k, self._quote(d[k], attnames[k])) for k in keyname])
             except KeyError:
-                raise ProgrammingError('Update needs primary key or oid.')
+                raise _prg_error('Update needs primary key or oid.')
         values = []
         for n in attnames:
             if n in d and n not in keyname:
@@ -688,7 +701,7 @@ class DB(object):
             try:
                 keyname = self.pkey(qcl)
             except KeyError:
-                raise ProgrammingError('Class %s has no primary key' % qcl)
+                raise _prg_error('Class %s has no primary key' % qcl)
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
             attnames = self.get_attnames(qcl)
@@ -696,7 +709,7 @@ class DB(object):
                 where = ' AND '.join(['%s = %s'
                     % (k, self._quote(d[k], attnames[k])) for k in keyname])
             except KeyError:
-                raise ProgrammingError('Delete needs primary key or oid.')
+                raise _prg_error('Delete needs primary key or oid.')
         q = 'DELETE FROM %s WHERE %s' % (qcl, where)
         self._do_debug(q)
         return int(self.db.query(q))

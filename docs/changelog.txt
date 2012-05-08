@@ -9,6 +9,7 @@ Version 4.x
   (as suggested by Adam Frederick).
 - Binary objects are now automatically escaped and unescaped.
 - Bug in money quoting fixed.  Amounts of $0.00 handled correctly.
+- All DatabaseError instances now have a sqlstate attribute.
 
 Version 4.0 (2009-01-01)
 ------------------------

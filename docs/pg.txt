@@ -74,7 +74,7 @@ Return type:
   :pgobject: If successful, the `pgobject` handling the connection
 
 Exceptions raised:
-  :TypeError: bad argument type, or too many arguments
+  :Type: bad argument type, or too many arguments
   :SyntaxError: duplicate argument definition
   :pg.InternalError: some error occurred during pg connection definition
 
@@ -447,6 +447,10 @@ Description:
   statement, but maybe also an "insert/update ... returning" statement), this
   method returns a `pgqueryobject` that can be accessed via the `getresult()`
   or `dictresult()` method or simply printed. Otherwise, it returns `None`.
+
+  When the database could not process the query, a `pg.ProgrammingError` or
+  a `pg.InternalError` is raised. You can check the "SQLSTATE" code of this
+  error by reading its `sqlstate` attribute.
 
 reset - resets the connection
 -----------------------------
@@ -1103,7 +1107,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: too many parameters
-  :pg.InternalError: invalid previous result
+  :MemoryError: internal memory error
 
 Description:
   This method returns the list of the values returned by the query.
@@ -1124,7 +1128,7 @@ Return type:
 
 Exceptions raised:
   :TypeError: too many parameters
-  :pg.InternalError: invalid previous result
+  :MemoryError: internal memory error
 
 Description:
   This method returns the list of the values returned by the query
@@ -1146,7 +1150,6 @@ Return type:
 
 Exceptions raised:
   :TypeError: too many parameters
-  :pg.InternalError: invalid previous result, or lost connection
 
 Description:
   This method returns the list of names of the fields defined for the
@@ -1167,7 +1170,6 @@ Return type:
 Exceptions raised:
   :TypeError: invalid connection, bad parameter type, or too many parameters
   :ValueError: invalid field number
-  :pg.InternalError: invalid previous result, or lost connection
 
 Description:
   This method allows to find a field name from its rank number. It can be
@@ -1187,7 +1189,6 @@ Return type:
 Exceptions raised:
   :TypeError: invalid connection, bad parameter type, or too many parameters
   :ValueError: unknown field name
-  :pg.InternalError: invalid previous result, or lost connection
 
 Description:
   This method returns a field number from its name. It can be used to
@@ -1225,7 +1226,7 @@ dereferencing the `pgobject` will thus affect the `pglarge` object.
 Dereferencing the initial `pgobject` is not a problem since Python won't
 deallocate it before the `pglarge` object dereference it.
 All functions return a generic error message on call error, whatever the
-exact error was. The `error` attribute of the object allow to get the exact
+exact error was. The `error` attribute of the object allows to get the exact
 error message.
 
 See also the PostgreSQL programmer's guide for more information about the
@@ -1408,7 +1409,7 @@ Return type:
 Exceptions raised:
   :TypeError: invalid connection or invalid object,
     bad parameter type, or too many parameters
-  :IOError:   object is not closed, or export error
+  :IOError: object is not closed, or export error
 
 Description:
   This methods allows to dump the content of a large object in a very simple

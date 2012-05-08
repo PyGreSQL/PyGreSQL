@@ -56,7 +56,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         curs = con.cursor()
         curs.execute("select 1 union select 2 union select 3")
-        self.assertEqual([r[0] for r in curs], [1,2,3])
+        self.assertEqual([r[0] for r in curs], [1, 2, 3])
 
     def test_fetch_2_rows(self):
         Decimal = pgdb.decimal_type()
@@ -95,6 +95,16 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(rows[0], rows[1])
         finally:
             con.close()
+
+    def test_sqlstate(self):
+        con = self._connect()
+        cur = con.cursor()
+        try:
+            cur.execute("select 1/0")
+        except pgdb.DatabaseError, error:
+            self.assert_(isinstance(error, pgdb.ProgrammingError))
+            # the SQLSTATE error code for division by zero is 22012
+            self.assertEqual(error.sqlstate, '22012')
 
     def test_float(self):
         from math import pi, e
