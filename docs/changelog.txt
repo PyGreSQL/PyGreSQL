@@ -17,6 +17,8 @@ Version 4.x
 - All DatabaseError instances now have a sqlstate attribute.
 - Open transactions are rolled back when pgdb connections are closed
   (as suggested by Peter Harris).
+- Connections and cursors can now be used with the "with" statement
+  (as suggested by Peter Harris).
 
 
 Version 4.0 (2009-01-01)

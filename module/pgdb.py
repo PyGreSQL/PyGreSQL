@@ -222,8 +222,16 @@ class pgdbCursor(object):
         self.lastrowid = None
 
     def __iter__(self):
-        """Return self to make cursors compatible to the iteration protocol."""
+        """Make cursors compatible to the iteration protocol."""
         return self
+
+    def __enter__(self):
+        """Enter the runtime context for the cursor object."""
+        return self
+
+    def __exit__(self, et, ev, tb):
+        """Exit the runtime context for the cursor object."""
+        self.close()
 
     def _quote(self, val):
         """Quote value depending on its type."""
@@ -445,6 +453,14 @@ class pgdbCnx(object):
             self._cnx.source()
         except Exception:
             raise _op_error("invalid connection")
+
+    def __enter__(self):
+        """Enter the runtime context for the connection object."""
+        return self
+
+    def __exit__(self, et, ev, tb):
+        """Exit the runtime context for the connection object."""
+        self.close()
 
     def close(self):
         """Close the connection object."""
