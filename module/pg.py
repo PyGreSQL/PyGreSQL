@@ -421,13 +421,15 @@ class DB(object):
         """Return list of tables in connected database."""
         return self.get_relations('r')
 
-    def get_attnames(self, cl, newattnames=None):
+    def get_attnames(self, cl, newattnames=None, regtypes=False):
         """Given the name of a table, digs out the set of attribute names.
 
         Returns a dictionary of attribute names (the names are the keys,
         the values are the names of the attributes' types).
         If the optional newattnames exists, it must be a dictionary and
         will become the new attribute names dictionary.
+        If the optional regtypes flag is set, then the regular type names
+        will be returned instead of the simplified type names.
 
         """
         if isinstance(newattnames, dict):
@@ -442,41 +444,47 @@ class DB(object):
             return self._attnames[qcl]
         if qcl not in self.get_relations('rv'):
             raise _prg_error('Class %s does not exist' % qcl)
-        t = {}
-        for att, typ, reg in self.db.query("SELECT pg_attribute.attname,"
-            " pg_type.typname, pg_type.typname::regtype FROM pg_class"
+
+        q = "SELECT pg_attribute.attname, pg_type.typname"
+        if regtypes:
+            q += "::regtype"
+        q += (" FROM pg_class"
             " JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid"
             " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
             " JOIN pg_type ON pg_type.oid = pg_attribute.atttypid"
             " WHERE pg_namespace.nspname = '%s' AND pg_class.relname = '%s'"
             " AND (pg_attribute.attnum > 0 OR pg_attribute.attname = 'oid')"
-            " AND pg_attribute.attisdropped = 'f'"
-                % cl).getresult():
-            if typ.startswith('_'):
-                typ = reg
-            if typ.startswith('bool'):
-                typ = 'bool'
-            elif typ.startswith('abstime'):
-                typ = 'date'
-            elif typ.startswith('date'):
-                typ = 'date'
-            elif typ.startswith('interval'):
-                typ = 'date'
-            elif typ.startswith('timestamp'):
-                typ = 'date'
-            elif typ.startswith('oid'):
-                typ = 'int'
-            elif typ.startswith('int'):
-                typ = 'int'
-            elif typ.startswith('float'):
-                typ = 'float'
-            elif typ.startswith('numeric'):
-                typ = 'num'
-            elif typ.startswith('money'):
-                typ = 'money'
-            else:
-                typ = 'text'
-            t[att] = typ
+            " AND pg_attribute.attisdropped = 'f'") % cl
+        q = self.db.query(q).getresult()
+
+        if regtypes:
+            t = dict(q)
+        else:
+            t = {}
+            for att, typ in q:
+                if typ.startswith('bool'):
+                    typ = 'bool'
+                elif typ.startswith('abstime'):
+                    typ = 'date'
+                elif typ.startswith('date'):
+                    typ = 'date'
+                elif typ.startswith('interval'):
+                    typ = 'date'
+                elif typ.startswith('timestamp'):
+                    typ = 'date'
+                elif typ.startswith('oid'):
+                    typ = 'int'
+                elif typ.startswith('int'):
+                    typ = 'int'
+                elif typ.startswith('float'):
+                    typ = 'float'
+                elif typ.startswith('numeric'):
+                    typ = 'num'
+                elif typ.startswith('money'):
+                    typ = 'money'
+                else:
+                    typ = 'text'
+                t[att] = typ
 
         self._attnames[qcl] = t  # cache it
         return self._attnames[qcl]
