@@ -15,6 +15,9 @@ Version 4.x
 - Proper handling of floats with 'nan' or 'inf' values as input.
 - Fixed the set_decimal() function.
 - All DatabaseError instances now have a sqlstate attribute.
+- Open transactions are rolled back when pgdb connections are closed
+  (as suggested by Peter Harris).
+
 
 Version 4.0 (2009-01-01)
 ------------------------

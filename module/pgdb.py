@@ -449,6 +449,11 @@ class pgdbCnx(object):
     def close(self):
         """Close the connection object."""
         if self._cnx:
+            if self._tnx:
+                try:
+                    self.rollback()
+                except DatabaseError:
+                    pass
             self._cnx.close()
             self._cnx = None
         else:
