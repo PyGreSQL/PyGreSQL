@@ -690,9 +690,11 @@ class DB(object):
         for n, t in attnames.iteritems():
             if n == 'oid':
                 continue
-            if t in ('int', 'float', 'num', 'money'):
+            if t in ('int', 'integer', 'smallint', 'bigint',
+                    'float', 'real', 'double precision',
+                    'num', 'numeric', 'money'):
                 a[n] = 0
-            elif t == 'bool':
+            elif t in ('bool', 'boolean'):
                 a[n] = 'f'
             else:
                 a[n] = ''
