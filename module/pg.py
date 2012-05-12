@@ -443,37 +443,41 @@ class DB(object):
         if qcl not in self.get_relations('rv'):
             raise _prg_error('Class %s does not exist' % qcl)
         t = {}
-        for att, typ in self.db.query("SELECT pg_attribute.attname,"
-            " pg_type.typname FROM pg_class"
+        for att, typ, reg in self.db.query("SELECT pg_attribute.attname,"
+            " pg_type.typname, pg_type.typname::regtype FROM pg_class"
             " JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid"
             " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
             " JOIN pg_type ON pg_type.oid = pg_attribute.atttypid"
             " WHERE pg_namespace.nspname = '%s' AND pg_class.relname = '%s'"
-            " AND (pg_attribute.attnum > 0 or pg_attribute.attname = 'oid')"
+            " AND (pg_attribute.attnum > 0 OR pg_attribute.attname = 'oid')"
             " AND pg_attribute.attisdropped = 'f'"
                 % cl).getresult():
+            if typ.startswith('_'):
+                typ = reg
             if typ.startswith('bool'):
-                t[att] = 'bool'
+                typ = 'bool'
             elif typ.startswith('abstime'):
-                t[att] = 'date'
+                typ = 'date'
             elif typ.startswith('date'):
-                t[att] = 'date'
+                typ = 'date'
             elif typ.startswith('interval'):
-                t[att] = 'date'
+                typ = 'date'
             elif typ.startswith('timestamp'):
-                t[att] = 'date'
+                typ = 'date'
             elif typ.startswith('oid'):
-                t[att] = 'int'
+                typ = 'int'
             elif typ.startswith('int'):
-                t[att] = 'int'
+                typ = 'int'
             elif typ.startswith('float'):
-                t[att] = 'float'
+                typ = 'float'
             elif typ.startswith('numeric'):
-                t[att] = 'num'
+                typ = 'num'
             elif typ.startswith('money'):
-                t[att] = 'money'
+                typ = 'money'
             else:
-                t[att] = 'text'
+                typ = 'text'
+            t[att] = typ
+
         self._attnames[qcl] = t  # cache it
         return self._attnames[qcl]
 
