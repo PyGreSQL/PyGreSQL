@@ -762,7 +762,7 @@ class TestDBClassBasic(unittest.TestCase):
             has_table_privilege host insert inserttable locreate loimport
             options parameter pkey port protocol_version putline query
             reopen reset server_version set_notice_receiver source status
-            transaction tty unescape_bytea update user'''.split()
+            transaction tty unescape_bytea update use_regtypes user'''.split()
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)

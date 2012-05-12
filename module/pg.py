@@ -147,6 +147,7 @@ class DB(object):
             self._closeable = 0
         self.db = db
         self.dbname = db.db
+        self._regtypes = False
         self._attnames = {}
         self._pkeys = {}
         self._privileges = {}
@@ -421,15 +422,16 @@ class DB(object):
         """Return list of tables in connected database."""
         return self.get_relations('r')
 
-    def get_attnames(self, cl, newattnames=None, regtypes=False):
+    def get_attnames(self, cl, newattnames=None):
         """Given the name of a table, digs out the set of attribute names.
 
         Returns a dictionary of attribute names (the names are the keys,
         the values are the names of the attributes' types).
         If the optional newattnames exists, it must be a dictionary and
         will become the new attribute names dictionary.
-        If the optional regtypes flag is set, then the regular type names
-        will be returned instead of the simplified type names.
+
+        By default, only a limited number of simple types will be returned.
+        You can get the regular types after calling use_regtypes(True).
 
         """
         if isinstance(newattnames, dict):
@@ -446,7 +448,7 @@ class DB(object):
             raise _prg_error('Class %s does not exist' % qcl)
 
         q = "SELECT pg_attribute.attname, pg_type.typname"
-        if regtypes:
+        if self._regtypes:
             q += "::regtype"
         q += (" FROM pg_class"
             " JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid"
@@ -457,7 +459,7 @@ class DB(object):
             " AND pg_attribute.attisdropped = 'f'") % cl
         q = self.db.query(q).getresult()
 
-        if regtypes:
+        if self._regtypes:
             t = dict(q)
         else:
             t = {}
@@ -488,6 +490,17 @@ class DB(object):
 
         self._attnames[qcl] = t  # cache it
         return self._attnames[qcl]
+
+    def use_regtypes(self, regtypes=None):
+        """Use regular type names instead of simplified type names."""
+        if regtypes is None:
+            return self._regtypes
+        else:
+            regtypes = bool(regtypes)
+            if regtypes != self._regtypes:
+                self._regtypes = regtypes
+                self._attnames.clear()
+            return regtypes
 
     def has_table_privilege(self, cl, privilege='select'):
         """Check whether current user has specified table privilege."""
