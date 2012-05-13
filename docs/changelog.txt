@@ -4,7 +4,7 @@ PyGreSQL ChangeLog
 
 Version 4.x
 -----------
-- Support the PostgreSQL 9.0 and 9.1 versions.
+- Support the new PostgreSQL versions 9.0 and 9.1.
 - Particularly, support PQescapeLiteral() and PQescapeIdentifier().
 - The execute() and executemany() methods now return the cursor object,
   so you can now write statements like "for row in cursor.execute(...)"
@@ -15,11 +15,16 @@ Version 4.x
 - Proper handling of floats with 'nan' or 'inf' values as input.
 - Fixed the set_decimal() function.
 - All DatabaseError instances now have a sqlstate attribute.
-- The getnotify() method can now also return payload strings.
+- The getnotify() method can now also return payload strings (#15).
+- Better support for notice processing with the new methods
+  set_notice_receiver() and get_notice_receiver()
+  (as suggested by Michael Filonenko, see #37).
 - Open transactions are rolled back when pgdb connections are closed
-  (as suggested by Peter Harris).
+  (as suggested by Peter Harris, see #46).
 - Connections and cursors can now be used with the "with" statement
-  (as suggested by Peter Harris).
+  (as suggested by Peter Harris, see #46).
+- New method use_regtypes() that can be called to let getattnames()
+  return regular type names instead of the simplified classic types (#44).
 
 
 Version 4.0 (2009-01-01)
