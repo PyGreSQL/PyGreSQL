@@ -2376,9 +2376,12 @@ pg_getnotify(pgobject *self, PyObject *args)
 		PyObject   *notify_result,
 				   *temp;
 
-		if (!(notify_result = PyTuple_New(2)) ||
-			!(temp = PyString_FromString(notify->relname)))
+		if (!(notify_result = PyTuple_New(3)))
+			return NULL;
+
+		if (!(temp = PyString_FromString(notify->relname)))
 		{
+			Py_DECREF(notify_result);
 			return NULL;
 		}
 
@@ -2391,7 +2394,18 @@ pg_getnotify(pgobject *self, PyObject *args)
 		}
 
 		PyTuple_SET_ITEM(notify_result, 1, temp);
+
+		/* extra exists even in old versions that did not support it */
+		if (!(temp = PyString_FromString(notify->extra)))
+		{
+			Py_DECREF(notify_result);
+			return NULL;
+		}
+
+		PyTuple_SET_ITEM(notify_result, 2, temp);
+
 		PQfreemem(notify);
+
 		return notify_result;
 	}
 }

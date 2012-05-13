@@ -549,10 +549,11 @@ Exceptions raised:
 Description:
   This methods try to get a notify from the server (from the SQL statement
   NOTIFY). If the server returns no notify, the methods returns None.
-  Otherwise, it returns a tuple (couple) `(relname, pid)`, where `relname`
-  is the name of the notify and `pid` the process id of the connection that
-  triggered the notify. Remember to do a listen query first otherwise
-  getnotify() will always return `None`.
+  Otherwise, it returns a tuple (triplet) `(relname, pid, extra)`, where
+  `relname` is the name of the notify, `pid` is the process id of the
+  connection that triggered the notify, and `extra` is a payload string
+  that has been sent with the notification. Remember to do a listen query
+  first, otherwise getnotify() will always return `None`.
 
 inserttable - insert a list into a table
 ----------------------------------------

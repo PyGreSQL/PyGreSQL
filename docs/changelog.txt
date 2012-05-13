@@ -15,6 +15,7 @@ Version 4.x
 - Proper handling of floats with 'nan' or 'inf' values as input.
 - Fixed the set_decimal() function.
 - All DatabaseError instances now have a sqlstate attribute.
+- The getnotify() method can now also return payload strings.
 - Open transactions are rolled back when pgdb connections are closed
   (as suggested by Peter Harris).
 - Connections and cursors can now be used with the "with" statement

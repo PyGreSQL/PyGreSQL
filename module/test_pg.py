@@ -615,13 +615,30 @@ class TestSimpleQueries(unittest.TestCase):
         self.c.query('listen test_notify')
         try:
             self.assert_(self.c.getnotify() is None)
-            self.c.query('notify test_notify')
+            self.c.query("notify test_notify")
             r = self.c.getnotify()
             self.assert_(isinstance(r, tuple))
-            self.assertEqual(len(r), 2)
+            self.assertEqual(len(r), 3)
             self.assert_(isinstance(r[0], str))
             self.assert_(isinstance(r[1], int))
+            self.assert_(isinstance(r[2], str))
             self.assertEqual(r[0], 'test_notify')
+            self.assertEqual(r[2], '')
+            self.assert_(self.c.getnotify() is None)
+            try:
+                self.c.query("notify test_notify, 'test_payload'")
+            except pg.ProgrammingError: # PostgreSQL < 9.0
+                pass
+            else:
+                r = self.c.getnotify()
+                self.assert_(isinstance(r, tuple))
+                self.assertEqual(len(r), 3)
+                self.assert_(isinstance(r[0], str))
+                self.assert_(isinstance(r[1], int))
+                self.assert_(isinstance(r[2], str))
+                self.assertEqual(r[0], 'test_notify')
+                self.assertEqual(r[2], 'test_payload')
+                self.assert_(self.c.getnotify() is None)
         finally:
             self.c.query('unlisten test_notify')
 
