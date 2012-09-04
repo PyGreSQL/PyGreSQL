@@ -946,12 +946,11 @@ insert - insert a row into a database table
 -------------------------------------------
 Syntax::
 
-  insert(table, [d,] [return_changes,] [key = val, ...])
+  insert(table, [d,] [key = val, ...])
 
 Parameters:
   :table:          name of table
   :d:              optional dictionary of values
-  :return_changes: Return values in new row - default True
 
 Return type:
   :dictionary:     The dictionary of values inserted
