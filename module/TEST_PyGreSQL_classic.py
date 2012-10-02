@@ -88,6 +88,11 @@ class UtilityTest(unittest.TestCase):
         self.failUnlessRaises(ProgrammingError, db.get, '_test_vschema', 1234)
         db.get('_test_vschema', 1234, keyname='_test')
 
+    def test_params(self):
+        db.query("INSERT INTO _test_schema VALUES ($1, $2, $3)", 12, None, 34)
+        d = db.get('_test_schema', 12)
+        self.assertEqual(d['dvar'], 34)
+
     def test_insert(self):
         d = dict(_test=1234)
         db.insert('_test_schema', d)

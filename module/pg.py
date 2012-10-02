@@ -318,7 +318,7 @@ class DB(object):
                 self.db.close()
             self.db = db
 
-    def query(self, qstr):
+    def query(self, qstr, *args):
         """Executes a SQL command string.
 
         This method simply sends a SQL query to the database. If the query is
@@ -332,12 +332,21 @@ class DB(object):
         a pgqueryobject that can be accessed via getresult() or dictresult()
         or simply printed. Otherwise, it returns `None`.
 
+        The query can contain numbered parameters of the form $1 in place
+        of any data constant. Arguments given after the query string will
+        be substituted for the corresponding numbered parameter. Parameter
+        values can also be given as a single list or tuple argument.
+
+        Note that the query string must not be passed as a unicode value,
+        but you can pass arguments as unicode values if they can be decoded
+        using the current client encoding.
+
         """
         # Wraps shared library function for debugging.
         if not self.db:
             raise _int_error('Connection is not valid')
         self._do_debug(qstr)
-        return self.db.query(qstr)
+        return self.db.query(qstr, args)
 
     def pkey(self, cl, newpkey=None):
         """This method gets or sets the primary key of a class.
@@ -548,7 +557,8 @@ class DB(object):
                     raise _db_error('%s not in arg' % qoid)
             else:
                 arg = {qoid: arg}
-            where = 'oid = %s' % arg[qoid]
+            where = 'oid = $1'
+            params = (arg[qoid],)
             attnames = '*'
         else:
             attnames = self.get_attnames(qcl)
@@ -558,14 +568,16 @@ class DB(object):
                 if len(keyname) > 1:
                     raise _prg_error('Composite key needs dict as arg')
                 arg = dict([(k, arg) for k in keyname])
-            where = ' AND '.join(['%s = %s'
-                % (k, self._quote(arg[k], attnames[k])) for k in keyname])
+            where = ' AND '.join(['%s = $%d'
+                % (k, i + 1) for i, k in enumerate(keyname)])
+            params = tuple(arg[k] for k in keyname)
             attnames = ', '.join(attnames)
         q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (attnames, qcl, where)
-        self._do_debug(q)
-        res = self.db.query(q).dictresult()
+        self._do_debug(q + ' %% %r' % (params,))
+        res = self.db.query(q, params).dictresult()
         if not res:
-            raise _db_error('No such record in %s where %s' % (qcl, where))
+            raise _db_error(
+                'No such record in %s where %s %% %r' % (qcl, where, params))
         for att, value in res[0].iteritems():
             arg[att == 'oid' and qoid or att] = value
         return arg
@@ -590,11 +602,14 @@ class DB(object):
             d = {}
         d.update(kw)
         attnames = self.get_attnames(qcl)
-        names, values = [], []
+        names, values, params = [], [], []
+        i = 1
         for n in attnames:
             if n != 'oid' and n in d:
                 names.append('"%s"' % n)
-                values.append(self._quote(d[n], attnames[n]))
+                values.append('$%d' % (i,))
+                params.append(d[n])
+                i += 1
         names, values = ', '.join(names), ', '.join(values)
         selectable = self.has_table_privilege(qcl)
         if selectable and self.server_version >= 80200:
@@ -602,8 +617,8 @@ class DB(object):
         else:
             ret = ''
         q = 'INSERT INTO %s (%s) VALUES (%s)%s' % (qcl, names, values, ret)
-        self._do_debug(q)
-        res = self.db.query(q)
+        self._do_debug(q + " %% %r" % (params,))
+        res = self.db.query(q, params)
         if ret:
             res = res.dictresult()
             for att, value in res[0].iteritems():
@@ -645,7 +660,8 @@ class DB(object):
         d.update(kw)
         attnames = self.get_attnames(qcl)
         if qoid in d:
-            where = 'oid = %s' % d[qoid]
+            where = 'oid = $1'
+            params = [d[qoid]]
             keyname = ()
         else:
             try:
@@ -655,14 +671,18 @@ class DB(object):
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
             try:
-                where = ' AND '.join(['%s = %s'
-                    % (k, self._quote(d[k], attnames[k])) for k in keyname])
+                where = ' AND '.join(['%s = $%d'
+                    % (k, i + 1) for i, k in enumerate(keyname)])
+                params = [d[k] for k in keyname]
             except KeyError:
                 raise _prg_error('Update needs primary key or oid.')
         values = []
+        i = len(params)
         for n in attnames:
             if n in d and n not in keyname:
-                values.append('%s = %s' % (n, self._quote(d[n], attnames[n])))
+                i += 1
+                values.append('%s = $%d' % (n, i))
+                params.append(d[n])
         if not values:
             return d
         values = ', '.join(values)
@@ -673,7 +693,7 @@ class DB(object):
             ret = ''
         q = 'UPDATE %s SET %s WHERE %s%s' % (qcl, values, where, ret)
         self._do_debug(q)
-        res = self.db.query(q)
+        res = self.db.query(q, params)
         if ret:
             res = res.dictresult()[0]
             for att, value in res.iteritems():
@@ -735,7 +755,8 @@ class DB(object):
             d = {}
         d.update(kw)
         if qoid in d:
-            where = 'oid = %s' % d[qoid]
+            where = 'oid = $1'
+            params = (d[qoid],)
         else:
             try:
                 keyname = self.pkey(qcl)
@@ -745,13 +766,14 @@ class DB(object):
                 keyname = (keyname,)
             attnames = self.get_attnames(qcl)
             try:
-                where = ' AND '.join(['%s = %s'
-                    % (k, self._quote(d[k], attnames[k])) for k in keyname])
+                where = ' AND '.join(['%s = $%d'
+                    % (k, i+ 1 ) for i, k in enumerate(keyname)])
+                params = tuple(d[k] for k in keyname)
             except KeyError:
                 raise _prg_error('Delete needs primary key or oid.')
         q = 'DELETE FROM %s WHERE %s' % (qcl, where)
-        self._do_debug(q)
-        return int(self.db.query(q))
+        self._do_debug(q + " %% %r" % (params,))
+        return int(self.db.query(q, params))
 
 
 # if run as script, print some information

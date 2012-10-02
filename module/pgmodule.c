@@ -786,7 +786,7 @@ pgsource_fetch(pgsourceobject *self, PyObject *args)
 		return NULL;
 
 	/* builds result */
-	for (i = 0; i < size; ++i)
+	for (i = 0; i < size; i++)
 	{
 		if (!(rowtuple = PyTuple_New(self->num_fields)))
 		{
@@ -2434,16 +2434,18 @@ pg_source(pgobject *self, PyObject *args)
 
 /* database query */
 static char pg_query__doc__[] =
-"query(sql) -- creates a new query object for this connection,"
-" using sql (string) request.";
+"query(sql, [args]) -- creates a new query object for this connection, using"
+" sql (string) request and optionally a tuple with positional parameters.";
 
 static PyObject *
 pg_query(pgobject *self, PyObject *args)
 {
-	char	   *query;
-	PGresult   *result;
+	char		*query;
+	PyObject	*oargs = NULL;
+	PGresult	*result;
 	pgqueryobject *npgobj;
-	int			status;
+	int			status,
+				nparms = 0;
 
 	if (!self->cnx)
 	{
@@ -2452,16 +2454,119 @@ pg_query(pgobject *self, PyObject *args)
 	}
 
 	/* get query args */
-	if (!PyArg_ParseTuple(args, "s", &query))
+	if (!PyArg_ParseTuple(args, "s|O", &query, &oargs))
 	{
-		PyErr_SetString(PyExc_TypeError, "query(sql), with sql (string).");
+		PyErr_SetString(PyExc_TypeError, "query(sql, [args]), with sql (string).");
 		return NULL;
 	}
 
+	/* If oargs is passed, ensure it's a non-empty tuple. We want to treat
+	 * an empty tuple the same as no argument since we'll get that when the
+	 * caller passes no arguments to db.query(), and historic behaviour was
+	 * to call PQexec() in that case, which can execute multiple commands. */
+	if (oargs)
+	{
+		if (!PyTuple_Check(oargs) && !PyList_Check(oargs))
+		{
+			PyErr_SetString(PyExc_TypeError, "query parameters must be a tuple or list.");
+			return NULL;
+		}
+
+		nparms = PySequence_Size(oargs);
+	}
+
 	/* gets result */
-	Py_BEGIN_ALLOW_THREADS
-	result = PQexec(self->cnx, query);
-	Py_END_ALLOW_THREADS
+	if (nparms)
+	{
+		/* prepare arguments */
+		PyObject	**str, **s, *obj = PySequence_GetItem(oargs, 0);
+		char		**parms, **p, *enc=NULL;
+		int			*lparms, *l;
+		register int i;
+
+		/* if there's a single argument and it's a list or tuple, it
+		 * contains the positional aguments. */
+		if (nparms == 1 && (PyList_Check(obj) || PyTuple_Check(obj)))
+		{
+			oargs = obj;
+			nparms = PySequence_Size(oargs);
+		}
+		str = (PyObject **)alloca(nparms * sizeof(*str));
+		parms = (char **)alloca(nparms * sizeof(*parms));
+		lparms = (int *)alloca(nparms * sizeof(*lparms));
+
+		/* convert optional args to a list of strings -- this allows
+		 * the caller to pass whatever they like, and prevents us
+		 * from having to map types to OIDs */
+		for (i = 0, s=str, p=parms, l=lparms; i < nparms; i++, s++, p++, l++)
+		{
+			obj = PySequence_GetItem(oargs, i);
+
+			if (obj == Py_None)
+			{
+				*s = NULL;
+				*p = NULL;
+				*l = 0;
+			}
+			else if (PyUnicode_Check(obj))
+			{
+				if (!enc)
+					enc = (char *)pg_encoding_to_char(
+						PQclientEncoding(self->cnx));
+				if (!strcmp(enc, "UTF8"))
+					*s = PyUnicode_AsUTF8String(obj);
+				else if (!strcmp(enc, "LATIN1"))
+					*s = PyUnicode_AsLatin1String(obj);
+				else if (!strcmp(enc, "SQL_ASCII"))
+					*s = PyUnicode_AsASCIIString(obj);
+				else
+					*s = PyUnicode_AsEncodedString(obj, enc, "strict");
+				if (*s == NULL) {
+					PyErr_SetString(PyExc_UnicodeError, "query parameter"
+						" could not be decoded (bad client encoding)");
+					while (i--) {
+						if (*--s)
+							Py_DECREF(*s);
+					}
+					return NULL;
+				}
+				*p = PyString_AsString(*s);
+				*l = PyString_Size(*s);
+			}
+			else
+			{
+				*s = PyObject_Str(obj);
+				if (*s == NULL) {
+					PyErr_SetString(PyExc_TypeError,
+						"query parameter has no string representation");
+					while (i--) {
+						if (*--s)
+							Py_DECREF(*s);
+					}
+					return NULL;
+				}
+				*p = PyString_AsString(*s);
+				*l = PyString_Size(*s);
+			}
+		}
+
+		Py_BEGIN_ALLOW_THREADS
+		result = PQexecParams(self->cnx, query, nparms,
+			NULL, (const char * const *)parms, lparms, NULL, 0);
+		Py_END_ALLOW_THREADS
+
+		for (i = 0, s=str; i < nparms; i++, s++)
+		{
+			if (*s)
+				Py_DECREF(*s);
+		}
+	}
+	else
+	{
+		Py_BEGIN_ALLOW_THREADS
+		result = PQexec(self->cnx, query);
+		Py_END_ALLOW_THREADS
+	}
 
 	/* checks result validity */
 	if (!result)

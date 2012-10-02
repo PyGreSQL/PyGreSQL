@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
 # test_pg.py
 #
@@ -34,7 +35,7 @@ debug = False
 german = True
 try:
     import locale
-    locale.setlocale(locale.LC_ALL, ('de', 'latin1'))
+    locale.setlocale(locale.LC_ALL, ('de', 'utf-8'))
 except Exception:
     try:
         locale.setlocale(locale.LC_ALL, 'german')
@@ -419,6 +420,12 @@ class TestConnectObject(unittest.TestCase):
 
     def testMethodQuery(self):
         self.connection.query("select 1+1")
+        self.connection.query("select 1+$1", (1,))
+        self.connection.query("select 1+$1+$2", (2, 3))
+        self.connection.query("select 1+$1+$2", [2, 3])
+
+    def testMethodQueryEmpty(self):
+        self.assertRaises(ValueError, self.connection.query, '')
 
     def testMethodEndcopy(self):
         try:
@@ -641,6 +648,116 @@ class TestSimpleQueries(unittest.TestCase):
                 self.assert_(self.c.getnotify() is None)
         finally:
             self.c.query('unlisten test_notify')
+
+
+class TestParamQueries(unittest.TestCase):
+    """"Test queries with parameters via a basic pg connection."""
+
+    def setUp(self):
+        dbname = 'test'
+        self.c = pg.connect(dbname)
+
+    def tearDown(self):
+        self.c.query("set client_encoding to UTF8")
+        self.c.close()
+
+    def testQueryWithNoneParam(self):
+        self.assertEqual(self.c.query("select $1::integer", (None,)
+            ).getresult(), [(None,)])
+        self.assertEqual(self.c.query("select $1::text", [None]
+            ).getresult(), [(None,)])
+
+    def testQueryWithIntParams(self):
+        query = self.c.query
+        self.assertEqual(query("select 1+1").getresult(), [(2,)])
+        self.assertEqual(query("select 1+$1", (1,)).getresult(), [(2,)])
+        self.assertEqual(query("select 1+$1", [1,]).getresult(), [(2,)])
+        self.assertEqual(query("select $1::integer", (2,)).getresult(), [(2,)])
+        self.assertEqual(query("select $1::text", (2,) ).getresult(), [('2',)])
+        self.assertEqual(query("select 1+$1::numeric", [1,]).getresult(),
+            [(Decimal('2'),)])
+        self.assertEqual(query("select 1, $1::integer", (2,)
+            ).getresult(), [(1, 2)])
+        self.assertEqual(query("select 1 union select $1", (2,)
+            ).getresult(), [(1,), (2,)])
+        self.assertEqual(query("select $1::integer+$2", (1, 2)
+            ).getresult(), [(3,)])
+        self.assertEqual(query("select $1::integer+$2", [1, 2]
+            ).getresult(), [(3,)])
+        self.assertEqual(query("select 0+$1+$2+$3+$4+$5+$6", range(6)
+            ).getresult(), [(15,)])
+
+    def testQueryWithStrParams(self):
+        query = self.c.query
+        self.assertEqual(query("select $1||', world!'", ('Hello',)
+            ).getresult(), [('Hello, world!',)])
+        self.assertEqual(query("select $1||', world!'", ['Hello']
+            ).getresult(), [('Hello, world!',)])
+        self.assertEqual(query("select $1||', '||$2||'!'", ('Hello', 'world'),
+            ).getresult(), [('Hello, world!',)])
+        self.assertEqual(query("select $1::text", ('Hello, world!',)
+            ).getresult(), [('Hello, world!',)])
+        self.assertEqual(query("select $1::text,$2::text", ('Hello', 'world')
+            ).getresult(), [('Hello', 'world')])
+        self.assertEqual(query("select $1::text,$2::text", ['Hello', 'world']
+            ).getresult(), [('Hello', 'world')])
+        self.assertEqual(query("select $1::text union select $2::text",
+            ('Hello', 'world')).getresult(), [('Hello',), ('world',)])
+        self.assertEqual(query("select $1||', '||$2||'!'", ('Hello',
+            'w\xc3\xb6rld')).getresult(), [('Hello, w\xc3\xb6rld!',)])
+
+    def testQueryWithUnicodeParams(self):
+        query = self.c.query
+        self.assertEqual(query("select $1||', '||$2||'!'",
+            ('Hello', u'w\xf6rld')).getresult(), [('Hello, w\xc3\xb6rld!',)])
+        self.assertEqual(query("select $1||', '||$2||'!'",
+            ('Hello', u'\u043c\u0438\u0440')).getresult(),
+            [('Hello, \xd0\xbc\xd0\xb8\xd1\x80!',)])
+        query('set client_encoding = latin1')
+        self.assertEqual(query("select $1||', '||$2||'!'",
+            ('Hello', u'w\xf6rld')).getresult(), [('Hello, w\xf6rld!',)])
+        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+            ('Hello', u'\u043c\u0438\u0440'))
+        query('set client_encoding = iso_8859_1')
+        self.assertEqual(query("select $1||', '||$2||'!'",
+            ('Hello', u'w\xf6rld')).getresult(), [('Hello, w\xf6rld!',)])
+        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+            ('Hello', u'\u043c\u0438\u0440'))
+        query('set client_encoding = iso_8859_5')
+        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+            ('Hello', u'w\xf6rld'))
+        self.assertEqual(query("select $1||', '||$2||'!'",
+            ('Hello', u'\u043c\u0438\u0440')).getresult(),
+            [('Hello, \xdc\xd8\xe0!',)])
+        query('set client_encoding = sql_ascii')
+        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+            ('Hello', u'w\xf6rld'))
+
+    def testQueryWithMixedParams(self):
+        self.assertEqual(self.c.query("select $1+2,$2||', world!'",
+            (1, 'Hello'),).getresult(), [(3, 'Hello, world!')])
+        self.assertEqual(self.c.query("select $1::integer,$2::date,$3::text",
+            (4711, None, 'Hello!'),).getresult(), [(4711, None, 'Hello!')])
+
+    def testQueryWithDuplicateParams(self):
+        self.assertRaises(pg.ProgrammingError,
+            self.c.query, "select $1+$1", (1,))
+        self.assertRaises(pg.ProgrammingError,
+            self.c.query, "select $1+$1", (1, 2))
+
+    def testQueryWithZeroParams(self):
+        self.assertEqual(self.c.query("select 1+1", []
+            ).getresult(), [(2,)])
+
+    def testQueryWithGarbage(self):
+        garbage = r"'\{}+()-#[]oo324"
+        self.assertEqual(self.c.query("select $1::text AS garbage", (garbage,)
+            ).dictresult(), [{'garbage': garbage}])
+
+    def testUnicodeQuery(self):
+        query = self.c.query
+        self.assertEqual(query(u"select 1+1").getresult(), [(2,)])
+        self.assertRaises(TypeError, query, u"select 'Hello, w\xf6rld!'")
 
 
 class TestInserttable(unittest.TestCase):
@@ -926,6 +1043,13 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testMethodQuery(self):
         self.db.query("select 1+1")
+        self.db.query("select 1+$1", 1)
+        self.db.query("select 1+$1+$2", 2, 3)
+        self.db.query("select 1+$1+$2", (2, 3))
+        self.db.query("select 1+$1+$2", [2, 3])
+
+    def testMethodQueryEmpty(self):
+        self.assertRaises(ValueError, self.db.query, '')
 
     def testMethodQueryProgrammingError(self):
         try:
@@ -1148,6 +1272,41 @@ class TestDBClass(unittest.TestCase):
         self.assert_(isinstance(r, str))
         self.assertEqual(r, '5')
 
+    def testMultipleQueries(self):
+        self.assertEqual(self.db.query(
+            "create temporary table test_multi (n integer);"
+            "insert into test_multi values (4711);"
+            "select n from test_multi").getresult()[0][0], 4711)
+
+    def testQueryWithParams(self):
+        smart_ddl(self.db, "drop table test_table")
+        q = "create table test_table (n1 integer, n2 integer) with oids"
+        r = self.db.query(q)
+        q = "insert into test_table values ($1, $2)"
+        r = self.db.query(q, (1, 2))
+        self.assert_(isinstance(r, int))
+        r = self.db.query(q, [3, 4])
+        self.assert_(isinstance(r, int))
+        r = self.db.query(q, [5, 6])
+        self.assert_(isinstance(r, int))
+        q = "select * from test_table order by 1, 2"
+        self.assertEqual(self.db.query(q).getresult(),
+            [(1, 2), (3, 4), (5, 6)])
+        q = "select * from test_table where n1=$1 and n2=$2"
+        self.assertEqual(self.db.query(q, 3, 4).getresult(), [(3, 4)])
+        q = "update test_table set n2=$2 where n1=$1"
+        r = self.db.query(q, 3, 7)
+        self.assertEqual(r, '1')
+        q = "select * from test_table order by 1, 2"
+        self.assertEqual(self.db.query(q).getresult(),
+            [(1, 2), (3, 7), (5, 6)])
+        q = "delete from test_table where n2!=$1"
+        r = self.db.query(q, 4)
+        self.assertEqual(r, '3')
+
+    def testEmptyQuery(self):
+        self.assertRaises(ValueError, self.db.query, '')
+
     def testQueryProgrammingError(self):
         try:
             self.db.query("select 1/0")
@@ -1345,12 +1504,11 @@ class TestDBClass(unittest.TestCase):
                 "d numeric, f4 real, f8 double precision, m money, "
                 "v4 varchar(4), c4 char(4), t text,"
                 "b boolean, ts timestamp)" % table)
-            data = dict(i2 = 2**15 - 1,
-                i4 = int(2**31 - 1), i8 = long(2**31 - 1),
-                d = Decimal('123456789.9876543212345678987654321'),
-                f4 = 1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
-                m = "1234.56", v4 = "1234", c4 = "1234", t = "1234" * 10,
-                b = 1, ts = 'current_date')
+            data = dict(i2=2**15 - 1, i4=int(2**31 - 1), i8=long(2**31 - 1),
+                d=Decimal('123456789.9876543212345678987654321'),
+                f4=1.0 + 1.0/32, f8 = 1.0 + 1.0/32,
+                m="1234.56", v4="1234", c4="1234",  t="1234" * 10,
+                b=1, ts='2012-12-21')
             r = self.db.insert(table, data)
             self.assertEqual(r, data)
             oid_table = table
@@ -1608,6 +1766,7 @@ class DBTestSuite(unittest.TestSuite):
         c.query("create database " + dbname
             + " template=template0")
         for s in ('client_min_messages = warning',
+            'client_encoding = UTF8',
             'lc_messages = C',
             'default_with_oids = on',
             'standard_conforming_strings = off',
@@ -1660,6 +1819,7 @@ if __name__ == '__main__':
         unittest.makeSuite(TestCanConnect),
         unittest.makeSuite(TestConnectObject),
         unittest.makeSuite(TestSimpleQueries),
+        unittest.makeSuite(TestParamQueries),
         unittest.makeSuite(TestDBClassBasic),
         ))
 

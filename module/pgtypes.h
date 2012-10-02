@@ -85,4 +85,4 @@
 #define ANYNONARRAYOID 2776
 #define ANYENUMOID 3500
 
-#endif
+#endif /* PG_TYPE_H */

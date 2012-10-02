@@ -423,10 +423,11 @@ query - executes a SQL command string
 -------------------------------------
 Syntax::
 
-  query(command)
+  query(command, [args])
 
 Parameters:
   :command: SQL command (string)
+  :args: optional positional arguments
 
 Return type:
   :pgqueryobject, None: result values
@@ -449,9 +450,21 @@ Description:
   method returns a `pgqueryobject` that can be accessed via the `getresult()`
   or `dictresult()` method or simply printed. Otherwise, it returns `None`.
 
+  The query may optionally contain positional parameters of the form `$1`,
+  `$2`, etc instead of literal data, and the values supplied as a tuple.
+  The values are substituted by the database in such a way that they don't
+  need to be escaped, making this an effective way to pass arbitrary or
+  unknown data without worrying about SQL injection or syntax errors.
+
   When the database could not process the query, a `pg.ProgrammingError` or
   a `pg.InternalError` is raised. You can check the "SQLSTATE" code of this
   error by reading its `sqlstate` attribute.
+
+Example::
+
+  name = raw_input("Name? ")
+  phone = con.query("select phone from employees"
+    " where name=$1", (name, )).getresult()
 
 reset - resets the connection
 -----------------------------
@@ -1002,6 +1015,41 @@ Description:
   on the fields in the keywords.  There must be an OID or primary key
   either in the dictionary where the OID must be munged, or in the keywords
   where it can be simply the string "oid".
+
+query - executes a SQL command string
+-------------------------------------
+Syntax::
+
+  query(command, [arg1, [arg2, ...]])
+
+Parameters:
+  :command: SQL command (string)
+  :arg*: optional positional arguments
+
+Return type:
+  :pgqueryobject, None: result values
+
+Exceptions raised:
+  :TypeError: bad argument type, or too many arguments
+  :TypeError: invalid connection
+  :ValueError: empty SQL query or lost connection
+  :pg.ProgrammingError: error in query
+  :pg.InternalError: error during query processing
+
+Description:
+  Similar to the pgobject function with the same name, except that positional
+  arguments can be passed either as a single list or tuple, or as individual
+  positional arguments
+
+Example::
+
+  name = raw_input("Name? ")
+  phone = raw_input("Phone? "
+  rows = db.query("update employees set phone=$2"
+    " where name=$1", (name, phone)).getresult()[0][0]
+  # or
+  rows = db.query("update employees set phone=$2"
+    " where name=$1", name, phone).getresult()[0][0]
 
 clear - clears row values in memory
 -----------------------------------
