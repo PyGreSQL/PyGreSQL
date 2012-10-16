@@ -9,6 +9,9 @@ Version 4.x
 - The query method of the classic API now supports positional parameters.
   This an effective way to pass arbitrary or unknown data without worrying
   about SQL injection or syntax errors (contribution by Patrick TJ McPhee).
+- The classic API now supports a method namedresult() in addition to
+  getresult() and dictresult(), which returns the rows of the result
+  as named tuples if these are supported (Python 2.6 or higher).
 - The execute() and executemany() methods now return the cursor object,
   so you can now write statements like "for row in cursor.execute(...)"
   (as suggested by Adam Frederick).

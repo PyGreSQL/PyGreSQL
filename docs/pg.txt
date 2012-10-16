@@ -74,7 +74,7 @@ Return type:
   :pgobject: If successful, the `pgobject` handling the connection
 
 Exceptions raised:
-  :Type: bad argument type, or too many arguments
+  :TypeError: bad argument type, or too many arguments
   :SyntaxError: duplicate argument definition
   :pg.InternalError: some error occurred during pg connection definition
 
@@ -384,6 +384,19 @@ Description:
   This function can be used to specify the Python class that shall be
   used by PyGreSQL to hold PostgreSQL numeric values. The default class
   is decimal.Decimal if available, otherwise the float type is used.
+  
+set_namedresult -- set a function that will convert to named tuples
+-------------------------------------------------------------------
+Syntax::
+
+  set_namedresult(func)
+
+Parameters:
+  :func: the function to be used to convert results to named tuples
+
+Description:
+  You can use this if you want to create different kinds of named tuples.
+  
 
 Module constants
 ----------------
@@ -447,8 +460,9 @@ Description:
   row in a table with OIDs, then the numer of rows affected is returned as a
   string. If it is a statement that returns rows as a result (usually a select
   statement, but maybe also an "insert/update ... returning" statement), this
-  method returns a `pgqueryobject` that can be accessed via the `getresult()`
-  or `dictresult()` method or simply printed. Otherwise, it returns `None`.
+  method returns a `pgqueryobject` that can be accessed via the `getresult()`,
+  `dictresult()` or `namedresult()` methods or simply printed. Otherwise, it
+  returns `None`.
 
   The query may optionally contain positional parameters of the form `$1`,
   `$2`, etc instead of literal data, and the values supplied as a tuple.
@@ -1158,7 +1172,7 @@ Return type:
   :list: result values as a list of tuples
 
 Exceptions raised:
-  :TypeError: too many parameters
+  :TypeError: too many (any) parameters
   :MemoryError: internal memory error
 
 Description:
@@ -1179,7 +1193,7 @@ Return type:
   :list: result values as a list of dictionaries
 
 Exceptions raised:
-  :TypeError: too many parameters
+  :TypeError: too many (any) parameters
   :MemoryError: internal memory error
 
 Description:
@@ -1187,6 +1201,26 @@ Description:
   with each tuple returned as a dictionary with the field names
   used as the dictionary index.
 
+namedresult - get query values as list of named tuples
+------------------------------------------------------
+Syntax::
+
+  namedresult()
+
+Parameters:
+  None
+
+Return type:
+  :list: result values as a list of named tuples
+
+Exceptions raised:
+  :TypeError: too many (any) parameters
+  :TypeError: named tuples not supported
+  :MemoryError: internal memory error
+
+Description:
+  This method returns the list of the values returned by the query
+  with each row returned as a named tuple with proper field names.
 
 listfields - lists fields names of previous query result
 --------------------------------------------------------

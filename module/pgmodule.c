@@ -116,7 +116,9 @@ static PyObject *pg_default_passwd;	/* default password */
 DL_EXPORT(void) init_pg(void);
 int *get_type_array(PGresult *result, int nfields);
 
-static PyObject *decimal = NULL; /* decimal type */
+static PyObject *decimal = NULL, /* decimal type */
+				*namedresult = NULL; /* function for getting named results */
+
 
 /* --------------------------------------------------------------------- */
 /* OBJECTS DECLARATION */
@@ -2092,7 +2094,7 @@ pgquery_fieldnum(pgqueryobject *self, PyObject *args)
 /* retrieves last result */
 static char pgquery_getresult__doc__[] =
 "getresult() -- Gets the result of a query.  The result is returned "
-"as a list of rows, each one a list of fields in the order returned "
+"as a list of rows, each one a tuple of fields in the order returned "
 "by the server.";
 
 static PyObject *
@@ -2236,7 +2238,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method getresult() takes no parameters.");
+			"method dictresult() takes no parameters.");
 		return NULL;
 	}
 
@@ -2338,6 +2340,43 @@ exit:
 
 	/* returns list */
 	return reslist;
+}
+
+/* retrieves last result as named tuples */
+static char pgquery_namedresult__doc__[] =
+"namedresult() -- Gets the result of a query.  The result is returned "
+"as a list of rows, each one a tuple of fields in the order returned "
+"by the server.";
+
+static PyObject *
+pgquery_namedresult(pgqueryobject *self, PyObject *args)
+{
+	PyObject   *arglist,
+			   *ret;
+
+	/* checks args (args == NULL for an internal call) */
+	if (args && !PyArg_ParseTuple(args, ""))
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"method namedresult() takes no parameters.");
+		return NULL;
+	}
+
+	if (!namedresult)
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"named tuples are not supported.");
+		return NULL;
+	}
+
+	arglist = Py_BuildValue("(O)", self);
+	ret = PyObject_CallObject(namedresult, arglist);
+	Py_DECREF(arglist);
+
+	if (ret == NULL)
+	    return NULL;
+
+	return ret;
 }
 
 /* gets asynchronous notify */
@@ -3493,6 +3532,8 @@ static struct PyMethodDef pgquery_methods[] = {
 			pgquery_getresult__doc__},
 	{"dictresult", (PyCFunction) pgquery_dictresult, METH_VARARGS,
 			pgquery_dictresult__doc__},
+	{"namedresult", (PyCFunction) pgquery_namedresult, METH_VARARGS,
+			pgquery_namedresult__doc__},
 	{"fieldname", (PyCFunction) pgquery_fieldname, METH_VARARGS,
 			 pgquery_fieldname__doc__},
 	{"fieldnum", (PyCFunction) pgquery_fieldnum, METH_VARARGS,
@@ -3639,6 +3680,28 @@ set_decimal(PyObject *self, PyObject *args)
 			PyErr_SetString(PyExc_TypeError, "decimal type must be None or callable");
 	}
 	return ret;
+}
+
+/* set named result */
+static char set_namedresult__doc__[] =
+"set_namedresult(cls) -- set a function to be used for getting named results.";
+
+static PyObject *
+set_namedresult(PyObject *self, PyObject *args)
+{
+    PyObject *ret = NULL;
+    PyObject *func;
+
+    if (PyArg_ParseTuple(args, "O", &func))
+    {
+        if (PyCallable_Check(func)) {
+            Py_XINCREF(func); Py_XDECREF(namedresult); namedresult = func;
+            Py_INCREF(Py_None); ret = Py_None;
+        }
+        else
+            PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+    }
+    return ret;
 }
 
 #ifdef DEFAULT_VARS
@@ -3998,6 +4061,8 @@ static struct PyMethodDef pg_methods[] = {
 			unescape_bytea__doc__},
 	{"set_decimal", (PyCFunction) set_decimal, METH_VARARGS,
 			set_decimal__doc__},
+	{"set_namedresult", (PyCFunction) set_namedresult, METH_VARARGS,
+			set_namedresult__doc__},
 
 #ifdef DEFAULT_VARS
 	{"get_defhost", pggetdefhost, METH_VARARGS, getdefhost__doc__},

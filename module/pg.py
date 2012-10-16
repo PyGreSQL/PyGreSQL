@@ -12,7 +12,7 @@
 
 This pg module implements some basic database management stuff.
 It includes the _pg module and builds on it, providing the higher
-level wrapper class named DB with addtional functionality.
+level wrapper class named DB with additional functionality.
 This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
 
@@ -26,8 +26,12 @@ except NameError:  # Python < 2.4
 try:
     from decimal import Decimal
     set_decimal(Decimal)
-except ImportError:
-    pass  # Python < 2.4
+except ImportError:  # Python < 2.4
+    pass
+try:
+    from collections import namedtuple
+except ImportError:  # Python < 2.6
+    namedtuple = None
 
 
 # Auxiliary functions which are independent from a DB connection:
@@ -94,6 +98,16 @@ def _join_parts(s):
 def _oid_key(qcl):
     """Build oid key from qualified class name."""
     return 'oid(%s)' % qcl
+
+
+if namedtuple:
+
+    def _namedresult(q):
+        """Get query result as named tuples."""
+        row = namedtuple('Row', q.listfields())
+        return [row(*r) for r in q.getresult()]
+
+    set_namedresult(_namedresult)
 
 
 def _db_error(msg, cls=DatabaseError):

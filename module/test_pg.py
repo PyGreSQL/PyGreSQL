@@ -52,6 +52,10 @@ try:
     from decimal import Decimal
 except ImportError:  # Python < 2.4
     Decimal = float
+try:
+    from collections import namedtuple
+except ImportError:  # Python < 2.6
+    namedtuple = None
 
 
 def smart_ddl(conn, cmd):
@@ -485,6 +489,16 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
+    def testNamedresult(self):
+        if namedtuple:
+            q = "select 0 as alias0"
+            result = [(0,)]
+            r = self.c.query(q).namedresult()
+            self.assertEqual(r, result)
+            v = r[0]
+            self.assertEqual(v._fields, ('alias0',))
+            self.assertEqual(v.alias0, 0)
+
     def testGet3Cols(self):
         q = "select 1,2,3"
         result = [(1, 2, 3)]
@@ -496,6 +510,16 @@ class TestSimpleQueries(unittest.TestCase):
         result = [dict(a=1, b=2, c=3)]
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
+
+    def testGet3NamedCols(self):
+        if namedtuple:
+            q = "select 1 as a,2 as b,3 as c"
+            result = [(1, 2, 3)]
+            r = self.c.query(q).namedresult()
+            self.assertEqual(r, result)
+            v = r[0]
+            self.assertEqual(v._fields, ('a', 'b', 'c'))
+            self.assertEqual(v.b, 2)
 
     def testGet3Rows(self):
         q = "select 3 union select 1 union select 2 order by 1"
@@ -510,6 +534,16 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
+    def testGet3NamedRows(self):
+        if namedtuple:
+            q = "select 3 as alias3" \
+                " union select 1 union select 2 order by 1"
+            result = [(1,), (2,), (3,)]
+            r = self.c.query(q).namedresult()
+            self.assertEqual(r, result)
+            for v in r:
+                self.assertEqual(v._fields, ('alias3',))
+
     def testDictresultNames(self):
         q = "select 'MixedCase' as MixedCaseAlias"
         result = [{'mixedcasealias': 'MixedCase'}]
@@ -519,6 +553,22 @@ class TestSimpleQueries(unittest.TestCase):
         result = [{'MixedCaseAlias': 'MixedCase'}]
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
+
+    def testNamedresultNames(self):
+        if namedtuple:
+            q = "select 'MixedCase' as MixedCaseAlias"
+            result = [('MixedCase',)]
+            r = self.c.query(q).namedresult()
+            self.assertEqual(r, result)
+            v = r[0]
+            self.assertEqual(v._fields, ('mixedcasealias',))
+            self.assertEqual(v.mixedcasealias, 'MixedCase')
+            q = "select 'MixedCase' as \"MixedCaseAlias\""
+            r = self.c.query(q).namedresult()
+            self.assertEqual(r, result)
+            v = r[0]
+            self.assertEqual(v._fields, ('MixedCaseAlias',))
+            self.assertEqual(v.MixedCaseAlias, 'MixedCase')
 
     def testBigGetresult(self):
         num_cols = 100
