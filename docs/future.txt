@@ -28,7 +28,7 @@ Proposed Patches
 
 - Notice handling with PQsetNoticeReceiver and PQsetNoticeProcessor
   (one possible implementation was already suggested by Dmitry Dvoinikov
-  http://mailman.vex.net/pipermail/pygresql/2005-November/001530.html).
+  https://mail.vex.net/mailman/private.cgi/pygresql/2005-November/001530.html).
   Maybe also make notifications accessible via the optional cursor and
   connection attribute "messages" proposed in the DB-API specs (#12).
 

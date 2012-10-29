@@ -171,7 +171,7 @@ For support
   If you would like to proposes changes, please join the
   PyGreSQL mailing list and send context diffs there.
 
-  See http://mailman.vex.net/mailman/listinfo/pygresql
+  See https://mail.vex.net/mailman/listinfo.cgi/pygresql
   to join the mailing list.
 
 Please note that messages to individual developers will generally not be
