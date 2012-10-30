@@ -96,6 +96,12 @@ class build_pg_ext(build_ext):
         """Return the C compiler used for building the extension."""
         return self.compiler or get_default_compiler()
 
+    def initialize_options(self):
+        build_ext.initialize_options(self)
+        self.direct_access = 1
+        self.large_objects = 1
+        self.default_vars = 1
+
     def finalize_options(self):
         """Set final values for all build_pg options."""
         build_ext.finalize_options(self)
