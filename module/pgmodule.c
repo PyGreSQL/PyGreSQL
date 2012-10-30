@@ -41,7 +41,9 @@ static PyObject *Error, *Warning, *InterfaceError,
 	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
 	*IntegrityError, *DataError, *NotSupportedError;
 
-static const char *PyPgVersion = PYGRESQL_VERSION;
+#define _TOSTRING(x) #x
+#define TOSTRING(x) _TOSTRING(x)
+static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;

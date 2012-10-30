@@ -71,7 +71,7 @@ py_modules = ['pg', 'pgdb']
 libraries = ['pq']
 include_dirs = [pg_config('includedir')]
 library_dirs = [pg_config('libdir')]
-define_macros = [('PYGRESQL_VERSION', r'\"%s\"' % version)]
+define_macros = [('PYGRESQL_VERSION', version)]
 undef_macros = []
 extra_compile_args = ['-O2']
 
