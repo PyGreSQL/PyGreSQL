@@ -991,18 +991,6 @@ Description:
   The dictionary is then, if possible, reloaded with the values actually
   inserted in order to pick up values modified by rules, triggers, etc.
 
-  Due to the way that this function works in PostgreSQL versions below
-  8.2, you may find inserts taking longer and longer as your table gets
-  bigger.  If this happens and it is a table with OID but no primary key
-  you can overcome this problem by simply adding an index onto the OID of
-  any table that you think may get large over time. You may also consider
-  using the inserttable() method described in section 3.
-
-  Note: With PostgreSQL versions before 8.2 the table being inserted to
-  must have a primary key or an OID to use this method properly.  If not
-  then the dictionary will not be filled in as described.  Also, if this
-  method is called within a transaction, the transaction will abort.
-
   Note: The method currently doesn't support insert into views
   although PostgreSQL does.
 
