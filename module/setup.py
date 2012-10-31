@@ -21,7 +21,7 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-The supported versions are Python 2.3-2.6 and PostgreSQL 7.4-8.4.
+The supported versions are Python 2.5-2.7 and PostgreSQL 8.3-9.2.
 
 Use as follows:
 python setup.py build   # to build the module
