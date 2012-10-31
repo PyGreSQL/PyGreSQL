@@ -3973,7 +3973,6 @@ static PyObject *
 pgsetdefpasswd(PyObject *self, PyObject *args)
 {
 	char	   *temp = NULL;
-	PyObject   *old;
 
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "z", &temp))
@@ -3982,9 +3981,6 @@ pgsetdefpasswd(PyObject *self, PyObject *args)
 			"set_defpasswd(password), with password (string/None).");
 		return NULL;
 	}
-
-	/* adjusts value */
-	old = pg_default_passwd;
 
 	if (temp)
 		pg_default_passwd = PyString_FromString(temp);
