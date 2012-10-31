@@ -80,75 +80,75 @@ class TestAuxiliaryFunctions(unittest.TestCase):
 
     def testIsQuoted(self):
         f = pg._is_quoted
-        self.assert_(f('A'))
-        self.assert_(f('0'))
-        self.assert_(f('#'))
-        self.assert_(f('*'))
-        self.assert_(f('.'))
-        self.assert_(f(' '))
-        self.assert_(f('a b'))
-        self.assert_(f('a+b'))
-        self.assert_(f('a*b'))
-        self.assert_(f('a.b'))
-        self.assert_(f('0ab'))
-        self.assert_(f('aBc'))
-        self.assert_(f('ABC'))
-        self.assert_(f('"a"'))
-        self.assert_(not f('a'))
-        self.assert_(not f('a0'))
-        self.assert_(not f('_'))
-        self.assert_(not f('_a'))
-        self.assert_(not f('_0'))
-        self.assert_(not f('_a_0_'))
-        self.assert_(not f('ab'))
-        self.assert_(not f('ab0'))
-        self.assert_(not f('abc'))
-        self.assert_(not f('abc'))
+        self.assertTrue(f('A'))
+        self.assertTrue(f('0'))
+        self.assertTrue(f('#'))
+        self.assertTrue(f('*'))
+        self.assertTrue(f('.'))
+        self.assertTrue(f(' '))
+        self.assertTrue(f('a b'))
+        self.assertTrue(f('a+b'))
+        self.assertTrue(f('a*b'))
+        self.assertTrue(f('a.b'))
+        self.assertTrue(f('0ab'))
+        self.assertTrue(f('aBc'))
+        self.assertTrue(f('ABC'))
+        self.assertTrue(f('"a"'))
+        self.assertTrue(not f('a'))
+        self.assertTrue(not f('a0'))
+        self.assertTrue(not f('_'))
+        self.assertTrue(not f('_a'))
+        self.assertTrue(not f('_0'))
+        self.assertTrue(not f('_a_0_'))
+        self.assertTrue(not f('ab'))
+        self.assertTrue(not f('ab0'))
+        self.assertTrue(not f('abc'))
+        self.assertTrue(not f('abc'))
         if recode('ä').isalpha():
             e = lambda s: f(recode(s))
-            self.assert_(not e('ä'))
-            self.assert_(e('Ä'))
-            self.assert_(not e('käse'))
-            self.assert_(e('Käse'))
-            self.assert_(not e('emmentaler_käse'))
-            self.assert_(e('emmentaler käse'))
-            self.assert_(e('EmmentalerKäse'))
-            self.assert_(e('Emmentaler Käse'))
+            self.assertTrue(not e('ä'))
+            self.assertTrue(e('Ä'))
+            self.assertTrue(not e('käse'))
+            self.assertTrue(e('Käse'))
+            self.assertTrue(not e('emmentaler_käse'))
+            self.assertTrue(e('emmentaler käse'))
+            self.assertTrue(e('EmmentalerKäse'))
+            self.assertTrue(e('Emmentaler Käse'))
 
     def testIsUnquoted(self):
         f = pg._is_unquoted
-        self.assert_(f('A'))
-        self.assert_(not f('0'))
-        self.assert_(not f('#'))
-        self.assert_(not f('*'))
-        self.assert_(not f('.'))
-        self.assert_(not f(' '))
-        self.assert_(not f('a b'))
-        self.assert_(not f('a+b'))
-        self.assert_(not f('a*b'))
-        self.assert_(not f('a.b'))
-        self.assert_(not f('0ab'))
-        self.assert_(f('aBc'))
-        self.assert_(f('ABC'))
-        self.assert_(not f('"a"'))
-        self.assert_(f('a0'))
-        self.assert_(f('_'))
-        self.assert_(f('_a'))
-        self.assert_(f('_0'))
-        self.assert_(f('_a_0_'))
-        self.assert_(f('ab'))
-        self.assert_(f('ab0'))
-        self.assert_(f('abc'))
+        self.assertTrue(f('A'))
+        self.assertTrue(not f('0'))
+        self.assertTrue(not f('#'))
+        self.assertTrue(not f('*'))
+        self.assertTrue(not f('.'))
+        self.assertTrue(not f(' '))
+        self.assertTrue(not f('a b'))
+        self.assertTrue(not f('a+b'))
+        self.assertTrue(not f('a*b'))
+        self.assertTrue(not f('a.b'))
+        self.assertTrue(not f('0ab'))
+        self.assertTrue(f('aBc'))
+        self.assertTrue(f('ABC'))
+        self.assertTrue(not f('"a"'))
+        self.assertTrue(f('a0'))
+        self.assertTrue(f('_'))
+        self.assertTrue(f('_a'))
+        self.assertTrue(f('_0'))
+        self.assertTrue(f('_a_0_'))
+        self.assertTrue(f('ab'))
+        self.assertTrue(f('ab0'))
+        self.assertTrue(f('abc'))
         if recode('ä').isalpha():
             e = lambda s: f(recode(s))
-            self.assert_(e('ä'))
-            self.assert_(e('Ä'))
-            self.assert_(e('käse'))
-            self.assert_(e('Käse'))
-            self.assert_(e('emmentaler_käse'))
-            self.assert_(not e('emmentaler käse'))
-            self.assert_(e('EmmentalerKäse'))
-            self.assert_(not e('Emmentaler Käse'))
+            self.assertTrue(e('ä'))
+            self.assertTrue(e('Ä'))
+            self.assertTrue(e('käse'))
+            self.assertTrue(e('Käse'))
+            self.assertTrue(e('emmentaler_käse'))
+            self.assertTrue(not e('emmentaler käse'))
+            self.assertTrue(e('EmmentalerKäse'))
+            self.assertTrue(not e('Emmentaler Käse'))
 
     def testSplitFirstPart(self):
         f = pg._split_first_part
@@ -223,46 +223,46 @@ class TestHasConnect(unittest.TestCase):
     """Test existence of basic pg module functions."""
 
     def testhasPgError(self):
-        self.assert_(issubclass(pg.Error, StandardError))
+        self.assertTrue(issubclass(pg.Error, StandardError))
 
     def testhasPgWarning(self):
-        self.assert_(issubclass(pg.Warning, StandardError))
+        self.assertTrue(issubclass(pg.Warning, StandardError))
 
     def testhasPgInterfaceError(self):
-        self.assert_(issubclass(pg.InterfaceError, pg.Error))
+        self.assertTrue(issubclass(pg.InterfaceError, pg.Error))
 
     def testhasPgDatabaseError(self):
-        self.assert_(issubclass(pg.DatabaseError, pg.Error))
+        self.assertTrue(issubclass(pg.DatabaseError, pg.Error))
 
     def testhasPgInternalError(self):
-        self.assert_(issubclass(pg.InternalError, pg.DatabaseError))
+        self.assertTrue(issubclass(pg.InternalError, pg.DatabaseError))
 
     def testhasPgOperationalError(self):
-        self.assert_(issubclass(pg.OperationalError, pg.DatabaseError))
+        self.assertTrue(issubclass(pg.OperationalError, pg.DatabaseError))
 
     def testhasPgProgrammingError(self):
-        self.assert_(issubclass(pg.ProgrammingError, pg.DatabaseError))
+        self.assertTrue(issubclass(pg.ProgrammingError, pg.DatabaseError))
 
     def testhasPgIntegrityError(self):
-        self.assert_(issubclass(pg.IntegrityError, pg.DatabaseError))
+        self.assertTrue(issubclass(pg.IntegrityError, pg.DatabaseError))
 
     def testhasPgDataError(self):
-        self.assert_(issubclass(pg.DataError, pg.DatabaseError))
+        self.assertTrue(issubclass(pg.DataError, pg.DatabaseError))
 
     def testhasPgNotSupportedError(self):
-        self.assert_(issubclass(pg.NotSupportedError, pg.DatabaseError))
+        self.assertTrue(issubclass(pg.NotSupportedError, pg.DatabaseError))
 
     def testhasConnect(self):
-        self.assert_(callable(pg.connect))
+        self.assertTrue(callable(pg.connect))
 
     def testhasEscapeString(self):
-        self.assert_(callable(pg.escape_string))
+        self.assertTrue(callable(pg.escape_string))
 
     def testhasEscapeBytea(self):
-        self.assert_(callable(pg.escape_bytea))
+        self.assertTrue(callable(pg.escape_bytea))
 
     def testhasUnescapeBytea(self):
-        self.assert_(callable(pg.unescape_bytea))
+        self.assertTrue(callable(pg.unescape_bytea))
 
     def testDefHost(self):
         d0 = pg.get_defhost()
@@ -383,7 +383,7 @@ class TestConnectObject(unittest.TestCase):
 
     def testAttributeError(self):
         error = self.connection.error
-        self.assert_(not error or 'krb5_' in error)
+        self.assertTrue(not error or 'krb5_' in error)
 
     def testAttributeHost(self):
         def_host = 'localhost'
@@ -399,13 +399,13 @@ class TestConnectObject(unittest.TestCase):
 
     def testAttributeProtocolVersion(self):
         protocol_version = self.connection.protocol_version
-        self.assert_(isinstance(protocol_version, int))
-        self.assert_(2 <= protocol_version < 4)
+        self.assertTrue(isinstance(protocol_version, int))
+        self.assertTrue(2 <= protocol_version < 4)
 
     def testAttributeServerVersion(self):
         server_version = self.connection.server_version
-        self.assert_(isinstance(server_version, int))
-        self.assert_(70400 <= server_version < 100000)
+        self.assertTrue(isinstance(server_version, int))
+        self.assertTrue(70400 <= server_version < 100000)
 
     def testAttributeStatus(self):
         status_ok = 1
@@ -418,7 +418,7 @@ class TestConnectObject(unittest.TestCase):
     def testAttributeUser(self):
         no_user = 'Deprecated facility'
         user = self.connection.user
-        self.assert_(user)
+        self.assertTrue(user)
         self.assertNotEqual(user, no_user)
 
     def testMethodQuery(self):
@@ -617,13 +617,13 @@ class TestSimpleQueries(unittest.TestCase):
         smart_ddl(self.c, "drop table test_table")
         q = "create table test_table (n integer) with oids"
         r = self.c.query(q)
-        self.assert_(r is None)
+        self.assertTrue(r is None)
         q = "insert into test_table values (1)"
         r = self.c.query(q)
-        self.assert_(isinstance(r, int)), r
+        self.assertTrue(isinstance(r, int)), r
         q = "insert into test_table select 2"
         r = self.c.query(q)
-        self.assert_(isinstance(r, int))
+        self.assertTrue(isinstance(r, int))
         oid = r
         q = "select oid from test_table where n=2"
         r = self.c.query(q).getresult()
@@ -634,15 +634,15 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, oid)
         q = "insert into test_table select 3 union select 4 union select 5"
         r = self.c.query(q)
-        self.assert_(isinstance(r, str))
+        self.assertTrue(isinstance(r, str))
         self.assertEqual(r, '3')
         q = "update test_table set n=4 where n<5"
         r = self.c.query(q)
-        self.assert_(isinstance(r, str))
+        self.assertTrue(isinstance(r, str))
         self.assertEqual(r, '4')
         q = "delete from test_table"
         r = self.c.query(q)
-        self.assert_(isinstance(r, str))
+        self.assertTrue(isinstance(r, str))
         self.assertEqual(r, '5')
 
     def testPrint(self):
@@ -669,34 +669,34 @@ class TestSimpleQueries(unittest.TestCase):
              '(2 rows)'])
 
     def testGetNotify(self):
-        self.assert_(self.c.getnotify() is None)
+        self.assertTrue(self.c.getnotify() is None)
         self.c.query('listen test_notify')
         try:
-            self.assert_(self.c.getnotify() is None)
+            self.assertTrue(self.c.getnotify() is None)
             self.c.query("notify test_notify")
             r = self.c.getnotify()
-            self.assert_(isinstance(r, tuple))
+            self.assertTrue(isinstance(r, tuple))
             self.assertEqual(len(r), 3)
-            self.assert_(isinstance(r[0], str))
-            self.assert_(isinstance(r[1], int))
-            self.assert_(isinstance(r[2], str))
+            self.assertTrue(isinstance(r[0], str))
+            self.assertTrue(isinstance(r[1], int))
+            self.assertTrue(isinstance(r[2], str))
             self.assertEqual(r[0], 'test_notify')
             self.assertEqual(r[2], '')
-            self.assert_(self.c.getnotify() is None)
+            self.assertTrue(self.c.getnotify() is None)
             try:
                 self.c.query("notify test_notify, 'test_payload'")
             except pg.ProgrammingError: # PostgreSQL < 9.0
                 pass
             else:
                 r = self.c.getnotify()
-                self.assert_(isinstance(r, tuple))
+                self.assertTrue(isinstance(r, tuple))
                 self.assertEqual(len(r), 3)
-                self.assert_(isinstance(r[0], str))
-                self.assert_(isinstance(r[1], int))
-                self.assert_(isinstance(r[2], str))
+                self.assertTrue(isinstance(r[0], str))
+                self.assertTrue(isinstance(r[1], int))
+                self.assertTrue(isinstance(r[2], str))
                 self.assertEqual(r[0], 'test_notify')
                 self.assertEqual(r[2], 'test_payload')
-                self.assert_(self.c.getnotify() is None)
+                self.assertTrue(self.c.getnotify() is None)
         finally:
             self.c.query('unlisten test_notify')
 
@@ -883,7 +883,7 @@ class TestNoticeReceiver(unittest.TestCase):
     def testGetNoticeReceiver(self):
         c = pg.connect(self.dbname)
         try:
-            self.assert_(c.get_notice_receiver() is None)
+            self.assertTrue(c.get_notice_receiver() is None)
         finally:
             c.close()
 
@@ -892,7 +892,7 @@ class TestNoticeReceiver(unittest.TestCase):
         try:
             self.assertRaises(TypeError, c.set_notice_receiver, None)
             self.assertRaises(TypeError, c.set_notice_receiver, 42)
-            self.assert_(c.set_notice_receiver(lambda notice: None) is None)
+            self.assertTrue(c.set_notice_receiver(lambda notice: None) is None)
         finally:
             c.close()
 
@@ -900,8 +900,8 @@ class TestNoticeReceiver(unittest.TestCase):
         c = pg.connect(self.dbname)
         try:
             r = lambda notice: None
-            self.assert_(c.set_notice_receiver(r) is None)
-            self.assert_(c.get_notice_receiver() is r)
+            self.assertTrue(c.set_notice_receiver(r) is None)
+            self.assertTrue(c.get_notice_receiver() is r)
         finally:
             c.close()
 
@@ -965,7 +965,7 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testAttributeError(self):
         error = self.db.error
-        self.assert_(not error or 'krb5_' in error)
+        self.assertTrue(not error or 'krb5_' in error)
         self.assertEqual(self.db.error, self.db.db.error)
 
     def testAttributeHost(self):
@@ -988,14 +988,14 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testAttributeProtocolVersion(self):
         protocol_version = self.db.protocol_version
-        self.assert_(isinstance(protocol_version, int))
-        self.assert_(2 <= protocol_version < 4)
+        self.assertTrue(isinstance(protocol_version, int))
+        self.assertTrue(2 <= protocol_version < 4)
         self.assertEqual(protocol_version, self.db.db.protocol_version)
 
     def testAttributeServerVersion(self):
         server_version = self.db.server_version
-        self.assert_(isinstance(server_version, int))
-        self.assert_(70400 <= server_version < 100000)
+        self.assertTrue(isinstance(server_version, int))
+        self.assertTrue(70400 <= server_version < 100000)
         self.assertEqual(server_version, self.db.db.server_version)
 
     def testAttributeStatus(self):
@@ -1013,7 +1013,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testAttributeUser(self):
         no_user = 'Deprecated facility'
         user = self.db.user
-        self.assert_(user)
+        self.assertTrue(user)
         self.assertNotEqual(user, no_user)
         self.assertEqual(user, self.db.db.user)
 
@@ -1042,7 +1042,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testMethodEscapeString(self):
         standard_conforming = self.db.query(
             "show standard_conforming_strings").getresult()[0][0]
-        self.assert_(standard_conforming in ('on', 'off'))
+        self.assertTrue(standard_conforming in ('on', 'off'))
         self.assertEqual(self.db.escape_string("plain"), "plain")
         self.assertEqual(self.db.escape_string(
             "that's k\xe4se"), "that''s k\xe4se")
@@ -1059,10 +1059,10 @@ class TestDBClassBasic(unittest.TestCase):
         output = self.db.query("show bytea_output").getresult()[0][0]
         if output == 'escape' and self.db.escape_bytea("plain") != 'plain':
             output = 'hex'
-        self.assert_(output in ('escape', 'hex'))
+        self.assertTrue(output in ('escape', 'hex'))
         standard_conforming = self.db.query(
             "show standard_conforming_strings").getresult()[0][0]
-        self.assert_(standard_conforming in ('on', 'off'))
+        self.assertTrue(standard_conforming in ('on', 'off'))
         if output == 'escape':
             self.assertEqual(self.db.escape_bytea("plain"), "plain")
             self.assertEqual(self.db.escape_bytea(
@@ -1085,7 +1085,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testMethodUnescapeBytea(self):
         standard_conforming = self.db.query(
             "show standard_conforming_strings").getresult()[0][0]
-        self.assert_(standard_conforming in ('on', 'off'))
+        self.assertTrue(standard_conforming in ('on', 'off'))
         self.assertEqual(self.db.unescape_bytea("plain"), "plain")
         self.assertEqual(self.db.unescape_bytea(
             "that's k\\344se"), "that's k\xe4se")
@@ -1134,13 +1134,13 @@ class TestDBClassBasic(unittest.TestCase):
     def testExistingConnection(self):
         db = pg.DB(self.db.db)
         self.assertEqual(self.db.db, db.db)
-        self.assert_(db.db)
+        self.assertTrue(db.db)
         db.close()
-        self.assert_(db.db)
+        self.assertTrue(db.db)
         db.reopen()
-        self.assert_(db.db)
+        self.assertTrue(db.db)
         db.close()
-        self.assert_(db.db)
+        self.assertTrue(db.db)
         db = pg.DB(self.db)
         self.assertEqual(self.db.db, db.db)
         db = pg.DB(db=self.db.db)
@@ -1180,10 +1180,10 @@ class TestDBClass(unittest.TestCase):
         output = self.db.query("show bytea_output").getresult()[0][0]
         if output == 'escape' and self.db.escape_bytea("plain") != 'plain':
             output = 'hex'
-        self.assert_(output in ('escape', 'hex'))
+        self.assertTrue(output in ('escape', 'hex'))
         standard_conforming = self.db.query(
             "show standard_conforming_strings").getresult()[0][0]
-        self.assert_(standard_conforming in ('on', 'off'))
+        self.assertTrue(standard_conforming in ('on', 'off'))
         if output == 'escape':
             self.assertEqual(self.db.escape_bytea("plain"), "plain")
             self.assertEqual(self.db.escape_bytea(
@@ -1206,7 +1206,7 @@ class TestDBClass(unittest.TestCase):
     def testUnescapeBytea(self):
         standard_conforming = self.db.query(
             "show standard_conforming_strings").getresult()[0][0]
-        self.assert_(standard_conforming in ('on', 'off'))
+        self.assertTrue(standard_conforming in ('on', 'off'))
         self.assertEqual(self.db.unescape_bytea("plain"), "plain")
         self.assertEqual(self.db.unescape_bytea(
             "that's k\\344se"), "that's k\xe4se")
@@ -1300,13 +1300,13 @@ class TestDBClass(unittest.TestCase):
         smart_ddl(self.db, "drop table test_table")
         q = "create table test_table (n integer) with oids"
         r = self.db.query(q)
-        self.assert_(r is None)
+        self.assertTrue(r is None)
         q = "insert into test_table values (1)"
         r = self.db.query(q)
-        self.assert_(isinstance(r, int))
+        self.assertTrue(isinstance(r, int))
         q = "insert into test_table select 2"
         r = self.db.query(q)
-        self.assert_(isinstance(r, int))
+        self.assertTrue(isinstance(r, int))
         oid = r
         q = "select oid from test_table where n=2"
         r = self.db.query(q).getresult()
@@ -1317,15 +1317,15 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, oid)
         q = "insert into test_table select 3 union select 4 union select 5"
         r = self.db.query(q)
-        self.assert_(isinstance(r, str))
+        self.assertTrue(isinstance(r, str))
         self.assertEqual(r, '3')
         q = "update test_table set n=4 where n<5"
         r = self.db.query(q)
-        self.assert_(isinstance(r, str))
+        self.assertTrue(isinstance(r, str))
         self.assertEqual(r, '4')
         q = "delete from test_table"
         r = self.db.query(q)
-        self.assert_(isinstance(r, str))
+        self.assertTrue(isinstance(r, str))
         self.assertEqual(r, '5')
 
     def testMultipleQueries(self):
@@ -1340,11 +1340,11 @@ class TestDBClass(unittest.TestCase):
         r = self.db.query(q)
         q = "insert into test_table values ($1, $2)"
         r = self.db.query(q, (1, 2))
-        self.assert_(isinstance(r, int))
+        self.assertTrue(isinstance(r, int))
         r = self.db.query(q, [3, 4])
-        self.assert_(isinstance(r, int))
+        self.assertTrue(isinstance(r, int))
         r = self.db.query(q, [5, 6])
-        self.assert_(isinstance(r, int))
+        self.assertTrue(isinstance(r, int))
         q = "select * from test_table order by 1, 2"
         self.assertEqual(self.db.query(q).getresult(),
             [(1, 2), (3, 4), (5, 6)])
@@ -1397,9 +1397,9 @@ class TestDBClass(unittest.TestCase):
 
     def testGetDatabases(self):
         databases = self.db.get_databases()
-        self.assert_('template0' in databases)
-        self.assert_('template1' in databases)
-        self.assert_(self.dbname in databases)
+        self.assertTrue('template0' in databases)
+        self.assertTrue('template1' in databases)
+        self.assertTrue(self.dbname in databases)
 
     def testGetTables(self):
         result1 = self.db.get_tables()
@@ -1430,20 +1430,20 @@ class TestDBClass(unittest.TestCase):
 
     def testGetRelations(self):
         result = self.db.get_relations()
-        self.assert_('public.test' in result)
-        self.assert_('public.test_view' in result)
+        self.assertTrue('public.test' in result)
+        self.assertTrue('public.test_view' in result)
         result = self.db.get_relations('rv')
-        self.assert_('public.test' in result)
-        self.assert_('public.test_view' in result)
+        self.assertTrue('public.test' in result)
+        self.assertTrue('public.test_view' in result)
         result = self.db.get_relations('r')
-        self.assert_('public.test' in result)
-        self.assert_('public.test_view' not in result)
+        self.assertTrue('public.test' in result)
+        self.assertTrue('public.test_view' not in result)
         result = self.db.get_relations('v')
-        self.assert_('public.test' not in result)
-        self.assert_('public.test_view' in result)
+        self.assertTrue('public.test' not in result)
+        self.assertTrue('public.test_view' in result)
         result = self.db.get_relations('cisSt')
-        self.assert_('public.test' not in result)
-        self.assert_('public.test_view' not in result)
+        self.assertTrue('public.test' not in result)
+        self.assertTrue('public.test_view' not in result)
 
     def testAttnames(self):
         self.assertRaises(pg.ProgrammingError,
@@ -1493,9 +1493,9 @@ class TestDBClass(unittest.TestCase):
             if ' ' in table:
                 oid_table = '"%s"' % oid_table
             oid_table = 'oid(public.%s)' % oid_table
-            self.assert_(oid_table in r)
+            self.assertTrue(oid_table in r)
             oid = r[oid_table]
-            self.assert_(isinstance(oid, int))
+            self.assertTrue(isinstance(oid, int))
             result = {'t': 'y', 'n': 2, oid_table: oid}
             self.assertEqual(r, result)
             self.assertEqual(self.db.get(table + ' *', 2, 'n'), r)
@@ -1549,7 +1549,7 @@ class TestDBClass(unittest.TestCase):
         self.db.query('insert into test (i4, v4) values('
             "14, 'abc4')")
         r = self.db.get('test_view', 14, 'i4')
-        self.assert_('v4' in r)
+        self.assertTrue('v4' in r)
         self.assertEqual(r['v4'], 'abc4')
 
     def testInsert(self):
@@ -1571,8 +1571,8 @@ class TestDBClass(unittest.TestCase):
             if ' ' in table:
                 oid_table = '"%s"' % oid_table
             oid_table = 'oid(public.%s)' % oid_table
-            self.assert_(oid_table in r)
-            self.assert_(isinstance(r[oid_table], int))
+            self.assertTrue(oid_table in r)
+            self.assertTrue(isinstance(r[oid_table], int))
             s = self.db.query('select oid,* from "%s"' % table).dictresult()[0]
             s[oid_table] = s['oid']
             del s['oid']
@@ -1722,9 +1722,9 @@ class TestDBClass(unittest.TestCase):
         self.db.query('insert into bytea_test values('
             "'%s')" % r)
         r = self.db.query('select * from bytea_test').getresult()
-        self.assert_(len(r) == 1)
+        self.assertTrue(len(r) == 1)
         r = r[0]
-        self.assert_(len(r) == 1)
+        self.assertTrue(len(r) == 1)
         r = r[0]
         r = self.db.unescape_bytea(r)
         self.assertEqual(r, s)
@@ -1752,7 +1752,7 @@ class TestSchemas(unittest.TestCase):
                 schema = "public"
             for t in (schema + ".t",
                 schema + ".t" + str(num_schema)):
-                self.assert_(t in tables, t + ' not in get_tables()')
+                self.assertTrue(t in tables, t + ' not in get_tables()')
 
     def testGetAttnames(self):
         result = {'oid': 'int', 'd': 'int', 'n': 'int'}
@@ -1795,13 +1795,13 @@ class TestSchemas(unittest.TestCase):
 
     def testMangling(self):
         r = self.db.get("t", 1, 'n')
-        self.assert_('oid(public.t)' in r)
+        self.assertTrue('oid(public.t)' in r)
         self.db.query("set search_path to s2")
         r = self.db.get("t2", 1, 'n')
-        self.assert_('oid(s2.t2)' in r)
+        self.assertTrue('oid(s2.t2)' in r)
         self.db.query("set search_path to s3")
         r = self.db.get("t", 1, 'n')
-        self.assert_('oid(s3.t)' in r)
+        self.assertTrue('oid(s3.t)' in r)
 
 
 class DBTestSuite(unittest.TestSuite):
