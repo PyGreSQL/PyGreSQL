@@ -458,8 +458,10 @@ class TestConnectObject(unittest.TestCase):
 class TestSimpleQueries(unittest.TestCase):
     """"Test simple queries via a basic pg connection."""
 
+    # Test database needed: must be run as a DBTestSuite.
+
     def setUp(self):
-        dbname = 'test'
+        dbname = DBTestSuite.dbname
         self.c = pg.connect(dbname)
 
     def tearDown(self):
@@ -703,8 +705,10 @@ class TestSimpleQueries(unittest.TestCase):
 class TestParamQueries(unittest.TestCase):
     """"Test queries with parameters via a basic pg connection."""
 
+    # Test database needed: must be run as a DBTestSuite.
+
     def setUp(self):
-        dbname = 'test'
+        dbname = DBTestSuite.dbname
         self.c = pg.connect(dbname)
 
     def tearDown(self):
@@ -1818,6 +1822,7 @@ class DBTestSuite(unittest.TestSuite):
         for s in ('client_min_messages = warning',
             'client_encoding = UTF8',
             'lc_messages = C',
+            'date_style = ISO, MDY',
             'default_with_oids = on',
             'standard_conforming_strings = off',
             'escape_string_warning = off'):
@@ -1868,13 +1873,13 @@ if __name__ == '__main__':
         unittest.makeSuite(TestEscapeFunctions),
         unittest.makeSuite(TestCanConnect),
         unittest.makeSuite(TestConnectObject),
-        unittest.makeSuite(TestSimpleQueries),
-        unittest.makeSuite(TestParamQueries),
         unittest.makeSuite(TestDBClassBasic),
         ))
 
     # All tests that need a test database:
     TestSuite2 = DBTestSuite((
+        unittest.makeSuite(TestSimpleQueries),
+        unittest.makeSuite(TestParamQueries),
         unittest.makeSuite(TestInserttable),
         unittest.makeSuite(TestNoticeReceiver),
         unittest.makeSuite(TestDBClass),
