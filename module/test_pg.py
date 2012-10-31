@@ -15,34 +15,30 @@ The testing is done against a real local PostgreSQL database.
 There are a few drawbacks:
   * A local PostgreSQL database must be up and running, and
     the database user who is running the tests must be a trusted superuser.
+  * The PostgreSQL database cluster must have been created with UTF-8 encoding.
   * The performance of the API is not tested.
   * Connecting to a remote host is not tested.
   * Passing user, password and options is not tested.
   * Table privilege problems (e.g. insert but no select) are not tested.
   * Status and error messages from the connection are not tested.
   * It would be more reasonable to create a test for the underlying
-    shared library functions in the _pg module and assume they are ok.
+    shared library functions in the _pg module and assume they are ok.vi
     The pg and pgdb modules should be tested against _pg mock functions.
 
 """
 
 import pg
 import unittest
+import locale
 
 debug = False
 
-# Try to load German locale for umlaut tests
-german = True
-try:
-    import locale
-    locale.setlocale(locale.LC_ALL, ('de', 'utf-8'))
-except Exception:
-    try:
-        locale.setlocale(locale.LC_ALL, 'german')
-    except Exception:
-        import warnings
-        warnings.warn('Cannot set German locale.')
-        german = False
+locale.setlocale(locale.LC_ALL, '')
+encoding = locale.getlocale()[1] or 'utf-8'
+if encoding.lower() == 'utf-8':
+    recode = lambda s: s
+else:
+    recode = lambda s: s.decode('utf-8').encode(encoding)
 
 try:
     frozenset
@@ -108,15 +104,16 @@ class TestAuxiliaryFunctions(unittest.TestCase):
         self.assert_(not f('ab0'))
         self.assert_(not f('abc'))
         self.assert_(not f('abc'))
-        if german:
-            self.assert_(not f('\xe4'))
-            self.assert_(f('\xc4'))
-            self.assert_(not f('k\xe4se'))
-            self.assert_(f('K\xe4se'))
-            self.assert_(not f('emmentaler_k\xe4se'))
-            self.assert_(f('emmentaler k\xe4se'))
-            self.assert_(f('EmmentalerK\xe4se'))
-            self.assert_(f('Emmentaler K\xe4se'))
+        if recode('ä').isalpha():
+            e = lambda s: f(recode(s))
+            self.assert_(not e('ä'))
+            self.assert_(e('Ä'))
+            self.assert_(not e('käse'))
+            self.assert_(e('Käse'))
+            self.assert_(not e('emmentaler_käse'))
+            self.assert_(e('emmentaler käse'))
+            self.assert_(e('EmmentalerKäse'))
+            self.assert_(e('Emmentaler Käse'))
 
     def testIsUnquoted(self):
         f = pg._is_unquoted
@@ -142,14 +139,16 @@ class TestAuxiliaryFunctions(unittest.TestCase):
         self.assert_(f('ab'))
         self.assert_(f('ab0'))
         self.assert_(f('abc'))
-        self.assert_(f('\xe4'))
-        self.assert_(f('\xc4'))
-        self.assert_(f('k\xe4se'))
-        self.assert_(f('K\xe4se'))
-        self.assert_(f('emmentaler_k\xe4se'))
-        self.assert_(not f('emmentaler k\xe4se'))
-        self.assert_(f('EmmentalerK\xe4se'))
-        self.assert_(not f('Emmentaler K\xe4se'))
+        if recode('ä').isalpha():
+            e = lambda s: f(recode(s))
+            self.assert_(e('ä'))
+            self.assert_(e('Ä'))
+            self.assert_(e('käse'))
+            self.assert_(e('Käse'))
+            self.assert_(e('emmentaler_käse'))
+            self.assert_(not e('emmentaler käse'))
+            self.assert_(e('EmmentalerKäse'))
+            self.assert_(not e('Emmentaler Käse'))
 
     def testSplitFirstPart(self):
         f = pg._split_first_part
@@ -918,7 +917,10 @@ class TestNoticeReceiver(unittest.TestCase):
                 received = {}
                 def notice_receiver(notice):
                     for attr in dir(notice):
-                        received[attr] = getattr(notice, attr)
+                        value = getattr(notice, attr)
+                        if isinstance(value, str):
+                            value = value.replace('WARNUNG', 'WARNING')
+                        received[attr] = value
                 c.set_notice_receiver(notice_receiver)
                 c.query('''select bilbo_notice()''')
                 self.assertEqual(received, dict(
@@ -1818,10 +1820,9 @@ class DBTestSuite(unittest.TestSuite):
         except pg.Error:
             pass
         c.query("create database " + dbname
-            + " template=template0")
+            + " template=template0 encoding='UTF8'")
         for s in ('client_min_messages = warning',
             'client_encoding = UTF8',
-            'lc_messages = C',
             'date_style = ISO, MDY',
             'default_with_oids = on',
             'standard_conforming_strings = off',
