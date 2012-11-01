@@ -29,6 +29,11 @@ try:
 except ImportError:  # Python < 2.4
     pass
 try:
+    from contextlib import contextmanager
+except ImportError:  # Python < 2.5
+    def contextmanager(f):
+        raise NotImplementedError
+try:
     from collections import namedtuple
 except ImportError:  # Python < 2.6
     namedtuple = None
@@ -165,12 +170,13 @@ class DB(object):
         self._attnames = {}
         self._pkeys = {}
         self._privileges = {}
+        self._transaction = False
         self._args = args, kw
         self.debug = None  # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
-            # * to a file object to write debug statements,
-            # * to a callable object which takes a string argument or
-            # * to any other true value to just print debug statements.
+            # * to a file object to write debug statements or
+            # * to a callable object which takes a string argument
+            # * to any other true value to just print debug statements
 
     def __getattr__(self, name):
         # All undefined members are same as in underlying pg connection:
@@ -178,6 +184,23 @@ class DB(object):
             return getattr(self.db, name)
         else:
             raise _int_error('Connection is not valid')
+
+    # Context manager methods
+
+    def __enter__(self):
+        if self._transaction:
+            self.begin()
+        return self
+
+    def __exit__(self, typ, val, tb):
+        if self._transaction:
+            self._transaction = None
+            if tb is None:
+                self.commit()
+            else:
+                self.rollback()
+        else:
+            self.close()
 
     # Auxiliary methods
 
@@ -334,6 +357,45 @@ class DB(object):
             if self.db:
                 self.db.close()
             self.db = db
+
+    def begin(self, mode=None):
+        """Begin a transaction."""
+        qstr = 'BEGIN'
+        if mode:
+            qstr += ' ' + mode
+        return self.query(qstr)
+
+    start = begin
+
+    def commit(self):
+        """Commit the current transaction."""
+        return self.query('COMMIT')
+
+    end = commit
+
+    def rollback(self, name=None):
+        """Rollback the current transaction."""
+        qstr = 'ROLLBACK'
+        if name:
+            qstr += ' TO ' + name
+        return self.query('ROLLBACK')
+
+    def savepoint(self, name=None):
+        """Define a new savepoint within the current transaction."""
+        qstr = 'SAVEPOINT'
+        if name:
+            qstr += ' ' + name
+        return self.query(qstr)
+
+    def release(self, name):
+        """Destroy a previously defined savepoint."""
+        return self.query('RELEASE ' + name)
+
+    @property
+    def transaction(self):
+        """Return a context manager for running a transaction."""
+        self._transaction = True
+        return self
 
     def query(self, qstr, *args):
         """Executes a SQL command string.
