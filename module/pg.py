@@ -29,11 +29,6 @@ try:
 except ImportError:  # Python < 2.4
     pass
 try:
-    from contextlib import contextmanager
-except ImportError:  # Python < 2.5
-    def contextmanager(f):
-        raise NotImplementedError
-try:
     from collections import namedtuple
 except ImportError:  # Python < 2.6
     namedtuple = None
@@ -194,7 +189,7 @@ class DB(object):
 
     def __exit__(self, typ, val, tb):
         if self._transaction:
-            self._transaction = None
+            self._transaction = False
             if tb is None:
                 self.commit()
             else:
