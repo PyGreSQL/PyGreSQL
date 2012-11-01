@@ -156,9 +156,9 @@ class DB(object):
                     pass
         if not db or not hasattr(db, 'db') or not hasattr(db, 'query'):
             db = connect(*args, **kw)
-            self._closeable = 1
+            self._closeable = True
         else:
-            self._closeable = 0
+            self._closeable = False
         self.db = db
         self.dbname = db.db
         self._regtypes = False
@@ -168,8 +168,9 @@ class DB(object):
         self._args = args, kw
         self.debug = None  # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
-            # * to a file object to write debug statements or
-            # * to a callable object which takes a string argument.
+            # * to a file object to write debug statements,
+            # * to a callable object which takes a string argument or
+            # * to any other true value to just print debug statements.
 
     def __getattr__(self, name):
         # All undefined members are same as in underlying pg connection:
@@ -189,6 +190,8 @@ class DB(object):
                 file.write(s + '\n')
             elif callable(self.debug):
                 self.debug(s)
+            else:
+                print s
 
     def _quote_text(self, d):
         """Quote text value."""
