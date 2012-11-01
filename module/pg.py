@@ -778,10 +778,9 @@ class DB(object):
                 raise _prg_error('Class %s has no primary key' % qcl)
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
-            attnames = self.get_attnames(qcl)
             try:
                 where = ' AND '.join(['%s = $%d'
-                    % (k, i+ 1 ) for i, k in enumerate(keyname)])
+                    % (k, i + 1) for i, k in enumerate(keyname)])
                 params = tuple(d[k] for k in keyname)
             except KeyError:
                 raise _prg_error('Delete needs primary key or oid.')
