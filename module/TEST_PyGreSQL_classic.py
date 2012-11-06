@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import with_statement
+
 import unittest
 from pg import *
 
@@ -99,6 +101,31 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(d['dvar'], 999)
         db.insert('_test_schema', _test=1235)
         self.assertEqual(d['dvar'], 999)
+
+    def test_context_manager(self):
+        t = '_test_schema'
+        d = dict(_test=1235)
+        with db:
+            db.insert(t, d)
+            d['_test'] += 1
+            db.insert(t, d)
+        try:
+            with db:
+                d['_test'] += 1
+                db.insert(t, d)
+                db.insert(t, d)
+        except ProgrammingError:
+            pass
+        with db:
+            d['_test'] += 1
+            db.insert(t, d)
+            d['_test'] += 1
+            db.insert(t, d)
+        self.assertTrue(db.get(t, 1235))
+        self.assertTrue(db.get(t, 1236))
+        self.assertRaises(DatabaseError, db.get, t, 1237)
+        self.assertTrue(db.get(t, 1238))
+        self.assertTrue(db.get(t, 1239))
 
     def test_sqlstate(self):
         db.query("INSERT INTO _test_schema VALUES (1234)")

@@ -165,7 +165,6 @@ class DB(object):
         self._attnames = {}
         self._pkeys = {}
         self._privileges = {}
-        self._transaction = False
         self._args = args, kw
         self.debug = None  # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
@@ -183,19 +182,16 @@ class DB(object):
     # Context manager methods
 
     def __enter__(self):
-        if self._transaction:
-            self.begin()
+        """Enter the runtime context. This will start a transaction."""
+        self.begin()
         return self
 
-    def __exit__(self, typ, val, tb):
-        if self._transaction:
-            self._transaction = False
-            if tb is None:
-                self.commit()
-            else:
-                self.rollback()
+    def __exit__(self, et, ev, tb):
+        """Exit the runtime context. This will end the transaction."""
+        if et is None and ev is None and tb is None:
+            self.commit()
         else:
-            self.close()
+            self.rollback()
 
     # Auxiliary methods
 
@@ -373,7 +369,7 @@ class DB(object):
         qstr = 'ROLLBACK'
         if name:
             qstr += ' TO ' + name
-        return self.query('ROLLBACK')
+        return self.query(qstr)
 
     def savepoint(self, name=None):
         """Define a new savepoint within the current transaction."""
@@ -385,12 +381,6 @@ class DB(object):
     def release(self, name):
         """Destroy a previously defined savepoint."""
         return self.query('RELEASE ' + name)
-
-    @property
-    def transaction(self):
-        """Return a context manager for running a transaction."""
-        self._transaction = True
-        return self
 
     def query(self, qstr, *args):
         """Executes a SQL command string.
