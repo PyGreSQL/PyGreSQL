@@ -13,6 +13,10 @@ Version 4.1 (2012-12-01)
 - The classic API now supports a method namedresult() in addition to
   getresult() and dictresult(), which returns the rows of the result
   as named tuples if these are supported (Python 2.6 or higher).
+- The classic API has got the new methods begin(), commit(), rollback(),
+  savepoint() and release() for handling transactions.
+- Both classic and DBAPI 2 connections can now be used as context
+  managers for encapsulating transactions.
 - The execute() and executemany() methods now return the cursor object,
   so you can now write statements like "for row in cursor.execute(...)"
   (as suggested by Adam Frederick).
@@ -25,7 +29,7 @@ Version 4.1 (2012-12-01)
 - The getnotify() method can now also return payload strings (#15).
 - Better support for notice processing with the new methods
   set_notice_receiver() and get_notice_receiver()
-  (as suggested by Michael Filonenko, see #37).
+  (as suggested by Michael Filonenko, see #12 and #37).
 - Open transactions are rolled back when pgdb connections are closed
   (as suggested by Peter Harris, see #46).
 - Connections and cursors can now be used with the "with" statement
