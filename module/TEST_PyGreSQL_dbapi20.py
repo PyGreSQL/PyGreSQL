@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # $Id$
 
+from __future__ import with_statement
+
 import unittest
 import dbapi20
 import pgdb
@@ -47,16 +49,16 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 return d
 
         con = self._connect()
-        curs = myCursor(con)
-        ret = curs.execute("select 1 as a, 2 as b")
-        self.assert_(ret is curs, 'execute() should return cursor')
-        self.assertEqual(curs.fetchone(), {'a': 1, 'b': 2})
+        cur = myCursor(con)
+        ret = cur.execute("select 1 as a, 2 as b")
+        self.assert_(ret is cur, 'execute() should return cursor')
+        self.assertEqual(cur.fetchone(), {'a': 1, 'b': 2})
 
     def test_cursor_iteration(self):
         con = self._connect()
-        curs = con.cursor()
-        curs.execute("select 1 union select 2 union select 3")
-        self.assertEqual([r[0] for r in curs], [1, 2, 3])
+        cur = con.cursor()
+        cur.execute("select 1 union select 2 union select 3")
+        self.assertEqual([r[0] for r in cur], [1, 2, 3])
 
     def test_fetch_2_rows(self):
         Decimal = pgdb.decimal_type()
@@ -84,7 +86,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 "rowidtest oid)" % table)
             for s in ('numeric', 'monetary', 'time'):
                 cur.execute("set lc_%s to 'C'" % s)
-            for i in range(2):
+            for _i in range(2):
                 cur.execute("insert into %s values ("
                     "%%s,%%s,%%s,%%s,%%s,%%s,%%s,"
                     "'%%s'::money,%%s,%%s,%%s,%%s,%%s)" % table, values)
@@ -128,30 +130,31 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assert_(isnan(nan) and not isinf(nan))
         self.assert_(isinf(inf) and not isnan(inf))
         values = [0, 1, 0.03125, -42.53125, nan, inf, -inf]
-        table = self.table_prefix + 'float'
+        table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
-            cur.execute("create table %s (floattest float)" % table)
-            params = [(val,) for val in values]
-            cur.executemany("insert into %s values(%%s)" % table, params)
-            cur.execute("select * from %s" % table)
+            cur.execute(
+                "create table %s (n smallint, floattest float)" % table)
+            params = enumerate(values)
+            cur.executemany("insert into %s values(%%s,%%s)" % table, params)
+            cur.execute("select * from %s order by 1" % table)
             rows = cur.fetchall()
-            self.assertEqual(len(rows), len(values))
-            rows = [row[0] for row in rows]
-            for inval, outval in zip(values, rows):
-                if isinf(inval):
-                    self.assert_(isinf(outval))
-                    if inval < 0:
-                        self.assert_(outval < 0)
-                    else:
-                        self.assert_(outval > 0)
-                elif isnan(inval):
-                    self.assert_(isnan(outval))
-                else:
-                    self.assertEqual(inval, outval)
         finally:
             con.close()
+        self.assertEqual(len(rows), len(values))
+        rows = [row[1] for row in rows]
+        for inval, outval in zip(values, rows):
+            if isinf(inval):
+                self.assert_(isinf(outval))
+                if inval < 0:
+                    self.assert_(outval < 0)
+                else:
+                    self.assert_(outval > 0)
+            elif isnan(inval):
+                self.assert_(isnan(outval))
+            else:
+                self.assertEqual(inval, outval)
 
     def test_set_decimal_type(self):
         decimal_type = pgdb.decimal_type()
@@ -175,10 +178,12 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assert_(pgdb.decimal_type() is decimal_type)
 
     def test_nextset(self):
-        pass  # not implemented
+        con = self._connect()
+        cur = con.cursor()
+        self.assertRaises(con.NotSupportedError, cur.nextset)
 
     def test_setoutputsize(self):
-        pass  # not implemented
+        pass  # not supported
 
     def test_connection_errors(self):
         con = self._connect()
@@ -193,10 +198,50 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(con.DataError, pgdb.DataError)
         self.assertEqual(con.NotSupportedError, pgdb.NotSupportedError)
 
+    def test_connection_as_contextmanager(self):
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s (n smallint check(n!=4))" % table)
+            with con:
+                cur.execute("insert into %s values (1)" % table)
+                cur.execute("insert into %s values (2)" % table)
+            try:
+                with con:
+                    cur.execute("insert into %s values (3)" % table)
+                    cur.execute("insert into %s values (4)" % table)
+            except con.ProgrammingError, error:
+                self.assertTrue('check' in str(error).lower())
+            with con:
+                cur.execute("insert into %s values (5)" % table)
+                cur.execute("insert into %s values (6)" % table)
+            try:
+                with con:
+                    cur.execute("insert into %s values (7)" % table)
+                    cur.execute("insert into %s values (8)" % table)
+                    raise ValueError('transaction should rollback')
+            except ValueError, error:
+                self.assertEqual(str(error), 'transaction should rollback')
+            with con:
+                cur.execute("insert into %s values (9)" % table)
+            cur.execute("select * from %s order by 1" % table)
+            rows = cur.fetchall()
+            rows = [row[0] for row in rows]
+        finally:
+            con.close()
+        self.assertEqual(rows, [1, 2, 5, 6, 9])
+
     def test_cursor_connection(self):
         con = self._connect()
-        curs = con.cursor()
-        self.assertEqual(curs.connection, con)
+        cur = con.cursor()
+        self.assertEqual(cur.connection, con)
+        cur.close()
+
+    def test_cursor_as_contextmanager(self):
+        con = self._connect()
+        with con.cursor() as cur:
+            self.assertEqual(cur.connection, con)
 
     def test_pgdb_type(self):
         self.assertEqual(pgdb.STRING, pgdb.STRING)

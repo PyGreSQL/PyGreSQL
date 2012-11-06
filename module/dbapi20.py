@@ -703,25 +703,30 @@ class DatabaseAPI20Test(unittest.TestCase):
         finally:
             con.close()
 
-    def help_nextset_setUp(self,cur):
+    def help_nextset_setUp(self, cur):
         """Should create a procedure called deleteme
             that returns two result sets, first the
             number of rows in booze then "name from booze"
         """
-        raise NotImplementedError('Helper not implemented')
-        #sql="""
-        #    create procedure deleteme as
-        #    begin
-        #        select count(*) from booze
-        #        select name from booze
-        #    end
-        #"""
-        #cur.execute(sql)
+        if False:
+            sql = """
+                create procedure deleteme as
+                begin
+                    select count(*) from booze
+                    select name from booze
+                end
+            """
+            cur.execute(sql)
+        else:
+            raise NotImplementedError('Helper not implemented')
 
-    def help_nextset_tearDown(self,cur):
+    def help_nextset_tearDown(self, cur):
         """If cleaning up is needed after nextSetTest"""
-        raise NotImplementedError('Helper not implemented')
-        #cur.execute("drop procedure deleteme")
+        if False:
+            cur.execute("drop procedure deleteme")
+        else:
+
+            raise NotImplementedError('Helper not implemented')
 
     def test_nextset(self):
         con = self._connect()
@@ -751,9 +756,6 @@ class DatabaseAPI20Test(unittest.TestCase):
 
         finally:
             con.close()
-
-    def test_nextset(self):
-        raise NotImplementedError('Drivers need to override this test')
 
     def test_arraysize(self):
         """Not much here - rest of the tests for this are in test_fetchmany"""

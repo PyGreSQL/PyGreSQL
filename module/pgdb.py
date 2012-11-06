@@ -90,7 +90,7 @@ except ValueError:  # Python < 2.6
 
 ### Module Constants
 
-# compliant with DB SIG 2.0
+# compliant with DB API 2.0
 apilevel = '2.0'
 
 # module may be shared, but not connections
@@ -98,6 +98,12 @@ threadsafety = 1
 
 # this module use extended python format codes
 paramstyle = 'pyformat'
+
+# shortcut methods are not supported by default
+# since they have been excluded from DB API 2
+# and are not recommended by the DB SIG;
+
+shortcutmethods = 0
 
 
 ### Internal Types Handling
@@ -208,7 +214,7 @@ class _quotedict(dict):
 ### Cursor Object
 
 class pgdbCursor(object):
-    """Cursor Object."""
+    """Cursor object."""
 
     def __init__(self, dbcnx):
         """Create a cursor object for the database connection."""
@@ -418,19 +424,19 @@ class pgdbCursor(object):
 
     def setinputsizes(sizes):
         """Not supported."""
-        pass
+        pass  # unsupported, but silently passed
     setinputsizes = staticmethod(setinputsizes)
 
     def setoutputsize(size, column=0):
         """Not supported."""
-        pass
+        pass  # unsupported, but silently passed
     setoutputsize = staticmethod(setoutputsize)
 
 
 ### Connection Objects
 
 class pgdbCnx(object):
-    """Connection Object."""
+    """Connection object."""
 
     # expose the exceptions as attributes on the connection object
     Error = Error
@@ -455,12 +461,23 @@ class pgdbCnx(object):
             raise _op_error("invalid connection")
 
     def __enter__(self):
-        """Enter the runtime context for the connection object."""
+        """Enter the runtime context for the connection object.
+
+        The runtime context can be used for running transactions.
+
+        """
         return self
 
     def __exit__(self, et, ev, tb):
-        """Exit the runtime context for the connection object."""
-        self.close()
+        """Exit the runtime context for the connection object.
+
+        This does not close the connection, but it ends a transaction.
+
+        """
+        if et is None and ev is None and tb is None:
+            self.commit()
+        else:
+            self.rollback()
 
     def close(self):
         """Close the connection object."""
@@ -504,7 +521,7 @@ class pgdbCnx(object):
             raise _op_error("connection has been closed")
 
     def cursor(self):
-        """Return a new Cursor Object using the connection."""
+        """Return a new cursor object using the connection."""
         if self._cnx:
             try:
                 return pgdbCursor(self)
@@ -512,6 +529,20 @@ class pgdbCnx(object):
                 raise _op_error("invalid connection")
         else:
             raise _op_error("connection has been closed")
+
+    if shortcutmethods:  # otherwise do not implement and document this
+
+        def execute(self, operation, params=None):
+            """Shortcut method to run an operation on an implicit cursor."""
+            cursor = self.cursor()
+            cursor.execute(operation, params)
+            return cursor
+
+        def executemany(self, operation, param_seq):
+            """Shortcut method to run an operation against a sequence."""
+            cursor = self.cursor()
+            cursor.executemany(operation, param_seq)
+            return cursor
 
 
 ### Module Interface
