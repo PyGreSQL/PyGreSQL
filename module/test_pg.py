@@ -27,9 +27,17 @@ There are a few drawbacks:
 
 """
 
+from __future__ import with_statement
+
 import pg
 import unittest
 import locale
+
+from decimal import Decimal
+try:
+    from collections import namedtuple
+except ImportError:  # Python < 2.6
+    namedtuple = None
 
 debug = False
 
@@ -39,19 +47,6 @@ if encoding.lower() == 'utf-8':
     recode = lambda s: s
 else:
     recode = lambda s: s.decode('utf-8').encode(encoding)
-
-try:
-    frozenset
-except NameError:  # Python < 2.4
-    from sets import ImmutableSet as frozenset
-try:
-    from decimal import Decimal
-except ImportError:  # Python < 2.4
-    Decimal = float
-try:
-    from collections import namedtuple
-except ImportError:  # Python < 2.6
-    namedtuple = None
 
 
 def smart_ddl(conn, cmd):
@@ -65,9 +60,9 @@ def smart_ddl(conn, cmd):
         else:
             conn.query(cmd)
     except pg.ProgrammingError:
-        if cmd.startswith('drop table ') \
-            or cmd.startswith('set ') \
-            or cmd.startswith('alter database '):
+        if (cmd.startswith('drop table ')
+            or cmd.startswith('set ')
+            or cmd.startswith('alter database ')):
             pass
         elif cmd.startswith('create table '):
             conn.query(cmd)
@@ -529,16 +524,16 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
 
     def testGet3DictRows(self):
-        q = "select 3 as alias3" \
-            " union select 1 union select 2 order by 1"
+        q = ("select 3 as alias3"
+            " union select 1 union select 2 order by 1")
         result = [{'alias3': 1}, {'alias3': 2}, {'alias3': 3}]
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
     def testGet3NamedRows(self):
         if namedtuple:
-            q = "select 3 as alias3" \
-                " union select 1 union select 2 order by 1"
+            q = ("select 3 as alias3"
+                " union select 1 union select 2 order by 1")
             result = [(1,), (2,), (3,)]
             r = self.c.query(q).namedresult()
             self.assertEqual(r, result)
@@ -581,12 +576,12 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
 
     def testListfields(self):
-        q = 'select 0 as a, 0 as b, 0 as c,' \
-            ' 0 as c, 0 as b, 0 as a,' \
-            ' 0 as lowercase, 0 as UPPERCASE,' \
-            ' 0 as MixedCase, 0 as "MixedCase",' \
-            ' 0 as a_long_name_with_underscores,' \
-            ' 0 as "A long name with Blanks"'
+        q = ('select 0 as a, 0 as b, 0 as c,'
+            ' 0 as c, 0 as b, 0 as a,'
+            ' 0 as lowercase, 0 as UPPERCASE,'
+            ' 0 as MixedCase, 0 as "MixedCase",'
+            ' 0 as a_long_name_with_underscores,'
+            ' 0 as "A long name with Blanks"')
         r = self.c.query(q).listfields()
         result = ('a', 'b', 'c', 'c', 'b', 'a',
             'lowercase', 'uppercase', 'mixedcase', 'MixedCase',
@@ -607,8 +602,8 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
 
     def testNtuples(self):
-        q = "select 1 as a, 2 as b, 3 as c, 4 as d" \
-            " union select 5 as a, 6 as b, 7 as c, 8 as d"
+        q = ("select 1 as a, 2 as b, 3 as c, 4 as d"
+            " union select 5 as a, 6 as b, 7 as c, 8 as d")
         r = self.c.query(q).ntuples()
         result = 2
         self.assertEqual(r, result)
@@ -648,8 +643,8 @@ class TestSimpleQueries(unittest.TestCase):
     def testPrint(self):
         import os
         import sys
-        q = "select 1 as a, 'hello' as h, 'w' as world" \
-            " union select 2, 'xyz', 'uvw'"
+        q = ("select 1 as a, 'hello' as h, 'w' as world"
+            " union select 2, 'xyz', 'uvw'")
         r = self.c.query(q)
         t = '~test_pg_testPrint_temp.tmp'
         s = open(t, 'w')
@@ -1793,6 +1788,17 @@ class TestDBClass(unittest.TestCase):
         r = r[0]
         r = self.db.unescape_bytea(r)
         self.assertEqual(r, s)
+
+    def testDebugWithCallable(self):
+        self.assertTrue(self.db.debug is None)
+        s = []
+        self.db.debug = s.append
+        try:
+            self.db.query("select 1")
+            self.db.query("select 2")
+            self.assertEqual(s, ["select 1", "select 2"])
+        finally:
+            self.db.debug = None
 
 
 class TestSchemas(unittest.TestCase):
