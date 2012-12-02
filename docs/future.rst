@@ -1,0 +1,57 @@
+PyGreSQL future directions
+==========================
+
+This list has been closed since tasks are now managed with the PyGreSQL
+tracker that can be found at http://trac.vex.net:8000/pgtracker.
+(ticket numbers have been added below):
+
+To Do
+-----
+
+- Add docs for the pgdb module (everything specific to PyGreSQL) (#5).
+- The large object and direct access functions need much more attention (#6).
+- The fetch method should use real cursors (#7).
+- The C module needs to be cleaned up and redundant code merged,
+  and should get its own unit test module (#8).
+- Clean up test_pg.py and merge it with TEST_PyGreSQL_classic.py (#9).
+- The test suite for the classic module should also check that quoted
+  mixed-case identifiers can be used everywhere - currently they can't.
+  Improve pg.py accordingly, adding quotes etc. as needed (#10).
+- What shall we do with the "tutorial" directory - it's rather a tutorial
+  for Postgres/SQL than for PyGreSQL, it's using only the query method from
+  the classic pg module and no other PyGreSQL functionality, it's rather
+  a demo than a tutorial (#11)?
+
+Proposed Patches
+----------------
+
+- Notice handling with PQsetNoticeReceiver and PQsetNoticeProcessor
+  (one possible implementation was already suggested by Dmitry Dvoinikov
+  https://mail.vex.net/mailman/private.cgi/pygresql/2005-November/001530.html).
+  Maybe also make notifications accessible via the optional cursor and
+  connection attribute "messages" proposed in the DB-API specs (#12).
+
+Wish List
+---------
+
+- Make SQLSTATE error codes available (#13).
+- Support the new listen/notify infrastructure of PostgreSQL 9.0 (#15).
+- Make use of PQexecParams() and PQprepare(). This could speed up
+  executemany() and allow retrieving binary data directly by setting
+  the resultFormat parameter to one (#16).
+- Enhance cursor.description attribute, delivering more information
+  available with PQfmod() or PQftable() for instance (#17).
+- Support optional "errorhandler" extension (#18).
+- Support optional cursor and connection attribute "messages" (#19).
+- Connection as context manager (see http://tinyurl.com/32bx6xo) (#20).
+- Users should be able to register their own types with _pg (#21).
+- Let pg and pgdb support namedtuples (as available in Py 2.6).
+  pg could get a new method namedresult(), and pgdb could provide
+  a row factory for namedtuples (similar to sqlite3) (#22).
+- New methods in the classic module, similar to getresult() and
+  dictresult(), but returning dictionaries of rows instead of lists
+  of rows (with primary key or oids as keys) (#23).
+- Make PyGreSQL thread-safe on the connection level (#24).
+- The API documentation could be created with Epydoc or Sphinx (#4).
+- Write a tutorial for beginners and advanced use (#11).
+- More and better documented examples (#4, #5, #11).
