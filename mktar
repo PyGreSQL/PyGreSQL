@@ -23,7 +23,7 @@ DISTDIR=/usr/ftp/pub/distrib
 TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
 
-MODFILES="module/pg.py module/pgdb.py module/pgmodule.c module/setup.py"
+MODFILES="module/pg.py module/pgdb.py module/pgmodule.c module/pgfs.h module/pgtypes.h module/setup.py"
 DOCFILES="docs/*.txt docs/*.html docs/*.css"
 TUTFILES="tutorial/*.py"
 
