@@ -105,7 +105,6 @@ const char *__movename[5] =
 /* MODULE GLOBAL VARIABLES */
 
 #ifdef DEFAULT_VARS
-
 static PyObject *pg_default_host;	/* default database host */
 static PyObject *pg_default_base;	/* default database name */
 static PyObject *pg_default_opt;	/* default connection options */
@@ -1775,6 +1774,7 @@ void notice_receiver(void *arg, const PGresult *res)
 	PyObject *proc = self->notice_receiver;
 	if (proc && PyCallable_Check(proc)) {
 		pgnoticeobject *notice = PyObject_NEW(pgnoticeobject, &PgNoticeType);
+		PyObject *args, *ret;
 		if (notice)
 		{
 			notice->pgcnx = arg;
@@ -1785,8 +1785,8 @@ void notice_receiver(void *arg, const PGresult *res)
 			Py_INCREF(Py_None);
 			notice = (pgnoticeobject *)Py_None;
 		}
-		PyObject *args = Py_BuildValue("(O)", notice);
-		PyObject *ret = PyObject_CallObject(proc, args);
+		args = Py_BuildValue("(O)", notice);
+		ret = PyObject_CallObject(proc, args);
 		Py_XDECREF(ret);
 		Py_DECREF(args);
 	}
@@ -2513,7 +2513,7 @@ pg_query(pgobject *self, PyObject *args)
 			return NULL;
 		}
 
-		nparms = PySequence_Size(oargs);
+		nparms = (int)PySequence_Size(oargs);
 	}
 
 	/* gets result */
@@ -2530,11 +2530,11 @@ pg_query(pgobject *self, PyObject *args)
 		if (nparms == 1 && (PyList_Check(obj) || PyTuple_Check(obj)))
 		{
 			oargs = obj;
-			nparms = PySequence_Size(oargs);
+			nparms = (int)PySequence_Size(oargs);
 		}
-		str = (PyObject **)alloca(nparms * sizeof(*str));
-		parms = (char **)alloca(nparms * sizeof(*parms));
-		lparms = (int *)alloca(nparms * sizeof(*lparms));
+		str = (PyObject **)malloc(nparms * sizeof(*str));
+		parms = (char **)malloc(nparms * sizeof(*parms));
+		lparms = (int *)malloc(nparms * sizeof(*lparms));
 
 		/* convert optional args to a list of strings -- this allows
 		 * the caller to pass whatever they like, and prevents us
@@ -2563,6 +2563,7 @@ pg_query(pgobject *self, PyObject *args)
 				else
 					*s = PyUnicode_AsEncodedString(obj, enc, "strict");
 				if (*s == NULL) {
+					free(lparms); free(parms); free(str);
 					PyErr_SetString(PyExc_UnicodeError, "query parameter"
 						" could not be decoded (bad client encoding)");
 					while (i--) {
@@ -2572,12 +2573,13 @@ pg_query(pgobject *self, PyObject *args)
 					return NULL;
 				}
 				*p = PyString_AsString(*s);
-				*l = PyString_Size(*s);
+				*l = (int)PyString_Size(*s);
 			}
 			else
 			{
 				*s = PyObject_Str(obj);
 				if (*s == NULL) {
+					free(lparms); free(parms); free(str);
 					PyErr_SetString(PyExc_TypeError,
 						"query parameter has no string representation");
 					while (i--) {
@@ -2587,7 +2589,7 @@ pg_query(pgobject *self, PyObject *args)
 					return NULL;
 				}
 				*p = PyString_AsString(*s);
-				*l = PyString_Size(*s);
+				*l = (int)PyString_Size(*s);
 			}
 		}
 
@@ -2596,11 +2598,13 @@ pg_query(pgobject *self, PyObject *args)
 			NULL, (const char * const *)parms, lparms, NULL, 0);
 		Py_END_ALLOW_THREADS
 
+		free(lparms); free(parms);
 		for (i = 0, s=str; i < nparms; i++, s++)
 		{
 			if (*s)
 				Py_DECREF(*s);
 		}
+		free(str);
 	}
 	else
 	{
@@ -3073,6 +3077,8 @@ pg_parameter(pgobject *self, PyObject *args)
 	return Py_None;
 }
 
+#if PG_VERSION_NUM >= 90000
+
 /* escape literal */
 static char pg_escape_literal__doc__[] =
 "pg_escape_literal(str) -- escape a literal constant for use within SQL.";
@@ -3116,6 +3122,8 @@ pg_escape_identifier(pgobject *self, PyObject *args) {
 		return NULL;
 	return ret;
 }
+
+#endif
 
 /* escape string */
 static char pg_escape_string__doc__[] =
@@ -3288,10 +3296,13 @@ static struct PyMethodDef pgobj_methods[] = {
 			pg_transaction__doc__},
 	{"parameter", (PyCFunction) pg_parameter, METH_VARARGS,
 			pg_parameter__doc__},
+
+#if PG_VERSION_NUM >= 90000
 	{"escape_literal", (PyCFunction) pg_escape_literal, METH_VARARGS,
 			pg_escape_literal__doc__},
 	{"escape_identifier", (PyCFunction) pg_escape_identifier, METH_VARARGS,
 			pg_escape_identifier__doc__},
+#endif
 	{"escape_string", (PyCFunction) pg_escape_string, METH_VARARGS,
 			pg_escape_string__doc__},
 	{"escape_bytea", (PyCFunction) pg_escape_bytea, METH_VARARGS,
@@ -3431,6 +3442,7 @@ static PyObject *
 pgnotice_getattr(pgnoticeobject *self, char *name)
 {
 	PGresult const *res = self->res;
+	int fieldcode;
 
 	if (!res)
 	{
@@ -3458,7 +3470,7 @@ pgnotice_getattr(pgnoticeobject *self, char *name)
 		return PyString_FromString(PQresultErrorMessage(res));
 
 	/* other possible fields */
-	int fieldcode = 0;
+	fieldcode = 0;
 	if (!strcmp(name, "severity"))
 		fieldcode = PG_DIAG_SEVERITY;
 	else if (!strcmp(name, "primary"))
