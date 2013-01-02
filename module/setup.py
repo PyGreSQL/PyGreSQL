@@ -54,6 +54,7 @@ except ImportError:
 from distutils.extension import Extension
 from distutils.command.build_ext import build_ext
 from distutils.ccompiler import get_default_compiler
+from distutils.sysconfig import get_python_inc, get_python_lib
 
 
 def pg_config(s):
@@ -69,8 +70,10 @@ def pg_config(s):
 
 py_modules = ['pg', 'pgdb']
 libraries = ['pq']
-include_dirs = [pg_config('includedir')]
-library_dirs = [pg_config('libdir')]
+# Make sure that the Python header files are searched before
+# those of PostgreSQL, because PostgreSQL can have its own Python.h
+include_dirs = [get_python_inc(), pg_config('includedir')]
+library_dirs = [get_python_lib(), pg_config('libdir')]
 define_macros = [('PYGRESQL_VERSION', version)]
 undef_macros = []
 extra_compile_args = ['-O2']
@@ -127,9 +130,9 @@ class build_pg_ext(build_ext):
                     if not os.path.isdir(include_dir):
                         continue
                     if library_dir not in library_dirs:
-                        library_dirs.insert(0, library_dir)
+                        library_dirs.insert(1, library_dir)
                     if include_dir not in include_dirs:
-                        include_dirs.insert(0, include_dir)
+                        include_dirs.insert(1, include_dir)
                     libraries[0] += 'dll' # libpqdll instead of libpq
                     break
             compiler = self.get_compiler()
