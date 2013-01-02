@@ -237,7 +237,8 @@ set_dberror(PyObject *type, const char *msg, PGresult *result)
 	}
 	if (err)
 	{
-		if (result) {
+		if (result)
+		{
 			char *sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
 			str = sqlstate ? PyString_FromStringAndSize(sqlstate, 5) : NULL;
 		}
@@ -506,7 +507,8 @@ format_result(const PGresult *res)
 						const char align = aligns[j];
 						const int k = sizes[j];
 
-						if (align) {
+						if (align)
+						{
 							sprintf(p, align == 'r' ?
 								"%*s" : "%-*s", k,
 								PQgetvalue(res, i, j));
@@ -1772,7 +1774,8 @@ void notice_receiver(void *arg, const PGresult *res)
 	PyGILState_STATE gstate = PyGILState_Ensure();
 	pgobject *self = (pgobject*) arg;
 	PyObject *proc = self->notice_receiver;
-	if (proc && PyCallable_Check(proc)) {
+	if (proc && PyCallable_Check(proc))
+	{
 		pgnoticeobject *notice = PyObject_NEW(pgnoticeobject, &PgNoticeType);
 		PyObject *args, *ret;
 		if (notice)
@@ -1783,7 +1786,7 @@ void notice_receiver(void *arg, const PGresult *res)
 		else
 		{
 			Py_INCREF(Py_None);
-			notice = (pgnoticeobject *)Py_None;
+			notice = (pgnoticeobject *)(void *)Py_None;
 		}
 		args = Py_BuildValue("(O)", notice);
 		ret = PyObject_CallObject(proc, args);
@@ -1805,7 +1808,8 @@ pg_dealloc(pgobject *self)
 		PQfinish(self->cnx);
 		Py_END_ALLOW_THREADS
 	}
-	if (self->notice_receiver) {
+	if (self->notice_receiver)
+	{
 		Py_DECREF(self->notice_receiver);
 	}
 	PyObject_Del(self);
@@ -2562,13 +2566,17 @@ pg_query(pgobject *self, PyObject *args)
 					*s = PyUnicode_AsASCIIString(obj);
 				else
 					*s = PyUnicode_AsEncodedString(obj, enc, "strict");
-				if (*s == NULL) {
+				if (*s == NULL)
+				{
 					free(lparms); free(parms); free(str);
 					PyErr_SetString(PyExc_UnicodeError, "query parameter"
 						" could not be decoded (bad client encoding)");
-					while (i--) {
+					while (i--)
+					{
 						if (*--s)
+						{
 							Py_DECREF(*s);
+						}
 					}
 					return NULL;
 				}
@@ -2578,13 +2586,17 @@ pg_query(pgobject *self, PyObject *args)
 			else
 			{
 				*s = PyObject_Str(obj);
-				if (*s == NULL) {
+				if (*s == NULL)
+				{
 					free(lparms); free(parms); free(str);
 					PyErr_SetString(PyExc_TypeError,
 						"query parameter has no string representation");
-					while (i--) {
+					while (i--)
+					{
 						if (*--s)
+						{
 							Py_DECREF(*s);
+						}
 					}
 					return NULL;
 				}
@@ -2602,7 +2614,9 @@ pg_query(pgobject *self, PyObject *args)
 		for (i = 0, s=str; i < nparms; i++, s++)
 		{
 			if (*s)
+			{
 				Py_DECREF(*s);
+			}
 		}
 		free(str);
 	}
@@ -3084,7 +3098,8 @@ static char pg_escape_literal__doc__[] =
 "pg_escape_literal(str) -- escape a literal constant for use within SQL.";
 
 static PyObject *
-pg_escape_literal(pgobject *self, PyObject *args) {
+pg_escape_literal(pgobject *self, PyObject *args)
+{
 	char *str; /* our string argument */
 	int str_length; /* length of string */
 	char *esc; /* the escaped version of the string */
@@ -3106,7 +3121,8 @@ static char pg_escape_identifier__doc__[] =
 "pg_escape_identifier(str) -- escape an identifier for use within SQL.";
 
 static PyObject *
-pg_escape_identifier(pgobject *self, PyObject *args) {
+pg_escape_identifier(pgobject *self, PyObject *args)
+{
 	char *str; /* our string argument */
 	int str_length; /* length of string */
 	char *esc; /* the escaped version of the string */
@@ -3130,7 +3146,8 @@ static char pg_escape_string__doc__[] =
 "pg_escape_string(str) -- escape a string for use within SQL.";
 
 static PyObject *
-pg_escape_string(pgobject *self, PyObject *args) {
+pg_escape_string(pgobject *self, PyObject *args)
+{
 	char *from; /* our string argument */
 	char *to=NULL; /* the result */
 	int from_length; /* length of string */
@@ -3140,7 +3157,8 @@ pg_escape_string(pgobject *self, PyObject *args) {
 	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
 		return NULL;
 	to_length = 2*from_length + 1;
-	if (to_length < from_length) { /* overflow */
+	if (to_length < from_length) /* overflow */
+	{
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
 	}
@@ -3160,7 +3178,8 @@ static char pg_escape_bytea__doc__[] =
 "pg_escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
 
 static PyObject *
-pg_escape_bytea(pgobject *self, PyObject *args) {
+pg_escape_bytea(pgobject *self, PyObject *args)
+{
 	unsigned char *from; /* our string argument */
 	unsigned char *to; /* the result */
 	int from_length; /* length of string */
@@ -3599,7 +3618,8 @@ static char escape_string__doc__[] =
 "escape_string(str) -- escape a string for use within SQL.";
 
 static PyObject *
-escape_string(PyObject *self, PyObject *args) {
+escape_string(PyObject *self, PyObject *args)
+{
 	char *from; /* our string argument */
 	char *to=NULL; /* the result */
 	int from_length; /* length of string */
@@ -3609,7 +3629,8 @@ escape_string(PyObject *self, PyObject *args) {
 	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
 		return NULL;
 	to_length = 2*from_length + 1;
-	if (to_length < from_length) { /* overflow */
+	if (to_length < from_length) /* overflow */
+	{
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
 	}
@@ -3628,7 +3649,8 @@ static char escape_bytea__doc__[] =
 "escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
 
 static PyObject *
-escape_bytea(PyObject *self, PyObject *args) {
+escape_bytea(PyObject *self, PyObject *args)
+{
 	unsigned char *from; /* our string argument */
 	unsigned char *to; /* the result */
 	int from_length; /* length of string */
@@ -3651,7 +3673,8 @@ static char unescape_bytea__doc__[] =
 "unescape_bytea(str) -- unescape bytea data that has been retrieved as text.";
 
 static PyObject
-*unescape_bytea(PyObject *self, PyObject *args) {
+*unescape_bytea(PyObject *self, PyObject *args)
+{
 	unsigned char *from; /* our string argument */
 	unsigned char *to; /* the result */
 	size_t to_length; /* length of result string */
@@ -3703,19 +3726,20 @@ static char set_namedresult__doc__[] =
 static PyObject *
 set_namedresult(PyObject *self, PyObject *args)
 {
-    PyObject *ret = NULL;
-    PyObject *func;
+	PyObject *ret = NULL;
+	PyObject *func;
 
-    if (PyArg_ParseTuple(args, "O", &func))
-    {
-        if (PyCallable_Check(func)) {
-            Py_XINCREF(func); Py_XDECREF(namedresult); namedresult = func;
-            Py_INCREF(Py_None); ret = Py_None;
-        }
-        else
-            PyErr_SetString(PyExc_TypeError, "parameter must be callable");
-    }
-    return ret;
+	if (PyArg_ParseTuple(args, "O", &func))
+	{
+		if (PyCallable_Check(func))
+		{
+			Py_XINCREF(func); Py_XDECREF(namedresult); namedresult = func;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else
+			PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+	}
+	return ret;
 }
 
 #ifdef DEFAULT_VARS
