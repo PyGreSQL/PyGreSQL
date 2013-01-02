@@ -3091,7 +3091,7 @@ pg_parameter(pgobject *self, PyObject *args)
 	return Py_None;
 }
 
-#if PG_VERSION_NUM >= 90000
+#ifdef ESCAPING_FUNCS
 
 /* escape literal */
 static char pg_escape_literal__doc__[] =
@@ -3139,7 +3139,7 @@ pg_escape_identifier(pgobject *self, PyObject *args)
 	return ret;
 }
 
-#endif
+#endif	/* ESCAPING_FUNCS */
 
 /* escape string */
 static char pg_escape_string__doc__[] =
@@ -3316,12 +3316,12 @@ static struct PyMethodDef pgobj_methods[] = {
 	{"parameter", (PyCFunction) pg_parameter, METH_VARARGS,
 			pg_parameter__doc__},
 
-#if PG_VERSION_NUM >= 90000
+#ifdef ESCAPING_FUNCS
 	{"escape_literal", (PyCFunction) pg_escape_literal, METH_VARARGS,
 			pg_escape_literal__doc__},
 	{"escape_identifier", (PyCFunction) pg_escape_identifier, METH_VARARGS,
 			pg_escape_identifier__doc__},
-#endif
+#endif	/* ESCAPING_FUNCS */
 	{"escape_string", (PyCFunction) pg_escape_string, METH_VARARGS,
 			pg_escape_string__doc__},
 	{"escape_bytea", (PyCFunction) pg_escape_bytea, METH_VARARGS,

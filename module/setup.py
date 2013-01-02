@@ -90,7 +90,9 @@ class build_pg_ext(build_ext):
         ('large-objects', None,
             "enable large object support"),
         ('default-vars', None,
-            'enable default variables use')]
+            "enable default variables use"),
+        ('escaping-funcs', None,
+            "enable string escaping functions")]
 
     boolean_options = build_ext.boolean_options + [
         'direct-access', 'large-objects', 'default-vars']
@@ -104,6 +106,7 @@ class build_pg_ext(build_ext):
         self.direct_access = 1
         self.large_objects = 1
         self.default_vars = 1
+        self.escaping_funcs = 1
 
     def finalize_options(self):
         """Set final values for all build_pg options."""
@@ -114,6 +117,8 @@ class build_pg_ext(build_ext):
             define_macros.append(('LARGE_OBJECTS', None))
         if self.default_vars:
             define_macros.append(('DEFAULT_VARS', None))
+        if self.escaping_funcs:
+            define_macros.append(('ESCAPING_FUNCS', None))
         if sys.platform == 'win32':
             bits = platform.architecture()[0]
             if bits == '64bit': # we need to find libpq64
