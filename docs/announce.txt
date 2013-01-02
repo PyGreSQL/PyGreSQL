@@ -19,5 +19,12 @@ for things that have changed in this version.
 Please refer to `readme.txt <readme.html>`_
 for general information.
 
+This version has been built and unit tested on:
+ - NetBSD
+ - FreeBSD
+ - Windows 7 with both MinGW and Visual Studio
+ - PostgreSQL 8.4, 9.0 and 9.2 64bit
+ - Python 2.6 and 2.7 64bit
+
 | D'Arcy J.M. Cain
 | darcy@PyGreSQL.org
