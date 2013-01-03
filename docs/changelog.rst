@@ -4,7 +4,7 @@ ChangeLog
 Version 4.1 (2013-01-01)
 ------------------------
 - Dropped support for Python below 2.5 and PostgreSQL below 8.3.
-- Support the new PostgreSQL versions 9.0 and 9.1.
+- Support the new PostgreSQL versions 9.0, 9.1 and 9.2.
 - Particularly, support PQescapeLiteral() and PQescapeIdentifier().
 - The query method of the classic API now supports positional parameters.
   This an effective way to pass arbitrary or unknown data without worrying
