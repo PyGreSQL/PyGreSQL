@@ -3,7 +3,7 @@ PyGreSQL ChangeLog
 ==================
 
 Version 4.1 (2013-01-01)
------------
+------------------------
 - Dropped support for Python below 2.5 and PostgreSQL below 8.3.
 - Added support for Python up to 2.7 and PostgreSQL up to 9.2.
 - Particularly, support PQescapeLiteral() and PQescapeIdentifier().
