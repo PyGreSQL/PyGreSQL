@@ -1,7 +1,7 @@
 ChangeLog
 =========
 
-Version 4.1 (2013-12-01)
+Version 4.1 (2013-01-01)
 ------------------------
 - Dropped support for Python below 2.5 and PostgreSQL below 8.3.
 - Support the new PostgreSQL versions 9.0 and 9.1.
