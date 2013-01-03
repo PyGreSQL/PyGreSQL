@@ -19,7 +19,7 @@ else
 	SYMLINK=PyGreSQL.tgz
 fi
 
-DISTDIR=/usr/ftp/pub/distrib
+DISTDIR=/u/pyg/files
 TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
 
