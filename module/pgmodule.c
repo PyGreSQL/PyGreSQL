@@ -2143,7 +2143,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 		{
 			int			k;
 			char	   *s = PQgetvalue(self->result, i, j);
-			char		cashbuf[64], cashdec, *t;
+			char		cashbuf[64];
 			PyObject   *tmp_obj;
 
 			if (PQgetisnull(self->result, i, j))
@@ -2169,23 +2169,12 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						break;
 
 					case 5:  /* money */
-						cashdec = '.';
-						for (t = s + strlen(s) - 1; t >= s; t--)
-						{
-							if (*t == '.' || *t == ',')
-							{
-								cashdec = *t;
-								break;
-							}
-						}
-						for (k = 0; *s &&
-							 k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
+						for (k = 0;
+							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s))
+							if (isdigit(*s) || *s == '.')
 								cashbuf[k++] = *s;
-							else if (*s == cashdec)
-								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
@@ -2279,7 +2268,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 		{
 			int			k;
 			char	   *s = PQgetvalue(self->result, i, j);
-			char		cashbuf[64], cashdec, *t;
+			char		cashbuf[64];
 			PyObject   *tmp_obj;
 
 			if (PQgetisnull(self->result, i, j))
@@ -2305,23 +2294,12 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						break;
 
 					case 5:  /* money */
-						cashdec = '.';
-						for (t = s + strlen(s) - 1; t >= s; t--)
-						{
-							if (*t == '.' || *t == ',')
-							{
-								cashdec = *t;
-								break;
-							}
-						}
-						for (k = 0; *s &&
-							 k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
+						for (k = 0;
+							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s))
+							if (isdigit(*s) || *s == '.')
 								cashbuf[k++] = *s;
-							else if (*s == cashdec)
-								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
