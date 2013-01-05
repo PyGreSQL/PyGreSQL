@@ -18,6 +18,8 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 
 """
 
+import select
+
 from _pg import *
 try:
     frozenset
@@ -126,9 +128,79 @@ def _prg_error(msg):
     """Returns ProgrammingError."""
     return _db_error(msg, ProgrammingError)
 
+class pgnotify(object):
+    """A PostgreSQL client-side asynchronous notification handler."""
+
+    def __init__(self, pgconn, event, callback, arg_dict={}, timeout=None):
+        """
+        pgconn   - PostgreSQL connection object.
+        event    - Event to LISTEN for.
+        callback - Event callback.
+        arg_dict - A dictionary passed as the argument to the callback.
+        timeout  - Timeout in seconds; a floating point number denotes
+                    fractions of seconds. If it is absent or None, the
+                    callers will never time out."""
+
+        self.pgconn = pgconn
+        self.event = event
+        self.stop = 'stop_%s' % event
+        self.callback = callback
+        self.arg_dict = arg_dict
+        self.timeout = timeout
+
+    def __del__(self):
+        try:
+            self.pgconn.query('unlisten "%s"' % self.event)
+            self.pgconn.query('unlisten "%s"' % self.stop)
+        except pg.DatabaseError:
+            pass
+
+    def __call__(self):
+        """
+        Invoke the handler.
+        The handler actually LISTENs for two NOTIFY messages:
+
+        <event> and stop_<event>.
+
+        When either of these NOTIFY messages are received, its associated
+        'pid' and 'event' are inserted into <arg_dict>, and the callback is
+        invoked with <arg_dict>. If the NOTIFY message is stop_<event>, the
+        handler UNLISTENs both <event> and stop_<event> and exits."""
+
+        self.pgconn.query('listen "%s"' % self.event)
+        self.pgconn.query('listen "%s"' % self.stop)
+        _ilist = [self.pgconn.fileno()]
+
+        while 1:
+            ilist, olist, elist = select.select(_ilist, [], [], self.timeout)
+            if ilist == []:
+                # We timed out.
+                self.pgconn.query('unlisten "%s"' % self.event)
+                self.pgconn.query('unlisten "%s"' % self.stop)
+                self.callback(None)
+                return
+            else:
+                notice = self.pgconn.getnotify()
+                if notice is None:
+                    continue
+                event, pid, extra = notice
+                if event in (self.event, self.stop):
+                    self.arg_dict['pid'] = pid
+                    self.arg_dict['event'] = event
+                    self.callback(self.arg_dict)
+                    if event == self.stop:
+                        self.pgconn.query('unlisten "%s"' % self.event)
+                        self.pgconn.query('unlisten "%s"' % self.stop)
+                        return
+                else:
+                    self.pgconn.query('unlisten "%s"' % self.event)
+                    self.pgconn.query('unlisten "%s"' % self.stop)
+                    raise pgnotifyError, \
+                        'listening for ("%s", "%s") but notified of "%s"' \
+                        % (self.event, self.stop, event)
+
 
 # The PostGreSQL database connection interface:
-
 class DB(object):
     """Wrapper class for the _pg connection type."""
 
@@ -838,6 +910,8 @@ class DB(object):
         self._do_debug(q + " %% %r" % (params,))
         return int(self.db.query(q, params))
 
+    def pgnotify(self, event, callback, arg_dict={}, timeout=None):
+        return pgnotify(self.db, event, callback, arg_dict, timeout)
 
 # if run as script, print some information
 
