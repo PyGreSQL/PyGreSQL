@@ -2443,14 +2443,11 @@ pg_getnotify(pgobject *self, PyObject *args)
 		PyObject   *notify_result,
 				   *temp;
 
-		if (!(notify_result = PyTuple_New(3)))
+		if (!(temp = PyString_FromString(notify->relname)))
 			return NULL;
 
-		if (!(temp = PyString_FromString(notify->relname)))
-		{
-			Py_DECREF(notify_result);
+		if (!(notify_result = PyTuple_New(3)))
 			return NULL;
-		}
 
 		PyTuple_SET_ITEM(notify_result, 0, temp);
 
