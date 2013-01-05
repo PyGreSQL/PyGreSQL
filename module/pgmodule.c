@@ -119,6 +119,7 @@ int *get_type_array(PGresult *result, int nfields);
 
 static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL; /* function for getting named results */
+static char *decimal_point = "."; /* decimal point used in money values */
 
 
 /* --------------------------------------------------------------------- */
@@ -2173,8 +2174,10 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s) || *s == '.')
+							if (isdigit(*s))
 								cashbuf[k++] = *s;
+							else if (*s == *decimal_point)
+								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
@@ -2298,8 +2301,10 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s) || *s == '.')
+							if (isdigit(*s))
 								cashbuf[k++] = *s;
+							else if (*s == *decimal_point)
+								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
@@ -3688,6 +3693,47 @@ static PyObject
 	return ret;
 }
 
+/* set decimal point */
+static char set_decimal_point__doc__[] =
+"set_decimal_point() -- set decimal point to be used for money values.";
+
+static PyObject *
+set_decimal_point(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	char *s;
+
+	if (PyArg_ParseTuple(args, "s", &s))
+	{
+		decimal_point = s;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	return ret;
+}
+
+/* get decimal point */
+static char get_decimal_point__doc__[] =
+"get_decimal_point() -- get decimal point to be used for money values.";
+
+static PyObject *
+get_decimal_point(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = PyString_FromString(decimal_point);
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError,
+			" get_decimal_point() takes no parameter");
+	}
+
+
+	return ret;
+}
+
 /* set decimal */
 static char set_decimal__doc__[] =
 "set_decimal(cls) -- set a decimal type to be used for numeric values.";
@@ -4090,6 +4136,10 @@ static struct PyMethodDef pg_methods[] = {
 			escape_bytea__doc__},
 	{"unescape_bytea", (PyCFunction) unescape_bytea, METH_VARARGS,
 			unescape_bytea__doc__},
+	{"set_decimal_point", (PyCFunction) set_decimal_point, METH_VARARGS,
+			set_decimal_point__doc__},
+	{"get_decimal_point", (PyCFunction) get_decimal_point, METH_VARARGS,
+			get_decimal_point__doc__},
 	{"set_decimal", (PyCFunction) set_decimal, METH_VARARGS,
 			set_decimal__doc__},
 	{"set_namedresult", (PyCFunction) set_namedresult, METH_VARARGS,
