@@ -969,10 +969,10 @@ class TestDBClassBasic(unittest.TestCase):
             escape_string fileno get get_attnames get_databases
             get_notice_receiver get_relations get_tables getline getlo
             getnotify has_table_privilege host insert inserttable locreate
-            loimport options parameter pkey port protocol_version putline query
-            release reopen reset rollback savepoint server_version
-            set_notice_receiver source start status transaction tty
-            unescape_bytea update use_regtypes user'''.split()
+            loimport options parameter pgnotify pkey port protocol_version
+            putline query release reopen reset rollback savepoint
+            server_version set_notice_receiver source start status transaction
+            tty unescape_bytea update use_regtypes user'''.split()
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)
