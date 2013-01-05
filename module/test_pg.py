@@ -22,7 +22,7 @@ There are a few drawbacks:
   * Table privilege problems (e.g. insert but no select) are not tested.
   * Status and error messages from the connection are not tested.
   * It would be more reasonable to create a test for the underlying
-    shared library functions in the _pg module and assume they are ok.vi
+    shared library functions in the _pg module and assume they are ok.
     The pg and pgdb modules should be tested against _pg mock functions.
 
 """
@@ -1184,6 +1184,7 @@ class TestDBClass(unittest.TestCase):
         dbname = DBTestSuite.dbname
         self.dbname = dbname
         self.db = pg.DB(dbname)
+        self.db.query("set lc_monetary='C'");
         if debug:
             self.db.debug = 'DEBUG: %s'
 
@@ -1276,14 +1277,14 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(f('123456789', 'num'), '123456789')
         self.assertEqual(f('1.23456789', 'num'), '1.23456789')
         self.assertEqual(f('12345678.9', 'num'), '12345678.9')
-        self.assertEqual(f(123, 'money'), "'123.00'")
-        self.assertEqual(f('123', 'money'), "'123.00'")
-        self.assertEqual(f(123.45, 'money'), "'123.45'")
-        self.assertEqual(f('123.45', 'money'), "'123.45'")
-        self.assertEqual(f(123.454, 'money'), "'123.45'")
-        self.assertEqual(f('123.454', 'money'), "'123.45'")
-        self.assertEqual(f(123.456, 'money'), "'123.46'")
-        self.assertEqual(f('123.456', 'money'), "'123.46'")
+        self.assertEqual(f(123, 'money'), '123')
+        self.assertEqual(f('123', 'money'), '123')
+        self.assertEqual(f(123.45, 'money'), '123.45')
+        self.assertEqual(f('123.45', 'money'), '123.45')
+        self.assertEqual(f(123.454, 'money'), '123.454')
+        self.assertEqual(f('123.454', 'money'), '123.454')
+        self.assertEqual(f(123.456, 'money'), '123.456')
+        self.assertEqual(f('123.456', 'money'), '123.456')
         self.assertEqual(f('f', 'bool'), "'f'")
         self.assertEqual(f('F', 'bool'), "'f'")
         self.assertEqual(f('false', 'bool'), "'f'")
@@ -1579,27 +1580,80 @@ class TestDBClass(unittest.TestCase):
             smart_ddl(self.db, 'drop table "%s"' % table)
             smart_ddl(self.db, 'create table "%s" ('
                 "i2 smallint, i4 integer, i8 bigint,"
-                "d numeric, f4 real, f8 double precision, m money, "
-                "v4 varchar(4), c4 char(4), t text,"
-                "b boolean, ts timestamp)" % table)
-            data = dict(
-                i2=2 ** 15 - 1, i4=int(2 ** 31 - 1), i8=long(2 ** 31 - 1),
-                d=Decimal('123456789.9876543212345678987654321'),
-                f4=1.0 + 1.0 / 32, f8=1.0 + 1.0 / 32,
-                m="1234.56", v4="1234", c4="1234",  t="1234" * 10,
-                b=1, ts='2012-12-21')
-            r = self.db.insert(table, data)
-            self.assertEqual(r, data)
+                " d numeric, f4 real, f8 double precision, m money,"
+                " v4 varchar(4), c4 char(4), t text,"
+                " b boolean, ts timestamp)" % table)
             oid_table = table
             if ' ' in table:
                 oid_table = '"%s"' % oid_table
             oid_table = 'oid(public.%s)' % oid_table
-            self.assertTrue(oid_table in r)
-            self.assertTrue(isinstance(r[oid_table], int))
-            s = self.db.query('select oid,* from "%s"' % table).dictresult()[0]
-            s[oid_table] = s['oid']
-            del s['oid']
-            self.assertEqual(r, s)
+            tests = [dict(i2=None, i4=None, i8=None),
+                (dict(i2='', i4='', i8=''), dict(i2=None, i4=None, i8=None)),
+                (dict(i2=0, i4=0, i8=0), dict(i2=0, i4=0, i8=0)),
+                dict(i2=42, i4=123456, i8=9876543210),
+                dict(i2=2 ** 15 - 1,
+                    i4=int(2 ** 31 - 1), i8=long(2 ** 63 - 1)),
+                dict(d=None), (dict(d=''), dict(d=None)),
+                dict(d=Decimal(0)), (dict(d=0), dict(d=Decimal(0))),
+                dict(f4=None, f8=None), dict(f4=0, f8=0),
+                (dict(f4='', f8=''), dict(f4=None, f8=None)),
+                dict(d=1234.5, f4=1234.5, f8=1234.5),
+                dict(d=Decimal('123.456789'), f4=12.375, f8=123.4921875),
+                dict(d=Decimal('123456789.9876543212345678987654321')),
+                dict(m=None), (dict(m=''), dict(m=None)),
+                dict(m=Decimal('-1234.56')),
+                (dict(m=('-1234.56')), dict(m=Decimal('-1234.56'))),
+                dict(m=Decimal('1234.56')), dict(m=Decimal('123456')),
+                (dict(m='1234.56'), dict(m=Decimal('1234.56'))),
+                (dict(m=1234.5), dict(m=Decimal('1234.5'))),
+                (dict(m=-1234.5), dict(m=Decimal('-1234.5'))),
+                (dict(m=123456), dict(m=Decimal('123456'))),
+                (dict(m='1234567.89'), dict(m=Decimal('1234567.89'))),
+                dict(b=None), (dict(b=''), dict(b=None)),
+                dict(b='f'), dict(b='t'),
+                (dict(b=0), dict(b='f')), (dict(b=1), dict(b='t')),
+                (dict(b=False), dict(b='f')), (dict(b=True), dict(b='t')),
+                (dict(b='0'), dict(b='f')), (dict(b='1'), dict(b='t')),
+                (dict(b='n'), dict(b='f')), (dict(b='y'), dict(b='t')),
+                (dict(b='no'), dict(b='f')), (dict(b='yes'), dict(b='t')),
+                (dict(b='off'), dict(b='f')), (dict(b='on'), dict(b='t')),
+                dict(v4=None, c4=None, t=None),
+                (dict(v4='', c4='', t=''), dict(c4=' ' * 4)),
+                dict(v4='1234', c4='1234', t='1234' * 10),
+                dict(v4='abcd', c4='abcd', t='abcdefg'),
+                (dict(v4='abc', c4='abc', t='abc'), dict(c4='abc ')),
+                dict(ts=None), (dict(ts=''), dict(ts=None)),
+                (dict(ts=0), dict(ts=None)), (dict(ts=False), dict(ts=None)),
+                dict(ts='2012-12-21 00:00:00'),
+                (dict(ts='2012-12-21'), dict(ts='2012-12-21 00:00:00')),
+                dict(ts='2012-12-21 12:21:12'),
+                dict(ts='2013-01-05 12:13:14'),
+                dict(ts='current_timestamp')]
+            for test in tests:
+                if isinstance(test, dict):
+                    data = test
+                    change = {}
+                else:
+                    data, change = test
+                expect = data.copy()
+                expect.update(change)
+                self.assertEqual(self.db.insert(table, data), data)
+                self.assertTrue(oid_table in data)
+                oid = data[oid_table]
+                self.assertTrue(isinstance(oid, int))
+                data = dict(item for item in data.iteritems()
+                    if item[0] in expect)
+                ts = expect.get('ts')
+                if ts == 'current_timestamp':
+                    expect['ts'] = data['ts']
+                self.assertEqual(data, expect)
+                data = self.db.query(
+                    'select oid,* from "%s"' % table).dictresult()[0]
+                self.assertEqual(data['oid'], oid)
+                data = dict(item for item in data.iteritems()
+                    if item[0] in expect)
+                self.assertEqual(data, expect)
+                self.db.query('delete from "%s"' % table)
 
     def testUpdate(self):
         for table in ('update_test_table', 'test table for update'):
@@ -1916,6 +1970,7 @@ class DBTestSuite(unittest.TestSuite):
         for s in ('client_min_messages = warning',
             'client_encoding = UTF8',
             'date_style = ISO, MDY',
+            'lc_monetary = C',
             'default_with_oids = on',
             'standard_conforming_strings = off',
             'escape_string_warning = off'):

@@ -199,13 +199,13 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(q('1', 'text'), "'1'")
         self.assertEqual(q('1', 'num'), "1")
         self.assertEqual(q(None, 'int'), "NULL")
-        self.assertEqual(q(1, 'money'), "'1.00'")
-        self.assertEqual(q('1', 'money'), "'1.00'")
-        self.assertEqual(q(1.234, 'money'), "'1.23'")
-        self.assertEqual(q('1.234', 'money'), "'1.23'")
-        self.assertEqual(q(0, 'money'), "'0.00'")
-        self.assertEqual(q(0.00, 'money'), "'0.00'")
-        self.assertEqual(q(Decimal('0.00'), 'money'), "'0.00'")
+        self.assertEqual(q(1, 'money'), "1")
+        self.assertEqual(q('1', 'money'), "1")
+        self.assertEqual(q(1.234, 'money'), "1.234")
+        self.assertEqual(q('1.234', 'money'), "1.234")
+        self.assertEqual(q(0, 'money'), "0")
+        self.assertEqual(q(0.00, 'money'), "0.0")
+        self.assertEqual(q(Decimal('0.00'), 'money'), "0.00")
         self.assertEqual(q(None, 'money'), "NULL")
         self.assertEqual(q('', 'money'), "NULL")
         self.assertEqual(q(0, 'bool'), "'f'")
@@ -221,7 +221,8 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(q('true', 'bool'), "'t'")
         self.assertEqual(q('y', 'bool'), "'t'")
         self.assertEqual(q('', 'date'), "NULL")
-        self.assertEqual(q('date', 'date'), "'date'")
+        self.assertEqual(q('some_date', 'date'), "'some_date'")
+        self.assertEqual(q('current_timestamp', 'date'), "current_timestamp")
         self.assertEqual(q('', 'text'), "''")
         self.assertEqual(q("'", 'text'), "''''")
         self.assertEqual(q("\\", 'text'), "'\\\\'")
@@ -231,7 +232,7 @@ class UtilityTest(unittest.TestCase):
 
     def test_notify_DB(self):
         global cb1_return
-        
+
         db = opendb()
         db2 = opendb()
         # Listen for 'event_1'
@@ -284,7 +285,7 @@ class UtilityTest(unittest.TestCase):
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    
+
     if len(sys.argv) > 1: test_list = sys.argv[1:]
     else: test_list = unittest.getTestCaseNames(UtilityTest, 'test_')
 

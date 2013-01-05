@@ -29,7 +29,7 @@ try:
     from decimal import Decimal
     set_decimal(Decimal)
 except ImportError:  # Python < 2.4
-    pass
+    Decimal = float
 try:
     from collections import namedtuple
 except ImportError:  # Python < 2.6
@@ -127,6 +127,7 @@ def _int_error(msg):
 def _prg_error(msg):
     """Returns ProgrammingError."""
     return _db_error(msg, ProgrammingError)
+
 
 class pgnotify(object):
     """A PostgreSQL client-side asynchronous notification handler."""
@@ -318,7 +319,9 @@ class DB(object):
         """Quote money value."""
         if d is None or d == '':
             return 'NULL'
-        return "'%.2f'" % float(d)
+        if not isinstance(d, basestring):
+            d = str(d)
+        return d
 
     _quote_funcs = dict(  # quote methods for each type
         text=_quote_text, bool=_quote_bool, date=_quote_date,
@@ -693,8 +696,7 @@ class DB(object):
                     raise _db_error('%s not in arg' % qoid)
             else:
                 arg = {qoid: arg}
-            where = 'oid = $1'
-            params = (arg[qoid],)
+            where = 'oid = %s' % arg[qoid]
             attnames = '*'
         else:
             attnames = self.get_attnames(qcl)
@@ -704,16 +706,14 @@ class DB(object):
                 if len(keyname) > 1:
                     raise _prg_error('Composite key needs dict as arg')
                 arg = dict([(k, arg) for k in keyname])
-            where = ' AND '.join(['%s = $%d'
-                % (k, i + 1) for i, k in enumerate(keyname)])
-            params = tuple(arg[k] for k in keyname)
+            where = ' AND '.join(['%s = %s'
+                % (k, self._quote(arg[k], attnames[k])) for k in keyname])
             attnames = ', '.join(attnames)
         q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (attnames, qcl, where)
-        self._do_debug(q + ' %% %r' % (params,))
-        res = self.db.query(q, params).dictresult()
+        self._do_debug(q)
+        res = self.db.query(q).dictresult()
         if not res:
-            raise _db_error(
-                'No such record in %s where %s %% %r' % (qcl, where, params))
+            raise _db_error('No such record in %s where %s' % (qcl, where))
         for att, value in res[0].iteritems():
             arg[att == 'oid' and qoid or att] = value
         return arg
@@ -738,14 +738,11 @@ class DB(object):
             d = {}
         d.update(kw)
         attnames = self.get_attnames(qcl)
-        names, values, params = [], [], []
-        i = 1
+        names, values = [], []
         for n in attnames:
             if n != 'oid' and n in d:
                 names.append('"%s"' % n)
-                values.append('$%d' % (i,))
-                params.append(d[n])
-                i += 1
+                values.append(self._quote(d[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         selectable = self.has_table_privilege(qcl)
         if selectable and self.server_version >= 80200:
@@ -753,8 +750,8 @@ class DB(object):
         else:
             ret = ''
         q = 'INSERT INTO %s (%s) VALUES (%s)%s' % (qcl, names, values, ret)
-        self._do_debug(q + " %% %r" % (params,))
-        res = self.db.query(q, params)
+        self._do_debug(q)
+        res = self.db.query(q)
         if ret:
             res = res.dictresult()
             for att, value in res[0].iteritems():
@@ -796,8 +793,7 @@ class DB(object):
         d.update(kw)
         attnames = self.get_attnames(qcl)
         if qoid in d:
-            where = 'oid = $1'
-            params = [d[qoid]]
+            where = 'oid = %s' % d[qoid]
             keyname = ()
         else:
             try:
@@ -807,18 +803,14 @@ class DB(object):
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
             try:
-                where = ' AND '.join(['%s = $%d'
-                    % (k, i + 1) for i, k in enumerate(keyname)])
-                params = [d[k] for k in keyname]
+                where = ' AND '.join(['%s = %s'
+                    % (k, self._quote(d[k], attnames[k])) for k in keyname])
             except KeyError:
                 raise _prg_error('Update needs primary key or oid.')
         values = []
-        i = len(params)
         for n in attnames:
             if n in d and n not in keyname:
-                i += 1
-                values.append('%s = $%d' % (n, i))
-                params.append(d[n])
+                values.append('%s = %s' % (n, self._quote(d[n], attnames[n])))
         if not values:
             return d
         values = ', '.join(values)
@@ -829,7 +821,7 @@ class DB(object):
             ret = ''
         q = 'UPDATE %s SET %s WHERE %s%s' % (qcl, values, where, ret)
         self._do_debug(q)
-        res = self.db.query(q, params)
+        res = self.db.query(q)
         if ret:
             res = res.dictresult()[0]
             for att, value in res.iteritems():
@@ -891,8 +883,7 @@ class DB(object):
             d = {}
         d.update(kw)
         if qoid in d:
-            where = 'oid = $1'
-            params = (d[qoid],)
+            where = 'oid = %s' % d[qoid]
         else:
             try:
                 keyname = self.pkey(qcl)
@@ -900,15 +891,15 @@ class DB(object):
                 raise _prg_error('Class %s has no primary key' % qcl)
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
+            attnames = self.get_attnames(qcl)
             try:
-                where = ' AND '.join(['%s = $%d'
-                    % (k, i + 1) for i, k in enumerate(keyname)])
-                params = tuple(d[k] for k in keyname)
+                where = ' AND '.join(['%s = %s'
+                    % (k, self._quote(d[k], attnames[k])) for k in keyname])
             except KeyError:
                 raise _prg_error('Delete needs primary key or oid.')
         q = 'DELETE FROM %s WHERE %s' % (qcl, where)
-        self._do_debug(q + " %% %r" % (params,))
-        return int(self.db.query(q, params))
+        self._do_debug(q)
+        return int(self.db.query(q))
 
     def pgnotify(self, event, callback, arg_dict={}, timeout=None):
         return pgnotify(self.db, event, callback, arg_dict, timeout)
