@@ -133,7 +133,8 @@ class pgnotify(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 
     def __init__(self, pgconn, event, callback, arg_dict={}, timeout=None):
-        """
+        """Initialize the notification handler.
+
         pgconn   - PostgreSQL connection object.
         event    - Event to LISTEN for.
         callback - Event callback.
@@ -153,12 +154,12 @@ class pgnotify(object):
         try:
             self.pgconn.query('unlisten "%s"' % self.event)
             self.pgconn.query('unlisten "%s"' % self.stop)
-        except pg.DatabaseError:
+        except DatabaseError:
             pass
 
     def __call__(self):
-        """
-        Invoke the handler.
+        """Invoke the handler.
+
         The handler actually LISTENs for two NOTIFY messages:
 
         <event> and stop_<event>.
@@ -173,7 +174,7 @@ class pgnotify(object):
         _ilist = [self.pgconn.fileno()]
 
         while 1:
-            ilist, olist, elist = select.select(_ilist, [], [], self.timeout)
+            ilist, _olist, _elist = select.select(_ilist, [], [], self.timeout)
             if ilist == []:
                 # We timed out.
                 self.pgconn.query('unlisten "%s"' % self.event)
@@ -184,7 +185,7 @@ class pgnotify(object):
                 notice = self.pgconn.getnotify()
                 if notice is None:
                     continue
-                event, pid, extra = notice
+                event, pid, _extra = notice
                 if event in (self.event, self.stop):
                     self.arg_dict['pid'] = pid
                     self.arg_dict['event'] = event
@@ -196,9 +197,9 @@ class pgnotify(object):
                 else:
                     self.pgconn.query('unlisten "%s"' % self.event)
                     self.pgconn.query('unlisten "%s"' % self.stop)
-                    raise pgnotifyError, \
-                        'listening for ("%s", "%s") but notified of "%s"' \
-                        % (self.event, self.stop, event)
+                    raise _db_error(
+                        'listening for ("%s", "%s") but notified of "%s"'
+                        % (self.event, self.stop, event))
 
 
 # The PostGreSQL database connection interface:
