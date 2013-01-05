@@ -2143,7 +2143,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 		{
 			int			k;
 			char	   *s = PQgetvalue(self->result, i, j);
-			char		cashbuf[64];
+			char		cashbuf[64], cashdec, *t;
 			PyObject   *tmp_obj;
 
 			if (PQgetisnull(self->result, i, j))
@@ -2154,27 +2154,38 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 			else
 				switch (typ[j])
 				{
-					case 1:
+					case 1:  /* int2/4 */
 						val = PyInt_FromString(s, NULL, 10);
 						break;
 
-					case 2:
+					case 2:  /* int8 */
 						val = PyLong_FromString(s, NULL, 10);
 						break;
 
-					case 3:
+					case 3:  /* float/double */
 						tmp_obj = PyString_FromString(s);
 						val = PyFloat_FromString(tmp_obj, NULL);
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:
-						for (k = 0;
-							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
+					case 5:  /* money */
+						cashdec = '.';
+						for (t = s + strlen(s) - 1; t >= s; t--)
+						{
+							if (*t == '.' || *t == ',')
+							{
+								cashdec = *t;
+								break;
+							}
+						}
+						for (k = 0; *s &&
+							 k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s) || *s == '.')
+							if (isdigit(*s))
 								cashbuf[k++] = *s;
+							else if (*s == cashdec)
+								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
@@ -2182,7 +2193,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						s = cashbuf;
 
 					/* FALLTHROUGH */ /* no break */
-					case 4:
+					case 4:  /* numeric */
 						if (decimal)
 						{
 							tmp_obj = Py_BuildValue("(s)", s);
@@ -2268,7 +2279,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 		{
 			int			k;
 			char	   *s = PQgetvalue(self->result, i, j);
-			char		cashbuf[64];
+			char		cashbuf[64], cashdec, *t;
 			PyObject   *tmp_obj;
 
 			if (PQgetisnull(self->result, i, j))
@@ -2279,27 +2290,38 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 			else
 				switch (typ[j])
 				{
-					case 1:
+					case 1:  /* int2/4 */
 						val = PyInt_FromString(s, NULL, 10);
 						break;
 
-					case 2:
+					case 2:  /* int8 */
 						val = PyLong_FromString(s, NULL, 10);
 						break;
 
-					case 3:
+					case 3:  /* float/double */
 						tmp_obj = PyString_FromString(s);
 						val = PyFloat_FromString(tmp_obj, NULL);
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:
-						for (k = 0;
-							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
+					case 5:  /* money */
+						cashdec = '.';
+						for (t = s + strlen(s) - 1; t >= s; t--)
+						{
+							if (*t == '.' || *t == ',')
+							{
+								cashdec = *t;
+								break;
+							}
+						}
+						for (k = 0; *s &&
+							 k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s) || *s == '.')
+							if (isdigit(*s))
 								cashbuf[k++] = *s;
+							else if (*s == cashdec)
+								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
@@ -2307,7 +2329,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						s = cashbuf;
 
 					/* FALLTHROUGH */ /* no break */
-					case 4:
+					case 4:  /* numeric */
 						if (decimal)
 						{
 							tmp_obj = Py_BuildValue("(s)", s);
