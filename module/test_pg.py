@@ -716,6 +716,27 @@ class TestParamQueries(unittest.TestCase):
         self.assertEqual(self.c.query("select $1::text", [None]
             ).getresult(), [(None,)])
 
+    def testQueryWithBoolParams(self):
+        query = self.c.query
+        self.assertEqual(query("select false").getresult(), [('f',)])
+        self.assertEqual(query("select true").getresult(), [('t',)])
+        self.assertEqual(query("select $1::bool", (None,)).getresult(),
+            [(None,)])
+        self.assertEqual(query("select $1::bool", ('f',)).getresult(), [('f',)])
+        self.assertEqual(query("select $1::bool", ('t',)).getresult(), [('t',)])
+        self.assertEqual(query("select $1::bool", ('false',)).getresult(),
+            [('f',)])
+        self.assertEqual(query("select $1::bool", ('true',)).getresult(),
+            [('t',)])
+        self.assertEqual(query("select $1::bool", ('n',)).getresult(), [('f',)])
+        self.assertEqual(query("select $1::bool", ('y',)).getresult(), [('t',)])
+        self.assertEqual(query("select $1::bool", (0,)).getresult(), [('f',)])
+        self.assertEqual(query("select $1::bool", (1,)).getresult(), [('t',)])
+        self.assertEqual(query("select $1::bool", (False,)).getresult(),
+            [('f',)])
+        self.assertEqual(query("select $1::bool", (True,)).getresult(),
+            [('t',)])
+
     def testQueryWithIntParams(self):
         query = self.c.query
         self.assertEqual(query("select 1+1").getresult(), [(2,)])
