@@ -132,7 +132,7 @@ def _prg_error(msg):
 class pgnotify(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 
-    def __init__(self, pgconn, event, callback, arg_dict={}, timeout=None):
+    def __init__(self, pgconn, event, callback, arg_dict=None, timeout=None):
         """Initialize the notification handler.
 
         pgconn   - PostgreSQL connection object.
@@ -147,7 +147,7 @@ class pgnotify(object):
         self.event = event
         self.stop = 'stop_%s' % event
         self.callback = callback
-        self.arg_dict = arg_dict
+        self.arg_dict = arg_dict or {}
         self.timeout = timeout
 
     def __del__(self):
