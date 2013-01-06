@@ -223,6 +223,8 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(q('true', 'bool'), "'t'")
         self.assertEqual(q('y', 'bool'), "'t'")
         self.assertEqual(q('', 'date'), "NULL")
+        self.assertEqual(q(False, 'date'), "NULL")
+        self.assertEqual(q(0, 'date'), "NULL")
         self.assertEqual(q('some_date', 'date'), "'some_date'")
         self.assertEqual(q('current_timestamp', 'date'), "current_timestamp")
         self.assertEqual(q('', 'text'), "''")
