@@ -145,9 +145,12 @@ class pgnotify(object):
 
         self.pgconn = pgconn
         self.event = event
+        self.start = 'start_%s' % event
         self.stop = 'stop_%s' % event
         self.callback = callback
-        self.arg_dict = arg_dict or {}
+        if arg_dict is None:
+            arg_dict = {}
+        self.arg_dict = arg_dict
         self.timeout = timeout
 
     def __del__(self):
@@ -171,16 +174,16 @@ class pgnotify(object):
 
         self.pgconn.query('listen "%s"' % self.event)
         self.pgconn.query('listen "%s"' % self.stop)
+        self.arg_dict['event'] = self.start
         _ilist = [self.pgconn.fileno()]
 
-        while 1:
+        while True:
             ilist, _olist, _elist = select.select(_ilist, [], [], self.timeout)
-            if ilist == []:
-                # We timed out.
+            if ilist == []:  # we timed out
                 self.pgconn.query('unlisten "%s"' % self.event)
                 self.pgconn.query('unlisten "%s"' % self.stop)
                 self.callback(None)
-                return
+                break
             else:
                 notice = self.pgconn.getnotify()
                 if notice is None:
@@ -189,17 +192,17 @@ class pgnotify(object):
                 if event in (self.event, self.stop):
                     self.arg_dict['pid'] = pid
                     self.arg_dict['event'] = event
-                    self.arg_dict['extra'] = event
+                    self.arg_dict['extra'] = extra
                     self.callback(self.arg_dict)
                     if event == self.stop:
                         self.pgconn.query('unlisten "%s"' % self.event)
                         self.pgconn.query('unlisten "%s"' % self.stop)
-                        return
+                        break
                 else:
                     self.pgconn.query('unlisten "%s"' % self.event)
                     self.pgconn.query('unlisten "%s"' % self.stop)
                     raise _db_error(
-                        'listening for ("%s", "%s") but notified of "%s"'
+                        'listening for "%s" and "%s", but notified of "%s"'
                         % (self.event, self.stop, event))
 
 
