@@ -1645,7 +1645,17 @@ class TestDBClass(unittest.TestCase):
                     if item[0] in expect)
                 ts = expect.get('ts')
                 if ts == 'current_timestamp':
-                    expect['ts'] = data['ts']
+                    ts = expect['ts'] = data['ts']
+                    if len(ts) > 19:
+                        self.assertEqual(ts[19], '.')
+                        ts = ts[:19]
+                    else:
+                        self.assertEqual(len(ts), 19)
+                    self.assertTrue(ts[:4].isdigit())
+                    self.assertEqual(ts[4], '-')
+                    self.assertEqual(ts[10], ' ')
+                    self.assertTrue(ts[11:13].isdigit())
+                    self.assertEqual(ts[13], ':')
                 self.assertEqual(data, expect)
                 data = self.db.query(
                     'select oid,* from "%s"' % table).dictresult()[0]
