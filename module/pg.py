@@ -185,10 +185,11 @@ class pgnotify(object):
                 notice = self.pgconn.getnotify()
                 if notice is None:
                     continue
-                event, pid, _extra = notice
+                event, pid, extra = notice
                 if event in (self.event, self.stop):
                     self.arg_dict['pid'] = pid
                     self.arg_dict['event'] = event
+                    self.arg_dict['extra'] = event
                     self.callback(self.arg_dict)
                     if event == self.stop:
                         self.pgconn.query('unlisten "%s"' % self.event)
