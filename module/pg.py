@@ -32,6 +32,7 @@ from _pg import *
 
 import select
 import warnings
+from threading import Lock
 try:
     frozenset
 except NameError:  # Python < 2.4
@@ -165,6 +166,7 @@ class WhenNotified(object):
             arg_dict = {}
         self.arg_dict = arg_dict
         self.timeout = timeout
+        self.lock = Lock()
 
     def __del__(self):
         self.close()
@@ -177,22 +179,35 @@ class WhenNotified(object):
 
     def listen(self):
         if not self.listening:
-            self.db.query('listen "%s"' % self.event)
-            self.db.query('listen "%s"' % self.stop)
-            self.listening = True
+            self.lock.acquire()
+            try:
+                self.db.query('listen "%s"' % self.event)
+                self.db.query('listen "%s"' % self.stop)
+                self.listening = True
+            finally:
+                self.lock.release()
 
     def unlisten(self):
         if self.listening:
-            self.db.query('unlisten "%s"' % self.event)
-            self.db.query('unlisten "%s"' % self.stop)
-            self.listening = False
+            self.lock.acquire()
+            try:
+                self.db.query('unlisten "%s"' % self.event)
+                self.db.query('unlisten "%s"' % self.stop)
+                self.listening = False
+            finally:
+                self.lock.release()
 
     def notify(self, stop=False, payload=None):
         if self.listening:
             q = 'notify "%s"' % (stop and self.stop or self.event)
             if payload:
                 q += ", '%s'" % payload
-            return self.db.query(q)
+            self.lock.acquire()
+            try:
+                ret = self.db.query(q)
+            finally:
+                self.lock.release()
+            return ret
 
     def __call__(self):
         """Invoke the handler.
@@ -217,7 +232,11 @@ class WhenNotified(object):
                 self.callback(None)
                 break
             else:
-                notice = self.db.getnotify()
+                self.lock.acquire()
+                try:
+                    notice = self.db.getnotify()
+                finally:
+                    self.lock.release()
                 if notice is None:
                     continue
                 event, pid, extra = notice
