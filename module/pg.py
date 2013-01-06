@@ -28,9 +28,10 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 # both that copyright notice and this permission notice appear in
 # supporting documentation.
 
-import select
-
 from _pg import *
+
+import select
+import warnings
 try:
     frozenset
 except NameError:  # Python < 2.4
@@ -139,7 +140,7 @@ def _prg_error(msg):
     return _db_error(msg, ProgrammingError)
 
 
-class pgnotify(object):
+class WhenNotified(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 
     def __init__(self, db, event, callback, arg_dict=None, timeout=None):
@@ -153,6 +154,8 @@ class pgnotify(object):
                     fractions of seconds. If it is absent or None, the
                     callers will never time out."""
 
+        if isinstance(db, DB):
+            db = db.db
         self.db = db
         self.event = event
         self.stop = 'stop_%s' % event
@@ -184,18 +187,26 @@ class pgnotify(object):
             self.db.query('unlisten "%s"' % self.stop)
             self.listening = False
 
+    def notify(self, stop=False, payload=None):
+        if self.listening:
+            q = 'notify "%s"' % (stop and self.stop or self.event)
+            if payload:
+                q += ", '%s'" % payload
+            return self.db.query(q)
+
     def __call__(self):
         """Invoke the handler.
 
-        The handler actually LISTENs for two NOTIFY messages:
+        The handler is a loop that actually LISTENs for two NOTIFY messages:
 
         <event> and stop_<event>.
 
         When either of these NOTIFY messages are received, its associated
         'pid' and 'event' are inserted into <arg_dict>, and the callback is
         invoked with <arg_dict>. If the NOTIFY message is stop_<event>, the
-        handler UNLISTENs both <event> and stop_<event> and exits."""
+        handler UNLISTENs both <event> and stop_<event> and exits.
 
+        """
         self.listen()
         _ilist = [self.db.fileno()]
 
@@ -225,7 +236,15 @@ class pgnotify(object):
                         % (self.event, self.stop, event))
 
 
-# The PostGreSQL database connection interface:
+def pgnotify(*args, **kw):
+    """Same as WhenNotified, under the traditional name."""
+    warnings.warn("pgnotify is deprecated, use WhenNotified instead.",
+        DeprecationWarning, stacklevel=2)
+    return WhenNotified(*args, **kw)
+
+
+# The actual PostGreSQL database connection interface:
+
 class DB(object):
     """Wrapper class for the _pg connection type."""
 
@@ -925,8 +944,10 @@ class DB(object):
         self._do_debug(q)
         return int(self.db.query(q))
 
-    def pgnotify(self, event, callback, arg_dict={}, timeout=None):
-        return pgnotify(self.db, event, callback, arg_dict, timeout)
+    def when_notified(self, event, callback, arg_dict={}, timeout=None):
+        """Get notification handler that will run the given callback."""
+        return WhenNotified(self.db, event, callback, arg_dict, timeout)
+
 
 # if run as script, print some information
 

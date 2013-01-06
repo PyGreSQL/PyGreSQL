@@ -235,10 +235,10 @@ class UtilityTest(unittest.TestCase):
             self.notify_timeout = True
 
     def test_notify(self):
-        for test_method in False, True:
+        for as_method in False, True:
             db = opendb()
             # Get function under test, can be standalone or DB method.
-            fut = db.pgnotify if test_method else partial(pgnotify, db)
+            fut = db.when_notified if as_method else partial(WhenNotified, db)
             arg_dict = dict(event=None, called=False)
             self.notify_timeout = False
             # Listen for 'event_1'
@@ -255,14 +255,14 @@ class UtilityTest(unittest.TestCase):
             # Open another connection for sending notifications.
             db2 = opendb()
             # Generate notification from the other connection.
-            db2.query("notify event_1, 'payload_1'")
+            db2.query("notify event_1, 'payload 1'")
             # Wait until the notification has been caught.
             for n in xrange(500):
                 if arg_dict['event'] == 'event_1':
                     break
                 sleep(0.01)
             self.assertEqual(arg_dict['event'], 'event_1')
-            self.assertEqual(arg_dict['extra'], 'payload_1')
+            self.assertEqual(arg_dict['extra'], 'payload 1')
             self.assertTrue(isinstance(arg_dict['pid'], int))
             # Check that callback has been invoked.
             self.assertTrue(arg_dict.get('called'))
@@ -270,7 +270,7 @@ class UtilityTest(unittest.TestCase):
             arg_dict['called'] = False
             self.assertTrue(thread.isAlive())
             # Generate stop notification.
-            db2.query("notify stop_event_1, 'payload_2'")
+            db.query("notify stop_event_1, 'payload 2'")
             db2.close()
             # Wait until the notification has been caught.
             for n in xrange(500):
@@ -278,7 +278,7 @@ class UtilityTest(unittest.TestCase):
                     break
                 sleep(0.01)
             self.assertEqual(arg_dict['event'], 'stop_event_1')
-            self.assertEqual(arg_dict['extra'], 'payload_2')
+            self.assertEqual(arg_dict['extra'], 'payload 2')
             self.assertTrue(isinstance(arg_dict['pid'], int))
             # Check that callback has been invoked.
             self.assertTrue(arg_dict.get('called'))
@@ -289,10 +289,10 @@ class UtilityTest(unittest.TestCase):
             target.close()
 
     def test_notify_timeout(self):
-        for test_method in False, True:
+        for as_method in False, True:
             db = opendb()
             # Get function under test, can be standalone or DB method.
-            fut = db.pgnotify if test_method else partial(pgnotify, db)
+            fut = db.when_notified if as_method else partial(WhenNotified, db)
             arg_dict = dict(event=None, called=False)
             self.notify_timeout = False
             # Listen for 'event_1' with timeout of 10ms
