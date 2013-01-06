@@ -214,6 +214,8 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(q('off', 'bool'), "'f'")
         self.assertEqual(q('no', 'bool'), "'f'")
         self.assertEqual(q(1, 'bool'), "'t'")
+        self.assertEqual(q(9999, 'bool'), "'t'")
+        self.assertEqual(q(-9999, 'bool'), "'t'")
         self.assertEqual(q('1', 'bool'), "'t'")
         self.assertEqual(q('t', 'bool'), "'t'")
         self.assertEqual(q('on', 'bool'), "'t'")
