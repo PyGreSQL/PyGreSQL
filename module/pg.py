@@ -132,10 +132,10 @@ def _prg_error(msg):
 class pgnotify(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 
-    def __init__(self, pgconn, event, callback, arg_dict=None, timeout=None):
+    def __init__(self, db, event, callback, arg_dict=None, timeout=None):
         """Initialize the notification handler.
 
-        pgconn   - PostgreSQL connection object.
+        db   - PostgreSQL connection object.
         event    - Event to LISTEN for.
         callback - Event callback.
         arg_dict - A dictionary passed as the argument to the callback.
@@ -143,10 +143,10 @@ class pgnotify(object):
                     fractions of seconds. If it is absent or None, the
                     callers will never time out."""
 
-        self.pgconn = pgconn
+        self.db = db
         self.event = event
-        self.start = 'start_%s' % event
         self.stop = 'stop_%s' % event
+        self.listening = False
         self.callback = callback
         if arg_dict is None:
             arg_dict = {}
@@ -154,11 +154,25 @@ class pgnotify(object):
         self.timeout = timeout
 
     def __del__(self):
-        try:
-            self.pgconn.query('unlisten "%s"' % self.event)
-            self.pgconn.query('unlisten "%s"' % self.stop)
-        except DatabaseError:
-            pass
+        self.close()
+
+    def close(self):
+        if self.db:
+            self.unlisten()
+            self.db.close()
+            self.db = None
+
+    def listen(self):
+        if not self.listening:
+            self.db.query('listen "%s"' % self.event)
+            self.db.query('listen "%s"' % self.stop)
+            self.listening = True
+
+    def unlisten(self):
+        if self.listening:
+            self.db.query('unlisten "%s"' % self.event)
+            self.db.query('unlisten "%s"' % self.stop)
+            self.listening = False
 
     def __call__(self):
         """Invoke the handler.
@@ -172,20 +186,17 @@ class pgnotify(object):
         invoked with <arg_dict>. If the NOTIFY message is stop_<event>, the
         handler UNLISTENs both <event> and stop_<event> and exits."""
 
-        self.pgconn.query('listen "%s"' % self.event)
-        self.pgconn.query('listen "%s"' % self.stop)
-        self.arg_dict['event'] = self.start
-        _ilist = [self.pgconn.fileno()]
+        self.listen()
+        _ilist = [self.db.fileno()]
 
         while True:
             ilist, _olist, _elist = select.select(_ilist, [], [], self.timeout)
             if ilist == []:  # we timed out
-                self.pgconn.query('unlisten "%s"' % self.event)
-                self.pgconn.query('unlisten "%s"' % self.stop)
+                self.unlisten()
                 self.callback(None)
                 break
             else:
-                notice = self.pgconn.getnotify()
+                notice = self.db.getnotify()
                 if notice is None:
                     continue
                 event, pid, extra = notice
@@ -195,12 +206,10 @@ class pgnotify(object):
                     self.arg_dict['extra'] = extra
                     self.callback(self.arg_dict)
                     if event == self.stop:
-                        self.pgconn.query('unlisten "%s"' % self.event)
-                        self.pgconn.query('unlisten "%s"' % self.stop)
+                        self.unlisten()
                         break
                 else:
-                    self.pgconn.query('unlisten "%s"' % self.event)
-                    self.pgconn.query('unlisten "%s"' % self.stop)
+                    self.unlisten()
                     raise _db_error(
                         'listening for "%s" and "%s", but notified of "%s"'
                         % (self.event, self.stop, event))
