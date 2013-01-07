@@ -239,8 +239,8 @@ class UtilityTest(unittest.TestCase):
             for call_notify in False, True:
                 db = opendb()
                 # Get function under test, can be standalone or DB method.
-                fut = db.when_notified if run_as_method else partial(
-                    WhenNotified, db)
+                fut = db.notification_handler if run_as_method else partial(
+                    NotificationHandler, db)
                 arg_dict = dict(event=None, called=False)
                 self.notify_timeout = False
                 # Listen for 'event_1'.
@@ -254,13 +254,12 @@ class UtilityTest(unittest.TestCase):
                     sleep(0.01)
                 self.assertTrue(target.listening)
                 self.assertTrue(thread.isAlive())
-                # Generate notification.
+                # Open another connection for sending notifications.
+                db2 = opendb()
+                # Generate notification from the other connection.
                 if call_notify:
-                    target.notify(payload='payload 1')
+                    target.notify(db2, payload='payload 1')
                 else:
-                    # Open another connection for sending notifications.
-                    db2 = opendb()
-                    # Generate notification from the other connection.
                     db2.query("notify event_1, 'payload 1'")
                 # Wait until the notification has been caught.
                 for n in xrange(500):
@@ -277,10 +276,10 @@ class UtilityTest(unittest.TestCase):
                 self.assertTrue(thread.isAlive())
                 # Generate stop notification.
                 if call_notify:
-                    target.notify(stop=True, payload='payload 2')
+                    target.notify(db2, stop=True, payload='payload 2')
                 else:
                     db2.query("notify stop_event_1, 'payload 2'")
-                    db2.close()
+                db2.close()
                 # Wait until the notification has been caught.
                 for n in xrange(500):
                     if arg_dict['called'] or self.notify_timeout:
@@ -301,8 +300,8 @@ class UtilityTest(unittest.TestCase):
         for run_as_method in False, True:
             db = opendb()
             # Get function under test, can be standalone or DB method.
-            fut = db.when_notified if run_as_method else partial(
-                WhenNotified, db)
+            fut = db.notification_handler if run_as_method else partial(
+                NotificationHandler, db)
             arg_dict = dict(event=None, called=False)
             self.notify_timeout = False
             # Listen for 'event_1' with timeout of 10ms.

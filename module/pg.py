@@ -32,7 +32,6 @@ from _pg import *
 
 import select
 import warnings
-from threading import Lock
 try:
     frozenset
 except NameError:  # Python < 2.4
@@ -141,76 +140,74 @@ def _prg_error(msg):
     return _db_error(msg, ProgrammingError)
 
 
-class WhenNotified(object):
+class NotificationHandler(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 
     def __init__(self, db, event, callback, arg_dict=None, timeout=None):
         """Initialize the notification handler.
 
-        db   - PostgreSQL connection object.
-        event    - Event to LISTEN for.
-        callback - Event callback.
+        db       - PostgreSQL connection object.
+        event    - Event (notification channel) to LISTEN for.
+        callback - Event callback function.
         arg_dict - A dictionary passed as the argument to the callback.
         timeout  - Timeout in seconds; a floating point number denotes
-                    fractions of seconds. If it is absent or None, the
-                    callers will never time out."""
+                   fractions of seconds. If it is absent or None, the
+                   callers will never time out.
 
+        """
         if isinstance(db, DB):
             db = db.db
         self.db = db
         self.event = event
-        self.stop = 'stop_%s' % event
+        self.stop_event = 'stop_%s' % event
         self.listening = False
         self.callback = callback
         if arg_dict is None:
             arg_dict = {}
         self.arg_dict = arg_dict
         self.timeout = timeout
-        self.lock = Lock()
 
     def __del__(self):
         self.close()
 
     def close(self):
+        """Stop listening and close the connection."""
         if self.db:
             self.unlisten()
             self.db.close()
             self.db = None
 
     def listen(self):
+        """Start listening for the event and the stop event."""
         if not self.listening:
-            self.lock.acquire()
-            try:
-                self.db.query('listen "%s"' % self.event)
-                self.db.query('listen "%s"' % self.stop)
-                self.listening = True
-            finally:
-                self.lock.release()
+            self.db.query('listen "%s"' % self.event)
+            self.db.query('listen "%s"' % self.stop_event)
+            self.listening = True
 
     def unlisten(self):
+        """Stop listening for the event and the stop event."""
         if self.listening:
-            self.lock.acquire()
-            try:
-                self.db.query('unlisten "%s"' % self.event)
-                self.db.query('unlisten "%s"' % self.stop)
-                self.listening = False
-            finally:
-                self.lock.release()
+            self.db.query('unlisten "%s"' % self.event)
+            self.db.query('unlisten "%s"' % self.stop_event)
+            self.listening = False
 
-    def notify(self, stop=False, payload=None):
+    def notify(self, db=None, stop=False, payload=None):
+        """Generate a notification.
+
+        Note: If the main loop is running in another thread, you must pass
+        a different database connection to avoid a collision.
+
+        """
+        if not db:
+            db = self.db
         if self.listening:
-            q = 'notify "%s"' % (stop and self.stop or self.event)
+            q = 'notify "%s"' % (stop and self.stop_event or self.event)
             if payload:
                 q += ", '%s'" % payload
-            self.lock.acquire()
-            try:
-                ret = self.db.query(q)
-            finally:
-                self.lock.release()
-            return ret
+            return db.query(q)
 
-    def __call__(self):
-        """Invoke the handler.
+    def __call__(self, close=False):
+        """Invoke the notification handler.
 
         The handler is a loop that actually LISTENs for two NOTIFY messages:
 
@@ -220,6 +217,9 @@ class WhenNotified(object):
         'pid' and 'event' are inserted into <arg_dict>, and the callback is
         invoked with <arg_dict>. If the NOTIFY message is stop_<event>, the
         handler UNLISTENs both <event> and stop_<event> and exits.
+
+        Note: If you run this loop in another thread, don't use the same
+        database connection for database operations in the main thread.
 
         """
         self.listen()
@@ -232,34 +232,30 @@ class WhenNotified(object):
                 self.callback(None)
                 break
             else:
-                self.lock.acquire()
-                try:
-                    notice = self.db.getnotify()
-                finally:
-                    self.lock.release()
+                notice = self.db.getnotify()
                 if notice is None:
                     continue
                 event, pid, extra = notice
-                if event in (self.event, self.stop):
+                if event in (self.event, self.stop_event):
                     self.arg_dict['pid'] = pid
                     self.arg_dict['event'] = event
                     self.arg_dict['extra'] = extra
                     self.callback(self.arg_dict)
-                    if event == self.stop:
+                    if event == self.stop_event:
                         self.unlisten()
                         break
                 else:
                     self.unlisten()
                     raise _db_error(
                         'listening for "%s" and "%s", but notified of "%s"'
-                        % (self.event, self.stop, event))
+                        % (self.event, self.stop_event, event))
 
 
 def pgnotify(*args, **kw):
-    """Same as WhenNotified, under the traditional name."""
-    warnings.warn("pgnotify is deprecated, use WhenNotified instead.",
+    """Same as NotificationHandler, under the traditional name."""
+    warnings.warn("pgnotify is deprecated, use NotificationHandler instead.",
         DeprecationWarning, stacklevel=2)
-    return WhenNotified(*args, **kw)
+    return NotificationHandler(*args, **kw)
 
 
 # The actual PostGreSQL database connection interface:
@@ -963,9 +959,9 @@ class DB(object):
         self._do_debug(q)
         return int(self.db.query(q))
 
-    def when_notified(self, event, callback, arg_dict={}, timeout=None):
+    def notification_handler(self, event, callback, arg_dict={}, timeout=None):
         """Get notification handler that will run the given callback."""
-        return WhenNotified(self.db, event, callback, arg_dict, timeout)
+        return NotificationHandler(self.db, event, callback, arg_dict, timeout)
 
 
 # if run as script, print some information
