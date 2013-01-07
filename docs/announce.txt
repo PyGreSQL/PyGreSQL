@@ -9,7 +9,7 @@ Release of PyGreSQL version 4.1.1
 A few problems showed up with the 4.1 release so we are releasing a
 quick bugfix version.
 
-It is available at: http://pygresql.org/files/PyGreSQL-4.1..1tgz.
+It is available at: http://pygresql.org/files/PyGreSQL-4.1.1.tgz.
 
 If you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.
