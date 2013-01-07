@@ -1,6 +1,16 @@
 ChangeLog
 =========
 
+Version 4.1.1 (2013-01-08)
+--------------------------
+- Add WhenNotified class and method.  Replaces need for third party pgnotify.
+- Sharpen test for inserting current_timestamp.
+- Add more quote tests.  False and 0 should evaluate to NULL.
+- More tests - Any number other than 0 is True.
+- Do not use positional parameters internally.
+  This restores backward compatibility with version 4.0.
+- Add methods for changing the decimal point.
+
 Version 4.1 (2013-01-01)
 ------------------------
 - Dropped support for Python below 2.5 and PostgreSQL below 8.3.

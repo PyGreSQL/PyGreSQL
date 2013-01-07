@@ -38,4 +38,4 @@ based on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.fr).
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL 4.1 needs PostgreSQL 8.3 and Python 2.5 or above.
+The current version PyGreSQL 4.1.1 needs PostgreSQL 8.3 and Python 2.5 or above.
