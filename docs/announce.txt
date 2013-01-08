@@ -2,14 +2,13 @@
 PyGreSQL Announcements
 ======================
 
----------------------------------
-Release of PyGreSQL version 4.1.1
----------------------------------
+-------------------------------
+Release of PyGreSQL version 4.2
+-------------------------------
 
-A few problems showed up with the 4.1 release so we are releasing a
-quick bugfix version.
+Release 4.2 of PyGreSQL.
 
-It is available at: http://pygresql.org/files/PyGreSQL-4.1.1.tgz.
+It is available at: http://pygresql.org/files/PyGreSQL-4.2.tgz.
 
 If you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.

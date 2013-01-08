@@ -1,6 +1,9 @@
 ChangeLog
 =========
 
+Version 4.2
+-----------
+
 Version 4.1.1 (2013-01-08)
 --------------------------
 - Add WhenNotified class and method.  Replaces need for third party pgnotify.

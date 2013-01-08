@@ -2,9 +2,9 @@
 PyGreSQL - Python interface for PostgreSQL
 ==========================================
 
-----------------------
-PyGreSQL version 4.1.1
-----------------------
+--------------------
+PyGreSQL version 4.2
+--------------------
 
 .. meta::
    :description: PyGreSQL - Python interface for PostgreSQL
