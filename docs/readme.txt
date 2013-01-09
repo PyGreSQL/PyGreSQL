@@ -77,7 +77,7 @@ It is based on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.f
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL 4.1 needs PostgreSQL 8.3 and Python 2.5 or above.
+The current version PyGreSQL 4.2 needs PostgreSQL 8.3 and Python 2.5 or above.
 
 
 Where to get ... ?
@@ -107,9 +107,9 @@ A **NetBSD package** is available in their pkgsrc collection
 A **FreeBSD package** is available in their ports collection
   * http://www.freebsd.org/cgi/cvsweb.cgi/ports/databases/py-PyGreSQL/
 A **Win32 package** for various Python versions is available at
-  * http://pygresql.org/files/PyGreSQL-4.1.win32-py2.5.exe
-  * http://pygresql.org/files/PyGreSQL-4.1.win32-py2.6.exe
-  * http://pygresql.org/files/PyGreSQL-4.1.win32-py2.7.exe
+  * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.5.exe
+  * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.6.exe
+  * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.7.exe
 You can also find PyGreSQL on the **Python Package Index** at
  * http://pypi.python.org/pypi/PyGreSQL/
 
