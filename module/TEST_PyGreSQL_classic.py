@@ -24,7 +24,7 @@ def opendb():
     db = DB(dbname, dbhost, dbport)
     db.query("SET DATESTYLE TO 'ISO'")
     db.query("SET TIME ZONE 'EST5EDT'")
-    db.query("SET DEFAULT_WITH_OIDS=TRUE")
+    db.query("SET DEFAULT_WITH_OIDS=FALSE")
     db.query("SET STANDARD_CONFORMING_STRINGS=FALSE")
     return db
 
@@ -67,19 +67,19 @@ class UtilityTest(unittest.TestCase):
         # see if they differentiate the table names properly
         self.assertEqual(
             db.get_attnames('_test_schema'),
-            {'_test': 'int', 'oid': 'int', '_i': 'date', 'dvar': 'int'}
+            {'_test': 'int', '_i': 'date', 'dvar': 'int'}
         )
         self.assertEqual(
             db.get_attnames('public._test_schema'),
-            {'_test': 'int', 'oid': 'int', '_i': 'date', 'dvar': 'int'}
+            {'_test': 'int', '_i': 'date', 'dvar': 'int'}
         )
         self.assertEqual(
             db.get_attnames('_test1._test_schema'),
-            {'_test1': 'int', 'oid': 'int'}
+            {'_test1': 'int'}
         )
         self.assertEqual(
             db.get_attnames('_test2._test_schema'),
-            {'_test2': 'int', 'oid': 'int'}
+            {'_test2': 'int'}
         )
 
     def test_pkey(self):
