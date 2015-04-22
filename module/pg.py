@@ -28,6 +28,10 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 # both that copyright notice and this permission notice appear in
 # supporting documentation.
 
+import sys
+if sys.version_info[0] == 3:
+    class basestring(str): pass
+
 from _pg import *
 
 import select
@@ -330,13 +334,13 @@ class DB(object):
         """Print a debug message."""
         if self.debug:
             if isinstance(self.debug, basestring):
-                print self.debug % s
+                print(self.debug % s)
             elif isinstance(self.debug, file):
                 file.write(s + '\n')
             elif callable(self.debug):
                 self.debug(s)
             else:
-                print s
+                print(s)
 
     def _quote_text(self, d):
         """Quote text value."""
@@ -561,7 +565,7 @@ class DB(object):
             # make sure that all classes have a namespace
             self._pkeys = dict([
                 ('.' in cl and cl or 'public.' + cl, pkey)
-                for cl, pkey in newpkey.iteritems()])
+                for cl, pkey in newpkey.items()])
             return self._pkeys
 
         qcl = self._add_schema(cl)  # build fully qualified class name
@@ -594,7 +598,7 @@ class DB(object):
                 cl, pkey = _join_parts(r[:2]), r[2]
                 self._pkeys.setdefault(cl, []).append(pkey)
             # (only) for composite primary keys, the values will be frozensets
-            for cl, pkey in self._pkeys.iteritems():
+            for cl, pkey in self._pkeys.items():
                 self._pkeys[cl] = len(pkey) > 1 and frozenset(pkey) or pkey[0]
             self._do_debug(self._pkeys)
 
@@ -616,13 +620,13 @@ class DB(object):
         """
         where = kinds and "pg_class.relkind IN (%s) AND" % ','.join(
             ["'%s'" % x for x in kinds]) or ''
-        return map(_join_parts, self.db.query(
+        return [_join_parts(x) for x in self.db.query(
             "SELECT pg_namespace.nspname, pg_class.relname "
             "FROM pg_class "
             "JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace "
             "WHERE %s pg_class.relname !~ '^Inv' AND "
                 "pg_class.relname !~ '^pg_' "
-            "ORDER BY 1, 2" % where).getresult())
+            "ORDER BY 1, 2" % where).getresult()]
 
     def get_tables(self):
         """Return list of tables in connected database."""
@@ -772,7 +776,7 @@ class DB(object):
         res = self.db.query(q).dictresult()
         if not res:
             raise _db_error('No such record in %s where %s' % (qcl, where))
-        for att, value in res[0].iteritems():
+        for att, value in res[0].items():
             arg[att == 'oid' and qoid or att] = value
         return arg
 
@@ -812,7 +816,7 @@ class DB(object):
         res = self.db.query(q)
         if ret:
             res = res.dictresult()
-            for att, value in res[0].iteritems():
+            for att, value in res[0].items():
                 d[att == 'oid' and qoid or att] = value
         elif isinstance(res, int):
             d[qoid] = res
@@ -882,7 +886,7 @@ class DB(object):
         res = self.db.query(q)
         if ret:
             res = res.dictresult()[0]
-            for att, value in res.iteritems():
+            for att, value in res.items():
                 d[att == 'oid' and qoid or att] = value
         else:
             if selectable:
@@ -906,7 +910,7 @@ class DB(object):
         if a is None:
             a = {}  # empty if argument is not present
         attnames = self.get_attnames(qcl)
-        for n, t in attnames.iteritems():
+        for n, t in attnames.items():
             if n == 'oid':
                 continue
             if t in ('int', 'integer', 'smallint', 'bigint',
