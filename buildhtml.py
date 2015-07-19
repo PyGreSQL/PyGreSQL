@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/python
 
 # Author: David Goodger
 # Contact: goodger@users.sourceforge.net

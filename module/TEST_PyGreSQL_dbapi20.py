@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/python
 # $Id$
 
 from __future__ import with_statement

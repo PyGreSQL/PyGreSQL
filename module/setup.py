@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/python
 # $Id$
 
 """Setup script for PyGreSQL version 4.1

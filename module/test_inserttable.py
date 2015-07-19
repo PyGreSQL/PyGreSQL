@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! /usr/bin/python
 #
 # Test the PyGreSQL inserttable() function.
 # You need a "test" database ("createdb test").

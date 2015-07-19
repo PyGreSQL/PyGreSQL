@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 # advanced.py - demo of advanced features of PostGres. Some may not be ANSI.
 # inspired from the Postgres tutorial 
 # adapted to Python 1995 by Pascal Andre

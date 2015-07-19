@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python
 # basics.py - basic SQL commands tutorial
 # inspired from the Postgres95 tutorial 
 # adapted to Python 1995 by Pascal ANDRE
