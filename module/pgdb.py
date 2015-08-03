@@ -23,9 +23,9 @@ Basic usage:
     # All parts are optional. You may also pass host through
     # password as keyword arguments. To pass a port,
     # pass it in the host keyword parameter:
-    pgdb.connect(host='localhost:5432')
+    connection = pgdb.connect(host='localhost:5432')
 
-    connection.cursor() # open a cursor
+    cursor = connection.cursor() # open a cursor
 
     cursor.execute(query[, params])
     # Execute a query, binding params (a dictionary) if they are
