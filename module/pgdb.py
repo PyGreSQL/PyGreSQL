@@ -353,9 +353,9 @@ class pgdbCursor(object):
                     self.rowcount = -1
         except DatabaseError:
             raise
-        except Error, err:
+        except Error as err:
             raise _db_error("error '%s' in '%s'" % (err, sql))
-        except Exception, err:
+        except Exception as err:
             raise _op_error("internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
@@ -402,7 +402,7 @@ class pgdbCursor(object):
             result = self._src.fetch(size)
         except DatabaseError:
             raise
-        except Error, err:
+        except Error as err:
             raise _db_error(str(err))
         row_factory = self.row_factory
         typecast = self._type_cache.typecast
