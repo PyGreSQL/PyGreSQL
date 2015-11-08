@@ -103,7 +103,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         cur = con.cursor()
         try:
             cur.execute("select 1/0")
-        except pgdb.DatabaseError, error:
+        except pgdb.DatabaseError as error:
             self.assert_(isinstance(error, pgdb.ProgrammingError))
             # the SQLSTATE error code for division by zero is 22012
             self.assertEqual(error.sqlstate, '22012')
@@ -211,7 +211,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 with con:
                     cur.execute("insert into %s values (3)" % table)
                     cur.execute("insert into %s values (4)" % table)
-            except con.ProgrammingError, error:
+            except con.ProgrammingError as error:
                 self.assertTrue('check' in str(error).lower())
             with con:
                 cur.execute("insert into %s values (5)" % table)
@@ -221,7 +221,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                     cur.execute("insert into %s values (7)" % table)
                     cur.execute("insert into %s values (8)" % table)
                     raise ValueError('transaction should rollback')
-            except ValueError, error:
+            except ValueError as error:
                 self.assertEqual(str(error), 'transaction should rollback')
             with con:
                 cur.execute("insert into %s values (9)" % table)

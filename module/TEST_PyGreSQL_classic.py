@@ -147,7 +147,7 @@ class UtilityTest(unittest.TestCase):
         db.query("INSERT INTO _test_schema VALUES (1234)")
         try:
             db.query("INSERT INTO _test_schema VALUES (1234)")
-        except DatabaseError, error:
+        except DatabaseError as error:
             # currently PyGreSQL does not support IntegrityError
             self.assert_(isinstance(error, ProgrammingError))
             # the SQLSTATE error code for unique violation is 23505
@@ -325,14 +325,14 @@ if __name__ == '__main__':
     else: test_list = unittest.getTestCaseNames(UtilityTest, 'test_')
 
     if len(sys.argv) == 2 and sys.argv[1] == '-l':
-        print '\n'.join(unittest.getTestCaseNames(UtilityTest, 'test_'))
+        print('\n'.join(unittest.getTestCaseNames(UtilityTest, 'test_')))
         sys.exit(1)
 
     for test_name in test_list:
         try:
             suite.addTest(UtilityTest(test_name))
         except:
-            print "\n ERROR: %s.\n" % sys.exc_value
+            print("\n ERROR: %s.\n" % sys.exc_value)
             sys.exit(1)
 
     rc = unittest.TextTestRunner(verbosity=1).run(suite)
