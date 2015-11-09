@@ -121,7 +121,6 @@ static PyObject *pg_default_user;	/* default username */
 static PyObject *pg_default_passwd;	/* default password */
 #endif	/* DEFAULT_VARS */
 
-(void) init_pg(void);
 int *get_type_array(PGresult *result, int nfields);
 
 static PyObject *decimal = NULL, /* decimal type */
@@ -4172,7 +4171,7 @@ static struct PyMethodDef pg_methods[] = {
 static char pg__doc__[] = "Python interface to PostgreSQL DB";
 
 /* Initialization function for the module */
-(void)
+void
 init_pg(void)
 {
 	PyObject   *mod,
