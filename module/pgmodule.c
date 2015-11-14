@@ -53,7 +53,7 @@ static PyObject *Error, *Warning, *InterfaceError,
 static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 
 #ifndef IS_PY3K
-# if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
+#if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
 #define PY_SSIZE_T_MIN INT_MIN
@@ -570,7 +570,7 @@ largeNew(connObject *pgcnx, Oid oid)
 
 /* destructor */
 static void
-pglarge_dealloc(largeObject *self)
+largeDealloc(largeObject *self)
 {
 	if (self->lo_fd >= 0 && check_cnx_obj(self->pgcnx))
 		lo_close(self->pgcnx->cnx, self->lo_fd);
@@ -910,7 +910,6 @@ largeUnlink(largeObject *self, PyObject *args)
 	return Py_None;
 }
 
-
 /* large object methods */
 static struct PyMethodDef largeMethods[] = {
 	{"open", (PyCFunction) largeOpen, METH_VARARGS, largeOpen__doc__},
@@ -927,7 +926,7 @@ static struct PyMethodDef largeMethods[] = {
 
 /* get attribute */
 static PyObject *
-pglarge_getattr(largeObject *self, char *name)
+largeGetAttr(largeObject *self, char *name)
 {
 	/* list postgreSQL large object fields */
 
@@ -987,7 +986,7 @@ pglarge_getattr(largeObject *self, char *name)
 
 /* prints query object in human readable format */
 static int
-pglarge_print(largeObject *self, FILE *fp, int flags)
+largePrint(largeObject *self, FILE *fp, int flags)
 {
 	char		print_buffer[128];
 	PyOS_snprintf(print_buffer, sizeof(print_buffer),
@@ -998,18 +997,19 @@ pglarge_print(largeObject *self, FILE *fp, int flags)
 	return 0;
 }
 
+static char large__doc__[] = "PostgreSQL large object";
+
 /* object type definition */
 static PyTypeObject largeType = {
-	PyObject_HEAD_INIT(NULL)
-	0,								/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"PGlargeObject",				/* tp_name */
 	sizeof(largeObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 
 	/* methods */
-	(destructor) pglarge_dealloc,	/* tp_dealloc */
-	(printfunc) pglarge_print,		/* tp_print */
-	(getattrfunc) pglarge_getattr,	/* tp_getattr */
+	(destructor) largeDealloc,		/* tp_dealloc */
+	(printfunc) largePrint,			/* tp_print */
+	(getattrfunc) largeGetAttr,		/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
 	0,								/* tp_repr */
@@ -1017,6 +1017,20 @@ static PyTypeObject largeType = {
 	0,								/* tp_as_sequence */
 	0,								/* tp_as_mapping */
 	0,								/* tp_hash */
+	0,                              /* tp_call */
+	0,								/* tp_str */
+	0,								/* tp_getattro */
+	0,                              /* tp_setattro */
+	0,                              /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,             /* tp_flags */
+	large__doc__,					/* tp_doc */
+	0,                              /* tp_traverse */
+	0,                              /* tp_clear */
+	0,                              /* tp_richcompare */
+	0,                              /* tp_weaklistoffset */
+	0,                              /* tp_iter */
+	0,                              /* tp_iternext */
+	largeMethods,					/* tp_methods */
 };
 #endif /* LARGE_OBJECTS */
 
@@ -1279,7 +1293,10 @@ connQuery(connObject *self, PyObject *args)
 	}
 
 	if (!(npgobj = PyObject_NEW(queryObject, &queryType)))
+	{
+		PyErr_SetString(PyExc_MemoryError, "Can't create query object");
 		return NULL;
+	}
 
 	/* stores result and returns object */
 	npgobj->result = result;
@@ -1395,13 +1412,13 @@ connEndCopy(connObject *self, PyObject *args)
 #endif /* DIRECT_ACCESS */
 
 static PyObject *
-pgquery_repr(queryObject *self)
+queryRepr(queryObject *self)
 {
 	return PyBytes_FromString("<pg query result>");
 }
 
 static PyObject *
-pgquery_str(queryObject *self)
+queryStr(queryObject *self)
 {
 	return format_result(self->result);
 }
@@ -2168,7 +2185,7 @@ static struct PyMethodDef connMethods[] = {
 };
 
 static PyObject *
-connGetattr(connObject *self, char *name)
+connGetAttr(connObject *self, char *name)
 {
 	/*
 	 * Although we could check individually, there are only a few
@@ -2261,22 +2278,36 @@ connGetattr(connObject *self, char *name)
 
 /* object type definition */
 static PyTypeObject connType = {
-	PyObject_HEAD_INIT(NULL)
-	0,							/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"PGconnObject",				/* tp_name */
 	sizeof(connObject),			/* tp_basicsize */
 	0,							/* tp_itemsize */
+
 	/* methods */
 	(destructor) connDelete,	/* tp_dealloc */
 	0,							/* tp_print */
-	(getattrfunc) connGetattr,	/* tp_getattr */
+	(getattrfunc) connGetAttr,	/* tp_getattr */
 	0,							/* tp_setattr */
-	0,							/* tp_compare */
+	0,							/* tp_reserved */
 	0,							/* tp_repr */
 	0,							/* tp_as_number */
 	0,							/* tp_as_sequence */
 	0,							/* tp_as_mapping */
 	0,							/* tp_hash */
+	0,							/* tp_call */
+	0,							/* tp_str */
+	0,							/* tp_getattro */
+	0,							/* tp_setattro */
+	0,							/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,         /* tp_flags */
+	0,							/* tp_doc */
+	0,							/* tp_traverse */
+	0,							/* tp_clear */
+	0,							/* tp_richcompare */
+	0,							/* tp_weaklistoffset */
+	0,							/* tp_iter */
+	0,							/* tp_iternext */
+	connMethods,				/* tp_methods */
 };
 
 /* --------------------------------------------------------------------- */
@@ -2313,7 +2344,7 @@ check_source_obj(sourceObject *self, int level)
 
 /* destructor */
 static void
-pgsource_dealloc(sourceObject *self)
+sourceDealloc(sourceObject *self)
 {
 	if (self->result)
 		PQclear(self->result);
@@ -2810,7 +2841,7 @@ static PyMethodDef sourceMethods[] = {
 
 /* gets query object attributes */
 static PyObject *
-pgsource_getattr(sourceObject *self, char *name)
+sourceGetAttr(sourceObject *self, char *name)
 {
 	/* pg connection object */
 	if (!strcmp(name, "pgcnx"))
@@ -2868,7 +2899,7 @@ pgsource_getattr(sourceObject *self, char *name)
 
 /* sets query object attributes */
 static int
-pgsource_setattr(sourceObject *self, char *name, PyObject *v)
+sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 {
 	/* arraysize */
 	if (!strcmp(name, "arraysize"))
@@ -2889,7 +2920,7 @@ pgsource_setattr(sourceObject *self, char *name, PyObject *v)
 }
 
 static PyObject *
-pgsource_repr(sourceObject *self)
+sourceRepr(sourceObject *self)
 {
 	return PyBytes_FromString("<pg source object>");
 }
@@ -2897,7 +2928,7 @@ pgsource_repr(sourceObject *self)
 /* returns source object as string in human readable format */
 
 static PyObject *
-pgsource_str(sourceObject *self)
+sourceStr(sourceObject *self)
 {
 	switch (self->result_type)
 	{
@@ -2912,26 +2943,39 @@ pgsource_str(sourceObject *self)
 	}
 }
 
+static char source__doc__[] = "PyGreSQL source object";
+
 /* query type definition */
 static PyTypeObject sourceType = {
-	PyObject_HEAD_INIT(NULL)
-	0,								/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"PGsourceObject",				/* tp_name */
 	sizeof(sourceObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
-	(destructor) pgsource_dealloc,	/* tp_dealloc */
+	(destructor) sourceDealloc,		/* tp_dealloc */
 	0,								/* tp_print */
-	(getattrfunc) pgsource_getattr,	/* tp_getattr */
-	(setattrfunc) pgsource_setattr,	/* tp_setattr */
+	(getattrfunc) sourceGetAttr,	/* tp_getattr */
+	(setattrfunc) sourceSetAttr,	/* tp_setattr */
 	0,								/* tp_compare */
-	(reprfunc) pgsource_repr,		/* tp_repr */
+	(reprfunc) sourceRepr,			/* tp_repr */
 	0,								/* tp_as_number */
 	0,								/* tp_as_sequence */
 	0,								/* tp_as_mapping */
 	0,								/* tp_hash */
 	0,								/* tp_call */
-	(reprfunc) pgsource_str,		/* tp_str */
+	(reprfunc) sourceStr,			/* tp_str */
+	0,								/* tp_getattro */
+	0,								/* tp_setattro */
+	0,								/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,				/* tp_flags */
+	source__doc__,					/* tp_doc */
+	0,								/* tp_traverse */
+	0,								/* tp_clear */
+	0,								/* tp_richcompare */
+	0,								/* tp_weaklistoffset */
+	0,								/* tp_iter */
+	0,								/* tp_iternext */
+	sourceMethods,					/* tp_methods */
 };
 
 /* connects to a database */
@@ -3028,7 +3072,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 }
 
 static void
-pgquery_dealloc(queryObject *self)
+queryDealloc(queryObject *self)
 {
 	if (self->result)
 		PQclear(self->result);
@@ -3037,11 +3081,11 @@ pgquery_dealloc(queryObject *self)
 }
 
 /* get number of rows */
-static char pgquery_ntuples__doc__[] =
+static char queryNTuples__doc__[] =
 "ntuples() -- returns number of tuples returned by query.";
 
 static PyObject *
-pgquery_ntuples(queryObject *self, PyObject *args)
+queryNTuples(queryObject *self, PyObject *args)
 {
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
@@ -3055,11 +3099,11 @@ pgquery_ntuples(queryObject *self, PyObject *args)
 }
 
 /* list fields names from query result */
-static char pgquery_listfields__doc__[] =
+static char queryListFields__doc__[] =
 "listfields() -- Lists field names from result.";
 
 static PyObject *
-pgquery_listfields(queryObject *self, PyObject *args)
+queryListFields(queryObject *self, PyObject *args)
 {
 	int			i,
 				n;
@@ -3090,11 +3134,11 @@ pgquery_listfields(queryObject *self, PyObject *args)
 }
 
 /* get field name from last result */
-static char pgquery_fieldname__doc__[] =
+static char queryFieldName__doc__[] =
 "fieldname() -- returns name of field from result from its position.";
 
 static PyObject *
-pgquery_fieldname(queryObject *self, PyObject *args)
+queryFieldName(queryObject *self, PyObject *args)
 {
 	int		i;
 	char   *name;
@@ -3120,11 +3164,11 @@ pgquery_fieldname(queryObject *self, PyObject *args)
 }
 
 /* gets fields number from name in last result */
-static char pgquery_fieldnum__doc__[] =
+static char queryFieldNumber__doc__[] =
 "fieldnum() -- returns position in query for field from its name.";
 
 static PyObject *
-pgquery_fieldnum(queryObject *self, PyObject *args)
+queryFieldNumber(queryObject *self, PyObject *args)
 {
 	int		num;
 	char   *name;
@@ -3147,13 +3191,13 @@ pgquery_fieldnum(queryObject *self, PyObject *args)
 }
 
 /* retrieves last result */
-static char pgquery_getresult__doc__[] =
+static char queryGetResult__doc__[] =
 "getresult() -- Gets the result of a query.  The result is returned "
 "as a list of rows, each one a tuple of fields in the order returned "
 "by the server.";
 
 static PyObject *
-pgquery_getresult(queryObject *self, PyObject *args)
+queryGetResult(queryObject *self, PyObject *args)
 {
 	PyObject   *rowtuple,
 			   *reslist,
@@ -3213,7 +3257,11 @@ pgquery_getresult(queryObject *self, PyObject *args)
 
 					case 3:  /* float/double */
 						tmp_obj = PyBytes_FromString(s);
+#ifdef IS_PY3K
+						val = PyFloat_FromString(tmp_obj);
+#else
 						val = PyFloat_FromString(tmp_obj, NULL);
+#endif
 						Py_DECREF(tmp_obj);
 						break;
 
@@ -3222,7 +3270,7 @@ pgquery_getresult(queryObject *self, PyObject *args)
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s))
+							if (isdigit((int)*s))
 								cashbuf[k++] = *s;
 							else if (*s == *decimal_point)
 								cashbuf[k++] = '.';
@@ -3242,7 +3290,11 @@ pgquery_getresult(queryObject *self, PyObject *args)
 						else
 						{
 							tmp_obj = PyBytes_FromString(s);
+#ifdef IS_PY3K
+							val = PyFloat_FromString(tmp_obj);
+#else
 							val = PyFloat_FromString(tmp_obj, NULL);
+#endif
 						}
 						Py_DECREF(tmp_obj);
 						break;
@@ -3274,13 +3326,13 @@ exit:
 }
 
 /* retrieves last result as a list of dictionaries*/
-static char pgquery_dictresult__doc__[] =
+static char queryDictResult__doc__[] =
 "dictresult() -- Gets the result of a query.  The result is returned "
 "as a list of rows, each one a dictionary with the field names used "
 "as the labels.";
 
 static PyObject *
-pgquery_dictresult(queryObject *self, PyObject *args)
+queryDictResult(queryObject *self, PyObject *args)
 {
 	PyObject   *dict,
 			   *reslist,
@@ -3340,7 +3392,11 @@ pgquery_dictresult(queryObject *self, PyObject *args)
 
 					case 3:  /* float/double */
 						tmp_obj = PyBytes_FromString(s);
+#ifdef IS_PY3K
+						val = PyFloat_FromString(tmp_obj);
+#else
 						val = PyFloat_FromString(tmp_obj, NULL);
+#endif
 						Py_DECREF(tmp_obj);
 						break;
 
@@ -3349,7 +3405,7 @@ pgquery_dictresult(queryObject *self, PyObject *args)
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s))
+							if (isdigit((int)*s))
 								cashbuf[k++] = *s;
 							else if (*s == *decimal_point)
 								cashbuf[k++] = '.';
@@ -3369,7 +3425,11 @@ pgquery_dictresult(queryObject *self, PyObject *args)
 						else
 						{
 							tmp_obj = PyBytes_FromString(s);
+#ifdef IS_PY3K
+							val = PyFloat_FromString(tmp_obj);
+#else
 							val = PyFloat_FromString(tmp_obj, NULL);
+#endif
 						}
 						Py_DECREF(tmp_obj);
 						break;
@@ -3402,13 +3462,13 @@ exit:
 }
 
 /* retrieves last result as named tuples */
-static char pgquery_namedresult__doc__[] =
+static char queryNamedResult__doc__[] =
 "namedresult() -- Gets the result of a query.  The result is returned "
 "as a list of rows, each one a tuple of fields in the order returned "
 "by the server.";
 
 static PyObject *
-pgquery_namedresult(queryObject *self, PyObject *args)
+queryNamedResult(queryObject *self, PyObject *args)
 {
 	PyObject   *arglist,
 			   *ret;
@@ -3441,7 +3501,7 @@ pgquery_namedresult(queryObject *self, PyObject *args)
 
 /* get attribute */
 static PyObject *
-pgnotice_getattr(noticeObject *self, char *name)
+noticeGetAttr(noticeObject *self, char *name)
 {
 	PGresult const *res = self->res;
 	int fieldcode;
@@ -3514,22 +3574,21 @@ pgnotice_getattr(noticeObject *self, char *name)
 }
 
 static PyObject *
-pgnotice_str(noticeObject *self)
+noticeStr(noticeObject *self)
 {
-	return pgnotice_getattr(self, "message");
+	return noticeGetAttr(self, "message");
 }
 
 /* object type definition */
 static PyTypeObject noticeType = {
-	PyObject_HEAD_INIT(NULL)
-	0,								/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"PGnoticeObject",				/* tp_name */
 	sizeof(noticeObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
 	0,								/* tp_dealloc */
 	0,								/* tp_print */
-	(getattrfunc) pgnotice_getattr,	/* tp_getattr */
+	(getattrfunc) noticeGetAttr,	/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
 	0,								/* tp_repr */
@@ -3538,59 +3597,67 @@ static PyTypeObject noticeType = {
 	0,								/* tp_as_mapping */
 	0,								/* tp_hash */
 	0,								/* tp_call */
-	(reprfunc) pgnotice_str			/* tp_str */
+	(reprfunc) noticeStr			/* tp_str */
 };
-
 
 /* query object methods */
 static struct PyMethodDef queryMethods[] = {
-	{"getresult", (PyCFunction) pgquery_getresult, METH_VARARGS,
-			pgquery_getresult__doc__},
-	{"dictresult", (PyCFunction) pgquery_dictresult, METH_VARARGS,
-			pgquery_dictresult__doc__},
-	{"namedresult", (PyCFunction) pgquery_namedresult, METH_VARARGS,
-			pgquery_namedresult__doc__},
-	{"fieldname", (PyCFunction) pgquery_fieldname, METH_VARARGS,
-			 pgquery_fieldname__doc__},
-	{"fieldnum", (PyCFunction) pgquery_fieldnum, METH_VARARGS,
-			pgquery_fieldnum__doc__},
-	{"listfields", (PyCFunction) pgquery_listfields, METH_VARARGS,
-			pgquery_listfields__doc__},
-	{"ntuples", (PyCFunction) pgquery_ntuples, METH_VARARGS,
-			pgquery_ntuples__doc__},
+	{"getresult", (PyCFunction) queryGetResult, METH_VARARGS,
+			queryGetResult__doc__},
+	{"dictresult", (PyCFunction) queryDictResult, METH_VARARGS,
+			queryDictResult__doc__},
+	{"namedresult", (PyCFunction) queryNamedResult, METH_VARARGS,
+			queryNamedResult__doc__},
+	{"fieldname", (PyCFunction) queryFieldName, METH_VARARGS,
+			 queryFieldName__doc__},
+	{"fieldnum", (PyCFunction) queryFieldNumber, METH_VARARGS,
+			queryFieldNumber__doc__},
+	{"listfields", (PyCFunction) queryListFields, METH_VARARGS,
+			queryListFields__doc__},
+	{"ntuples", (PyCFunction) queryNTuples, METH_VARARGS,
+			queryNTuples__doc__},
 	{NULL, NULL}
 };
 
 /* gets query object attributes */
 static PyObject *
-pgquery_getattr(queryObject *self, char *name)
+queryGetAttr(queryObject *self, char *name)
 {
-	/* list postgreSQL connection fields */
 	return Py_FindMethod(queryMethods, (PyObject *) self, name);
 }
 
 /* query type definition */
 static PyTypeObject queryType = {
-	PyObject_HEAD_INIT(NULL)
-	0,								/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"PGqueryObject",				/* tp_name */
 	sizeof(queryObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
-	(destructor) pgquery_dealloc,	/* tp_dealloc */
+	(destructor) queryDealloc,		/* tp_dealloc */
 	0,								/* tp_print */
-	(getattrfunc) pgquery_getattr,	/* tp_getattr */
+	(getattrfunc) queryGetAttr,		/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
-	(reprfunc) pgquery_repr,		/* tp_repr */
+	(reprfunc) queryRepr,			/* tp_repr */
 	0,								/* tp_as_number */
 	0,								/* tp_as_sequence */
 	0,								/* tp_as_mapping */
 	0,								/* tp_hash */
 	0,								/* tp_call */
-	(reprfunc) pgquery_str			/* tp_str */
+	(reprfunc) queryStr,			/* tp_str */
+	0,								/* tp_getattro */
+	0,								/* tp_setattro */
+	0,								/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,				/* tp_flags */
+	0,								/* tp_doc */
+	0,								/* tp_traverse */
+	0,								/* tp_clear */
+	0,								/* tp_richcompare */
+	0,								/* tp_weaklistoffset */
+	0,								/* tp_iter */
+	0,								/* tp_iternext */
+	queryMethods,					/* tp_methods */
 };
-
 
 /* --------------------------------------------------------------------- */
 
@@ -4147,30 +4214,52 @@ static struct PyMethodDef pgMethods[] = {
 
 static char pg__doc__[] = "Python interface to PostgreSQL DB";
 
+#ifdef IS_PY3K
+static struct PyModuleDef pgType = {
+	PyModuleDef_HEAD_INIT,
+	"pg",
+	pg__doc__,
+	-1,
+	pgMethods,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+#endif
+
 /* Initialization function for the module */
-void
-init_pg(void)
+#ifdef IS_PY3K
+PyMODINIT_FUNC PyInit__pg(void)
+#else
+void init_pg(void)
+#endif
 {
 	PyObject   *mod,
 			   *dict,
 			   *v;
 
+	/* Create the module and add the functions */
+#ifdef IS_PY3K
+	mod = PyModule_Create(&pgType);
+#else
 	/* Initialize here because some WIN platforms get confused otherwise */
 	connType.ob_type = noticeType.ob_type =
 		queryType.ob_type = sourceType.ob_type = &PyType_Type;
+
 #ifdef LARGE_OBJECTS
 	largeType.ob_type = &PyType_Type;
 #endif
 
-	/* Create the module and add the functions */
 	mod = Py_InitModule4("_pg", pgMethods, pg__doc__, NULL, PYTHON_API_VERSION);
+#endif
 	dict = PyModule_GetDict(mod);
 
 	/* Exceptions as defined by DB-API 2.0 */
-	Error = PyErr_NewException("pg.Error", PyExc_StandardError, NULL);
+	Error = PyErr_NewException("pg.Error", PyExc_Exception, NULL);
 	PyDict_SetItemString(dict, "Error", Error);
 
-	Warning = PyErr_NewException("pg.Warning", PyExc_StandardError, NULL);
+	Warning = PyErr_NewException("pg.Warning", PyExc_Exception, NULL);
 	PyDict_SetItemString(dict, "Warning", Warning);
 
 	InterfaceError = PyErr_NewException("pg.InterfaceError", Error, NULL);
@@ -4252,4 +4341,8 @@ init_pg(void)
 	/* Check for errors */
 	if (PyErr_Occurred())
 		Py_FatalError("can't initialize module _pg");
+
+#ifdef IS_PY3K
+	return mod;
+#endif
 }
