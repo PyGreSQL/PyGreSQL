@@ -29,6 +29,7 @@
 
 /* Note: This should be linked against the same C runtime lib as Python */
 #include <Python.h>
+
 #if PY_MAJOR_VERSION >= 3
 #define IS_PY3K
 #endif
@@ -301,7 +302,7 @@ set_dberror(PyObject *type, const char *msg, PGresult *result)
 	PyObject *err = NULL;
 	PyObject *str;
 
-	if (!(str = PyBytes_FromString(msg)))
+	if (!(str = PyUnicode_FromString(msg)))
 		err = NULL;
 	else
 	{
@@ -313,7 +314,7 @@ set_dberror(PyObject *type, const char *msg, PGresult *result)
 		if (result)
 		{
 			char *sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
-			str = sqlstate ? PyBytes_FromStringAndSize(sqlstate, 5) : NULL;
+			str = sqlstate ? PyUnicode_FromStringAndSize(sqlstate, 5) : NULL;
 		}
 		else
 			str = NULL;
@@ -488,7 +489,7 @@ format_result(const PGresult *res)
 				/* create the footer */
 				sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
 				/* return the result */
-				result = PyBytes_FromString(buffer);
+				result = PyUnicode_FromString(buffer);
 				free(buffer);
 				return result;
 			}
@@ -509,7 +510,7 @@ format_result(const PGresult *res)
 		}
 	}
 	else
-		return PyBytes_FromString("(nothing selected)");
+		return PyUnicode_FromString("(nothing selected)");
 }
 
 /* --------------------------------------------------------------------- */
@@ -926,8 +927,10 @@ static struct PyMethodDef largeMethods[] = {
 
 /* get attribute */
 static PyObject *
-largeGetAttr(largeObject *self, char *name)
+largeGetAttr(largeObject *self, PyObject *nameobj)
 {
+	const char *name = PyBytes_AsString(nameobj);
+
 	/* list postgreSQL large object fields */
 
 	/* associated pg connection object */
@@ -955,7 +958,7 @@ largeGetAttr(largeObject *self, char *name)
 
 	/* error (status) message */
 	if (!strcmp(name, "error"))
-		return PyBytes_FromString(PQerrorMessage(self->pgcnx->cnx));
+		return PyUnicode_FromString(PQerrorMessage(self->pgcnx->cnx));
 
 	/* attributes list */
 	if (!strcmp(name, "__members__"))
@@ -964,9 +967,9 @@ largeGetAttr(largeObject *self, char *name)
 
 		if (list)
 		{
-			PyList_SET_ITEM(list, 0, PyBytes_FromString("oid"));
-			PyList_SET_ITEM(list, 1, PyBytes_FromString("pgcnx"));
-			PyList_SET_ITEM(list, 2, PyBytes_FromString("error"));
+			PyList_SET_ITEM(list, 0, PyUnicode_FromString("oid"));
+			PyList_SET_ITEM(list, 1, PyUnicode_FromString("pgcnx"));
+			PyList_SET_ITEM(list, 2, PyUnicode_FromString("error"));
 		}
 
 		return list;
@@ -974,14 +977,14 @@ largeGetAttr(largeObject *self, char *name)
 
 	/* module name */
 	if (!strcmp(name, "__module__"))
-		return PyBytes_FromString(MODULE_NAME);
+		return PyUnicode_FromString(MODULE_NAME);
 
 	/* class name */
 	if (!strcmp(name, "__class__"))
-		return PyBytes_FromString("pglarge");
+		return PyUnicode_FromString("pglarge");
 
 	/* seeks name in methods (fallback) */
-	return Py_FindMethod(largeMethods, (PyObject *) self, name);
+	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
 /* prints query object in human readable format */
@@ -1002,14 +1005,14 @@ static char large__doc__[] = "PostgreSQL large object";
 /* object type definition */
 static PyTypeObject largeType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"PGlargeObject",				/* tp_name */
+	"pglarge",						/* tp_name */
 	sizeof(largeObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 
 	/* methods */
 	(destructor) largeDealloc,		/* tp_dealloc */
 	(printfunc) largePrint,			/* tp_print */
-	(getattrfunc) largeGetAttr,		/* tp_getattr */
+	0,								/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
 	0,								/* tp_repr */
@@ -1019,7 +1022,7 @@ static PyTypeObject largeType = {
 	0,								/* tp_hash */
 	0,                              /* tp_call */
 	0,								/* tp_str */
-	0,								/* tp_getattro */
+	(getattrofunc) largeGetAttr,	/* tp_getattro */
 	0,                              /* tp_setattro */
 	0,                              /* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,             /* tp_flags */
@@ -1268,7 +1271,7 @@ connQuery(connObject *self, PyObject *args)
 						PQclear(result);
 						if (ret[0])		/* return number of rows affected */
 						{
-							return PyBytes_FromString(ret);
+							return PyUnicode_FromString(ret);
 						}
 						Py_INCREF(Py_None);
 						return Py_None;
@@ -1364,7 +1367,7 @@ connGetLine(connObject *self, PyObject *args)
 	switch (PQgetline(self->cnx, line, MAX_BUFFER_SIZE))
 	{
 		case 0:
-			str = PyBytes_FromString(line);
+			str = PyUnicode_FromString(line);
 			break;
 		case 1:
 			PyErr_SetString(PyExc_MemoryError, "buffer overflow");
@@ -1414,7 +1417,7 @@ connEndCopy(connObject *self, PyObject *args)
 static PyObject *
 queryRepr(queryObject *self)
 {
-	return PyBytes_FromString("<pg query result>");
+	return PyUnicode_FromString("<pg query result>");
 }
 
 static PyObject *
@@ -1564,7 +1567,7 @@ connInsertTable(connObject *self, PyObject *args)
 				else
 					bufsiz = 0;
 			}
-			else if (PyBytes_Check(item))
+			else if (PyUnicode_Check(item))
 			{
 				const char* t = PyBytes_AS_STRING(item);
 				while (*t && bufsiz)
@@ -1697,7 +1700,7 @@ connParameter(connObject *self, PyObject *args)
 	name = PQparameterStatus(self->cnx, name);
 
 	if (name)
-		return PyBytes_FromString(name);
+		return PyUnicode_FromString(name);
 
 	/* unknown parameter, return None */
 	Py_INCREF(Py_None);
@@ -2106,7 +2109,7 @@ connGetNotify(connObject *self, PyObject *args)
 		PyObject   *notify_result,
 				   *temp;
 
-		if (!(temp = PyBytes_FromString(notify->relname)))
+		if (!(temp = PyUnicode_FromString(notify->relname)))
 			return NULL;
 
 		if (!(notify_result = PyTuple_New(3)))
@@ -2123,7 +2126,7 @@ connGetNotify(connObject *self, PyObject *args)
 		PyTuple_SET_ITEM(notify_result, 1, temp);
 
 		/* extra exists even in old versions that did not support it */
-		if (!(temp = PyBytes_FromString(notify->extra)))
+		if (!(temp = PyUnicode_FromString(notify->extra)))
 		{
 			Py_DECREF(notify_result);
 			return NULL;
@@ -2185,8 +2188,10 @@ static struct PyMethodDef connMethods[] = {
 };
 
 static PyObject *
-connGetAttr(connObject *self, char *name)
+connGetAttr(connObject *self, PyObject *nameobj)
 {
+	const char *name = PyBytes_AsString(nameobj);
+
 	/*
 	 * Although we could check individually, there are only a few
 	 * attributes that don't require a live connection and unless someone
@@ -2208,7 +2213,7 @@ connGetAttr(connObject *self, char *name)
 		char *r = PQhost(self->cnx);
 		if (!r)
 			r = "localhost";
-		return PyBytes_FromString(r);
+		return PyUnicode_FromString(r);
 	}
 
 	/* postmaster port */
@@ -2217,19 +2222,19 @@ connGetAttr(connObject *self, char *name)
 
 	/* selected database */
 	if (!strcmp(name, "db"))
-		return PyBytes_FromString(PQdb(self->cnx));
+		return PyUnicode_FromString(PQdb(self->cnx));
 
 	/* selected options */
 	if (!strcmp(name, "options"))
-		return PyBytes_FromString(PQoptions(self->cnx));
+		return PyUnicode_FromString(PQoptions(self->cnx));
 
 	/* selected postgres tty */
 	if (!strcmp(name, "tty"))
-		return PyBytes_FromString(PQtty(self->cnx));
+		return PyUnicode_FromString(PQtty(self->cnx));
 
 	/* error (status) message */
 	if (!strcmp(name, "error"))
-		return PyBytes_FromString(PQerrorMessage(self->cnx));
+		return PyUnicode_FromString(PQerrorMessage(self->cnx));
 
 	/* connection status : 1 - OK, 0 - BAD */
 	if (!strcmp(name, "status"))
@@ -2237,7 +2242,7 @@ connGetAttr(connObject *self, char *name)
 
 	/* provided user name */
 	if (!strcmp(name, "user"))
-		return PyBytes_FromString(PQuser(self->cnx));
+		return PyUnicode_FromString(PQuser(self->cnx));
 
 	/* protocol version */
 	if (!strcmp(name, "protocol_version"))
@@ -2258,35 +2263,35 @@ connGetAttr(connObject *self, char *name)
 
 		if (list)
 		{
-			PyList_SET_ITEM(list, 0, PyBytes_FromString("host"));
-			PyList_SET_ITEM(list, 1, PyBytes_FromString("port"));
-			PyList_SET_ITEM(list, 2, PyBytes_FromString("db"));
-			PyList_SET_ITEM(list, 3, PyBytes_FromString("options"));
-			PyList_SET_ITEM(list, 4, PyBytes_FromString("tty"));
-			PyList_SET_ITEM(list, 5, PyBytes_FromString("error"));
-			PyList_SET_ITEM(list, 6, PyBytes_FromString("status"));
-			PyList_SET_ITEM(list, 7, PyBytes_FromString("user"));
-			PyList_SET_ITEM(list, 8, PyBytes_FromString("protocol_version"));
-			PyList_SET_ITEM(list, 9, PyBytes_FromString("server_version"));
+			PyList_SET_ITEM(list, 0, PyUnicode_FromString("host"));
+			PyList_SET_ITEM(list, 1, PyUnicode_FromString("port"));
+			PyList_SET_ITEM(list, 2, PyUnicode_FromString("db"));
+			PyList_SET_ITEM(list, 3, PyUnicode_FromString("options"));
+			PyList_SET_ITEM(list, 4, PyUnicode_FromString("tty"));
+			PyList_SET_ITEM(list, 5, PyUnicode_FromString("error"));
+			PyList_SET_ITEM(list, 6, PyUnicode_FromString("status"));
+			PyList_SET_ITEM(list, 7, PyUnicode_FromString("user"));
+			PyList_SET_ITEM(list, 8, PyUnicode_FromString("protocol_version"));
+			PyList_SET_ITEM(list, 9, PyUnicode_FromString("server_version"));
 		}
 
 		return list;
 	}
 
-	return Py_FindMethod(connMethods, (PyObject *) self, name);
+	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
 /* object type definition */
 static PyTypeObject connType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"PGconnObject",				/* tp_name */
+	"pgconnobject",				/* tp_name */
 	sizeof(connObject),			/* tp_basicsize */
 	0,							/* tp_itemsize */
 
 	/* methods */
 	(destructor) connDelete,	/* tp_dealloc */
 	0,							/* tp_print */
-	(getattrfunc) connGetAttr,	/* tp_getattr */
+	0,							/* tp_getattr */
 	0,							/* tp_setattr */
 	0,							/* tp_reserved */
 	0,							/* tp_repr */
@@ -2296,7 +2301,7 @@ static PyTypeObject connType = {
 	0,							/* tp_hash */
 	0,							/* tp_call */
 	0,							/* tp_str */
-	0,							/* tp_getattro */
+	(getattrofunc) connGetAttr,	/* tp_getattro */
 	0,							/* tp_setattro */
 	0,							/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,         /* tp_flags */
@@ -2568,7 +2573,7 @@ sourceFetch(sourceObject *self, PyObject *args)
 				str = Py_None;
 			}
 			else
-				str = PyBytes_FromString(PQgetvalue(self->result, self->current_row, j));
+				str = PyUnicode_FromString(PQgetvalue(self->result, self->current_row, j));
 
 			PyTuple_SET_ITEM(rowtuple, j, str);
 		}
@@ -2673,7 +2678,7 @@ sourceFieldindex(sourceObject *self, PyObject *param, const char *usage)
 		return -1;
 
 	/* gets field number */
-	if (PyBytes_Check(param))
+	if (PyUnicode_Check(param))
 		num = PQfnumber(self->result, PyBytes_AsString(param));
 	else if (PyLong_Check(param))
 		num = PyLong_AsLong(param);
@@ -2707,7 +2712,7 @@ pgsource_buildinfo(sourceObject *self, int num)
 	/* affects field information */
 	PyTuple_SET_ITEM(result, 0, PyLong_FromLong(num));
 	PyTuple_SET_ITEM(result, 1,
-		PyBytes_FromString(PQfname(self->result, num)));
+		PyUnicode_FromString(PQfname(self->result, num)));
 	PyTuple_SET_ITEM(result, 2,
 		PyLong_FromLong(PQftype(self->result, num)));
 
@@ -2808,7 +2813,7 @@ sourceField(sourceObject *self, PyObject *args)
 	if ((num = sourceFieldindex(self, param, short_usage)) == -1)
 		return NULL;
 
-	return PyBytes_FromString(PQgetvalue(self->result,
+	return PyUnicode_FromString(PQgetvalue(self->result,
 									self->current_row, num));
 }
 
@@ -2841,8 +2846,10 @@ static PyMethodDef sourceMethods[] = {
 
 /* gets query object attributes */
 static PyObject *
-sourceGetAttr(sourceObject *self, char *name)
+sourceGetAttr(sourceObject *self, PyObject *nameobj)
 {
+	const char *name = PyBytes_AsString(nameobj);
+
 	/* pg connection object */
 	if (!strcmp(name, "pgcnx"))
 	{
@@ -2876,25 +2883,25 @@ sourceGetAttr(sourceObject *self, char *name)
 	{
 		PyObject *list = PyList_New(5);
 
-		PyList_SET_ITEM(list, 0, PyBytes_FromString("pgcnx"));
-		PyList_SET_ITEM(list, 1, PyBytes_FromString("arraysize"));
-		PyList_SET_ITEM(list, 2, PyBytes_FromString("resulttype"));
-		PyList_SET_ITEM(list, 3, PyBytes_FromString("ntuples"));
-		PyList_SET_ITEM(list, 4, PyBytes_FromString("nfields"));
+		PyList_SET_ITEM(list, 0, PyUnicode_FromString("pgcnx"));
+		PyList_SET_ITEM(list, 1, PyUnicode_FromString("arraysize"));
+		PyList_SET_ITEM(list, 2, PyUnicode_FromString("resulttype"));
+		PyList_SET_ITEM(list, 3, PyUnicode_FromString("ntuples"));
+		PyList_SET_ITEM(list, 4, PyUnicode_FromString("nfields"));
 
 		return list;
 	}
 
 	/* module name */
 	if (!strcmp(name, "__module__"))
-		return PyBytes_FromString(MODULE_NAME);
+		return PyUnicode_FromString(MODULE_NAME);
 
 	/* class name */
 	if (!strcmp(name, "__class__"))
-		return PyBytes_FromString("pgsource");
+		return PyUnicode_FromString("pgsource");
 
 	/* seeks name in methods (fallback) */
-	return Py_FindMethod(sourceMethods, (PyObject *) self, name);
+	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
 /* sets query object attributes */
@@ -2922,7 +2929,7 @@ sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 static PyObject *
 sourceRepr(sourceObject *self)
 {
-	return PyBytes_FromString("<pg source object>");
+	return PyUnicode_FromString("<pg source object>");
 }
 
 /* returns source object as string in human readable format */
@@ -2936,10 +2943,10 @@ sourceStr(sourceObject *self)
 			return format_result(self->result);
 		case RESULT_DDL:
 		case RESULT_DML:
-			return PyBytes_FromString(PQcmdStatus(self->result));
+			return PyUnicode_FromString(PQcmdStatus(self->result));
 		case RESULT_EMPTY:
 		default:
-			return PyBytes_FromString("(empty PostgreSQL source object)");
+			return PyUnicode_FromString("(empty PostgreSQL source object)");
 	}
 }
 
@@ -2948,13 +2955,13 @@ static char source__doc__[] = "PyGreSQL source object";
 /* query type definition */
 static PyTypeObject sourceType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"PGsourceObject",				/* tp_name */
+	"pgsourceobject",				/* tp_name */
 	sizeof(sourceObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
 	(destructor) sourceDealloc,		/* tp_dealloc */
 	0,								/* tp_print */
-	(getattrfunc) sourceGetAttr,	/* tp_getattr */
+	0,								/* tp_getattr */
 	(setattrfunc) sourceSetAttr,	/* tp_setattr */
 	0,								/* tp_compare */
 	(reprfunc) sourceRepr,			/* tp_repr */
@@ -2964,7 +2971,7 @@ static PyTypeObject sourceType = {
 	0,								/* tp_hash */
 	0,								/* tp_call */
 	(reprfunc) sourceStr,			/* tp_str */
-	0,								/* tp_getattro */
+	(getattrofunc) sourceGetAttr,	/* tp_getattro */
 	0,								/* tp_setattro */
 	0,								/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,				/* tp_flags */
@@ -2979,7 +2986,7 @@ static PyTypeObject sourceType = {
 };
 
 /* connects to a database */
-static char connect__doc__[] =
+static char pgConnect__doc__[] =
 "connect(dbname, host, port, opt, tty) -- connect to a PostgreSQL database "
 "using specified parameters (optionals, keywords aware).";
 
@@ -3126,7 +3133,7 @@ queryListFields(queryObject *self, PyObject *args)
 	for (i = 0; i < n; i++)
 	{
 		name = PQfname(self->result, i);
-		str = PyBytes_FromString(name);
+		str = PyUnicode_FromString(name);
 		PyTuple_SET_ITEM(fieldstuple, i, str);
 	}
 
@@ -3160,7 +3167,7 @@ queryFieldName(queryObject *self, PyObject *args)
 
 	/* gets fields name and builds object */
 	name = PQfname(self->result, i);
-	return PyBytes_FromString(name);
+	return PyUnicode_FromString(name);
 }
 
 /* gets fields number from name in last result */
@@ -3300,7 +3307,7 @@ queryGetResult(queryObject *self, PyObject *args)
 						break;
 
 					default:
-						val = PyBytes_FromString(s);
+						val = PyUnicode_FromString(s);
 						break;
 				}
 
@@ -3435,7 +3442,7 @@ queryDictResult(queryObject *self, PyObject *args)
 						break;
 
 					default:
-						val = PyBytes_FromString(s);
+						val = PyUnicode_FromString(s);
 						break;
 				}
 
@@ -3501,9 +3508,10 @@ queryNamedResult(queryObject *self, PyObject *args)
 
 /* get attribute */
 static PyObject *
-noticeGetAttr(noticeObject *self, char *name)
+noticeGetAttr(noticeObject *self, PyObject *nameobj)
 {
 	PGresult const *res = self->res;
+	const char *name = PyBytes_AsString(nameobj);
 	int fieldcode;
 
 	if (!res)
@@ -3529,7 +3537,7 @@ noticeGetAttr(noticeObject *self, char *name)
 
 	/* full message */
 	if (!strcmp(name, "message"))
-		return PyBytes_FromString(PQresultErrorMessage(res));
+		return PyUnicode_FromString(PQresultErrorMessage(res));
 
 	/* other possible fields */
 	fieldcode = 0;
@@ -3545,7 +3553,7 @@ noticeGetAttr(noticeObject *self, char *name)
 	{
 		char *s = PQresultErrorField(res, fieldcode);
 		if (s)
-			return PyBytes_FromString(s);
+			return PyUnicode_FromString(s);
 		else
 		{
 			Py_INCREF(Py_None); return Py_None;
@@ -3558,37 +3566,35 @@ noticeGetAttr(noticeObject *self, char *name)
 		PyObject *list = PyList_New(6);
 		if (list)
 		{
-			PyList_SET_ITEM(list, 0, PyBytes_FromString("pgcnx"));
-			PyList_SET_ITEM(list, 1, PyBytes_FromString("severity"));
-			PyList_SET_ITEM(list, 2, PyBytes_FromString("message"));
-			PyList_SET_ITEM(list, 3, PyBytes_FromString("primary"));
-			PyList_SET_ITEM(list, 4, PyBytes_FromString("detail"));
-			PyList_SET_ITEM(list, 5, PyBytes_FromString("hint"));
+			PyList_SET_ITEM(list, 0, PyUnicode_FromString("pgcnx"));
+			PyList_SET_ITEM(list, 1, PyUnicode_FromString("severity"));
+			PyList_SET_ITEM(list, 2, PyUnicode_FromString("message"));
+			PyList_SET_ITEM(list, 3, PyUnicode_FromString("primary"));
+			PyList_SET_ITEM(list, 4, PyUnicode_FromString("detail"));
+			PyList_SET_ITEM(list, 5, PyUnicode_FromString("hint"));
 		}
 		return list;
 	}
 
-	PyErr_Format(PyExc_AttributeError,
-		"'noticeObject' has no attribute %s", name);
-	return NULL;
+	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
 static PyObject *
 noticeStr(noticeObject *self)
 {
-	return noticeGetAttr(self, "message");
+	return noticeGetAttr(self, PyBytes_FromString("message"));
 }
 
 /* object type definition */
 static PyTypeObject noticeType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"PGnoticeObject",				/* tp_name */
+	"pgnoticeobject",				/* tp_name */
 	sizeof(noticeObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
 	0,								/* tp_dealloc */
 	0,								/* tp_print */
-	(getattrfunc) noticeGetAttr,	/* tp_getattr */
+	0,								/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
 	0,								/* tp_repr */
@@ -3597,7 +3603,11 @@ static PyTypeObject noticeType = {
 	0,								/* tp_as_mapping */
 	0,								/* tp_hash */
 	0,								/* tp_call */
-	(reprfunc) noticeStr			/* tp_str */
+	(reprfunc) noticeStr,			/* tp_str */
+	(getattrofunc) noticeGetAttr,	/* tp_getattro */
+	PyObject_GenericSetAttr,		/* tp_setattro */
+	0,								/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,				/* tp_flags */
 };
 
 /* query object methods */
@@ -3619,23 +3629,16 @@ static struct PyMethodDef queryMethods[] = {
 	{NULL, NULL}
 };
 
-/* gets query object attributes */
-static PyObject *
-queryGetAttr(queryObject *self, char *name)
-{
-	return Py_FindMethod(queryMethods, (PyObject *) self, name);
-}
-
 /* query type definition */
 static PyTypeObject queryType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"PGqueryObject",				/* tp_name */
+	"pgqueryobject",				/* tp_name */
 	sizeof(queryObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
 	(destructor) queryDealloc,		/* tp_dealloc */
 	0,								/* tp_print */
-	(getattrfunc) queryGetAttr,		/* tp_getattr */
+	0,								/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
 	(reprfunc) queryRepr,			/* tp_repr */
@@ -3645,7 +3648,7 @@ static PyTypeObject queryType = {
 	0,								/* tp_hash */
 	0,								/* tp_call */
 	(reprfunc) queryStr,			/* tp_str */
-	0,								/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,								/* tp_setattro */
 	0,								/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,				/* tp_flags */
@@ -3770,7 +3773,7 @@ pgGetDecimalPoint(PyObject *self, PyObject * args)
 
 	if (PyArg_ParseTuple(args, ""))
 	{
-		ret = PyBytes_FromString(decimal_point);
+		ret = PyUnicode_FromString(decimal_point);
 	}
 	else
 	{
@@ -3876,7 +3879,7 @@ pgSetDefHost(PyObject *self, PyObject *args)
 	old = pg_default_host;
 
 	if (temp)
-		pg_default_host = PyBytes_FromString(temp);
+		pg_default_host = PyUnicode_FromString(temp);
 	else
 	{
 		Py_INCREF(Py_None);
@@ -3927,7 +3930,7 @@ pgSetDefBase(PyObject *self, PyObject *args)
 	old = pg_default_base;
 
 	if (temp)
-		pg_default_base = PyBytes_FromString(temp);
+		pg_default_base = PyUnicode_FromString(temp);
 	else
 	{
 		Py_INCREF(Py_None);
@@ -3978,7 +3981,7 @@ pgSetDefOpt(PyObject *self, PyObject *args)
 	old = pg_default_opt;
 
 	if (temp)
-		pg_default_opt = PyBytes_FromString(temp);
+		pg_default_opt = PyUnicode_FromString(temp);
 	else
 	{
 		Py_INCREF(Py_None);
@@ -4030,7 +4033,7 @@ pgSetDefTTY(PyObject *self, PyObject *args)
 	old = pg_default_tty;
 
 	if (temp)
-		pg_default_tty = PyBytes_FromString(temp);
+		pg_default_tty = PyUnicode_FromString(temp);
 	else
 	{
 		Py_INCREF(Py_None);
@@ -4083,7 +4086,7 @@ pgSetDefUser(PyObject *self, PyObject *args)
 	old = pg_default_user;
 
 	if (temp)
-		pg_default_user = PyBytes_FromString(temp);
+		pg_default_user = PyUnicode_FromString(temp);
 	else
 	{
 		Py_INCREF(Py_None);
@@ -4111,7 +4114,7 @@ pgSetDefPassword(PyObject *self, PyObject *args)
 	}
 
 	if (temp)
-		pg_default_passwd = PyBytes_FromString(temp);
+		pg_default_passwd = PyUnicode_FromString(temp);
 	else
 	{
 		Py_INCREF(Py_None);
@@ -4178,7 +4181,7 @@ pgSetDefPort(PyObject *self, PyObject *args)
 
 static struct PyMethodDef pgMethods[] = {
 	{"connect", (PyCFunction) pgConnect, METH_VARARGS|METH_KEYWORDS,
-			connect__doc__},
+			pgConnect__doc__},
 	{"escape_string", (PyCFunction) pgEscapeString, METH_VARARGS,
 			pgEscapeString__doc__},
 	{"escape_bytea", (PyCFunction) pgEscapeBytea, METH_VARARGS,
@@ -4217,27 +4220,23 @@ static char pg__doc__[] = "Python interface to PostgreSQL DB";
 #ifdef IS_PY3K
 static struct PyModuleDef pgType = {
 	PyModuleDef_HEAD_INIT,
-	"pg",
-	pg__doc__,
-	-1,
-	pgMethods,
-	NULL,
-	NULL,
-	NULL,
-	NULL
+	"pg",		/* m_name */
+	pg__doc__,	/* m_doc */
+	-1,			/* m_size */
+	pgMethods,	/* m_methods */
+	NULL,		/* m_reload */
+	NULL,		/* m_traverse */
+	NULL,		/* m_clear */
+	NULL		/* m_free */
 };
-#endif
 
 /* Initialization function for the module */
-#ifdef IS_PY3K
 PyMODINIT_FUNC PyInit__pg(void)
 #else
 void init_pg(void)
 #endif
 {
-	PyObject   *mod,
-			   *dict,
-			   *v;
+	PyObject   *mod, *dict, *v;
 
 	/* Create the module and add the functions */
 #ifdef IS_PY3K
@@ -4291,7 +4290,7 @@ void init_pg(void)
 	PyDict_SetItemString(dict, "NotSupportedError", NotSupportedError);
 
 	/* Make the version available */
-	v = PyBytes_FromString(PyPgVersion);
+	v = PyUnicode_FromString(PyPgVersion);
 	PyDict_SetItemString(dict, "version", v);
 	PyDict_SetItemString(dict, "__version__", v);
 	Py_DECREF(v);
