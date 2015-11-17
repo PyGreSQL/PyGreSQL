@@ -30,6 +30,8 @@ There are a few drawbacks:
 from __future__ import with_statement
 
 import pg
+
+import sys
 import unittest
 import locale
 
@@ -469,8 +471,8 @@ class TestSimpleQueries(unittest.TestCase):
         q = "select 0;"
         self.c.query(q)
 
-    def testSelectSemicolon(self):
-        q = "select ;"
+    def testSelectDotSemicolon(self):
+        q = "select .;"
         self.assertRaises(pg.ProgrammingError, self.c.query, q)
 
     def testGetresult(self):
@@ -642,7 +644,6 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testPrint(self):
         import os
-        import sys
         q = ("select 1 as a, 'hello' as h, 'w' as world"
             " union select 2, 'xyz', 'uvw'")
         r = self.c.query(q)
@@ -2099,4 +2100,12 @@ if __name__ == '__main__':
         TestSuite2,
     ))
 
-    unittest.TextTestRunner(verbosity=2).run(TestSuite)
+    opts = dict(verbosity=1)
+    if '-v' in sys.argv:
+        opts.update(verbosity=2)
+    if '-f' in sys.argv:
+        opts.update(failfast=True)  # needs Python 2.7
+
+    rc = unittest.TextTestRunner(**opts).run(TestSuite)
+
+    sys.exit(1 if rc.errors or rc.failures else 0)
