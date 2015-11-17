@@ -176,6 +176,7 @@ setup(
         include_dirs=include_dirs, library_dirs=library_dirs,
         define_macros=define_macros, undef_macros=undef_macros,
         libraries=libraries, extra_compile_args=extra_compile_args)],
+    zip_safe=False,
     cmdclass=dict(build_ext=build_pg_ext),
     classifiers=[
         "Development Status :: 6 - Mature",
