@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 
 import sys
 from functools import partial
@@ -28,6 +28,16 @@ def opendb():
     db.query("SET STANDARD_CONFORMING_STRINGS=FALSE")
     return db
 
+db = opendb()
+for q in (
+    "DROP TABLE _test1._test_schema",
+    "DROP TABLE _test2._test_schema",
+    "DROP SCHEMA _test1",
+    "DROP SCHEMA _test2",
+):
+    try: db.query(q)
+    except: pass
+db.close()
 
 class UtilityTest(unittest.TestCase):
 
