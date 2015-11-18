@@ -547,6 +547,7 @@ class TestParamQueries(unittest.TestCase):
 
     def testQueryWithUnicodeParams(self):
         query = self.c.query
+        query('set client_encoding = utf8')
         self.assertEqual(query("select $1||', '||$2||'!'",
             ('Hello', u'w\xf6rld')).getresult(), [('Hello, w\xc3\xb6rld!',)])
         self.assertEqual(query("select $1||', '||$2||'!'",
