@@ -135,7 +135,8 @@ class TestDBClassBasic(unittest.TestCase):
     def testAttributeHost(self):
         def_host = 'localhost'
         host = self.db.host
-        self.assertEqual(host, def_host)
+        self.assertIsInstance(host, str)
+        self.assertEqual(host, dbhost or def_host)
         self.assertEqual(host, self.db.db.host)
 
     def testAttributeOptions(self):
@@ -148,7 +149,7 @@ class TestDBClassBasic(unittest.TestCase):
         def_port = 5432
         port = self.db.port
         self.assertIsInstance(port, int)
-        self.assertEqual(port, def_port)
+        self.assertEqual(port, dbport or def_port)
         self.assertEqual(port, self.db.db.port)
 
     def testAttributeProtocolVersion(self):

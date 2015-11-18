@@ -98,16 +98,16 @@ class TestConnectObject(unittest.TestCase):
 
     def testAttributeHost(self):
         def_host = 'localhost'
-        self.assertEqual(self.connection.host, def_host)
+        self.assertIsInstance(self.connection.host, str)
+        self.assertEqual(self.connection.host, dbhost or def_host)
 
     def testAttributeOptions(self):
         no_options = ''
         self.assertEqual(self.connection.options, no_options)
 
     def testAttributePort(self):
-        def_port = 5432
         self.assertIsInstance(self.connection.port, int)
-        self.assertEqual(self.connection.port, def_port)
+        self.assertEqual(self.connection.port, dbport or dbport)
 
     def testAttributeProtocolVersion(self):
         protocol_version = self.connection.protocol_version
