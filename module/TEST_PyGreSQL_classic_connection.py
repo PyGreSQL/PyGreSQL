@@ -106,8 +106,9 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(self.connection.options, no_options)
 
     def testAttributePort(self):
+        def_port = 5432
         self.assertIsInstance(self.connection.port, int)
-        self.assertEqual(self.connection.port, dbport or dbport)
+        self.assertEqual(self.connection.port, dbport or def_port)
 
     def testAttributeProtocolVersion(self):
         protocol_version = self.connection.protocol_version
