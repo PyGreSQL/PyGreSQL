@@ -28,10 +28,6 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 # both that copyright notice and this permission notice appear in
 # supporting documentation.
 
-import sys
-if sys.version_info[0] == 3:
-    class basestring(str): pass
-
 from _pg import *
 
 import select
