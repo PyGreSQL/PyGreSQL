@@ -147,30 +147,33 @@ class TestDBClassBasic(unittest.TestCase):
     def testAttributePort(self):
         def_port = 5432
         port = self.db.port
+        self.assertIsInstance(port, int)
         self.assertEqual(port, def_port)
         self.assertEqual(port, self.db.db.port)
 
     def testAttributeProtocolVersion(self):
         protocol_version = self.db.protocol_version
-        self.assertTrue(isinstance(protocol_version, int))
+        self.assertIsInstance(protocol_version, int)
         self.assertTrue(2 <= protocol_version < 4)
         self.assertEqual(protocol_version, self.db.db.protocol_version)
 
     def testAttributeServerVersion(self):
         server_version = self.db.server_version
-        self.assertTrue(isinstance(server_version, int))
+        self.assertIsInstance(server_version, int)
         self.assertTrue(70400 <= server_version < 100000)
         self.assertEqual(server_version, self.db.db.server_version)
 
     def testAttributeStatus(self):
         status_ok = 1
         status = self.db.status
+        self.assertIsInstance(status, int)
         self.assertEqual(status, status_ok)
         self.assertEqual(status, self.db.db.status)
 
     def testAttributeTty(self):
         def_tty = ''
         tty = self.db.tty
+        self.assertIsInstance(tty, str)
         self.assertEqual(tty, def_tty)
         self.assertEqual(tty, self.db.db.tty)
 
@@ -178,6 +181,7 @@ class TestDBClassBasic(unittest.TestCase):
         no_user = 'Deprecated facility'
         user = self.db.user
         self.assertTrue(user)
+        self.assertIsInstance(user, str)
         self.assertNotEqual(user, no_user)
         self.assertEqual(user, self.db.db.user)
 

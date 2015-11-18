@@ -106,30 +106,34 @@ class TestConnectObject(unittest.TestCase):
 
     def testAttributePort(self):
         def_port = 5432
+        self.assertIsInstance(self.connection.port, int)
         self.assertEqual(self.connection.port, def_port)
 
     def testAttributeProtocolVersion(self):
         protocol_version = self.connection.protocol_version
-        self.assertTrue(isinstance(protocol_version, int))
+        self.assertIsInstance(protocol_version, int)
         self.assertTrue(2 <= protocol_version < 4)
 
     def testAttributeServerVersion(self):
         server_version = self.connection.server_version
-        self.assertTrue(isinstance(server_version, int))
+        self.assertIsInstance(server_version, int)
         self.assertTrue(70400 <= server_version < 100000)
 
     def testAttributeStatus(self):
         status_ok = 1
+        self.assertIsInstance(self.connection.status, int)
         self.assertEqual(self.connection.status, status_ok)
 
     def testAttributeTty(self):
         def_tty = ''
+        self.assertIsInstance(self.connection.tty, str)
         self.assertEqual(self.connection.tty, def_tty)
 
     def testAttributeUser(self):
         no_user = 'Deprecated facility'
         user = self.connection.user
         self.assertTrue(user)
+        self.assertIsInstance(user, str)
         self.assertNotEqual(user, no_user)
 
     def testMethodQuery(self):
@@ -191,13 +195,49 @@ class TestSimpleQueries(unittest.TestCase):
         q = "select 0"
         result = [(0,)]
         r = self.c.query(q).getresult()
+        self.assertIsInstance(r, list)
+        v = r[0]
+        self.assertIsInstance(v, tuple)
+        self.assertIsInstance(v[0], int)
         self.assertEqual(r, result)
+
+    def testGetresultLong(self):
+        q = "select 1234567890123456790"
+        result = 1234567890123456790L
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, long)
+        self.assertEqual(v, result)
+
+    def testGetresultString(self):
+        result = 'Hello, world!'
+        q = "select '%s'" % result
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
 
     def testDictresult(self):
         q = "select 0 as alias0"
         result = [{'alias0': 0}]
         r = self.c.query(q).dictresult()
+        self.assertIsInstance(r, list)
+        v = r[0]
+        self.assertIsInstance(v, dict)
+        self.assertIsInstance(v['alias0'], int)
         self.assertEqual(r, result)
+
+    def testDictresultLong(self):
+        q = "select 1234567890123456790 as longjohnsilver"
+        result = 1234567890123456790L
+        v = self.c.query(q).dictresult()[0]['longjohnsilver']
+        self.assertIsInstance(v, long)
+        self.assertEqual(v, result)
+
+    def testDictresultString(self):
+        result = 'Hello, world!'
+        q = "select '%s' as greeting" % result
+        v = self.c.query(q).dictresult()[0]['greeting']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
 
     def testNamedresult(self):
         if namedtuple:
@@ -306,21 +346,40 @@ class TestSimpleQueries(unittest.TestCase):
     def testFieldname(self):
         q = "select 0 as z, 0 as a, 0 as x, 0 as y"
         r = self.c.query(q).fieldname(2)
-        result = "x"
-        self.assertEqual(r, result)
+        self.assertEqual(r, 'x')
+        r = self.c.query(q).fieldname(3)
+        self.assertEqual(r, 'y')
 
     def testFieldnum(self):
+        q = "select 1 as x"
+        self.assertRaises(ValueError, self.c.query(q).fieldnum, 'y')
+        q = "select 1 as x"
+        r = self.c.query(q).fieldnum('x')
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 0)
         q = "select 0 as z, 0 as a, 0 as x, 0 as y"
-        r = self.c.query(q).fieldnum("x")
-        result = 2
-        self.assertEqual(r, result)
+        r = self.c.query(q).fieldnum('x')
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 2)
+        r = self.c.query(q).fieldnum('y')
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 3)
 
     def testNtuples(self):
+        q = "select 1 where false"
+        r = self.c.query(q).ntuples()
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 0)
         q = ("select 1 as a, 2 as b, 3 as c, 4 as d"
             " union select 5 as a, 6 as b, 7 as c, 8 as d")
         r = self.c.query(q).ntuples()
-        result = 2
-        self.assertEqual(r, result)
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 2)
+        q = ("select 1 union select 2 union select 3"
+            " union select 4 union select 5 union select 6")
+        r = self.c.query(q).ntuples()
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 6)
 
     def testQuery(self):
         query = self.c.query
@@ -330,10 +389,10 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsNone(r)
         q = "insert into test_table values (1)"
         r = query(q)
-        self.assertTrue(isinstance(r, int)), r
+        self.assertIsInstance(r, int)
         q = "insert into test_table select 2"
         r = query(q)
-        self.assertTrue(isinstance(r, int))
+        self.assertIsInstance(r, int)
         oid = r
         q = "select oid from test_table where n=2"
         r = query(q).getresult()
@@ -341,18 +400,19 @@ class TestSimpleQueries(unittest.TestCase):
         r = r[0]
         self.assertEqual(len(r), 1)
         r = r[0]
+        self.assertIsInstance(r, int)
         self.assertEqual(r, oid)
         q = "insert into test_table select 3 union select 4 union select 5"
         r = query(q)
-        self.assertTrue(isinstance(r, str))
+        self.assertIsInstance(r, str)
         self.assertEqual(r, '3')
         q = "update test_table set n=4 where n<5"
         r = query(q)
-        self.assertTrue(isinstance(r, str))
+        self.assertIsInstance(r, str)
         self.assertEqual(r, '4')
         q = "delete from test_table"
         r = query(q)
-        self.assertTrue(isinstance(r, str))
+        self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
         query("drop table test_table")
 
@@ -384,11 +444,11 @@ class TestSimpleQueries(unittest.TestCase):
             self.assertIsNone(self.c.getnotify())
             self.c.query("notify test_notify")
             r = self.c.getnotify()
-            self.assertTrue(isinstance(r, tuple))
+            self.assertIsInstance(r, tuple)
             self.assertEqual(len(r), 3)
-            self.assertTrue(isinstance(r[0], str))
-            self.assertTrue(isinstance(r[1], int))
-            self.assertTrue(isinstance(r[2], str))
+            self.assertIsInstance(r[0], str)
+            self.assertIsInstance(r[1], int)
+            self.assertIsInstance(r[2], str)
             self.assertEqual(r[0], 'test_notify')
             self.assertEqual(r[2], '')
             self.assertIsNone(self.c.getnotify())
@@ -400,9 +460,9 @@ class TestSimpleQueries(unittest.TestCase):
                 r = self.c.getnotify()
                 self.assertTrue(isinstance(r, tuple))
                 self.assertEqual(len(r), 3)
-                self.assertTrue(isinstance(r[0], str))
-                self.assertTrue(isinstance(r[1], int))
-                self.assertTrue(isinstance(r[2], str))
+                self.assertIsInstance(r[0], str)
+                self.assertIsInstance(r[1], int)
+                self.assertIsInstance(r[2], str)
                 self.assertEqual(r[0], 'test_notify')
                 self.assertEqual(r[2], 'test_payload')
                 self.assertIsNone(self.c.getnotify())
