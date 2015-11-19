@@ -1249,16 +1249,16 @@ pglarge_open(pglargeobject *self, PyObject *args)
 	int			mode,
 				fd;
 
-	/* check validity */
-	if (!check_lo_obj(self, CHECK_CLOSE))
-		return NULL;
-
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &mode))
 	{
 		PyErr_SetString(PyExc_TypeError, "open(mode), with mode(integer).");
 		return NULL;
 	}
+
+	/* check validity */
+	if (!check_lo_obj(self, CHECK_CLOSE))
+		return NULL;
 
 	/* opens large object */
 	if ((fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode)) < 0)
@@ -1316,10 +1316,6 @@ pglarge_read(pglargeobject *self, PyObject *args)
 	int			size;
 	PyObject   *buffer;
 
-	/* checks validity */
-	if (!check_lo_obj(self, CHECK_OPEN))
-		return NULL;
-
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &size))
 	{
@@ -1332,6 +1328,10 @@ pglarge_read(pglargeobject *self, PyObject *args)
 		PyErr_SetString(PyExc_ValueError, "size must be positive.");
 		return NULL;
 	}
+
+	/* checks validity */
+	if (!check_lo_obj(self, CHECK_OPEN))
+		return NULL;
 
 	/* allocate buffer and runs read */
 	buffer = PyString_FromStringAndSize((char *) NULL, size);
@@ -1360,10 +1360,6 @@ pglarge_write(pglargeobject *self, PyObject *args)
 	int			size,
 				bufsize;
 
-	/* checks validity */
-	if (!check_lo_obj(self, CHECK_OPEN))
-		return NULL;
-
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "s#", &buffer, &bufsize))
 	{
@@ -1371,6 +1367,10 @@ pglarge_write(pglargeobject *self, PyObject *args)
 			"write(buffer), with buffer (sized string).");
 		return NULL;
 	}
+
+	/* checks validity */
+	if (!check_lo_obj(self, CHECK_OPEN))
+		return NULL;
 
 	/* sends query */
 	if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
@@ -1399,10 +1399,6 @@ pglarge_lseek(pglargeobject *self, PyObject *args)
 				offset = 0,
 				whence = 0;
 
-	/* checks validity */
-	if (!check_lo_obj(self, CHECK_OPEN))
-		return NULL;
-
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "ii", &offset, &whence))
 	{
@@ -1410,6 +1406,10 @@ pglarge_lseek(pglargeobject *self, PyObject *args)
 			"lseek(offset, whence), with offset and whence (integers).");
 		return NULL;
 	}
+
+	/* checks validity */
+	if (!check_lo_obj(self, CHECK_OPEN))
+		return NULL;
 
 	/* sends query */
 	if ((ret = lo_lseek(self->pgcnx->cnx, self->lo_fd, offset, whence)) == -1)

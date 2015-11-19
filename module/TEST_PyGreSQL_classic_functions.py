@@ -317,15 +317,6 @@ class TestModuleConstants(unittest.TestCase):
             self.assertTrue(1 <= len(w) <= 2)
             self.assertTrue(w.isdigit())
 
-    def testLargeObjectIntConstants(self):
-        names = 'INV_READ INV_WRITE SEEK_SET SEEK_CUR SEEK_END'.split()
-        for name in names:
-            try:
-                value = getattr(pg, name)
-            except AttributeError:
-                self.fail('Module constant %s is missing' % name)
-            self.assertIsInstance(value, int)
-
 
 if __name__ == '__main__':
     unittest.main()
