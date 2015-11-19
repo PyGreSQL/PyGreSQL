@@ -222,8 +222,6 @@ class TestConnectObject(unittest.TestCase):
         self.assertGreaterEqual(r, 0)
 
 
-
-
 class TestSimpleQueries(unittest.TestCase):
     """"Test simple queries via a basic pg connection."""
 
@@ -646,7 +644,7 @@ class TestInserttable(unittest.TestCase):
         self.c.query("set datestyle='ISO,YMD'")
 
     def tearDown(self):
-        self.c.query('truncate table test')
+        self.c.query("truncate table test")
         self.c.close()
 
     data = [
@@ -746,7 +744,73 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.get_back(), data)
 
 
-class TestNoticeReceiver(unittest.TestCase):
+class TestDirectSocketAccess(unittest.TestCase):
+    """"Test copy command with direct socket access."""
+
+    @classmethod
+    def setUpClass(cls):
+        c = connect()
+        c.query("drop table if exists test cascade")
+        c.query("create table test (i int, v varchar(16))")
+        c.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        c = connect()
+        c.query("drop table test cascade")
+        c.close()
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query("set datestyle='ISO,YMD'")
+
+    def tearDown(self):
+        self.c.query("truncate table test")
+        self.c.close()
+
+    def testPutline(self):
+        putline = self.c.putline
+        query = self.c.query
+        data = list(enumerate("apple pear plum cherry banana".split()))
+        query("copy test from stdin")
+        try:
+            for i, v in data:
+                putline("%d\t%s\n" % (i, v))
+            putline("\\.\n")
+        finally:
+            self.c.endcopy()
+        r = query("select * from test").getresult()
+        self.assertEqual(r, data)
+
+    def testPutline(self):
+        getline = self.c.getline
+        query = self.c.query
+        data = list(enumerate("apple banana pear plum strawberry".split()))
+        n = len(data)
+        self.c.inserttable('test', data)
+        query("copy test to stdout")
+        try:
+            for i in range(n + 2):
+                v = getline()
+                if i < n:
+                    self.assertEqual(v, '%d\t%s' % data[i])
+                elif i == n:
+                    self.assertEqual(v, '\\.')
+                else:
+                    self.assertIsNone(v)
+        finally:
+            try:
+                self.c.endcopy()
+            except IOError:
+                pass
+
+    def testParameterChecks(self):
+        self.assertRaises(TypeError, self.c.putline)
+        self.assertRaises(TypeError, self.c.getline, 'invalid')
+        self.assertRaises(TypeError, self.c.endcopy, 'invalid')
+
+
+class TestNotificatons(unittest.TestCase):
     """"Test notification support."""
 
     def setUp(self):
@@ -756,7 +820,7 @@ class TestNoticeReceiver(unittest.TestCase):
         self.c.close()
 
     def testGetNotify(self):
-        getnotify = self.connection.getnotify
+        getnotify = self.c.getnotify
         query = self.c.query
         self.assertIsNone(getnotify())
         query('listen test_notify')
