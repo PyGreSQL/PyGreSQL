@@ -275,5 +275,57 @@ class TestEscapeFunctions(unittest.TestCase):
         self.assertEqual(f(r'O\000ps\377!'), 'O\x00ps\xff!')
 
 
+class TestConfigFunctions(unittest.TestCase):
+    """Test the functions for changing default settings.
+
+    The effect of most of these cannot be tested here, because that
+    needs a database connection.  So we merely test their existence here.
+
+    """
+
+    def testGetDecimalPoint(self):
+        r = pg.get_decimal_point()
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '.')
+
+    def testSetDecimalPoint(self):
+        point = pg.get_decimal_point()
+        pg.set_decimal_point('*')
+        r = pg.get_decimal_point()
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '*')
+        pg.set_decimal_point(point)
+
+    def testSetDecimal(self):
+        decimal_class = pg.Decimal
+        pg.set_decimal(long)
+        pg.set_decimal(decimal_class)
+
+    def testSetNamedresult(self):
+        pg.set_namedresult(tuple)
+
+
+class TestModuleConstants(unittest.TestCase):
+    """Test the existence of the documented module constants."""
+
+    def testVersion(self):
+        v = pg.version
+        self.assertIsInstance(v, str)
+        v = v.split('.')
+        self.assertTrue(2 <= len(v) <= 3)
+        for w in v:
+            self.assertTrue(1 <= len(w) <= 2)
+            self.assertTrue(w.isdigit())
+
+    def testLargeObjectIntConstants(self):
+        names = 'INV_READ INV_WRITE SEEK_SET SEEK_CUR SEEK_END'.split()
+        for name in names:
+            try:
+                value = getattr(pg, name)
+            except AttributeError:
+                self.fail('Module constant %s is missing' % name)
+            self.assertIsInstance(value, int)
+
+
 if __name__ == '__main__':
     unittest.main()

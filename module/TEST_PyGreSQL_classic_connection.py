@@ -240,15 +240,15 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
+    @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testNamedresult(self):
-        if namedtuple:
-            q = "select 0 as alias0"
-            result = [(0,)]
-            r = self.c.query(q).namedresult()
-            self.assertEqual(r, result)
-            v = r[0]
-            self.assertEqual(v._fields, ('alias0',))
-            self.assertEqual(v.alias0, 0)
+        q = "select 0 as alias0"
+        result = [(0,)]
+        r = self.c.query(q).namedresult()
+        self.assertEqual(r, result)
+        v = r[0]
+        self.assertEqual(v._fields, ('alias0',))
+        self.assertEqual(v.alias0, 0)
 
     def testGet3Cols(self):
         q = "select 1,2,3"
@@ -773,6 +773,103 @@ class TestNoticeReceiver(unittest.TestCase):
                 detail=None, hint=None))
         finally:
             self.c.query('''drop function bilbo_notice();''')
+
+
+class TestConfigFunctions(unittest.TestCase):
+    """Test the functions for changing default settings.
+
+    To test the effect of most of these functions, we need a database
+    connection.  That's why they are covered in this test module.
+
+    """
+
+    def setUp(self):
+        self.c = connect()
+
+    def tearDown(self):
+        self.c.close()
+
+    def testGetDecimalPoint(self):
+        point = pg.get_decimal_point()
+        self.assertIsInstance(point, str)
+        self.assertEqual(point, '.')
+
+    def testSetDecimalPoint(self):
+        d = pg.Decimal
+        point = pg.get_decimal_point()
+        query = self.c.query
+        # check that money values can be interpreted correctly
+        # if and only if the decimal point is set appropriately
+        # for the current lc_monetary setting
+        query("set lc_monetary='en_US'")
+        pg.set_decimal_point('.')
+        r = query("select '34.25'::money").getresult()[0][0]
+        self.assertIsInstance(r, d)
+        self.assertEqual(r, d('34.25'))
+        pg.set_decimal_point(',')
+        r = query("select '34.25'::money").getresult()[0][0]
+        self.assertNotEqual(r, d('34.25'))
+        query("set lc_monetary='de_DE'")
+        pg.set_decimal_point(',')
+        r = query("select '34,25'::money").getresult()[0][0]
+        self.assertIsInstance(r, d)
+        self.assertEqual(r, d('34.25'))
+        pg.set_decimal_point('.')
+        r = query("select '34,25'::money").getresult()[0][0]
+        self.assertNotEqual(r, d('34.25'))
+        pg.set_decimal_point(point)
+
+    def testSetDecimal(self):
+        d = pg.Decimal
+        query = self.c.query
+        r = query("select 3425::numeric").getresult()[0][0]
+        self.assertIsInstance(r, d)
+        self.assertEqual(r, d('3425'))
+        pg.set_decimal(long)
+        r = query("select 3425::numeric").getresult()[0][0]
+        self.assertNotIsInstance(r, d)
+        self.assertIsInstance(r, long)
+        self.assertEqual(r, 3425L)
+        pg.set_decimal(d)
+
+    @unittest.skipUnless(namedtuple, 'Named tuples not available')
+    def testSetNamedresult(self):
+        query = self.c.query
+
+        r = query("select 1 as x, 2 as y").namedresult()[0]
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(r, (1, 2))
+        self.assertIsNot(type(r), tuple)
+        self.assertEqual(r._fields, ('x', 'y'))
+        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
+        self.assertEqual(r.__class__.__name__, 'Row')
+
+        _namedresult = pg._namedresult
+        self.assertTrue(callable(_namedresult))
+        pg.set_namedresult(_namedresult)
+
+        r = query("select 1 as x, 2 as y").namedresult()[0]
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(r, (1, 2))
+        self.assertIsNot(type(r), tuple)
+        self.assertEqual(r._fields, ('x', 'y'))
+        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
+        self.assertEqual(r.__class__.__name__, 'Row')
+
+        def _listresult(q):
+            return map(list, q.getresult())
+
+        pg.set_namedresult(_listresult)
+
+        try:
+            r = query("select 1 as x, 2 as y").namedresult()[0]
+            self.assertIsInstance(r, list)
+            self.assertEqual(r, [1, 2])
+            self.assertIsNot(type(r), tuple)
+            self.assertFalse(hasattr(r, '_fields'))
+            self.assertNotEqual(r.__class__.__name__, 'Row')
+        finally:
+            pg.set_namedresult(_namedresult)
 
 
 if __name__ == '__main__':
