@@ -384,7 +384,7 @@ Description:
   This function can be used to specify the Python class that shall be
   used by PyGreSQL to hold PostgreSQL numeric values. The default class
   is decimal.Decimal if available, otherwise the float type is used.
-  
+
 set_namedresult -- set a function that will convert to named tuples
 -------------------------------------------------------------------
 Syntax::
@@ -396,7 +396,7 @@ Parameters:
 
 Description:
   You can use this if you want to create different kinds of named tuples.
-  
+
 
 Module constants
 ----------------
@@ -457,7 +457,7 @@ Description:
   insert statement that inserted exactly one row into a table that has OIDs, the
   return value is the OID of the newly inserted row. If the query is an update
   or delete statement, or an insert statement that did not insert exactly one
-  row in a table with OIDs, then the numer of rows affected is returned as a
+  row in a table with OIDs, then the number of rows affected is returned as a
   string. If it is a statement that returns rows as a result (usually a select
   statement, but maybe also an "insert/update ... returning" statement), this
   method returns a `pgqueryobject` that can be accessed via the `getresult()`,

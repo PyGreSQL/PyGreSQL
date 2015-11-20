@@ -519,7 +519,7 @@ class DB(object):
         has OIDs, the return value is the OID of the newly inserted row.
         If the query is an update or delete statement, or an insert statement
         that did not insert exactly one row in a table with OIDs, then the
-        numer of rows affected is returned as a string. If it is a statement
+        number of rows affected is returned as a string. If it is a statement
         that returns rows as a result (usually a select statement, but maybe
         also an "insert/update ... returning" statement), this method returns
         a pgqueryobject that can be accessed via getresult() or dictresult()
