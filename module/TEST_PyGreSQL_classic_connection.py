@@ -16,6 +16,7 @@ try:
 except ImportError:
     import unittest
 import sys
+import tempfile
 import threading
 import time
 
@@ -26,8 +27,6 @@ try:
     from collections import namedtuple
 except ImportError:  # Python < 2.6
     namedtuple = None
-
-from StringIO import StringIO
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
@@ -472,16 +471,17 @@ class TestSimpleQueries(unittest.TestCase):
         q = ("select 1 as a, 'hello' as h, 'w' as world"
             " union select 2, 'xyz', 'uvw'")
         r = self.c.query(q)
-        s = StringIO()
-        stdout, sys.stdout = sys.stdout, s
+        f = tempfile.TemporaryFile()
+        stdout, sys.stdout = sys.stdout, f
         try:
             print r
         except Exception:
             pass
         finally:
             sys.stdout = stdout
-        r = s.getvalue()
-        s.close()
+        f.seek(0)
+        r = f.read()
+        f.close()
         self.assertEqual(r,
             'a|  h  |world\n'
             '-+-----+-----\n'

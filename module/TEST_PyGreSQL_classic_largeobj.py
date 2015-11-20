@@ -15,6 +15,7 @@ try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
+import sys
 import tempfile
 
 import pg  # the module under test
@@ -364,6 +365,28 @@ class TestLargeObjects(unittest.TestCase):
         r = f.read()
         f.close()
         self.assertEqual(r, data)
+
+    def testPrint(self):
+        self.obj.open(pg.INV_WRITE)
+        data = 'some object to be printed'
+        self.obj.write(data)
+        f = tempfile.TemporaryFile()
+        stdout, sys.stdout = sys.stdout, f
+        try:
+            print self.obj
+            self.obj.close()
+            print self.obj
+        except Exception:
+            pass
+        finally:
+            sys.stdout = stdout
+        f.seek(0)
+        r = f.read()
+        f.close()
+        oid = self.obj.oid
+        self.assertEqual(r,
+            'Opened large object, oid %d\n'
+            'Closed large object, oid %d\n' % (oid, oid))
 
 
 if __name__ == '__main__':
