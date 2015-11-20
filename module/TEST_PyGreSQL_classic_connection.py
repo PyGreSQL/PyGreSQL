@@ -77,7 +77,8 @@ class TestConnectObject(unittest.TestCase):
         attributes = '''db error host options port
             protocol_version server_version status tty user'''.split()
         connection_attributes = [a for a in dir(self.connection)
-            if not callable(eval("self.connection." + a))]
+            if not a.startswith('__')
+            and not callable(eval("self.connection." + a))]
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
@@ -87,7 +88,8 @@ class TestConnectObject(unittest.TestCase):
             inserttable locreate loimport parameter putline query reset
             set_notice_receiver source transaction'''.split()
         connection_methods = [a for a in dir(self.connection)
-            if callable(eval("self.connection." + a))]
+            if not a.startswith('__')
+            and callable(eval("self.connection." + a))]
         self.assertEqual(methods, connection_methods)
 
     def testAttributeDb(self):
@@ -877,6 +879,8 @@ class TestNotificatons(unittest.TestCase):
 
             def notice_receiver(notice):
                 for attr in dir(notice):
+                    if attr.startswith('__'):
+                        continue
                     value = getattr(notice, attr)
                     if isinstance(value, str):
                         value = value.replace('WARNUNG', 'WARNING')
