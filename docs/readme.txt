@@ -77,7 +77,7 @@ It is based on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.f
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL 4.2 needs PostgreSQL 8.3 and Python 2.5 or above.
+The current version PyGreSQL 5.0 needs PostgreSQL 9.0 and Python 2.6 or above.
 
 
 Where to get ... ?

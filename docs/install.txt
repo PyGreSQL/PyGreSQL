@@ -16,8 +16,8 @@ are on Windows, make sure that the directory with libpq.dll is in your
 ``PATH`` environment variable.
 
 The current version of PyGreSQL has been tested with Python 2.7 and
-PostGreSQL 9.2. Older version should work as well, but you will need
-at least Python 2.5 and PostgreSQL 8.3.
+PostGreSQL 9.4. Older version should work as well, but you will need
+at least Python 2.6 and PostgreSQL 9.0.
 
 PyGreSQL will be installed as three modules, a dynamic module called
 _pg.pyd, and two pure Python wrapper modules called pg.py and pgdb.py.

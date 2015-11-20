@@ -36,19 +36,11 @@ from _pg import *
 
 import select
 import warnings
-try:
-    frozenset
-except NameError:  # Python < 2.4
-    from sets import ImmutableSet as frozenset
-try:
-    from decimal import Decimal
-    set_decimal(Decimal)
-except ImportError:  # Python < 2.4
-    Decimal = float
-try:
-    from collections import namedtuple
-except ImportError:  # Python < 2.6
-    namedtuple = None
+
+from decimal import Decimal
+from collections import namedtuple
+
+set_decimal(Decimal)
 
 
 # Auxiliary functions which are independent from a DB connection:

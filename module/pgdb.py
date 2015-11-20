@@ -64,28 +64,13 @@ Basic usage:
 """
 
 from _pg import *
-try:
-    frozenset
-except NameError:  # Python < 2.4
-    from sets import ImmutableSet as frozenset
+
 from datetime import date, time, datetime, timedelta
 from time import localtime
-try:  # use Decimal if available
-    from decimal import Decimal
-    set_decimal(Decimal)
-except ImportError:  # otherwise (Python < 2.4)
-    Decimal = float  # use float instead of Decimal
-try:
-    from math import isnan, isinf
-except ImportError:  # Python < 2.6
-    isnan = lambda x: x != x
-    isinf = lambda x: not isnan(x) and isnan(x * 0)
-try:
-    inf = float('inf')
-    nan = float('nan')
-except ValueError:  # Python < 2.6
-    inf = 1.0e999
-    nan = inf * 0
+from decimal import Decimal
+from math import isnan, isinf
+
+set_decimal(Decimal)
 
 
 ### Module Constants

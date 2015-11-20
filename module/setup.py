@@ -1,7 +1,7 @@
 #! /usr/bin/python
 # $Id$
 
-"""Setup script for PyGreSQL version 4.1
+"""Setup script for PyGreSQL version 5.0
 
 PyGreSQL is an open-source Python module that interfaces to a
 PostgreSQL database. It embeds the PostgreSQL query library to allow
@@ -21,7 +21,7 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-The supported versions are Python 2.5-3.4 and PostgreSQL 8.3-9.3.
+The supported versions are Python 2.6-3.5 and PostgreSQL 9.0-9.5.
 
 Use as follows:
 python setup.py build   # to build the module
@@ -35,12 +35,12 @@ using distutils to install Python programs.
 
 """
 
-version = '4.1.1'
+version = '5.0a0'
 
 
 import sys
 
-if not (2, 5) <= sys.version_info[:2] <= (3, 4):
+if not (2, 6) <= sys.version_info[:2] <= (3, 5):
     raise Exception("Sorry, PyGreSQL %s"
         " does not support this Python version" % version)
 

@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-from __future__ import with_statement, print_function
+from __future__ import print_function
 
 import sys
 from functools import partial

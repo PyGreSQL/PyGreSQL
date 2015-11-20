@@ -12,9 +12,10 @@ These tests need a database to test against.
 """
 
 try:
-    import unittest2 as unittest  # for Python < 2.6
+    import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
+
 import sys
 import threading
 import time
@@ -22,10 +23,8 @@ import time
 import pg  # the module under test
 
 from decimal import Decimal
-try:
-    from collections import namedtuple
-except ImportError:  # Python < 2.6
-    namedtuple = None
+
+from collections import namedtuple
 
 from StringIO import StringIO
 

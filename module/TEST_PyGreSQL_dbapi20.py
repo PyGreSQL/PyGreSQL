@@ -1,8 +1,6 @@
 #! /usr/bin/python
 # $Id$
 
-from __future__ import with_statement
-
 import unittest
 import dbapi20
 import pgdb
@@ -109,24 +107,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(error.sqlstate, '22012')
 
     def test_float(self):
-        try:
-            nan = float('nan')
-        except ValueError:  # Python < 2.6
-            nan = 3.0e999 - 1.5e999999
-        try:
-            inf = float('inf')
-        except ValueError:  # Python < 2.6
-            inf = 3.0e999 * 1.5e999999
-        try:
-            from math import isnan, isinf
-        except ImportError:  # Python < 2.6
-            isnan = lambda x: x != x
-            isinf = lambda x: not isnan(x) and isnan(x * 0)
-        try:
-            from math import isnan, isinf
-        except ImportError:  # Python < 2.6
-            isnan = lambda x: x != x
-            isinf = lambda x: not isnan(x) and isnan(x * 0)
+        nan, inf = float('nan'), float('inf')
+        from math import isnan, isinf
         self.assert_(isnan(nan) and not isinf(nan))
         self.assert_(isinf(inf) and not isnan(inf))
         values = [0, 1, 0.03125, -42.53125, nan, inf, -inf]

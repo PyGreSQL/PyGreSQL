@@ -13,7 +13,7 @@ These tests do not need a database to test against.
 
 
 try:
-    import unittest2 as unittest  # for Python < 2.6
+    import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
 
