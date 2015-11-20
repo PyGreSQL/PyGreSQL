@@ -47,7 +47,7 @@ except ImportError:  # Python < 2.6
     namedtuple = None
 
 
-# Auxiliary functions which are independent from a DB connection:
+# Auxiliary functions that are independent of a DB connection:
 
 def _is_quoted(s):
     """Check whether this string is a quoted identifier."""
