@@ -1484,13 +1484,13 @@ Return type:
   :integer: new position in object
 
 Exceptions raised:
-  :TypeError: binvalid connection or invalid object,
+  :TypeError: invalid connection or invalid object,
     bad parameter type, or too many parameters
   :IOError: object is not opened, or seek error
 
 Description:
   This method allows to move the position cursor in the large object. The
-  whence parameter can be obtained by OR-ing the constants defined in the
+  valid values for the whence parameter are defined as constants in the
   `pg` module (`SEEK_SET`, `SEEK_CUR`, `SEEK_END`).
 
 Syntax::
