@@ -28,15 +28,8 @@
  */
 
 /* Note: This should be linked against the same C runtime lib as Python */
+
 #include <Python.h>
-
-#if PY_MAJOR_VERSION >= 3
-#define IS_PY3K
-#endif
-
-#ifndef IS_PY3K
-#define PyLong_FromLong PyInt_FromLong
-#endif
 
 #include <libpq-fe.h>
 
@@ -44,6 +37,9 @@
 #include "pgfs.h"
 /* the type definitions from <catalog/pg_type.h> */
 #include "pgtypes.h"
+
+/* macros for single-source Python 2/3 compatibility */
+#include "py3c.h"
 
 static PyObject *Error, *Warning, *InterfaceError,
 	*DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
@@ -753,7 +749,7 @@ largeSeek(largeObject *self, PyObject *args)
 	}
 
 	/* returns position */
-	return PyLong_FromLong(ret);
+	return PyInt_FromLong(ret);
 }
 
 /* gets large object size */
@@ -802,7 +798,7 @@ largeSize(largeObject *self, PyObject *args)
 	}
 
 	/* returns size */
-	return PyLong_FromLong(end);
+	return PyInt_FromLong(end);
 }
 
 /* gets large object cursor position */
@@ -835,7 +831,7 @@ largeTell(largeObject *self, PyObject *args)
 	}
 
 	/* returns size */
-	return PyLong_FromLong(start);
+	return PyInt_FromLong(start);
 }
 
 /* exports large object as unix file */
@@ -942,7 +938,7 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 	if (!strcmp(name, "oid"))
 	{
 		if (check_lo_obj(self, 0))
-			return PyLong_FromLong(self->lo_oid);
+			return PyInt_FromLong(self->lo_oid);
 
 		Py_INCREF(Py_None);
 		return Py_None;
@@ -1270,7 +1266,7 @@ connQuery(connObject *self, PyObject *args)
 					}
 					/* for a single insert, return the oid */
 					PQclear(result);
-					return PyLong_FromLong(oid);
+					return PyInt_FromLong(oid);
 				}
 			case PGRES_COPY_OUT:		/* no data will be received */
 			case PGRES_COPY_IN:
@@ -1572,7 +1568,7 @@ connInsertTable(connObject *self, PyObject *args)
 					*bufpt++ = *t++; --bufsiz;
 				}
 			}
-			else if (PyLong_Check(item) || PyLong_Check(item))
+			else if (PyInt_Check(item) || PyLong_Check(item))
 			{
 				PyObject* s = PyObject_Str(item);
 				const char* t = PyBytes_AsString(s);
@@ -1664,7 +1660,7 @@ connTransaction(connObject *self, PyObject *args)
 		return NULL;
 	}
 
-	return PyLong_FromLong(PQtransactionStatus(self->cnx));
+	return PyInt_FromLong(PQtransactionStatus(self->cnx));
 }
 
 /* get parameter setting */
@@ -1953,7 +1949,7 @@ connCancel(connObject *self, PyObject *args)
 	}
 
 	/* request that the server abandon processing of the current command */
-	return PyLong_FromLong((long) PQrequestCancel(self->cnx));
+	return PyInt_FromLong((long) PQrequestCancel(self->cnx));
 }
 
 /* get connection socket */
@@ -1978,9 +1974,9 @@ connFileno(connObject *self, PyObject *args)
 	}
 
 #ifdef NO_PQSOCKET
-	return PyLong_FromLong((long) self->cnx->sock);
+	return PyInt_FromLong((long) self->cnx->sock);
 #else
-	return PyLong_FromLong((long) PQsocket(self->cnx));
+	return PyInt_FromLong((long) PQsocket(self->cnx));
 #endif
 }
 
@@ -2109,7 +2105,7 @@ connGetNotify(connObject *self, PyObject *args)
 
 		PyTuple_SET_ITEM(notify_result, 0, temp);
 
-		if (!(temp = PyLong_FromLong(notify->be_pid)))
+		if (!(temp = PyInt_FromLong(notify->be_pid)))
 		{
 			Py_DECREF(notify_result);
 			return NULL;
@@ -2210,7 +2206,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 
 	/* postmaster port */
 	if (!strcmp(name, "port"))
-		return PyLong_FromLong(atol(PQport(self->cnx)));
+		return PyInt_FromLong(atol(PQport(self->cnx)));
 
 	/* selected database */
 	if (!strcmp(name, "db"))
@@ -2230,7 +2226,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 
 	/* connection status : 1 - OK, 0 - BAD */
 	if (!strcmp(name, "status"))
-		return PyLong_FromLong(PQstatus(self->cnx) == CONNECTION_OK ? 1 : 0);
+		return PyInt_FromLong(PQstatus(self->cnx) == CONNECTION_OK ? 1 : 0);
 
 	/* provided user name */
 	if (!strcmp(name, "user"))
@@ -2238,14 +2234,14 @@ connGetAttr(connObject *self, PyObject *nameobj)
 
 	/* protocol version */
 	if (!strcmp(name, "protocol_version"))
-		return PyLong_FromLong(PQprotocolVersion(self->cnx));
+		return PyInt_FromLong(PQprotocolVersion(self->cnx));
 
 	/* backend version */
 	if (!strcmp(name, "server_version"))
 #if PG_VERSION_NUM < 80000
-		return PyLong_FromLong(PG_VERSION_NUM);
+		return PyInt_FromLong(PG_VERSION_NUM);
 #else
-		return PyLong_FromLong(PQserverVersion(self->cnx));
+		return PyInt_FromLong(PQserverVersion(self->cnx));
 #endif
 
 	/* attributes list */
@@ -2454,7 +2450,7 @@ sourceExecute(sourceObject *self, PyObject *args)
 				self->result_type = RESULT_DML;
 				num_rows = atol(temp);
 			}
-			return PyLong_FromLong(num_rows);
+			return PyInt_FromLong(num_rows);
 
 		/* query failed */
 		case PGRES_EMPTY_QUERY:
@@ -2507,7 +2503,7 @@ sourceStatusOID(sourceObject *self, PyObject *args)
 		return Py_None;
 	}
 
-	return PyLong_FromLong(oid);
+	return PyInt_FromLong(oid);
 }
 
 /* fetches rows from last result */
@@ -2672,8 +2668,8 @@ sourceFieldindex(sourceObject *self, PyObject *param, const char *usage)
 	/* gets field number */
 	if (PyUnicode_Check(param))
 		num = PQfnumber(self->result, PyBytes_AsString(param));
-	else if (PyLong_Check(param))
-		num = PyLong_AsLong(param);
+	else if (PyInt_Check(param))
+		num = PyInt_AsLong(param);
 	else
 	{
 		PyErr_SetString(PyExc_TypeError, usage);
@@ -2702,11 +2698,11 @@ pgsource_buildinfo(sourceObject *self, int num)
 		return NULL;
 
 	/* affects field information */
-	PyTuple_SET_ITEM(result, 0, PyLong_FromLong(num));
+	PyTuple_SET_ITEM(result, 0, PyInt_FromLong(num));
 	PyTuple_SET_ITEM(result, 1,
 		PyUnicode_FromString(PQfname(self->result, num)));
 	PyTuple_SET_ITEM(result, 2,
-		PyLong_FromLong(PQftype(self->result, num)));
+		PyInt_FromLong(PQftype(self->result, num)));
 
 	return result;
 }
@@ -2856,19 +2852,19 @@ sourceGetAttr(sourceObject *self, PyObject *nameobj)
 
 	/* arraysize */
 	if (!strcmp(name, "arraysize"))
-		return PyLong_FromLong(self->arraysize);
+		return PyInt_FromLong(self->arraysize);
 
 	/* resulttype */
 	if (!strcmp(name, "resulttype"))
-		return PyLong_FromLong(self->result_type);
+		return PyInt_FromLong(self->result_type);
 
 	/* ntuples */
 	if (!strcmp(name, "ntuples"))
-		return PyLong_FromLong(self->max_row);
+		return PyInt_FromLong(self->max_row);
 
 	/* nfields */
 	if (!strcmp(name, "nfields"))
-		return PyLong_FromLong(self->num_fields);
+		return PyInt_FromLong(self->num_fields);
 
 	/* attributes list */
 	if (!strcmp(name, "__members__"))
@@ -2903,13 +2899,13 @@ sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 	/* arraysize */
 	if (!strcmp(name, "arraysize"))
 	{
-		if (!PyLong_Check(v))
+		if (!PyInt_Check(v))
 		{
 			PyErr_SetString(PyExc_TypeError, "arraysize must be integer.");
 			return -1;
 		}
 
-		self->arraysize = PyLong_AsLong(v);
+		self->arraysize = PyInt_AsLong(v);
 		return 0;
 	}
 
@@ -3017,7 +3013,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 		pghost = PyBytes_AsString(pg_default_host);
 
 	if ((pgport == -1) && (pg_default_port != Py_None))
-		pgport = PyLong_AsLong(pg_default_port);
+		pgport = PyInt_AsLong(pg_default_port);
 
 	if ((!pgopt) && (pg_default_opt != Py_None))
 		pgopt = PyBytes_AsString(pg_default_opt);
@@ -3094,7 +3090,7 @@ queryNTuples(queryObject *self, PyObject *args)
 		return NULL;
 	}
 
-	return PyLong_FromLong((long) PQntuples(self->result));
+	return PyInt_FromLong((long) PQntuples(self->result));
 }
 
 /* list fields names from query result */
@@ -3186,7 +3182,7 @@ queryFieldNumber(queryObject *self, PyObject *args)
 		return NULL;
 	}
 
-	return PyLong_FromLong(num);
+	return PyInt_FromLong(num);
 }
 
 /* retrieves last result */
@@ -3247,7 +3243,7 @@ queryGetResult(queryObject *self, PyObject *args)
 				switch (typ[j])
 				{
 					case 1:  /* int2/4 */
-						val = PyLong_FromString(s, NULL, 10);
+						val = PyInt_FromString(s, NULL, 10);
 						break;
 
 					case 2:  /* int8 */
@@ -3256,7 +3252,7 @@ queryGetResult(queryObject *self, PyObject *args)
 
 					case 3:  /* float/double */
 						tmp_obj = PyBytes_FromString(s);
-#ifdef IS_PY3K
+#if IS_PY3
 						val = PyFloat_FromString(tmp_obj);
 #else
 						val = PyFloat_FromString(tmp_obj, NULL);
@@ -3289,7 +3285,7 @@ queryGetResult(queryObject *self, PyObject *args)
 						else
 						{
 							tmp_obj = PyBytes_FromString(s);
-#ifdef IS_PY3K
+#if IS_PY3
 							val = PyFloat_FromString(tmp_obj);
 #else
 							val = PyFloat_FromString(tmp_obj, NULL);
@@ -3382,7 +3378,7 @@ queryDictResult(queryObject *self, PyObject *args)
 				switch (typ[j])
 				{
 					case 1:  /* int2/4 */
-						val = PyLong_FromString(s, NULL, 10);
+						val = PyInt_FromString(s, NULL, 10);
 						break;
 
 					case 2:  /* int8 */
@@ -3391,7 +3387,7 @@ queryDictResult(queryObject *self, PyObject *args)
 
 					case 3:  /* float/double */
 						tmp_obj = PyBytes_FromString(s);
-#ifdef IS_PY3K
+#if IS_PY3
 						val = PyFloat_FromString(tmp_obj);
 #else
 						val = PyFloat_FromString(tmp_obj, NULL);
@@ -3424,7 +3420,7 @@ queryDictResult(queryObject *self, PyObject *args)
 						else
 						{
 							tmp_obj = PyBytes_FromString(s);
-#ifdef IS_PY3K
+#if IS_PY3
 							val = PyFloat_FromString(tmp_obj);
 #else
 							val = PyFloat_FromString(tmp_obj, NULL);
@@ -4158,7 +4154,7 @@ pgSetDefPort(PyObject *self, PyObject *args)
 	old = pg_default_port;
 
 	if (port != -1)
-		pg_default_port = PyLong_FromLong(port);
+		pg_default_port = PyInt_FromLong(port);
 	else
 	{
 		Py_INCREF(Py_None);
@@ -4209,7 +4205,7 @@ static struct PyMethodDef pgMethods[] = {
 
 static char pg__doc__[] = "Python interface to PostgreSQL DB";
 
-#ifdef IS_PY3K
+#if IS_PY3
 static struct PyModuleDef pgType = {
 	PyModuleDef_HEAD_INIT,
 	"pg",		/* m_name */
@@ -4231,7 +4227,7 @@ void init_pg(void)
 	PyObject   *mod, *dict, *v;
 
 	/* Create the module and add the functions */
-#ifdef IS_PY3K
+#if IS_PY3
 	mod = PyModule_Create(&pgType);
 #else
 	/* Initialize here because some WIN platforms get confused otherwise */
@@ -4288,27 +4284,27 @@ void init_pg(void)
 	Py_DECREF(v);
 
 	/* results type for queries */
-	PyDict_SetItemString(dict, "RESULT_EMPTY", PyLong_FromLong(RESULT_EMPTY));
-	PyDict_SetItemString(dict, "RESULT_DML", PyLong_FromLong(RESULT_DML));
-	PyDict_SetItemString(dict, "RESULT_DDL", PyLong_FromLong(RESULT_DDL));
-	PyDict_SetItemString(dict, "RESULT_DQL", PyLong_FromLong(RESULT_DQL));
+	PyDict_SetItemString(dict, "RESULT_EMPTY", PyInt_FromLong(RESULT_EMPTY));
+	PyDict_SetItemString(dict, "RESULT_DML", PyInt_FromLong(RESULT_DML));
+	PyDict_SetItemString(dict, "RESULT_DDL", PyInt_FromLong(RESULT_DDL));
+	PyDict_SetItemString(dict, "RESULT_DQL", PyInt_FromLong(RESULT_DQL));
 
 	/* transaction states */
-	PyDict_SetItemString(dict,"TRANS_IDLE",PyLong_FromLong(PQTRANS_IDLE));
-	PyDict_SetItemString(dict,"TRANS_ACTIVE",PyLong_FromLong(PQTRANS_ACTIVE));
-	PyDict_SetItemString(dict,"TRANS_INTRANS",PyLong_FromLong(PQTRANS_INTRANS));
-	PyDict_SetItemString(dict,"TRANS_INERROR",PyLong_FromLong(PQTRANS_INERROR));
-	PyDict_SetItemString(dict,"TRANS_UNKNOWN",PyLong_FromLong(PQTRANS_UNKNOWN));
+	PyDict_SetItemString(dict,"TRANS_IDLE",PyInt_FromLong(PQTRANS_IDLE));
+	PyDict_SetItemString(dict,"TRANS_ACTIVE",PyInt_FromLong(PQTRANS_ACTIVE));
+	PyDict_SetItemString(dict,"TRANS_INTRANS",PyInt_FromLong(PQTRANS_INTRANS));
+	PyDict_SetItemString(dict,"TRANS_INERROR",PyInt_FromLong(PQTRANS_INERROR));
+	PyDict_SetItemString(dict,"TRANS_UNKNOWN",PyInt_FromLong(PQTRANS_UNKNOWN));
 
 #ifdef LARGE_OBJECTS
 	/* create mode for large objects */
-	PyDict_SetItemString(dict, "INV_READ", PyLong_FromLong(INV_READ));
-	PyDict_SetItemString(dict, "INV_WRITE", PyLong_FromLong(INV_WRITE));
+	PyDict_SetItemString(dict, "INV_READ", PyInt_FromLong(INV_READ));
+	PyDict_SetItemString(dict, "INV_WRITE", PyInt_FromLong(INV_WRITE));
 
 	/* position flags for lo_lseek */
-	PyDict_SetItemString(dict, "SEEK_SET", PyLong_FromLong(SEEK_SET));
-	PyDict_SetItemString(dict, "SEEK_CUR", PyLong_FromLong(SEEK_CUR));
-	PyDict_SetItemString(dict, "SEEK_END", PyLong_FromLong(SEEK_END));
+	PyDict_SetItemString(dict, "SEEK_SET", PyInt_FromLong(SEEK_SET));
+	PyDict_SetItemString(dict, "SEEK_CUR", PyInt_FromLong(SEEK_CUR));
+	PyDict_SetItemString(dict, "SEEK_END", PyInt_FromLong(SEEK_END));
 #endif /* LARGE_OBJECTS */
 
 #ifdef DEFAULT_VARS
@@ -4333,7 +4329,7 @@ void init_pg(void)
 	if (PyErr_Occurred())
 		Py_FatalError("can't initialize module _pg");
 
-#ifdef IS_PY3K
+#if IS_PY3
 	return mod;
 #endif
 }
