@@ -11,6 +11,8 @@ These tests need a database to test against.
 
 """
 
+from __future__ import print_function
+
 try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
@@ -474,7 +476,7 @@ class TestSimpleQueries(unittest.TestCase):
         s = StringIO()
         stdout, sys.stdout = sys.stdout, s
         try:
-            print r
+            print(r)
         except Exception:
             pass
         finally:
