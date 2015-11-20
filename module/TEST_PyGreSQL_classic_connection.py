@@ -17,11 +17,10 @@ try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
-
 import sys
+import tempfile
 import threading
 import time
-import tempfile
 
 import pg  # the module under test
 
