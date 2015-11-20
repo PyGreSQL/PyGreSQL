@@ -1703,7 +1703,7 @@ connParameter(connObject *self, PyObject *args)
 
 /* escape literal */
 static char connEscapeLiteral__doc__[] =
-"connEscapeLiteral(str) -- escape a literal constant for use within SQL.";
+"escape_literal(str) -- escape a literal constant for use within SQL.";
 
 static PyObject *
 connEscapeLiteral(connObject *self, PyObject *args)
@@ -1726,7 +1726,7 @@ connEscapeLiteral(connObject *self, PyObject *args)
 
 /* escape identifier */
 static char connEscapeIdentifier__doc__[] =
-"connEscapeIdentifier(str) -- escape an identifier for use within SQL.";
+"escape_identifier(str) -- escape an identifier for use within SQL.";
 
 static PyObject *
 connEscapeIdentifier(connObject *self, PyObject *args)
@@ -1751,7 +1751,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 
 /* escape string */
 static char connEscapeString__doc__[] =
-"connEscapeString(str) -- escape a string for use within SQL.";
+"escape_string(str) -- escape a string for use within SQL.";
 
 static PyObject *
 connEscapeString(connObject *self, PyObject *args)
@@ -1783,7 +1783,7 @@ connEscapeString(connObject *self, PyObject *args)
 
 /* escape bytea */
 static char connEscapeBytea__doc__[] =
-"connEscapeBytea(data) -- escape binary data for use within SQL as type bytea.";
+"escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
 
 static PyObject *
 connEscapeBytea(connObject *self, PyObject *args)
@@ -3660,7 +3660,7 @@ static PyTypeObject queryType = {
 
 /* escape string */
 static char pgEscapeString__doc__[] =
-"pgEscapeString(str) -- escape a string for use within SQL.";
+"escape_string(str) -- escape a string for use within SQL.";
 
 static PyObject *
 pgEscapeString(PyObject *self, PyObject *args)
@@ -3691,7 +3691,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 
 /* escape bytea */
 static char pgEscapeBytea__doc__[] =
-"pgEscapeBytea(data) -- escape binary data for use within SQL as type bytea.";
+"escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
 
 static PyObject *
 pgEscapeBytea(PyObject *self, PyObject *args)
@@ -3715,7 +3715,7 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 
 /* unescape bytea */
 static char pgUnescapeBytea__doc__[] =
-"pgUnescapeBytea(str) -- unescape bytea data that has been retrieved as text.";
+"unescape_bytea(str) -- unescape bytea data that has been retrieved as text.";
 
 static PyObject
 *pgUnescapeBytea(PyObject *self, PyObject *args)
@@ -3738,7 +3738,7 @@ static PyObject
 
 /* set decimal point */
 static char pgSetDecimalPoint__doc__[] =
-"pgSetDecimalPoint() -- set decimal point to be used for money values.";
+"set_decimal_point() -- set decimal point to be used for money values.";
 
 static PyObject *
 pgSetDecimalPoint(PyObject *self, PyObject * args)
@@ -3756,7 +3756,7 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 
 /* get decimal point */
 static char pgGetDecimalPoint__doc__[] =
-"pgGetDecimalPoint() -- get decimal point to be used for money values.";
+"get_decimal_point() -- get decimal point to be used for money values.";
 
 static PyObject *
 pgGetDecimalPoint(PyObject *self, PyObject * args)
@@ -3770,7 +3770,7 @@ pgGetDecimalPoint(PyObject *self, PyObject * args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			" pgGetDecimalPoint() takes no parameter");
+			" get_decimal_point() takes no parameter");
 	}
 
 
@@ -4180,9 +4180,9 @@ static struct PyMethodDef pgMethods[] = {
 			pgEscapeBytea__doc__},
 	{"unescape_bytea", (PyCFunction) pgUnescapeBytea, METH_VARARGS,
 			pgUnescapeBytea__doc__},
-	{"set_decimalpoint", (PyCFunction) pgSetDecimalPoint, METH_VARARGS,
+	{"set_decimal_point", (PyCFunction) pgSetDecimalPoint, METH_VARARGS,
 			pgSetDecimalPoint__doc__},
-	{"get_decimalpoint", (PyCFunction) pgGetDecimalPoint, METH_VARARGS,
+	{"get_decimal_point", (PyCFunction) pgGetDecimalPoint, METH_VARARGS,
 			pgGetDecimalPoint__doc__},
 	{"set_decimal", (PyCFunction) pgSetDecimal, METH_VARARGS,
 			pgSetDecimal__doc__},
