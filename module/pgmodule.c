@@ -53,15 +53,7 @@ static PyObject *Error, *Warning, *InterfaceError,
 #define TOSTRING(x) _TOSTRING(x)
 static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 
-#ifndef IS_PY3K
-#if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
-typedef int Py_ssize_t;
-#define PY_SSIZE_T_MAX INT_MAX
-#define PY_SSIZE_T_MIN INT_MIN
-#endif
-#endif
-
-#if PY_VERSION_HEX >= 0x02050000 && SIZEOF_SIZE_T != SIZEOF_INT
+#if SIZEOF_SIZE_T != SIZEOF_INT
 #define Py_InitModule4 Py_InitModule4_64
 #endif
 
