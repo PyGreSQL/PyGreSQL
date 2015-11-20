@@ -53,7 +53,7 @@ class TestCanConnect(unittest.TestCase):
     def testCanConnect(self):
         try:
             connection = connect()
-        except pg.Error, error:
+        except pg.Error as error:
             self.fail('Cannot connect to database %s:\n%s' % (dbname, error))
         try:
             connection.close()
@@ -196,7 +196,7 @@ class TestConnectObject(unittest.TestCase):
         def sleep():
             try:
                 self.connection.query('select pg_sleep(5)').getresult()
-            except pg.ProgrammingError, error:
+            except pg.ProgrammingError as error:
                 errors.append(str(error))
 
         thread = threading.Thread(target=sleep)

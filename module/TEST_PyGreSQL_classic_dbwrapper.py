@@ -214,7 +214,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testMethodQueryProgrammingError(self):
         try:
             self.db.query("select 1/0")
-        except pg.ProgrammingError, error:
+        except pg.ProgrammingError as error:
             self.assertEqual(error.sqlstate, '22012')
 
     def testMethodEndcopy(self):
@@ -479,7 +479,7 @@ class TestDBClass(unittest.TestCase):
     def testQueryProgrammingError(self):
         try:
             self.db.query("select 1/0")
-        except pg.ProgrammingError, error:
+        except pg.ProgrammingError as error:
             self.assertEqual(error.sqlstate, '22012')
 
     def testPkey(self):
@@ -968,7 +968,7 @@ class TestDBClass(unittest.TestCase):
                 query("insert into test_table values (3)")
                 query("insert into test_table values (4)")
                 raise ValueError('test transaction should rollback')
-        except ValueError, error:
+        except ValueError as error:
             self.assertEqual(str(error), 'test transaction should rollback')
         with self.db:
             query("insert into test_table values (5)")
@@ -976,7 +976,7 @@ class TestDBClass(unittest.TestCase):
             with self.db:
                 query("insert into test_table values (6)")
                 query("insert into test_table values (-1)")
-        except pg.ProgrammingError, error:
+        except pg.ProgrammingError as error:
             self.assertTrue('check' in str(error))
         with self.db:
             query("insert into test_table values (7)")
