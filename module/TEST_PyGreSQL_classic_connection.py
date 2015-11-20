@@ -922,7 +922,7 @@ class TestConfigFunctions(unittest.TestCase):
         # check that money values can be interpreted correctly
         # if and only if the decimal point is set appropriately
         # for the current lc_monetary setting
-        query("set lc_monetary='en_US'")
+        query("set lc_monetary='en_US.UTF-8'")
         pg.set_decimal_point('.')
         r = query("select '34.25'::money").getresult()[0][0]
         self.assertIsInstance(r, d)
@@ -930,7 +930,7 @@ class TestConfigFunctions(unittest.TestCase):
         pg.set_decimal_point(',')
         r = query("select '34.25'::money").getresult()[0][0]
         self.assertNotEqual(r, d('34.25'))
-        query("set lc_monetary='de_DE'")
+        query("set lc_monetary='de_DE.UTF-8'")
         pg.set_decimal_point(',')
         r = query("select '34,25'::money").getresult()[0][0]
         self.assertIsInstance(r, d)
