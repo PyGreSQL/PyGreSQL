@@ -166,10 +166,10 @@ class TestHasConnect(unittest.TestCase):
     """Test existence of basic pg module functions."""
 
     def testhasPgError(self):
-        self.assertTrue(issubclass(pg.Error, StandardError))
+        self.assertTrue(issubclass(pg.Error, Exception))
 
     def testhasPgWarning(self):
-        self.assertTrue(issubclass(pg.Warning, StandardError))
+        self.assertTrue(issubclass(pg.Warning, Exception))
 
     def testhasPgInterfaceError(self):
         self.assertTrue(issubclass(pg.InterfaceError, pg.Error))
