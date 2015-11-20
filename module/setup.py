@@ -35,7 +35,7 @@ using distutils to install Python programs.
 
 """
 
-version = '4.1.1'
+version = '4.1.2a1'
 
 
 import sys

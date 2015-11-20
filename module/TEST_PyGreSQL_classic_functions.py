@@ -17,6 +17,8 @@ try:
 except ImportError:
     import unittest
 
+import re
+
 import pg  # the module under test
 
 
@@ -311,11 +313,16 @@ class TestModuleConstants(unittest.TestCase):
     def testVersion(self):
         v = pg.version
         self.assertIsInstance(v, str)
-        v = v.split('.')
-        self.assertTrue(2 <= len(v) <= 3)
-        for w in v:
-            self.assertTrue(1 <= len(w) <= 2)
-            self.assertTrue(w.isdigit())
+        # make sure the version conforms to PEP440
+        re_version = r"""^
+            (\d[\.\d]*(?<= \d))
+            ((?:[abc]|rc)\d+)?
+            (?:(\.post\d+))?
+            (?:(\.dev\d+))?
+            (?:(\+(?![.])[a-zA-Z0-9\.]*[a-zA-Z0-9]))?
+            $"""
+        match = re.match(re_version, v, re.X)
+        self.assertIsNotNone(match)
 
 
 if __name__ == '__main__':
