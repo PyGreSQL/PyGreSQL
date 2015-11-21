@@ -4222,16 +4222,25 @@ MODULE_INIT_FUNC(_pg)
 
 	mod = PyModule_Create(&moduleDef);
 
-#if !IS_PY3
-	/* TODO: Check whether this is still necessary, and also needed in Py 3. */
 	/* Initialize here because some Windows platforms get confused otherwise */
+#if IS_PY3
+	connType.tp_base = noticeType.tp_base =
+		queryType.tp_base = sourceType.tp_base = &PyBaseObject_Type;
+#ifdef LARGE_OBJECTS
+	largeType.tp_base = &PyBaseObject_Type;
+#endif
+#else
 	connType.ob_type = noticeType.ob_type =
 		queryType.ob_type = sourceType.ob_type = &PyType_Type;
-
 #ifdef LARGE_OBJECTS
 	largeType.ob_type = &PyType_Type;
 #endif
 #endif
+
+	if (PyType_Ready(&connType) ||
+		PyType_Ready(&noticeType) ||
+		PyType_Ready(&queryType) ||
+		PyType_Ready(&sourceType)) return NULL;
 
 	dict = PyModule_GetDict(mod);
 
