@@ -253,10 +253,17 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
 
     def testGetresultLong(self):
-        q = "select 1234567890123456790"
-        result = 1234567890123456790L
+        q = "select 9876543210"
+        result = 9876543210L
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, long)
+        self.assertEqual(v, result)
+
+    def testGetresultDecimal(self):
+        q = "select 98765432109876543210"
+        result = Decimal(98765432109876543210L)
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, Decimal)
         self.assertEqual(v, result)
 
     def testGetresultString(self):
@@ -277,10 +284,17 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
 
     def testDictresultLong(self):
-        q = "select 1234567890123456790 as longjohnsilver"
-        result = 1234567890123456790L
+        q = "select 9876543210 as longjohnsilver"
+        result = 9876543210L
         v = self.c.query(q).dictresult()[0]['longjohnsilver']
         self.assertIsInstance(v, long)
+        self.assertEqual(v, result)
+
+    def testDictresultDecimal(self):
+        q = "select 98765432109876543210 as longjohnsilver"
+        result = Decimal(98765432109876543210L)
+        v = self.c.query(q).dictresult()[0]['longjohnsilver']
+        self.assertIsInstance(v, Decimal)
         self.assertEqual(v, result)
 
     def testDictresultString(self):
