@@ -3716,15 +3716,18 @@ static PyObject
 {
 	unsigned char *from; /* our string argument */
 	unsigned char *to; /* the result */
+	int from_length; /* length of string */
 	size_t to_length; /* length of result string */
 	PyObject *ret; /* string object to return */
 
-	if (!PyArg_ParseTuple(args, "s", &from))
+	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
 		return NULL;
 	to = PQunescapeBytea(from, &to_length);
+	if (!to)
+	    return NULL;
 	ret = Py_BuildValue("s#", to, (int)to_length);
 	if (to)
-		PQfreemem((void *)to);
+	    PQfreemem((void *)to);
 	if (!ret) /* pass on exception */
 		return NULL;
 	return ret;

@@ -17,14 +17,16 @@ try:
 except ImportError:
     import unittest
 
+import re
+
+import pg  # the module under test
+
 try:
     long
 except NameError:  # Python >= 3.0
     long = int
 
-import re
-
-import pg  # the module under test
+unicode_strings = str is not bytes
 
 
 class TestAuxiliaryFunctions(unittest.TestCase):
@@ -264,22 +266,60 @@ class TestEscapeFunctions(unittest.TestCase):
 
     def testEscapeString(self):
         f = pg.escape_string
-        self.assertEqual(f('plain'), 'plain')
-        self.assertEqual(f("that's k\xe4se"), "that''s k\xe4se")
-        self.assertEqual(f(r"It's fine to have a \ inside."),
-            r"It''s fine to have a \\ inside.")
+        r = f('plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        if unicode_strings:
+            r = f(b'plain')
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, 'plain')
+        r = f("das is' käse")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is'' käse")
+        if unicode_strings:
+            r = f("das is' käse".encode('utf-8'))
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, "das is'' käse")
+        r = f(r"It's fine to have a \ inside.")
+        self.assertEqual(r, r"It''s fine to have a \\ inside.")
 
     def testEscapeBytea(self):
         f = pg.escape_bytea
-        self.assertEqual(f('plain'), 'plain')
-        self.assertEqual(f("that's k\xe4se"), "that''s k\\\\344se")
-        self.assertEqual(f('O\x00ps\xff!'), r'O\\000ps\\377!')
+        r = f('plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        if unicode_strings:
+            r = f(b'plain')
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, 'plain')
+        r = f("das is' käse")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, r"das is'' k\\303\\244se")
+        if unicode_strings:
+            r = f("das is' käse".encode('utf-8'))
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, r"das is'' k\\303\\244se")
+        r = f(b'O\x00ps\xff!')
+        self.assertEqual(r, r'O\\000ps\\377!')
 
     def testUnescapeBytea(self):
         f = pg.unescape_bytea
-        self.assertEqual(f('plain'), 'plain')
-        self.assertEqual(f("that's k\\344se"), "that's k\xe4se")
-        self.assertEqual(f(r'O\000ps\377!'), 'O\x00ps\xff!')
+        r = f('plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        if unicode_strings:
+            r = f(b'plain')
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, 'plain')
+        r = f(r"das is' k\303\244se")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is' käse")
+        if unicode_strings:
+            r = f(u"das is' k\\303\\244se")
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, "das is' käse")
+        r = f(r'O\\000ps\\377!')
+        self.assertEqual(r, r'O\000ps\377!')
 
 
 class TestConfigFunctions(unittest.TestCase):
