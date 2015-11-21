@@ -304,7 +304,8 @@ class TestConfigFunctions(unittest.TestCase):
         pg.set_decimal(decimal_class)
 
     def testSetNamedresult(self):
-        pg.set_namedresult(tuple)
+        pg.set_namedresult(lambda q: q.getresult())
+        pg.set_namedresult(pg._namedresult)
 
 
 class TestModuleConstants(unittest.TestCase):
