@@ -79,9 +79,10 @@ class TestConnectObject(unittest.TestCase):
     def testAllConnectAttributes(self):
         attributes = '''db error host options port
             protocol_version server_version status tty user'''.split()
-        connection_attributes = [a for a in dir(self.connection)
+        connection = self.connection
+        connection_attributes = [a for a in dir(connection)
             if not a.startswith('__')
-            and not callable(eval("self.connection." + a))]
+            and not callable(getattr(connection, a))]
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
@@ -90,9 +91,10 @@ class TestConnectObject(unittest.TestCase):
             fileno get_notice_receiver getline getlo getnotify
             inserttable locreate loimport parameter putline query reset
             set_notice_receiver source transaction'''.split()
-        connection_methods = [a for a in dir(self.connection)
+        connection = self.connection
+        connection_methods = [a for a in dir(connection)
             if not a.startswith('__')
-            and callable(eval("self.connection." + a))]
+            and callable(getattr(connection, a))]
         self.assertEqual(methods, connection_methods)
 
     def testAttributeDb(self):
