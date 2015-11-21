@@ -109,14 +109,12 @@ def _oid_key(qcl):
     return 'oid(%s)' % qcl
 
 
-if namedtuple:
+def _namedresult(q):
+    """Get query result as named tuples."""
+    row = namedtuple('Row', q.listfields())
+    return [row(*r) for r in q.getresult()]
 
-    def _namedresult(q):
-        """Get query result as named tuples."""
-        row = namedtuple('Row', q.listfields())
-        return [row(*r) for r in q.getresult()]
-
-    set_namedresult(_namedresult)
+set_namedresult(_namedresult)
 
 
 def _db_error(msg, cls=DatabaseError):

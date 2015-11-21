@@ -26,8 +26,6 @@ import pg  # the module under test
 
 from decimal import Decimal
 
-from collections import namedtuple
-
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
 dbname = 'unittest'
@@ -292,7 +290,6 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testNamedresult(self):
         q = "select 0 as alias0"
         result = [(0,)]
@@ -314,7 +311,6 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
-    @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testGet3NamedCols(self):
         q = "select 1 as a,2 as b,3 as c"
         result = [(1, 2, 3)]
@@ -337,7 +333,6 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
-    @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testGet3NamedRows(self):
         q = ("select 3 as alias3"
             " union select 1 union select 2 order by 1")
@@ -357,7 +352,6 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
-    @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testNamedresultNames(self):
         q = "select 'MixedCase' as MixedCaseAlias"
         result = [('MixedCase',)]
@@ -953,7 +947,6 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertEqual(r, 3425L)
         pg.set_decimal(d)
 
-    @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testSetNamedresult(self):
         query = self.c.query
 
