@@ -4242,7 +4242,7 @@ MODULE_INIT_FUNC(_pg)
 		|| PyType_Ready(&queryType)
 		|| PyType_Ready(&sourceType)
 #ifdef LARGE_OBJECTS
-		|| PyType_Ready(largeType.ob_type)
+		|| PyType_Ready(&largeType)
 #endif
 		) return NULL;
 
