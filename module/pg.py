@@ -300,11 +300,18 @@ class DB(object):
             # * to any other true value to just print debug statements
 
     def __getattr__(self, name):
-        # All undefined members are same as in underlying pg connection:
+        # All undefined members are same as in underlying connection:
         if self.db:
             return getattr(self.db, name)
         else:
             raise _int_error('Connection is not valid')
+
+    def __dir__(self):
+        # Custom dir function including the attributes of the connection:
+        attrs = set(self.__class__.__dict__)
+        attrs.update(self.__dict__)
+        attrs.update(dir(self.db))
+        return sorted(attrs)
 
     # Context manager methods
 
