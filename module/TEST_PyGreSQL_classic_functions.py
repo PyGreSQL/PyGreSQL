@@ -266,18 +266,17 @@ class TestEscapeFunctions(unittest.TestCase):
 
     def testEscapeString(self):
         f = pg.escape_string
-        r = f('plain')
+        r = f(b'plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        if unicode_strings:
-            r = f(b'plain')
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, 'plain')
-        r = f("das is' käse")
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u"das is' käse".encode('utf-8'))
         self.assertIsInstance(r, str)
         self.assertEqual(r, "das is'' käse")
         if unicode_strings:
-            r = f("das is' käse".encode('utf-8'))
+            r = f("das is' käse")
             self.assertIsInstance(r, str)
             self.assertEqual(r, "das is'' käse")
         r = f(r"It's fine to have a \ inside.")
@@ -285,18 +284,17 @@ class TestEscapeFunctions(unittest.TestCase):
 
     def testEscapeBytea(self):
         f = pg.escape_bytea
-        r = f('plain')
+        r = f(b'plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        if unicode_strings:
-            r = f(b'plain')
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, 'plain')
-        r = f("das is' käse")
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u"das is' käse".encode('utf-8'))
         self.assertIsInstance(r, str)
         self.assertEqual(r, r"das is'' k\\303\\244se")
         if unicode_strings:
-            r = f("das is' käse".encode('utf-8'))
+            r = f("das is' käse")
             self.assertIsInstance(r, str)
             self.assertEqual(r, r"das is'' k\\303\\244se")
         r = f(b'O\x00ps\xff!')
@@ -304,20 +302,18 @@ class TestEscapeFunctions(unittest.TestCase):
 
     def testUnescapeBytea(self):
         f = pg.unescape_bytea
-        r = f('plain')
+        r = f(b'plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        if unicode_strings:
-            r = f(b'plain')
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, 'plain')
-        r = f(r"das is' k\303\244se")
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(b"das is' k\\303\\244se")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "das is' käse")
-        if unicode_strings:
-            r = f(u"das is' k\\303\\244se")
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, "das is' käse")
+        r = f(u"das is' k\\303\\244se")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is' käse")
         r = f(r'O\\000ps\\377!')
         self.assertEqual(r, r'O\000ps\377!')
 
