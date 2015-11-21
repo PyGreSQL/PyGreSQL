@@ -54,7 +54,8 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #endif
 
 /* default values */
-#define MODULE_NAME			"pgsql"
+#define MODULE_NAME			"pg"
+#define MODULE_NAME_DB		"pgdb"
 #define PG_ARRAYSIZE			1
 
 /* flags for object validity checks */
@@ -962,10 +963,6 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 	/* module name */
 	if (!strcmp(name, "__module__"))
 		return PyStr_FromString(MODULE_NAME);
-
-	/* class name */
-	if (!strcmp(name, "__class__"))
-		return PyStr_FromString("pglarge");
 
 	/* seeks name in methods (fallback) */
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
@@ -2256,6 +2253,10 @@ connGetAttr(connObject *self, PyObject *nameobj)
 		return PyInt_FromLong(PQserverVersion(self->cnx));
 #endif
 
+	/* module name */
+	if (!strcmp(name, "__module__"))
+		return PyStr_FromString(MODULE_NAME);
+
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
@@ -2869,11 +2870,7 @@ sourceGetAttr(sourceObject *self, PyObject *nameobj)
 
 	/* module name */
 	if (!strcmp(name, "__module__"))
-		return PyStr_FromString(MODULE_NAME);
-
-	/* class name */
-	if (!strcmp(name, "__class__"))
-		return PyStr_FromString("pgsource");
+		return PyStr_FromString(MODULE_NAME_DB);
 
 	/* seeks name in methods (fallback) */
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
@@ -3533,6 +3530,10 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
 			Py_INCREF(Py_None); return Py_None;
 		}
 	}
+
+	/* module name */
+	if (!strcmp(name, "__module__"))
+		return PyStr_FromString(MODULE_NAME);
 
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
@@ -4236,10 +4237,14 @@ MODULE_INIT_FUNC(_pg)
 #endif
 #endif
 
-	if (PyType_Ready(&connType) ||
-		PyType_Ready(&noticeType) ||
-		PyType_Ready(&queryType) ||
-		PyType_Ready(&sourceType)) return NULL;
+	if (PyType_Ready(&connType)
+		|| PyType_Ready(&noticeType)
+		|| PyType_Ready(&queryType)
+		|| PyType_Ready(&sourceType)
+#ifdef LARGE_OBJECTS
+		|| PyType_Ready(largeType.ob_type)
+#endif
+		) return NULL;
 
 	dict = PyModule_GetDict(mod);
 

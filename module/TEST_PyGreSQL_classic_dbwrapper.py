@@ -293,6 +293,12 @@ class TestDBClass(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
+    def testClassName(self):
+        self.assertEqual(self.db.__class__.__name__, 'DB')
+
+    def testModuleName(self):
+        self.assertEqual(self.db.__module__, 'pg')
+
     def testEscapeLiteral(self):
         f = self.db.escape_literal
         self.assertEqual(f("plain"), "'plain'")

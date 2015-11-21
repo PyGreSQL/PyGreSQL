@@ -158,6 +158,12 @@ class TestLargeObjects(unittest.TestCase):
         self.pgcnx.query('end')
         self.pgcnx.close()
 
+    def testClassName(self):
+        self.assertEqual(self.obj.__class__.__name__, 'pglarge')
+
+    def testModuleName(self):
+        self.assertEqual(self.obj.__module__, 'pg')
+
     def testOid(self):
         self.assertIsInstance(self.obj.oid, int)
         self.assertNotEqual(self.obj.oid, 0)

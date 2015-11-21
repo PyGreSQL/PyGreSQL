@@ -76,6 +76,12 @@ class TestConnectObject(unittest.TestCase):
         except pg.InternalError:
             pass
 
+    def testClassName(self):
+        self.assertEqual(self.connection.__class__.__name__, 'pgconnobject')
+
+    def testModuleName(self):
+        self.assertEqual(self.connection.__module__, 'pg')
+
     def testAllConnectAttributes(self):
         attributes = '''db error host options port
             protocol_version server_version status tty user'''.split()
