@@ -2243,6 +2243,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 #endif
 
 	/* attributes list */
+
 	if (!strcmp(name, "__members__"))
 	{
 		PyObject *list = PyList_New(10);
@@ -2273,8 +2274,6 @@ static PyTypeObject connType = {
 	"pgconnobject",				/* tp_name */
 	sizeof(connObject),			/* tp_basicsize */
 	0,							/* tp_itemsize */
-
-	/* methods */
 	(destructor) connDelete,	/* tp_dealloc */
 	0,							/* tp_print */
 	0,							/* tp_getattr */
@@ -4206,41 +4205,34 @@ static struct PyMethodDef pgMethods[] = {
 
 static char pg__doc__[] = "Python interface to PostgreSQL DB";
 
-#if IS_PY3
-static struct PyModuleDef pgType = {
+static struct PyModuleDef moduleDef = {
 	PyModuleDef_HEAD_INIT,
-	"pg",		/* m_name */
+	"_pg",		/* m_name */
 	pg__doc__,	/* m_doc */
 	-1,			/* m_size */
-	pgMethods,	/* m_methods */
-	NULL,		/* m_reload */
-	NULL,		/* m_traverse */
-	NULL,		/* m_clear */
-	NULL		/* m_free */
+	pgMethods	/* m_methods */
 };
 
 /* Initialization function for the module */
-PyMODINIT_FUNC PyInit__pg(void)
-#else
-void init_pg(void)
-#endif
+MODULE_INIT_FUNC(_pg)
 {
 	PyObject   *mod, *dict, *v;
 
 	/* Create the module and add the functions */
-#if IS_PY3
-	mod = PyModule_Create(&pgType);
-#else
-	/* Initialize here because some WIN platforms get confused otherwise */
+
+	mod = PyModule_Create(&moduleDef);
+
+#if !IS_PY3
+	/* TODO: Check whether this is still necessary, and also needed in Py 3. */
+	/* Initialize here because some Windows platforms get confused otherwise */
 	connType.ob_type = noticeType.ob_type =
 		queryType.ob_type = sourceType.ob_type = &PyType_Type;
 
 #ifdef LARGE_OBJECTS
 	largeType.ob_type = &PyType_Type;
 #endif
-
-	mod = Py_InitModule4("_pg", pgMethods, pg__doc__, NULL, PYTHON_API_VERSION);
 #endif
+
 	dict = PyModule_GetDict(mod);
 
 	/* Exceptions as defined by DB-API 2.0 */
@@ -4328,9 +4320,7 @@ void init_pg(void)
 
 	/* Check for errors */
 	if (PyErr_Occurred())
-		Py_FatalError("can't initialize module _pg");
+		return NULL;
 
-#if IS_PY3
 	return mod;
-#endif
 }
