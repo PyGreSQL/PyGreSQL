@@ -992,7 +992,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertEqual(r.__class__.__name__, 'Row')
 
         def _listresult(q):
-            return map(list, q.getresult())
+            return [list(row) for row in q.getresult()]
 
         pg.set_namedresult(_listresult)
 
