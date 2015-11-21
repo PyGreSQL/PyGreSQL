@@ -655,6 +655,7 @@ class TestInserttable(unittest.TestCase):
 
     def setUp(self):
         self.c = connect()
+        self.c.query("set lc_monetary='C'")
         self.c.query("set datestyle='ISO,YMD'")
 
     def tearDown(self):
