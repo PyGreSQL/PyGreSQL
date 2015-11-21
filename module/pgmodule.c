@@ -54,8 +54,6 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #endif
 
 /* default values */
-#define MODULE_NAME			"pg"
-#define MODULE_NAME_DB		"pgdb"
 #define PG_ARRAYSIZE			1
 
 /* flags for object validity checks */
@@ -959,10 +957,6 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 	/* error (status) message */
 	if (!strcmp(name, "error"))
 		return PyStr_FromString(PQerrorMessage(self->pgcnx->cnx));
-
-	/* module name */
-	if (!strcmp(name, "__module__"))
-		return PyStr_FromString(MODULE_NAME);
 
 	/* seeks name in methods (fallback) */
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
@@ -2253,10 +2247,6 @@ connGetAttr(connObject *self, PyObject *nameobj)
 		return PyInt_FromLong(PQserverVersion(self->cnx));
 #endif
 
-	/* module name */
-	if (!strcmp(name, "__module__"))
-		return PyStr_FromString(MODULE_NAME);
-
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
@@ -2867,10 +2857,6 @@ sourceGetAttr(sourceObject *self, PyObject *nameobj)
 	/* nfields */
 	if (!strcmp(name, "nfields"))
 		return PyInt_FromLong(self->num_fields);
-
-	/* module name */
-	if (!strcmp(name, "__module__"))
-		return PyStr_FromString(MODULE_NAME_DB);
 
 	/* seeks name in methods (fallback) */
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
@@ -3530,10 +3516,6 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
 			Py_INCREF(Py_None); return Py_None;
 		}
 	}
-
-	/* module name */
-	if (!strcmp(name, "__module__"))
-		return PyStr_FromString(MODULE_NAME);
 
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
@@ -4216,7 +4198,7 @@ static struct PyModuleDef moduleDef = {
 /* Initialization function for the module */
 MODULE_INIT_FUNC(_pg)
 {
-	PyObject   *mod, *dict, *v;
+	PyObject   *mod, *dict, *s;
 
 	/* Create the module and add the functions */
 
@@ -4245,6 +4227,19 @@ MODULE_INIT_FUNC(_pg)
 		|| PyType_Ready(&largeType)
 #endif
 		) return NULL;
+
+	/* make the module names available */
+	s = PyStr_FromString("pg");
+	PyDict_SetItemString(connType.tp_dict, "__module__", s);
+	PyDict_SetItemString(noticeType.tp_dict, "__module__", s);
+	PyDict_SetItemString(queryType.tp_dict, "__module__", s);
+#ifdef LARGE_OBJECTS
+	PyDict_SetItemString(largeType.tp_dict, "__module__", s);
+#endif
+	Py_DECREF(s);
+	s = PyStr_FromString("pgdb");
+	PyDict_SetItemString(sourceType.tp_dict, "__module__", s);
+	Py_DECREF(s);
 
 	dict = PyModule_GetDict(mod);
 
@@ -4284,10 +4279,10 @@ MODULE_INIT_FUNC(_pg)
 	PyDict_SetItemString(dict, "NotSupportedError", NotSupportedError);
 
 	/* Make the version available */
-	v = PyStr_FromString(PyPgVersion);
-	PyDict_SetItemString(dict, "version", v);
-	PyDict_SetItemString(dict, "__version__", v);
-	Py_DECREF(v);
+	s = PyStr_FromString(PyPgVersion);
+	PyDict_SetItemString(dict, "version", s);
+	PyDict_SetItemString(dict, "__version__", s);
+	Py_DECREF(s);
 
 	/* results type for queries */
 	PyDict_SetItemString(dict, "RESULT_EMPTY", PyInt_FromLong(RESULT_EMPTY));
