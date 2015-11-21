@@ -897,8 +897,21 @@ largeUnlink(largeObject *self, PyObject *args)
 	return Py_None;
 }
 
+/* get the list of large object attributes */
+static PyObject *
+largeDir(largeObject *self) {
+	PyObject *attrs;
+
+	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
+	PyObject_CallMethod(attrs, "extend", "[sss]",
+		"oid", "pgcnx", "error");
+
+	return attrs;
+}
+
 /* large object methods */
 static struct PyMethodDef largeMethods[] = {
+	{"__dir__", (PyCFunction) largeDir,  METH_NOARGS, NULL},
 	{"open", (PyCFunction) largeOpen, METH_VARARGS, largeOpen__doc__},
 	{"close", (PyCFunction) largeClose, METH_VARARGS, largeClose__doc__},
 	{"read", (PyCFunction) largeRead, METH_VARARGS, largeRead__doc__},
@@ -911,7 +924,7 @@ static struct PyMethodDef largeMethods[] = {
 	{NULL, NULL}
 };
 
-/* get attribute */
+/* gets large object attributes */
 static PyObject *
 largeGetAttr(largeObject *self, PyObject *nameobj)
 {
@@ -946,21 +959,6 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 	if (!strcmp(name, "error"))
 		return PyStr_FromString(PQerrorMessage(self->pgcnx->cnx));
 
-	/* attributes list */
-	if (!strcmp(name, "__members__"))
-	{
-		PyObject *list = PyList_New(3);
-
-		if (list)
-		{
-			PyList_SET_ITEM(list, 0, PyStr_FromString("oid"));
-			PyList_SET_ITEM(list, 1, PyStr_FromString("pgcnx"));
-			PyList_SET_ITEM(list, 2, PyStr_FromString("error"));
-		}
-
-		return list;
-	}
-
 	/* module name */
 	if (!strcmp(name, "__module__"))
 		return PyStr_FromString(MODULE_NAME);
@@ -988,7 +986,7 @@ largePrint(largeObject *self, FILE *fp, int flags)
 
 static char large__doc__[] = "PostgreSQL large object";
 
-/* object type definition */
+/* large object type definition */
 static PyTypeObject largeType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"pglarge",						/* tp_name */
@@ -2126,8 +2124,23 @@ connGetNotify(connObject *self, PyObject *args)
 	}
 }
 
+/* get the list of connection attributes */
+static PyObject *
+connDir(connObject *self) {
+	PyObject *attrs;
+
+	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
+	PyObject_CallMethod(attrs, "extend", "[ssssssssss]",
+		"host", "port", "db", "options", "tty", "error", "status", "user",
+		"protocol_version", "server_version");
+
+	return attrs;
+}
+
 /* connection object methods */
 static struct PyMethodDef connMethods[] = {
+	{"__dir__", (PyCFunction) connDir,  METH_NOARGS, NULL},
+
 	{"source", (PyCFunction) connSource, METH_VARARGS, connSource__doc__},
 	{"query", (PyCFunction) connQuery, METH_VARARGS, connQuery__doc__},
 	{"reset", (PyCFunction) connReset, METH_VARARGS, connReset__doc__},
@@ -2159,20 +2172,21 @@ static struct PyMethodDef connMethods[] = {
 			connEscapeBytea__doc__},
 
 #ifdef DIRECT_ACCESS
-	{"putline", (PyCFunction) connPutLine, 1, connPutLine__doc__},
-	{"getline", (PyCFunction) connGetLine, 1, connGetLine__doc__},
-	{"endcopy", (PyCFunction) connEndCopy, 1, connEndCopy__doc__},
+	{"putline", (PyCFunction) connPutLine, METH_VARARGS, connPutLine__doc__},
+	{"getline", (PyCFunction) connGetLine, METH_VARARGS, connGetLine__doc__},
+	{"endcopy", (PyCFunction) connEndCopy, METH_VARARGS, connEndCopy__doc__},
 #endif /* DIRECT_ACCESS */
 
 #ifdef LARGE_OBJECTS
-	{"locreate", (PyCFunction) connCreateLO, 1, connCreateLO__doc__},
-	{"getlo", (PyCFunction) connGetLO, 1, connGetLO__doc__},
-	{"loimport", (PyCFunction) connImportLO, 1, connImportLO__doc__},
+	{"locreate", (PyCFunction) connCreateLO, METH_VARARGS, connCreateLO__doc__},
+	{"getlo", (PyCFunction) connGetLO, METH_VARARGS, connGetLO__doc__},
+	{"loimport", (PyCFunction) connImportLO, METH_VARARGS, connImportLO__doc__},
 #endif /* LARGE_OBJECTS */
 
 	{NULL, NULL} /* sentinel */
 };
 
+/* gets connection attributes */
 static PyObject *
 connGetAttr(connObject *self, PyObject *nameobj)
 {
@@ -2242,33 +2256,10 @@ connGetAttr(connObject *self, PyObject *nameobj)
 		return PyInt_FromLong(PQserverVersion(self->cnx));
 #endif
 
-	/* attributes list */
-
-	if (!strcmp(name, "__members__"))
-	{
-		PyObject *list = PyList_New(10);
-
-		if (list)
-		{
-			PyList_SET_ITEM(list, 0, PyStr_FromString("host"));
-			PyList_SET_ITEM(list, 1, PyStr_FromString("port"));
-			PyList_SET_ITEM(list, 2, PyStr_FromString("db"));
-			PyList_SET_ITEM(list, 3, PyStr_FromString("options"));
-			PyList_SET_ITEM(list, 4, PyStr_FromString("tty"));
-			PyList_SET_ITEM(list, 5, PyStr_FromString("error"));
-			PyList_SET_ITEM(list, 6, PyStr_FromString("status"));
-			PyList_SET_ITEM(list, 7, PyStr_FromString("user"));
-			PyList_SET_ITEM(list, 8, PyStr_FromString("protocol_version"));
-			PyList_SET_ITEM(list, 9, PyStr_FromString("server_version"));
-		}
-
-		return list;
-	}
-
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* object type definition */
+/* connection type definition */
 static PyTypeObject connType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"pgconnobject",				/* tp_name */
@@ -2802,8 +2793,21 @@ sourceField(sourceObject *self, PyObject *args)
 									self->current_row, num));
 }
 
-/* query object methods */
+/* get the list of source object attributes */
+static PyObject *
+sourceDir(connObject *self) {
+	PyObject *attrs;
+
+	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
+	PyObject_CallMethod(attrs, "extend", "[sssss]",
+		"pgcnx", "arraysize", "resulttype", "ntuples", "nfields");
+
+	return attrs;
+}
+
+/* source object methods */
 static PyMethodDef sourceMethods[] = {
+	{"__dir__", (PyCFunction) sourceDir,  METH_NOARGS, NULL},
 	{"close", (PyCFunction) sourceClose, METH_VARARGS,
 			sourceClose__doc__},
 	{"execute", (PyCFunction) sourceExecute, METH_VARARGS,
@@ -2829,7 +2833,7 @@ static PyMethodDef sourceMethods[] = {
 	{NULL, NULL}
 };
 
-/* gets query object attributes */
+/* gets source object attributes */
 static PyObject *
 sourceGetAttr(sourceObject *self, PyObject *nameobj)
 {
@@ -2862,20 +2866,6 @@ sourceGetAttr(sourceObject *self, PyObject *nameobj)
 	/* nfields */
 	if (!strcmp(name, "nfields"))
 		return PyInt_FromLong(self->num_fields);
-
-	/* attributes list */
-	if (!strcmp(name, "__members__"))
-	{
-		PyObject *list = PyList_New(5);
-
-		PyList_SET_ITEM(list, 0, PyStr_FromString("pgcnx"));
-		PyList_SET_ITEM(list, 1, PyStr_FromString("arraysize"));
-		PyList_SET_ITEM(list, 2, PyStr_FromString("resulttype"));
-		PyList_SET_ITEM(list, 3, PyStr_FromString("ntuples"));
-		PyList_SET_ITEM(list, 4, PyStr_FromString("nfields"));
-
-		return list;
-	}
 
 	/* module name */
 	if (!strcmp(name, "__module__"))
@@ -2937,7 +2927,7 @@ sourceStr(sourceObject *self)
 
 static char source__doc__[] = "PyGreSQL source object";
 
-/* query type definition */
+/* source type definition */
 static PyTypeObject sourceType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"pgsourceobject",				/* tp_name */
@@ -3490,8 +3480,7 @@ queryNamedResult(queryObject *self, PyObject *args)
 	return ret;
 }
 
-
-/* get attribute */
+/* gets notice object attributes */
 static PyObject *
 noticeGetAttr(noticeObject *self, PyObject *nameobj)
 {
@@ -3545,22 +3534,6 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
 		}
 	}
 
-	/* attributes list */
-	if (!strcmp(name, "__members__"))
-	{
-		PyObject *list = PyList_New(6);
-		if (list)
-		{
-			PyList_SET_ITEM(list, 0, PyStr_FromString("pgcnx"));
-			PyList_SET_ITEM(list, 1, PyStr_FromString("severity"));
-			PyList_SET_ITEM(list, 2, PyStr_FromString("message"));
-			PyList_SET_ITEM(list, 3, PyStr_FromString("primary"));
-			PyList_SET_ITEM(list, 4, PyStr_FromString("detail"));
-			PyList_SET_ITEM(list, 5, PyStr_FromString("hint"));
-		}
-		return list;
-	}
-
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
@@ -3570,7 +3543,25 @@ noticeStr(noticeObject *self)
 	return noticeGetAttr(self, PyBytes_FromString("message"));
 }
 
-/* object type definition */
+/* get the list of notice attributes */
+static PyObject *
+noticeDir(noticeObject *self) {
+	PyObject *attrs;
+
+	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
+	PyObject_CallMethod(attrs, "extend", "[ssssss]",
+		"pgcnx", "severity", "message", "primary", "detail", "hint");
+
+	return attrs;
+}
+
+/* notice object methods */
+static struct PyMethodDef noticeMethods[] = {
+	{"__dir__", (PyCFunction) noticeDir,  METH_NOARGS, NULL},
+	{NULL, NULL}
+};
+
+/* notice type definition */
 static PyTypeObject noticeType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"pgnoticeobject",				/* tp_name */
@@ -3593,6 +3584,14 @@ static PyTypeObject noticeType = {
 	PyObject_GenericSetAttr,		/* tp_setattro */
 	0,								/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,				/* tp_flags */
+	0,								/* tp_doc */
+	0,								/* tp_traverse */
+	0,								/* tp_clear */
+	0,								/* tp_richcompare */
+	0,								/* tp_weaklistoffset */
+	0,								/* tp_iter */
+	0,								/* tp_iternext */
+	noticeMethods,					/* tp_methods */
 };
 
 /* query object methods */
