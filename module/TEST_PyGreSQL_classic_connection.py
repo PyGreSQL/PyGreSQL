@@ -26,6 +26,11 @@ import pg  # the module under test
 
 from decimal import Decimal
 
+try:
+    long
+except NameError:  # Python >= 3.0
+    long = int
+
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
 dbname = 'unittest'
@@ -253,10 +258,18 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
 
     def testGetresultLong(self):
-        q = "select 1234567890123456790"
-        result = 1234567890123456790L
+        q = "select 9876543210"
+        result = long(9876543210)
+        self.assertIsInstance(result, long)
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, long)
+        self.assertEqual(v, result)
+
+    def testGetresultDecimal(self):
+        q = "select 98765432109876543210"
+        result = Decimal(98765432109876543210)
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, Decimal)
         self.assertEqual(v, result)
 
     def testGetresultString(self):
@@ -277,10 +290,18 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
 
     def testDictresultLong(self):
-        q = "select 1234567890123456790 as longjohnsilver"
-        result = 1234567890123456790L
+        q = "select 9876543210 as longjohnsilver"
+        result = long(9876543210)
+        self.assertIsInstance(result, long)
         v = self.c.query(q).dictresult()[0]['longjohnsilver']
         self.assertIsInstance(v, long)
+        self.assertEqual(v, result)
+
+    def testDictresultDecimal(self):
+        q = "select 98765432109876543210 as longjohnsilver"
+        result = Decimal(98765432109876543210)
+        v = self.c.query(q).dictresult()[0]['longjohnsilver']
+        self.assertIsInstance(v, Decimal)
         self.assertEqual(v, result)
 
     def testDictresultString(self):
@@ -644,13 +665,13 @@ class TestInserttable(unittest.TestCase):
         self.c.close()
 
     data = [
-        (-1, -1, -1L, True, '1492-10-12', '08:30:00',
+        (-1, -1, long(-1), True, '1492-10-12', '08:30:00',
             -1.2345, -1.75, -1.875, '-1.25', '-', 'r?', '!u', 'xyz'),
-        (0, 0, 0L, False, '1607-04-14', '09:00:00',
+        (0, 0, long(0), False, '1607-04-14', '09:00:00',
             0.0, 0.0, 0.0, '0.0', ' ', '0123', '4567', '890'),
-        (1, 1, 1L, True, '1801-03-04', '03:45:00',
+        (1, 1, long(1), True, '1801-03-04', '03:45:00',
             1.23456, 1.75, 1.875, '1.25', 'x', 'bc', 'cdef', 'g'),
-        (2, 2, 2L, False, '1903-12-17', '11:22:00',
+        (2, 2, long(2), False, '1903-12-17', '11:22:00',
             2.345678, 2.25, 2.125, '2.75', 'y', 'q', 'ijk', 'mnop\nstux!')]
 
     def get_back(self):
@@ -944,7 +965,7 @@ class TestConfigFunctions(unittest.TestCase):
         r = query("select 3425::numeric").getresult()[0][0]
         self.assertNotIsInstance(r, d)
         self.assertIsInstance(r, long)
-        self.assertEqual(r, 3425L)
+        self.assertEqual(r, long(3425))
         pg.set_decimal(d)
 
     def testSetNamedresult(self):

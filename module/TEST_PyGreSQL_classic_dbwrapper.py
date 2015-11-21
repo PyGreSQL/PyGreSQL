@@ -20,6 +20,11 @@ import pg  # the module under test
 
 from decimal import Decimal
 
+try:
+    long
+except NameError:  # Python >= 3.0
+    long = int
+
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
 # The current user must have create schema privilege on the database.
@@ -840,9 +845,10 @@ class TestDBClass(unittest.TestCase):
             r['a'] = r['n'] = 1
             r['d'] = r['t'] = 'x'
             r['b'] = 't'
-            r['oid'] = 1L
+            r['oid'] = long(1)
             r = clear(table, r)
-            result = {'a': 1, 'n': 0, 'b': 'f', 'd': '', 't': '', 'oid': 1L}
+            result = {'a': 1, 'n': 0, 'b': 'f', 'd': '', 't': '',
+                'oid': long(1)}
             self.assertEqual(r, result)
             query('drop table "%s"' % table)
 

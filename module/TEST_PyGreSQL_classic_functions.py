@@ -17,6 +17,11 @@ try:
 except ImportError:
     import unittest
 
+try:
+    long
+except NameError:  # Python >= 3.0
+    long = int
+
 import re
 
 import pg  # the module under test
