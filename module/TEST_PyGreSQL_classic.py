@@ -20,6 +20,7 @@ try:
 except ImportError:
     pass
 
+
 def opendb():
     db = DB(dbname, dbhost, dbport)
     db.query("SET DATESTYLE TO 'ISO'")
@@ -35,9 +36,12 @@ for q in (
     "DROP SCHEMA _test1",
     "DROP SCHEMA _test2",
 ):
-    try: db.query(q)
-    except: pass
+    try:
+        db.query(q)
+    except Exception:
+        pass
 db.close()
+
 
 class UtilityTest(unittest.TestCase):
 
@@ -258,7 +262,7 @@ class UtilityTest(unittest.TestCase):
                 thread = Thread(None, target)
                 thread.start()
                 # Wait until the thread has started.
-                for n in xrange(500):
+                for n in range(500):
                     if target.listening:
                         break
                     sleep(0.01)
@@ -272,7 +276,7 @@ class UtilityTest(unittest.TestCase):
                 else:
                     db2.query("notify event_1, 'payload 1'")
                 # Wait until the notification has been caught.
-                for n in xrange(500):
+                for n in range(500):
                     if arg_dict['called'] or self.notify_timeout:
                         break
                     sleep(0.01)
@@ -291,7 +295,7 @@ class UtilityTest(unittest.TestCase):
                     db2.query("notify stop_event_1, 'payload 2'")
                 db2.close()
                 # Wait until the notification has been caught.
-                for n in xrange(500):
+                for n in range(500):
                     if arg_dict['called'] or self.notify_timeout:
                         break
                     sleep(0.01)
@@ -331,8 +335,10 @@ class UtilityTest(unittest.TestCase):
 if __name__ == '__main__':
     suite = unittest.TestSuite()
 
-    if len(sys.argv) > 1: test_list = sys.argv[1:]
-    else: test_list = unittest.getTestCaseNames(UtilityTest, 'test_')
+    if len(sys.argv) > 1:
+        test_list = sys.argv[1:]
+    else:
+        test_list = unittest.getTestCaseNames(UtilityTest, 'test_')
 
     if len(sys.argv) == 2 and sys.argv[1] == '-l':
         print('\n'.join(unittest.getTestCaseNames(UtilityTest, 'test_')))
@@ -341,10 +347,9 @@ if __name__ == '__main__':
     for test_name in test_list:
         try:
             suite.addTest(UtilityTest(test_name))
-        except:
+        except Exception:
             print("\n ERROR: %s.\n" % sys.exc_value)
             sys.exit(1)
 
     rc = unittest.TextTestRunner(verbosity=1).run(suite)
-    sys.exit(len(rc.errors+rc.failures) != 0)
-
+    sys.exit(1 if rc.errors or rc.failures else 0)

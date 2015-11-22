@@ -70,6 +70,16 @@ from time import localtime
 from decimal import Decimal
 from math import isnan, isinf
 
+try:
+    long
+except NameError:  # Python >= 3.0
+    long = int
+
+try:
+    basestring
+except NameError:  # Python >= 3.0
+    basestring = (str, bytes)
+
 set_decimal(Decimal)
 
 
@@ -228,9 +238,9 @@ class pgdbCursor(object):
         """Quote value depending on its type."""
         if isinstance(val, (datetime, date, time, timedelta)):
             val = str(val)
-        elif isinstance(val, unicode):
+        elif isinstance(val, str) and str is not bytes:
             val = val.encode('utf8')
-        if isinstance(val, str):
+        if isinstance(val, bytes):
             if isinstance(val, Binary):
                 val = self._cnx.escape_bytea(val)
             else:
@@ -594,16 +604,10 @@ class pgdbType(frozenset):
 
     """
 
-    if frozenset.__module__ == '__builtin__':
-        def __new__(cls, values):
-            if isinstance(values, basestring):
-                values = values.split()
-            return super(pgdbType, cls).__new__(cls, values)
-    else:  # Python < 2.4
-        def __init__(self, values):
-            if isinstance(values, basestring):
-                values = values.split()
-            super(pgdbType, self).__init__(values)
+    def __new__(cls, values):
+        if isinstance(values, basestring):
+            values = values.split()
+        return super(pgdbType, cls).__new__(cls, values)
 
     def __eq__(self, other):
         if isinstance(other, basestring):

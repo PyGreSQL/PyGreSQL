@@ -49,7 +49,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         cur = myCursor(con)
         ret = cur.execute("select 1 as a, 2 as b")
-        self.assert_(ret is cur, 'execute() should return cursor')
+        self.assertTrue(ret is cur, 'execute() should return cursor')
         self.assertEqual(cur.fetchone(), {'a': 1, 'b': 2})
 
     def test_cursor_iteration(self):
@@ -102,15 +102,15 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         try:
             cur.execute("select 1/0")
         except pgdb.DatabaseError as error:
-            self.assert_(isinstance(error, pgdb.ProgrammingError))
+            self.assertTrue(isinstance(error, pgdb.ProgrammingError))
             # the SQLSTATE error code for division by zero is 22012
             self.assertEqual(error.sqlstate, '22012')
 
     def test_float(self):
         nan, inf = float('nan'), float('inf')
         from math import isnan, isinf
-        self.assert_(isnan(nan) and not isinf(nan))
-        self.assert_(isinf(inf) and not isnan(inf))
+        self.assertTrue(isnan(nan) and not isinf(nan))
+        self.assertTrue(isinf(inf) and not isnan(inf))
         values = [0, 1, 0.03125, -42.53125, nan, inf, -inf]
         table = self.table_prefix + 'booze'
         con = self._connect()
@@ -128,36 +128,36 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         rows = [row[1] for row in rows]
         for inval, outval in zip(values, rows):
             if isinf(inval):
-                self.assert_(isinf(outval))
+                self.assertTrue(isinf(outval))
                 if inval < 0:
-                    self.assert_(outval < 0)
+                    self.assertTrue(outval < 0)
                 else:
-                    self.assert_(outval > 0)
+                    self.assertTrue(outval > 0)
             elif isnan(inval):
-                self.assert_(isnan(outval))
+                self.assertTrue(isnan(outval))
             else:
                 self.assertEqual(inval, outval)
 
     def test_set_decimal_type(self):
         decimal_type = pgdb.decimal_type()
-        self.assert_(decimal_type is not None and callable(decimal_type))
+        self.assertTrue(decimal_type is not None and callable(decimal_type))
         con = self._connect()
         try:
             cur = con.cursor()
-            self.assert_(pgdb.decimal_type(int) is int)
+            self.assertTrue(pgdb.decimal_type(int) is int)
             cur.execute('select 42')
             value = cur.fetchone()[0]
-            self.assert_(isinstance(value, int))
+            self.assertTrue(isinstance(value, int))
             self.assertEqual(value, 42)
-            self.assert_(pgdb.decimal_type(float) is float)
+            self.assertTrue(pgdb.decimal_type(float) is float)
             cur.execute('select 4.25')
             value = cur.fetchone()[0]
-            self.assert_(isinstance(value, float))
+            self.assertTrue(isinstance(value, float))
             self.assertEqual(value, 4.25)
         finally:
             con.close()
             pgdb.decimal_type(decimal_type)
-        self.assert_(pgdb.decimal_type() is decimal_type)
+        self.assertTrue(pgdb.decimal_type() is decimal_type)
 
     def test_nextset(self):
         con = self._connect()
@@ -247,11 +247,11 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual('int8', pgdb.INTEGER)
         self.assertNotEqual('int4', pgdb.LONG)
         self.assertEqual('int8', pgdb.LONG)
-        self.assert_('char' in pgdb.STRING)
-        self.assert_(pgdb.NUMERIC <= pgdb.NUMBER)
-        self.assert_(pgdb.NUMBER >= pgdb.INTEGER)
-        self.assert_(pgdb.TIME <= pgdb.DATETIME)
-        self.assert_(pgdb.DATETIME >= pgdb.DATE)
+        self.assertTrue('char' in pgdb.STRING)
+        self.assertTrue(pgdb.NUMERIC <= pgdb.NUMBER)
+        self.assertTrue(pgdb.NUMBER >= pgdb.INTEGER)
+        self.assertTrue(pgdb.TIME <= pgdb.DATETIME)
+        self.assertTrue(pgdb.DATETIME >= pgdb.DATE)
 
 
 if __name__ == '__main__':
