@@ -376,7 +376,7 @@ class TestLargeObjects(unittest.TestCase):
         self.obj.open(pg.INV_WRITE)
         data = 'some object to be printed'
         self.obj.write(data)
-        f = tempfile.TemporaryFile()
+        f = tempfile.TemporaryFile('r+')
         stdout, sys.stdout = sys.stdout, f
         try:
             print(self.obj)

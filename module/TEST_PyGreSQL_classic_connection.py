@@ -498,7 +498,7 @@ class TestSimpleQueries(unittest.TestCase):
         q = ("select 1 as a, 'hello' as h, 'w' as world"
             " union select 2, 'xyz', 'uvw'")
         r = self.c.query(q)
-        f = tempfile.TemporaryFile()
+        f = tempfile.TemporaryFile('r+')
         stdout, sys.stdout = sys.stdout, f
         try:
             print(r)
