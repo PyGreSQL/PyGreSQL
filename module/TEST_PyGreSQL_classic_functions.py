@@ -303,9 +303,14 @@ class TestEscapeFunctions(unittest.TestCase):
         r = f(u'plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        r = f("that's cheese")
+        r = f(b"das is' k\\303\\244se")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, "that's cheese")
+        self.assertEqual(r, "das is' käse")
+        r = f(u"das is' k\\303\\244se")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is' käse")
+        r = f(r'O\\000ps\\377!')
+        self.assertEqual(r, r'O\000ps\377!')
 
 
 class TestConfigFunctions(unittest.TestCase):
