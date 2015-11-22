@@ -328,19 +328,39 @@ class TestDBClass(unittest.TestCase):
         f = self.db.escape_bytea
         # note that escape_byte always returns hex output since Pg 9.0,
         # regardless of the bytea_output setting
-        self.assertEqual(f("plain"), r"\x706c61696e")
-        self.assertEqual(f("that's k\xe4se"), r"\x746861742773206be47365")
-        self.assertEqual(f('O\x00ps\xff!'), r"\x4f007073ff21")
+        r = f(b'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, r'\x706c61696e')
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, r'\x706c61696e')
+        r = f(u"das is' käse".encode('utf-8'))
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, r'\x64617320697327206bc3a47365')
+        r = f("das is' käse")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, r'\x64617320697327206bc3a47365')
+        self.assertEqual(f(b'O\x00ps\xff!'), r'\x4f007073ff21')
 
     def testUnescapeBytea(self):
         f = self.db.unescape_bytea
-        self.assertEqual(f("plain"), "plain")
-        self.assertEqual(f("that's k\\344se"), "that's k\xe4se")
-        self.assertEqual(f(r'O\000ps\377!'), 'O\x00ps\xff!')
-        self.assertEqual(f(r"\\x706c61696e"), r"\x706c61696e")
-        self.assertEqual(f(r"\\x746861742773206be47365"),
-            r"\x746861742773206be47365")
-        self.assertEqual(f(r"\\x4f007073ff21"), r"\x4f007073ff21")
+        r = f(b'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(b"das is' k\\303\\244se")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is' käse")
+        r = f(u"das is' k\\303\\244se")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is' käse")
+        self.assertEqual(f(r'O\\000ps\\377!'), r'O\000ps\377!')
+        self.assertEqual(f(r'\\x706c61696e'), r'\x706c61696e')
+        self.assertEqual(f(r'\\x746861742773206be47365'),
+            r'\x746861742773206be47365')
+        self.assertEqual(f(r'\\x4f007073ff21'), r'\x4f007073ff21')
 
     def testQuote(self):
         f = self.db._quote
