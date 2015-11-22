@@ -16,6 +16,7 @@ try:
 except ImportError:
     import unittest
 import tempfile
+import os
 
 import pg  # the module under test
 
@@ -29,6 +30,8 @@ try:
     from LOCAL_PyGreSQL import *
 except ImportError:
     pass
+
+windows = os.name == 'nt'
 
 
 def connect():
@@ -59,7 +62,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.c.query('begin')
 
     def tearDown(self):
-        self.c.query('end')
+        self.c.query('rollback')
         self.c.close()
 
     def assertIsLargeObject(self, obj):
@@ -113,14 +116,26 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.assertEqual(r, data)
 
     def testLoImport(self):
-        f = tempfile.NamedTemporaryFile()
+        if windows:
+            # NamedTemporaryFiles don't work well here
+            fname = 'temp_test_pg_largeobj_import.txt'
+            f = open(fname, 'wb')
+        else:
+            f = tempfile.NamedTemporaryFile()
+            fname = f.name
         data = b'some data to be imported'
         f.write(data)
-        f.flush()
-        f.seek(0)
+        if windows:
+            f.close()
+            f = open(fname, 'rb')
+        else:
+            f.flush()
+            f.seek(0)
         large_object = self.c.loimport(f.name)
         try:
             f.close()
+            if windows:
+                os.remove(fname)
             self.assertIsLargeObject(large_object)
             large_object.open(pg.INV_READ)
             large_object.seek(0, pg.SEEK_SET)
@@ -148,14 +163,17 @@ class TestLargeObjects(unittest.TestCase):
         if self.obj.oid:
             try:
                 self.obj.close()
-            except IOError:
+            except (SystemError, IOError):
                 pass
             try:
                 self.obj.unlink()
-            except IOError:
+            except (SystemError, IOError):
                 pass
         del self.obj
-        self.pgcnx.query('end')
+        try:
+            self.pgcnx.query('rollback')
+        except SystemError:
+            pass
         self.pgcnx.close()
 
     def testClassName(self):
@@ -363,7 +381,10 @@ class TestLargeObjects(unittest.TestCase):
         finally:
             del obj
         unlink()
-        self.assertIsNone(self.obj.oid)
+        try:
+            self.assertIsNone(self.obj.oid)
+        except SystemError:
+            pass
 
     def testSize(self):
         size = self.obj.size
@@ -412,16 +433,27 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, export)
         self.assertRaises(TypeError, export, 0)
         self.assertRaises(TypeError, export, 'invalid', 0)
-        f = tempfile.NamedTemporaryFile()
+        if windows:
+            # NamedTemporaryFiles don't work well here
+            fname = 'temp_test_pg_largeobj_export.txt'
+            f = open(fname, 'wb')
+        else:
+            f = tempfile.NamedTemporaryFile()
+            fname = f.name
         data = b'some data to be exported'
         self.obj.open(pg.INV_WRITE)
         self.obj.write(data)
         # exporting when object is not yet closed
         self.assertRaises(IOError, export, f.name)
         self.obj.close()
-        export(f.name)
+        export(fname)
+        if windows:
+            f.close()
+            f = open(fname, 'rb')
         r = f.read()
         f.close()
+        if windows:
+            os.remove(fname)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
