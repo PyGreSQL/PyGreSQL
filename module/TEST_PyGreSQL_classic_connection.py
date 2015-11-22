@@ -1019,7 +1019,7 @@ class TestConfigFunctions(unittest.TestCase):
         pg.set_decimal_point(',')
         r = query("select '34.25'::money").getresult()[0][0]
         self.assertNotEqual(r, d('34.25'))
-        # first try with German localization (using the comma)
+        # then try with German localization (using the comma)
         for lc in 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8':
             try:
                 query("set lc_monetary='%s'" % lc)
