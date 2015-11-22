@@ -405,12 +405,16 @@ class pgdbCursor(object):
         return [row_factory([typecast(*args)
             for args in zip(coltypes, row)]) for row in result]
 
-    def next(self):
+    def __next__(self):
         """Return the next row (support for the iteration protocol)."""
         res = self.fetchone()
         if res is None:
             raise StopIteration
         return res
+
+    # Note that since Python 2.6 the iterator protocol uses __next()__
+    # instead of next(), we keep it only for backward compatibility of pgdb.
+    next = __next__
 
     @staticmethod
     def nextset():
