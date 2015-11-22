@@ -1072,5 +1072,77 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_namedresult(_namedresult)
 
 
+class TestStandaloneEscapeFunctions(unittest.TestCase):
+    """"Test pg escape and unescape functions.
+
+    The libpq interface memorizes some parameters of the last opened
+    connection that influence the result of these functions.  Therefore
+    we need to open a connection with fixed parameters prior to testing
+    in order to ensure that the tests always run under the same conditions.
+    That's why these tests are included in this test module.
+
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        query = connect().query
+        query('set client_encoding=sql_ascii')
+        query('set standard_conforming_strings=off')
+        query('set bytea_output=escape')
+
+    def testEscapeString(self):
+        f = pg.escape_string
+        r = f(b'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u"das is' käse".encode('utf-8'))
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is'' käse")
+        if unicode_strings:
+            r = f("das is' käse")
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, "das is'' käse")
+        r = f(r"It's bad to have a \ inside.")
+        self.assertEqual(r, r"It''s bad to have a \\ inside.")
+
+    def testEscapeBytea(self):
+        f = pg.escape_bytea
+        r = f(b'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u"das is' käse".encode('utf-8'))
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, r"das is'' k\\303\\244se")
+        if unicode_strings:
+            r = f("das is' käse")
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, r"das is'' k\\303\\244se")
+        r = f(b'O\x00ps\xff!')
+        self.assertEqual(r, r'O\\000ps\\377!')
+
+    def testUnescapeBytea(self):
+        f = pg.unescape_bytea
+        r = f(b'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(u'plain')
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 'plain')
+        r = f(b"das is' k\\303\\244se")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is' käse")
+        r = f(u"das is' k\\303\\244se")
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "das is' käse")
+        r = f(r'O\\000ps\\377!')
+        self.assertEqual(r, r'O\000ps\377!')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -286,9 +286,11 @@ class TestDBClass(unittest.TestCase):
 
     def setUp(self):
         self.db = DB()
-        self.db.query("set lc_monetary='C'")
-        self.db.query('set bytea_output=hex')
-        self.db.query('set standard_conforming_strings=on')
+        query = self.db.query
+        query('set client_encoding=utf8')
+        query('set standard_conforming_strings=on')
+        query('set bytea_output=hex')
+        query("set lc_monetary='C'")
 
     def tearDown(self):
         self.db.close()

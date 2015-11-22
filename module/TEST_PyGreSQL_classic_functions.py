@@ -262,7 +262,14 @@ class TestHasConnect(unittest.TestCase):
 
 
 class TestEscapeFunctions(unittest.TestCase):
-    """"Test pg escape and unescape functions."""
+    """"Test pg escape and unescape functions.
+
+    The libpq interface memorizes some parameters of the last opened
+    connection that influence the result of these functions.
+    Therefore we cannot do rigid tests of these functions here.
+    We leave this for the test module that runs with a database.
+
+    """
 
     def testEscapeString(self):
         f = pg.escape_string
@@ -272,15 +279,9 @@ class TestEscapeFunctions(unittest.TestCase):
         r = f(u'plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        r = f(u"das is' käse".encode('utf-8'))
+        r = f("that's cheese")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is'' käse")
-        if unicode_strings:
-            r = f("das is' käse")
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, "das is'' käse")
-        r = f(r"It's fine to have a \ inside.")
-        self.assertEqual(r, r"It''s fine to have a \\ inside.")
+        self.assertEqual(r, "that''s cheese")
 
     def testEscapeBytea(self):
         f = pg.escape_bytea
@@ -290,15 +291,9 @@ class TestEscapeFunctions(unittest.TestCase):
         r = f(u'plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        r = f(u"das is' käse".encode('utf-8'))
+        r = f("that's cheese")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, r"das is'' k\\303\\244se")
-        if unicode_strings:
-            r = f("das is' käse")
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, r"das is'' k\\303\\244se")
-        r = f(b'O\x00ps\xff!')
-        self.assertEqual(r, r'O\\000ps\\377!')
+        self.assertEqual(r, "that''s cheese")
 
     def testUnescapeBytea(self):
         f = pg.unescape_bytea
@@ -308,14 +303,9 @@ class TestEscapeFunctions(unittest.TestCase):
         r = f(u'plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        r = f(b"das is' k\\303\\244se")
+        r = f("that's cheese")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is' käse")
-        r = f(u"das is' k\\303\\244se")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is' käse")
-        r = f(r'O\\000ps\\377!')
-        self.assertEqual(r, r'O\000ps\377!')
+        self.assertEqual(r, "that's cheese")
 
 
 class TestConfigFunctions(unittest.TestCase):

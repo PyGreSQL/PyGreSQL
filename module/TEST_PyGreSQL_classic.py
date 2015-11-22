@@ -73,7 +73,7 @@ class UtilityTest(unittest.TestCase):
     def test_invalidname(self):
         """Make sure that invalid table names are caught"""
         db = opendb()
-        self.failUnlessRaises(ProgrammingError, db.get_attnames, 'x.y.z')
+        self.assertRaises(ProgrammingError, db.get_attnames, 'x.y.z')
 
     def test_schema(self):
         """Does it differentiate the same table name in different schemas"""
@@ -113,7 +113,7 @@ class UtilityTest(unittest.TestCase):
         db.query("INSERT INTO _test_schema VALUES (1234)")
         db.get('_test_schema', 1234)
         db.get('_test_schema', 1234, keyname='_test')
-        self.failUnlessRaises(ProgrammingError, db.get, '_test_vschema', 1234)
+        self.assertRaises(ProgrammingError, db.get, '_test_vschema', 1234)
         db.get('_test_vschema', 1234, keyname='_test')
 
     def test_params(self):
@@ -163,7 +163,7 @@ class UtilityTest(unittest.TestCase):
             db.query("INSERT INTO _test_schema VALUES (1234)")
         except DatabaseError as error:
             # currently PyGreSQL does not support IntegrityError
-            self.assert_(isinstance(error, ProgrammingError))
+            self.assertTrue(isinstance(error, ProgrammingError))
             # the SQLSTATE error code for unique violation is 23505
             self.assertEqual(error.sqlstate, '23505')
 
