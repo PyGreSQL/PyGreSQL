@@ -797,7 +797,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         r = query("select * from test").getresult()
         self.assertEqual(r, data)
 
-    def testPutline(self):
+    def testGetline(self):
         getline = self.c.getline
         query = self.c.query
         data = list(enumerate("apple banana pear plum strawberry".split()))
