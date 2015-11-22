@@ -110,6 +110,10 @@ static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL; /* function for getting named results */
 static char *decimal_point = "."; /* decimal point used in money values */
 
+static int pg_encoding_utf8 = 0;
+static int pg_encoding_latin1 = 0;
+static int pg_encoding_ascii = 0;
+
 /*
 OBJECTS
 =======
@@ -180,9 +184,7 @@ typedef struct
 {
 	PyObject_HEAD
 	PGresult	*result;		/* result content */
-	int			result_type;	/* type of previous result */
-	long		current_pos;	/* current position in last result */
-	long		num_rows;		/* number of (affected) rows */
+	int			encoding; 		/* client encoding */
 }	queryObject;
 #define is_queryObject(v) (PyType(v) == &queryType)
 
@@ -1077,7 +1079,9 @@ connQuery(connObject *self, PyObject *args)
 	PyObject	*oargs = NULL;
 	PGresult	*result;
 	queryObject *npgobj;
-	int			status,
+	const char*	encoding_name=NULL;
+	int			encoding,
+				status,
 				nparms = 0;
 
 	if (!self->cnx)
@@ -1108,12 +1112,18 @@ connQuery(connObject *self, PyObject *args)
 		nparms = (int)PySequence_Size(oargs);
 	}
 
+	encoding = PQclientEncoding(self->cnx);
+	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
+			&& encoding != pg_encoding_ascii)
+		/* should be translated to Python here */
+		encoding_name = pg_encoding_to_char(encoding);
+
 	/* gets result */
 	if (nparms)
 	{
 		/* prepare arguments */
 		PyObject	**str, **s, *obj = PySequence_GetItem(oargs, 0);
-		char		**parms, **p, *enc=NULL;
+		char		**parms, **p;
 		int			*lparms, *l;
 		register int i;
 
@@ -1149,17 +1159,15 @@ connQuery(connObject *self, PyObject *args)
 			}
 			else if (PyUnicode_Check(obj))
 			{
-				if (!enc)
-					enc = (char *)pg_encoding_to_char(
-						PQclientEncoding(self->cnx));
-				if (!strcmp(enc, "UTF8"))
+				if (encoding == pg_encoding_utf8)
 					*s = PyUnicode_AsUTF8String(obj);
-				else if (!strcmp(enc, "LATIN1"))
+				else if (encoding == pg_encoding_latin1)
 					*s = PyUnicode_AsLatin1String(obj);
-				else if (!strcmp(enc, "SQL_ASCII"))
+				else if (encoding == pg_encoding_ascii)
 					*s = PyUnicode_AsASCIIString(obj);
 				else
-					*s = PyUnicode_AsEncodedString(obj, enc, "strict");
+					*s = PyUnicode_AsEncodedString(obj,
+						encoding_name, "strict");
 				if (*s == NULL)
 				{
 					free(lparms); free(parms); free(str);
@@ -1284,6 +1292,7 @@ connQuery(connObject *self, PyObject *args)
 
 	/* stores result and returns object */
 	npgobj->result = result;
+	npgobj->encoding = encoding;
 	return (PyObject *) npgobj;
 }
 
@@ -1419,7 +1428,8 @@ connInsertTable(connObject *self, PyObject *args)
 	char		*table,
 				*buffer,
 				*bufpt;
-	char		*enc=NULL;
+	const char *encoding_name=NULL;
+	int			encoding;
 	size_t		bufsiz;
 	PyObject	*list,
 				*sublist,
@@ -1485,6 +1495,12 @@ connInsertTable(connObject *self, PyObject *args)
 		PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
 		return NULL;
 	}
+
+	encoding = PQclientEncoding(self->cnx);
+	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
+			&& encoding != pg_encoding_ascii)
+		/* should be translated to Python here */
+		encoding_name = pg_encoding_to_char(encoding);
 
 	PQclear(result);
 
@@ -1565,17 +1581,15 @@ connInsertTable(connObject *self, PyObject *args)
 			else if (PyUnicode_Check(item))
 			{
 				PyObject *s;
-				if (!enc)
-					enc = (char *)pg_encoding_to_char(
-						PQclientEncoding(self->cnx));
-				if (!strcmp(enc, "UTF8"))
+				if (encoding == pg_encoding_utf8)
 					s = PyUnicode_AsUTF8String(item);
-				else if (!strcmp(enc, "LATIN1"))
+				else if (encoding == pg_encoding_latin1)
 					s = PyUnicode_AsLatin1String(item);
-				else if (!strcmp(enc, "SQL_ASCII"))
+				else if (encoding == pg_encoding_ascii)
 					s = PyUnicode_AsASCIIString(item);
 				else
-					s = PyUnicode_AsEncodedString(item, enc, "strict");
+					s = PyUnicode_AsEncodedString(item,
+						encoding_name, "strict");
 				const char* t = PyBytes_AsString(s);
 				while (*t && bufsiz)
 				{
@@ -3205,6 +3219,10 @@ queryGetResult(queryObject *self, PyObject *args)
 				m,
 				n,
 			   *typ;
+#if IS_PY3
+	int			encoding;
+	const char *encoding_name=NULL;
+#endif
 
 	/* checks args (args == NULL for an internal call) */
 	if (args && !PyArg_ParseTuple(args, ""))
@@ -3213,6 +3231,14 @@ queryGetResult(queryObject *self, PyObject *args)
 			"method getresult() takes no parameters.");
 		return NULL;
 	}
+
+#if IS_PY3
+	encoding = self->encoding;
+	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
+			&& encoding != pg_encoding_ascii)
+		/* should be translated to Python here */
+		encoding_name = pg_encoding_to_char(encoding);
+#endif
 
 	/* stores result in tuple */
 	m = PQntuples(self->result);
@@ -3254,7 +3280,7 @@ queryGetResult(queryObject *self, PyObject *args)
 						break;
 
 					case 3:  /* float/double */
-						tmp_obj = PyBytes_FromString(s);
+						tmp_obj = PyStr_FromString(s);
 #if IS_PY3
 						val = PyFloat_FromString(tmp_obj);
 #else
@@ -3287,7 +3313,7 @@ queryGetResult(queryObject *self, PyObject *args)
 						}
 						else
 						{
-							tmp_obj = PyBytes_FromString(s);
+							tmp_obj = PyStr_FromString(s);
 #if IS_PY3
 							val = PyFloat_FromString(tmp_obj);
 #else
@@ -3298,7 +3324,21 @@ queryGetResult(queryObject *self, PyObject *args)
 						break;
 
 					default:
-						val = PyStr_FromString(s);
+#if IS_PY3
+						if (encoding == pg_encoding_utf8)
+							val = PyUnicode_DecodeUTF8(s, strlen(s), "strict");
+						else if (encoding == pg_encoding_latin1)
+							val = PyUnicode_DecodeLatin1(s, strlen(s), "strict");
+						else if (encoding == pg_encoding_ascii)
+							val = PyUnicode_DecodeASCII(s, strlen(s), "strict");
+						else
+							val = PyUnicode_Decode(s, strlen(s),
+								encoding_name, "strict");
+						if (!val)
+							val = PyBytes_FromString(s);
+#else
+						val = PyBytes_FromString(s);
+#endif
 						break;
 				}
 
@@ -4358,6 +4398,12 @@ MODULE_INIT_FUNC(_pg)
 	Py_INCREF(Py_None);
 	pg_default_passwd = Py_None;
 #endif /* DEFAULT_VARS */
+
+	/* store common pg encoding ids */
+
+	pg_encoding_utf8 = pg_char_to_encoding("UTF8");
+	pg_encoding_latin1 = pg_char_to_encoding("LATIN1");
+	pg_encoding_ascii = pg_char_to_encoding("SQL_ASCII");
 
 	/* Check for errors */
 	if (PyErr_Occurred())

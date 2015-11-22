@@ -31,6 +31,8 @@ try:
 except NameError:  # Python >= 3.0
     long = int
 
+unicode_strings = str is not bytes
+
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
 dbname = 'unittest'
@@ -399,7 +401,7 @@ class TestSimpleQueries(unittest.TestCase):
     def testBigGetresult(self):
         num_cols = 100
         num_rows = 100
-        q = "select " + ','.join(map(str, xrange(num_cols)))
+        q = "select " + ','.join(map(str, range(num_cols)))
         q = ' union all '.join((q,) * num_rows)
         r = self.c.query(q).getresult()
         result = [tuple(range(num_cols))] * num_rows
@@ -568,7 +570,7 @@ class TestParamQueries(unittest.TestCase):
             ).getresult(), [(3,)])
         self.assertEqual(query("select $1::integer+$2", [1, 2]
             ).getresult(), [(3,)])
-        self.assertEqual(query("select 0+$1+$2+$3+$4+$5+$6", range(6)
+        self.assertEqual(query("select 0+$1+$2+$3+$4+$5+$6", list(range(6))
             ).getresult(), [(15,)])
 
     def testQueryWithStrParams(self):
@@ -594,29 +596,37 @@ class TestParamQueries(unittest.TestCase):
         query = self.c.query
         query('set client_encoding = utf8')
         self.assertEqual(query("select $1||', '||$2||'!'",
-            ('Hello', u'w\xf6rld')).getresult(), [('Hello, w\xc3\xb6rld!',)])
+            ('Hello', u'wörld')).getresult(), [('Hello, wörld!',)])
         self.assertEqual(query("select $1||', '||$2||'!'",
-            ('Hello', u'\u043c\u0438\u0440')).getresult(),
-            [('Hello, \xd0\xbc\xd0\xb8\xd1\x80!',)])
+            ('Hello', u'мир')).getresult(),
+            [('Hello, мир!',)])
         query('set client_encoding = latin1')
-        self.assertEqual(query("select $1||', '||$2||'!'",
-            ('Hello', u'w\xf6rld')).getresult(), [('Hello, w\xf6rld!',)])
+        r = query("select $1||', '||$2||'!'", ('Hello', u'wörld')).getresult()
+        if unicode_strings:
+            self.assertEqual(r, [('Hello, wörld!',)])
+        else:
+            self.assertEqual(r, [(u'Hello, wörld!'.encode('latin1'),)])
         self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
-            ('Hello', u'\u043c\u0438\u0440'))
+            ('Hello', u'мир'))
         query('set client_encoding = iso_8859_1')
-        self.assertEqual(query("select $1||', '||$2||'!'",
-            ('Hello', u'w\xf6rld')).getresult(), [('Hello, w\xf6rld!',)])
+        r = query("select $1||', '||$2||'!'", ('Hello', u'wörld')).getresult()
+        if unicode_strings:
+            self.assertEqual(r, [('Hello, wörld!',)])
+        else:
+            self.assertEqual(r, [(u'Hello, wörld!'.encode('latin1'),)])
         self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
-            ('Hello', u'\u043c\u0438\u0440'))
+            ('Hello', u'мир'))
         query('set client_encoding = iso_8859_5')
         self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
-            ('Hello', u'w\xf6rld'))
-        self.assertEqual(query("select $1||', '||$2||'!'",
-            ('Hello', u'\u043c\u0438\u0440')).getresult(),
-            [('Hello, \xdc\xd8\xe0!',)])
+            ('Hello', u'wörld'))
+        r = query("select $1||', '||$2||'!'", ('Hello', u'мир')).getresult()
+        if unicode_strings:
+            self.assertEqual(r, [('Hello, мир!',)])
+        else:
+            self.assertEqual(r, [(u'Hello, мир!'.encode('cyrillic'),)])
         query('set client_encoding = sql_ascii')
         self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
-            ('Hello', u'w\xf6rld'))
+            ('Hello', u'wörld'))
 
     def testQueryWithMixedParams(self):
         self.assertEqual(self.c.query("select $1+2,$2||', world!'",
@@ -642,7 +652,11 @@ class TestParamQueries(unittest.TestCase):
     def testUnicodeQuery(self):
         query = self.c.query
         self.assertEqual(query(u"select 1+1").getresult(), [(2,)])
-        self.assertRaises(TypeError, query, u"select 'Hello, w\xf6rld!'")
+        if unicode_strings:
+            self.assertEqual(query("select 'Hello, wörld!'").getresult(),
+                [('Hello, wörld!',)])
+        else:
+            self.assertRaises(TypeError, query, u"select 'Hello, wörld!'")
 
 
 class TestInserttable(unittest.TestCase):
