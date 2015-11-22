@@ -822,6 +822,20 @@ class TestDirectSocketAccess(unittest.TestCase):
         r = query("select * from test").getresult()
         self.assertEqual(r, data)
 
+    def testPutlineBytesAndUnicode(self):
+        putline = self.c.putline
+        query = self.c.query
+        query("set client_encoding=utf8")
+        query("copy test from stdin")
+        try:
+            putline(u"47\tkäse\n".encode('utf8'))
+            putline("35\twürstel\n")
+            putline(b"\\.\n")
+        finally:
+            self.c.endcopy()
+        r = query("select * from test").getresult()
+        self.assertEqual(r, [(47, 'käse'), (35, 'würstel')])
+
     def testGetline(self):
         getline = self.c.getline
         query = self.c.query
@@ -838,6 +852,27 @@ class TestDirectSocketAccess(unittest.TestCase):
                     self.assertEqual(v, '\\.')
                 else:
                     self.assertIsNone(v)
+        finally:
+            try:
+                self.c.endcopy()
+            except IOError:
+                pass
+
+    def testGetlineBytesAndUnicode(self):
+        getline = self.c.getline
+        query = self.c.query
+        data = [(54, u'käse'.encode('utf8')), (73, u'würstel')]
+        self.c.inserttable('test', data)
+        query("copy test to stdout")
+        try:
+            v = getline()
+            self.assertIsInstance(v, str)
+            self.assertEqual(v, '54\tkäse')
+            v = getline()
+            self.assertIsInstance(v, str)
+            self.assertEqual(v, '73\twürstel')
+            self.assertEqual(getline(), '\\.')
+            self.assertIsNone(getline())
         finally:
             try:
                 self.c.endcopy()

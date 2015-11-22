@@ -1300,11 +1300,12 @@ connQuery(connObject *self, PyObject *args)
 static char connPutLine__doc__[] =
 "putline() -- sends a line directly to the backend";
 
-/* direct acces function : putline */
+/* direct access function: putline */
 static PyObject *
 connPutLine(connObject *self, PyObject *args)
 {
 	char *line;
+	int line_length;
 
 	if (!self->cnx)
 	{
@@ -1313,7 +1314,7 @@ connPutLine(connObject *self, PyObject *args)
 	}
 
 	/* reads args */
-	if (!PyArg_ParseTuple(args, "s", &line))
+	if (!PyArg_ParseTuple(args, "s#", &line, &line_length))
 	{
 		PyErr_SetString(PyExc_TypeError, "putline(line), with line (string).");
 		return NULL;
@@ -1329,7 +1330,7 @@ connPutLine(connObject *self, PyObject *args)
 	return Py_None;
 }
 
-/* direct access function : getline */
+/* direct access function: getline */
 static char connGetLine__doc__[] =
 "getline() -- gets a line directly from the backend.";
 
@@ -1372,7 +1373,7 @@ connGetLine(connObject *self, PyObject *args)
 	return str;
 }
 
-/* direct access function : end copy */
+/* direct access function: end copy */
 static char connEndCopy__doc__[] =
 "endcopy() -- synchronizes client and server";
 
