@@ -15,15 +15,11 @@ try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
+import os
 
 import pg  # the module under test
 
 from decimal import Decimal
-
-try:
-    long
-except NameError:  # Python >= 3.0
-    long = int
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
@@ -38,6 +34,18 @@ try:
     from LOCAL_PyGreSQL import *
 except ImportError:
     pass
+
+try:
+    long
+except NameError:  # Python >= 3.0
+    long = int
+
+windows = os.name == 'nt'
+
+# There is a known a bug in libpq under Windows which can cause
+# the interface to crash when calling PQhost():
+do_not_ask_for_host = windows
+do_not_ask_for_host_reason = 'libpq issue on Windows'
 
 
 def DB():
@@ -135,6 +143,7 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertTrue(not error or 'krb5_' in error)
         self.assertEqual(self.db.error, self.db.db.error)
 
+    @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
     def testAttributeHost(self):
         def_host = 'localhost'
         host = self.db.host
