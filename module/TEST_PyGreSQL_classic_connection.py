@@ -243,6 +243,21 @@ class TestSimpleQueries(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
+    def testStr(self):
+        q = ("select 1 as a, 'hello' as h, 'w' as world"
+            " union select 2, 'xyz', 'uvw'")
+        r = self.c.query(q)
+        self.assertEqual(str(r),
+            'a|  h  |world\n'
+            '-+-----+-----\n'
+            '1|hello|w    \n'
+            '2|xyz  |uvw  \n'
+            '(2 rows)')
+
+    def testRepr(self):
+        r = repr(self.c.query("select 1"))
+        self.assertTrue(r.startswith('<pgqueryobject object'), r)
+
     def testSelect0(self):
         q = "select 0"
         self.c.query(q)
@@ -491,17 +506,6 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
         query("drop table test_table")
-
-    def testStr(self):
-        q = ("select 1 as a, 'hello' as h, 'w' as world"
-            " union select 2, 'xyz', 'uvw'")
-        r = self.c.query(q)
-        self.assertEqual(str(r),
-            'a|  h  |world\n'
-            '-+-----+-----\n'
-            '1|hello|w    \n'
-            '2|xyz  |uvw  \n'
-            '(2 rows)')
 
 
 class TestParamQueries(unittest.TestCase):

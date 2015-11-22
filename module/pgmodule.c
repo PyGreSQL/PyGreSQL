@@ -964,7 +964,7 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* output large object as string */
+/* return large object as string in human readable form */
 static PyObject *
 largeStr(largeObject *self)
 {
@@ -1403,13 +1403,7 @@ connEndCopy(connObject *self, PyObject *args)
 }
 #endif /* DIRECT_ACCESS */
 
-static PyObject *
-queryRepr(queryObject *self)
-{
-	return PyStr_FromString("<pg query result>");
-}
-
-/* output query as string */
+/* return query as string in human readable form */
 static PyObject *
 queryStr(queryObject *self)
 {
@@ -2931,14 +2925,7 @@ sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 	return -1;
 }
 
-static PyObject *
-sourceRepr(sourceObject *self)
-{
-	return PyStr_FromString("<pg source object>");
-}
-
-/* returns source object as string in human readable format */
-
+/* return source object as string in human readable form */
 static PyObject *
 sourceStr(sourceObject *self)
 {
@@ -2969,7 +2956,7 @@ static PyTypeObject sourceType = {
 	0,								/* tp_getattr */
 	(setattrfunc) sourceSetAttr,	/* tp_setattr */
 	0,								/* tp_compare */
-	(reprfunc) sourceRepr,			/* tp_repr */
+	0,								/* tp_repr */
 	0,								/* tp_as_number */
 	0,								/* tp_as_sequence */
 	0,								/* tp_as_mapping */
@@ -3593,7 +3580,7 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* output notice as string */
+/* return notice as string in human readable form */
 static PyObject *
 noticeStr(noticeObject *self)
 {
@@ -3682,7 +3669,7 @@ static PyTypeObject queryType = {
 	0,								/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
-	(reprfunc) queryRepr,			/* tp_repr */
+	0,								/* tp_repr */
 	0,								/* tp_as_number */
 	0,								/* tp_as_sequence */
 	0,								/* tp_as_mapping */

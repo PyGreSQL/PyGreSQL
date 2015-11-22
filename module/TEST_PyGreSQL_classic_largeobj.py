@@ -175,6 +175,21 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(self.obj.error, str)
         self.assertEqual(self.obj.error, '')
 
+    def testStr(self):
+        self.obj.open(pg.INV_WRITE)
+        data = b'some object to be printed'
+        self.obj.write(data)
+        oid = self.obj.oid
+        r = str(self.obj)
+        self.assertEqual(r, 'Opened large object, oid %d' % oid)
+        self.obj.close()
+        r = str(self.obj)
+        self.assertEqual(r, 'Closed large object, oid %d' % oid)
+
+    def testRepr(self):
+        r = repr(self.obj)
+        self.assertTrue(r.startswith('<pglarge object'), r)
+
     def testOpen(self):
         open = self.obj.open
         # testing with invalid parameters
@@ -379,17 +394,6 @@ class TestLargeObjects(unittest.TestCase):
         f.close()
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
-
-    def testStr(self):
-        self.obj.open(pg.INV_WRITE)
-        data = b'some object to be printed'
-        self.obj.write(data)
-        oid = self.obj.oid
-        self.assertEqual(str(self.obj),
-            'Opened large object, oid %d' % oid)
-        self.obj.close()
-        self.assertEqual(str(self.obj),
-            'Closed large object, oid %d' % oid)
 
 
 if __name__ == '__main__':
