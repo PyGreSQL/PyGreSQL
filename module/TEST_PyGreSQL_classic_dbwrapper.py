@@ -298,6 +298,7 @@ class TestDBClass(unittest.TestCase):
 
     def testModuleName(self):
         self.assertEqual(self.db.__module__, 'pg')
+        self.assertEqual(self.db.__class__.__module__, 'pg')
 
     def testEscapeLiteral(self):
         f = self.db.escape_literal

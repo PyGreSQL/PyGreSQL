@@ -250,6 +250,36 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
+    def testWriteLatin1Bytes(self):
+        read = self.obj.read
+        self.obj.open(pg.INV_WRITE)
+        self.obj.write(u'käse'.encode('latin1'))
+        self.obj.close()
+        self.obj.open(pg.INV_READ)
+        r = read(80)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r.decode('latin1'), u'käse')
+
+    def testWriteUtf8Bytes(self):
+        read = self.obj.read
+        self.obj.open(pg.INV_WRITE)
+        self.obj.write(u'käse'.encode('utf8'))
+        self.obj.close()
+        self.obj.open(pg.INV_READ)
+        r = read(80)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r.decode('utf8'), u'käse')
+
+    def testWriteUtf8String(self):
+        read = self.obj.read
+        self.obj.open(pg.INV_WRITE)
+        self.obj.write('käse')
+        self.obj.close()
+        self.obj.open(pg.INV_READ)
+        r = read(80)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r.decode('utf8'), u'käse')
+
     def testSeek(self):
         seek = self.obj.seek
         # testing with invalid parameters
