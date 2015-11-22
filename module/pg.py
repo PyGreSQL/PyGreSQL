@@ -332,7 +332,7 @@ class DB(object):
             if isinstance(self.debug, basestring):
                 print(self.debug % s)
             elif isinstance(self.debug, file):
-                file.write(s + '\n')
+                self.debug.write(s + '\n')
             elif callable(self.debug):
                 self.debug(s)
             else:
