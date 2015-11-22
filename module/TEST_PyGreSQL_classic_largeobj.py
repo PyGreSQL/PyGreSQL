@@ -159,10 +159,10 @@ class TestLargeObjects(unittest.TestCase):
         self.pgcnx.close()
 
     def testClassName(self):
-        self.assertEqual(self.obj.__class__.__name__, 'pglarge')
+        self.assertEqual(self.obj.__class__.__name__, 'LargeObject')
 
     def testModuleName(self):
-        self.assertEqual(self.obj.__module__, 'pg')
+        self.assertEqual(self.obj.__class__.__module__, 'pg')
 
     def testOid(self):
         self.assertIsInstance(self.obj.oid, int)
@@ -188,7 +188,7 @@ class TestLargeObjects(unittest.TestCase):
 
     def testRepr(self):
         r = repr(self.obj)
-        self.assertTrue(r.startswith('<pglarge object'), r)
+        self.assertTrue(r.startswith('<pg.LargeObject object'), r)
 
     def testOpen(self):
         open = self.obj.open

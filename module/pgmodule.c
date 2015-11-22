@@ -980,7 +980,7 @@ static char large__doc__[] = "PostgreSQL large object";
 /* large object type definition */
 static PyTypeObject largeType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"pglarge",						/* tp_name */
+	"pg.LargeObject",				/* tp_name */
 	sizeof(largeObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 
@@ -2294,7 +2294,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 /* connection type definition */
 static PyTypeObject connType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"pgconnobject",				/* tp_name */
+	"pg.Connection",			/* tp_name */
 	sizeof(connObject),			/* tp_basicsize */
 	0,							/* tp_itemsize */
 	(destructor) connDelete,	/* tp_dealloc */
@@ -2947,7 +2947,7 @@ static char source__doc__[] = "PyGreSQL source object";
 /* source type definition */
 static PyTypeObject sourceType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"pgsourceobject",				/* tp_name */
+	"pgdb.Source",					/* tp_name */
 	sizeof(sourceObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
@@ -3608,7 +3608,7 @@ static struct PyMethodDef noticeMethods[] = {
 /* notice type definition */
 static PyTypeObject noticeType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"pgnoticeobject",				/* tp_name */
+	"pg.Notice",					/* tp_name */
 	sizeof(noticeObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
@@ -3660,7 +3660,7 @@ static struct PyMethodDef queryMethods[] = {
 /* query type definition */
 static PyTypeObject queryType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"pgqueryobject",				/* tp_name */
+	"pg.Query",						/* tp_name */
 	sizeof(queryObject),			/* tp_basicsize */
 	0,								/* tp_itemsize */
 	/* methods */
@@ -4288,19 +4288,6 @@ MODULE_INIT_FUNC(_pg)
 		|| PyType_Ready(&largeType)
 #endif
 		) return NULL;
-
-	/* make the module names available */
-	s = PyStr_FromString("pg");
-	PyDict_SetItemString(connType.tp_dict, "__module__", s);
-	PyDict_SetItemString(noticeType.tp_dict, "__module__", s);
-	PyDict_SetItemString(queryType.tp_dict, "__module__", s);
-#ifdef LARGE_OBJECTS
-	PyDict_SetItemString(largeType.tp_dict, "__module__", s);
-#endif
-	Py_DECREF(s);
-	s = PyStr_FromString("pgdb");
-	PyDict_SetItemString(sourceType.tp_dict, "__module__", s);
-	Py_DECREF(s);
 
 	dict = PyModule_GetDict(mod);
 

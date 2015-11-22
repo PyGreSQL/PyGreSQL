@@ -77,10 +77,18 @@ class TestConnectObject(unittest.TestCase):
             pass
 
     def testClassName(self):
-        self.assertEqual(self.connection.__class__.__name__, 'pgconnobject')
+        self.assertEqual(self.connection.__class__.__name__, 'Connection')
 
     def testModuleName(self):
-        self.assertEqual(self.connection.__module__, 'pg')
+        self.assertEqual(self.connection.__class__.__module__, 'pg')
+
+    def testStr(self):
+        r = str(self.connection)
+        self.assertTrue(r.startswith('<pg.Connection object'), r)
+
+    def testRepr(self):
+        r = repr(self.connection)
+        self.assertTrue(r.startswith('<pg.Connection object'), r)
 
     def testAllConnectAttributes(self):
         attributes = '''db error host options port
@@ -243,6 +251,14 @@ class TestSimpleQueries(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
+    def testClassName(self):
+        r = self.c.query("select 1")
+        self.assertEqual(r.__class__.__name__, 'Query')
+
+    def testModuleName(self):
+        r = self.c.query("select 1")
+        self.assertEqual(r.__class__.__module__, 'pg')
+
     def testStr(self):
         q = ("select 1 as a, 'hello' as h, 'w' as world"
             " union select 2, 'xyz', 'uvw'")
@@ -256,7 +272,7 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testRepr(self):
         r = repr(self.c.query("select 1"))
-        self.assertTrue(r.startswith('<pgqueryobject object'), r)
+        self.assertTrue(r.startswith('<pg.Query object'), r)
 
     def testSelect0(self):
         q = "select 0"
