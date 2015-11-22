@@ -17,8 +17,6 @@ try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
-import sys
-import tempfile
 import threading
 import time
 
@@ -494,27 +492,16 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, '5')
         query("drop table test_table")
 
-    def testPrint(self):
+    def testStr(self):
         q = ("select 1 as a, 'hello' as h, 'w' as world"
             " union select 2, 'xyz', 'uvw'")
         r = self.c.query(q)
-        f = tempfile.TemporaryFile('r+')
-        stdout, sys.stdout = sys.stdout, f
-        try:
-            print(r)
-        except Exception:
-            pass
-        finally:
-            sys.stdout = stdout
-        f.seek(0)
-        r = f.read()
-        f.close()
-        self.assertEqual(r,
+        self.assertEqual(str(r),
             'a|  h  |world\n'
             '-+-----+-----\n'
             '1|hello|w    \n'
             '2|xyz  |uvw  \n'
-            '(2 rows)\n')
+            '(2 rows)')
 
 
 class TestParamQueries(unittest.TestCase):

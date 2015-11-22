@@ -15,7 +15,6 @@ try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
-import sys
 import tempfile
 
 import pg  # the module under test
@@ -381,27 +380,16 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
-    def testPrint(self):
+    def testStr(self):
         self.obj.open(pg.INV_WRITE)
         data = b'some object to be printed'
         self.obj.write(data)
-        f = tempfile.TemporaryFile('r+')
-        stdout, sys.stdout = sys.stdout, f
-        try:
-            print(self.obj)
-            self.obj.close()
-            print(self.obj)
-        except Exception:
-            pass
-        finally:
-            sys.stdout = stdout
-        f.seek(0)
-        r = f.read()
-        f.close()
         oid = self.obj.oid
-        self.assertEqual(r,
-            'Opened large object, oid %d\n'
-            'Closed large object, oid %d\n' % (oid, oid))
+        self.assertEqual(str(self.obj),
+            'Opened large object, oid %d' % oid)
+        self.obj.close()
+        self.assertEqual(str(self.obj),
+            'Closed large object, oid %d' % oid)
 
 
 if __name__ == '__main__':
