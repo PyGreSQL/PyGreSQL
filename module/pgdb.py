@@ -165,6 +165,7 @@ class pgdbTypeCache(dict):
         super(pgdbTypeCache, self).__init__()
         self._src = cnx.source()
 
+    @staticmethod
     def typecast(typ, value):
         """Cast value to database type."""
         if value is None:
@@ -176,7 +177,6 @@ class pgdbTypeCache(dict):
             return value
         else:
             return cast(value)
-    typecast = staticmethod(typecast)
 
     def getdescr(self, oid):
         """Get name of database type with given oid."""
@@ -412,10 +412,10 @@ class pgdbCursor(object):
             raise StopIteration
         return res
 
+    @staticmethod
     def nextset():
         """Not supported."""
         raise NotSupportedError("nextset() is not supported")
-    nextset = staticmethod(nextset)
 
     def setinputsizes(sizes):
         """Not supported."""
