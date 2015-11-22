@@ -1413,6 +1413,7 @@ connInsertTable(connObject *self, PyObject *args)
 	char		*table,
 				*buffer,
 				*bufpt;
+	char		*enc=NULL;
 	size_t		bufsiz;
 	PyObject	*list,
 				*sublist,
@@ -1542,9 +1543,9 @@ connInsertTable(connObject *self, PyObject *args)
 				else
 					bufsiz = 0;
 			}
-			else if (PyStr_Check(item))
+			else if (PyBytes_Check(item))
 			{
-				const char* t = PyBytes_AS_STRING(item);
+				const char* t = PyBytes_AsString(item);
 				while (*t && bufsiz)
 				{
 					if (*t == '\\' || *t == '\t' || *t == '\n')
@@ -1555,10 +1556,36 @@ connInsertTable(connObject *self, PyObject *args)
 					*bufpt++ = *t++; --bufsiz;
 				}
 			}
+			else if (PyUnicode_Check(item))
+			{
+				PyObject *s;
+				if (!enc)
+					enc = (char *)pg_encoding_to_char(
+						PQclientEncoding(self->cnx));
+				if (!strcmp(enc, "UTF8"))
+					s = PyUnicode_AsUTF8String(item);
+				else if (!strcmp(enc, "LATIN1"))
+					s = PyUnicode_AsLatin1String(item);
+				else if (!strcmp(enc, "SQL_ASCII"))
+					s = PyUnicode_AsASCIIString(item);
+				else
+					s = PyUnicode_AsEncodedString(item, enc, "strict");
+				const char* t = PyBytes_AsString(s);
+				while (*t && bufsiz)
+				{
+					if (*t == '\\' || *t == '\t' || *t == '\n')
+					{
+						*bufpt++ = '\\'; --bufsiz;
+						if (!bufsiz) break;
+					}
+					*bufpt++ = *t++; --bufsiz;
+				}
+				Py_DECREF(s);
+			}
 			else if (PyInt_Check(item) || PyLong_Check(item))
 			{
 				PyObject* s = PyObject_Str(item);
-				const char* t = PyBytes_AsString(s);
+				const char* t = PyStr_AsString(s);
 				while (*t && bufsiz)
 				{
 					*bufpt++ = *t++; --bufsiz;
@@ -1568,7 +1595,7 @@ connInsertTable(connObject *self, PyObject *args)
 			else
 			{
 				PyObject* s = PyObject_Repr(item);
-				const char* t = PyBytes_AsString(s);
+				const char* t = PyStr_AsString(s);
 				while (*t && bufsiz)
 				{
 					if (*t == '\\' || *t == '\t' || *t == '\n')
