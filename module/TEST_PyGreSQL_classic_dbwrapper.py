@@ -758,7 +758,7 @@ class TestDBClass(unittest.TestCase):
                 self.assertIn(oid_table, data)
                 oid = data[oid_table]
                 self.assertIsInstance(oid, int)
-                data = dict(item for item in data.iteritems()
+                data = dict(item for item in data.items()
                     if item[0] in expect)
                 ts = expect.get('ts')
                 if ts == 'current_timestamp':
@@ -777,7 +777,7 @@ class TestDBClass(unittest.TestCase):
                 data = query(
                     'select oid,* from "%s"' % table).dictresult()[0]
                 self.assertEqual(data['oid'], oid)
-                data = dict(item for item in data.iteritems()
+                data = dict(item for item in data.items()
                     if item[0] in expect)
                 self.assertEqual(data, expect)
                 query('delete from "%s"' % table)
