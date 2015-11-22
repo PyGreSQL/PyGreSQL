@@ -90,7 +90,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
             oid = large_object.oid
         finally:
             del large_object
-        data = 'some data to be shared'
+        data = b'some data to be shared'
         large_object = self.c.getlo(oid)
         try:
             self.assertIsLargeObject(large_object)
@@ -110,11 +110,12 @@ class TestCreatingLargeObjects(unittest.TestCase):
             large_object.unlink()
         finally:
             del large_object
+        self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
     def testLoImport(self):
         f = tempfile.NamedTemporaryFile()
-        data = 'some data to be imported'
+        data = b'some data to be imported'
         f.write(data)
         f.flush()
         f.seek(0)
@@ -128,7 +129,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
             self.assertIsInstance(r, int)
             self.assertEqual(r, len(data))
             r = large_object.read(80)
-            self.assertIsInstance(r, str)
+            self.assertIsInstance(r, bytes)
             self.assertEqual(r, data)
             large_object.close()
             large_object.unlink()
@@ -203,18 +204,18 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, read, 80, 'invalid')
         # reading when object is not yet open
         self.assertRaises(IOError, read, 80)
-        data = 'some data to be read'
+        data = b'some data to be read'
         self.obj.open(pg.INV_WRITE)
         self.obj.write(data)
         self.obj.close()
         self.obj.open(pg.INV_READ)
         r = read(80)
-        self.assertIsInstance(r, str)
+        self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
         self.obj.close()
         self.obj.open(pg.INV_READ)
         r = read(8)
-        self.assertIsInstance(r, str)
+        self.assertIsInstance(r, bytes)
         self.assertEqual(r, data[:8])
         self.obj.close()
 
@@ -226,12 +227,13 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, write, '', 'invalid')
         # writing when object is not yet open
         self.assertRaises(IOError, write, 'invalid')
-        data = 'some data to be written'
+        data = b'some data to be written'
         self.obj.open(pg.INV_WRITE)
         write(data)
         self.obj.close()
         self.obj.open(pg.INV_READ)
         r = self.obj.read(80)
+        self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
     def testSeek(self):
@@ -244,26 +246,31 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, seek, 0, 'invalid')
         # seeking when object is not yet open
         self.assertRaises(IOError, seek, 0, pg.SEEK_SET)
-        data = 'some data to be seeked'
+        data = b'some data to be seeked'
         self.obj.open(pg.INV_WRITE)
         self.obj.write(data)
         self.obj.close()
         self.obj.open(pg.INV_READ)
         seek(0, pg.SEEK_SET)
         r = self.obj.read(9)
-        self.assertEqual(r, 'some data')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'some data')
         seek(4, pg.SEEK_CUR)
         r = self.obj.read(2)
-        self.assertEqual(r, 'be')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'be')
         seek(-10, pg.SEEK_CUR)
         r = self.obj.read(4)
-        self.assertEqual(r, 'data')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'data')
         seek(0, pg.SEEK_SET)
         r = self.obj.read(4)
-        self.assertEqual(r, 'some')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'some')
         seek(-6, pg.SEEK_END)
         r = self.obj.read(4)
-        self.assertEqual(r, 'seek')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'seek')
 
     def testTell(self):
         tell = self.obj.tell
@@ -271,7 +278,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, tell, 0)
         # telling when object is not yet open
         self.assertRaises(IOError, tell)
-        data = 'some story to be told'
+        data = b'some story to be told'
         self.obj.open(pg.INV_WRITE)
         self.obj.write(data)
         r = tell()
@@ -294,7 +301,7 @@ class TestLargeObjects(unittest.TestCase):
         # unlinking when object is still open
         self.obj.open(pg.INV_WRITE)
         self.assertRaises(IOError, unlink)
-        data = 'some data to be sold'
+        data = b'some data to be sold'
         self.obj.write(data)
         self.obj.close()
         oid = self.obj.oid
@@ -307,6 +314,7 @@ class TestLargeObjects(unittest.TestCase):
             obj.open(pg.INV_READ)
             r = obj.read(80)
             obj.close()
+            self.assertIsInstance(r, bytes)
             self.assertEqual(r, data)
         finally:
             del obj
@@ -326,7 +334,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 0)
         # sizing after adding some data
-        data = 'some data to be sized'
+        data = b'some data to be sized'
         self.obj.open(pg.INV_WRITE)
         self.obj.write(data)
         self.obj.close()
@@ -344,7 +352,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, len(data))
         # sizing after adding more data
-        data += ' and more data'
+        data += b' and more data'
         self.obj.open(pg.INV_WRITE)
         self.obj.write(data)
         self.obj.close()
@@ -361,7 +369,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, export, 0)
         self.assertRaises(TypeError, export, 'invalid', 0)
         f = tempfile.NamedTemporaryFile()
-        data = 'some data to be exported'
+        data = b'some data to be exported'
         self.obj.open(pg.INV_WRITE)
         self.obj.write(data)
         # exporting when object is not yet closed
@@ -370,11 +378,12 @@ class TestLargeObjects(unittest.TestCase):
         export(f.name)
         r = f.read()
         f.close()
+        self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
     def testPrint(self):
         self.obj.open(pg.INV_WRITE)
-        data = 'some object to be printed'
+        data = b'some object to be printed'
         self.obj.write(data)
         f = tempfile.TemporaryFile('r+')
         stdout, sys.stdout = sys.stdout, f
