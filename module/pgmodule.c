@@ -1141,6 +1141,12 @@ connQuery(connObject *self, PyObject *args)
 				*p = NULL;
 				*l = 0;
 			}
+			else if (PyBytes_Check(obj))
+			{
+				*s = obj;
+				*p = PyBytes_AsString(*s);
+				*l = (int)PyBytes_Size(*s);
+			}
 			else if (PyUnicode_Check(obj))
 			{
 				if (!enc)
@@ -1188,8 +1194,8 @@ connQuery(connObject *self, PyObject *args)
 					}
 					return NULL;
 				}
-				*p = PyBytes_AsString(*s);
-				*l = (int)PyBytes_Size(*s);
+				*p = PyStr_AsString(*s);
+				*l = (int)strlen(*p);
 			}
 		}
 
