@@ -964,17 +964,15 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* prints query object in human readable format */
-static int
-largePrint(largeObject *self, FILE *fp, int flags)
+/* output large object as string */
+static PyObject *
+largeStr(largeObject *self)
 {
-	char		print_buffer[128];
-	PyOS_snprintf(print_buffer, sizeof(print_buffer),
-		self->lo_fd >= 0 ?
+	char		str[80];
+	sprintf(str, self->lo_fd >= 0 ?
 			"Opened large object, oid %ld" :
 			"Closed large object, oid %ld", (long) self->lo_oid);
-	fputs(print_buffer, fp);
-	return 0;
+	return PyStr_FromString(str);
 }
 
 static char large__doc__[] = "PostgreSQL large object";
@@ -988,7 +986,7 @@ static PyTypeObject largeType = {
 
 	/* methods */
 	(destructor) largeDealloc,		/* tp_dealloc */
-	(printfunc) largePrint,			/* tp_print */
+	0,								/* tp_print */
 	0,								/* tp_getattr */
 	0,								/* tp_setattr */
 	0,								/* tp_compare */
@@ -998,7 +996,7 @@ static PyTypeObject largeType = {
 	0,								/* tp_as_mapping */
 	0,								/* tp_hash */
 	0,                              /* tp_call */
-	0,								/* tp_str */
+	(reprfunc) largeStr,			/* tp_str */
 	(getattrofunc) largeGetAttr,	/* tp_getattro */
 	0,                              /* tp_setattro */
 	0,                              /* tp_as_buffer */
@@ -1411,6 +1409,7 @@ queryRepr(queryObject *self)
 	return PyStr_FromString("<pg query result>");
 }
 
+/* output query as string */
 static PyObject *
 queryStr(queryObject *self)
 {
@@ -3594,6 +3593,7 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
+/* output notice as string */
 static PyObject *
 noticeStr(noticeObject *self)
 {
