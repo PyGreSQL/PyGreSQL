@@ -21,7 +21,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     driver = pgdb
     connect_args = ()
-    connect_kw_args = {'dsn': dbhost + ':' + dbname}
+    connect_kw_args = {'dsn': (dbhost or '') + ':' + dbname}
 
     lower_func = 'lower'  # For stored procedure test
 
