@@ -845,7 +845,6 @@ class TestDirectSocketAccess(unittest.TestCase):
     def testPutlineBytesAndUnicode(self):
         putline = self.c.putline
         query = self.c.query
-        query("set client_encoding=utf8")
         query("copy test from stdin")
         try:
             putline(u"47\tkäse\n".encode('utf8'))
