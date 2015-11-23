@@ -997,6 +997,8 @@ class TestConfigFunctions(unittest.TestCase):
 
     def setUp(self):
         self.c = connect()
+        self.c.query("set client_encoding=utf8")
+        self.c.query("set lc_monetary='C'")
 
     def tearDown(self):
         self.c.close()
