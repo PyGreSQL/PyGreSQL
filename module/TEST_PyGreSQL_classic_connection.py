@@ -699,8 +699,9 @@ class TestInserttable(unittest.TestCase):
 
     def setUp(self):
         self.c = connect()
-        self.c.query("set lc_monetary='C'")
+        self.c.query("set client_encoding=utf8")
         self.c.query("set datestyle='ISO,YMD'")
+        self.c.query("set lc_monetary='C'")
 
     def tearDown(self):
         self.c.query("truncate table test")
@@ -821,7 +822,7 @@ class TestDirectSocketAccess(unittest.TestCase):
 
     def setUp(self):
         self.c = connect()
-        self.c.query("set datestyle='ISO,YMD'")
+        self.c.query("set client_encoding=utf8")
 
     def tearDown(self):
         self.c.query("truncate table test")
