@@ -1103,7 +1103,8 @@ connQuery(connObject *self, PyObject *args)
 	{
 		if (!PyTuple_Check(oargs) && !PyList_Check(oargs))
 		{
-			PyErr_SetString(PyExc_TypeError, "query parameters must be a tuple or list.");
+			PyErr_SetString(PyExc_TypeError,
+				"query parameters must be a tuple or list.");
 			return NULL;
 		}
 
@@ -1166,11 +1167,9 @@ connQuery(connObject *self, PyObject *args)
 				else
 					*s = PyUnicode_AsEncodedString(obj,
 						encoding_name, "strict");
-				if (*s == NULL)
+				if (!*s)
 				{
 					free(lparms); free(parms); free(str);
-					PyErr_SetString(PyExc_UnicodeError, "query parameter"
-						" could not be decoded (bad client encoding)");
 					while (i--)
 					{
 						if (*--s)
@@ -1178,7 +1177,7 @@ connQuery(connObject *self, PyObject *args)
 							Py_DECREF(*s);
 						}
 					}
-					return NULL;
+					return NULL; /* pass the UnicodeEncodeError */
 				}
 				*p = PyBytes_AsString(*s);
 				*l = (int)PyBytes_Size(*s);
@@ -1186,11 +1185,9 @@ connQuery(connObject *self, PyObject *args)
 			else
 			{
 				*s = PyObject_Str(obj);
-				if (*s == NULL)
+				if (!*s)
 				{
 					free(lparms); free(parms); free(str);
-					PyErr_SetString(PyExc_TypeError,
-						"query parameter has no string representation");
 					while (i--)
 					{
 						if (*--s)
@@ -1198,6 +1195,8 @@ connQuery(connObject *self, PyObject *args)
 							Py_DECREF(*s);
 						}
 					}
+					PyErr_SetString(PyExc_TypeError,
+						"query parameter has no string representation");
 					return NULL;
 				}
 				*p = PyStr_AsString(*s);
@@ -1584,6 +1583,11 @@ connInsertTable(connObject *self, PyObject *args)
 				else
 					s = PyUnicode_AsEncodedString(item,
 						encoding_name, "strict");
+				if (!s)
+				{
+					free(buffer);
+					return NULL; /* pass the UnicodeEncodeError */
+				}
 				const char* t = PyBytes_AsString(s);
 				while (*t && bufsiz)
 				{
@@ -1709,7 +1713,8 @@ connParameter(connObject *self, PyObject *args)
 	/* get query args */
 	if (!PyArg_ParseTuple(args, "s", &name))
 	{
-		PyErr_SetString(PyExc_TypeError, "parameter(name), with name (string).");
+		PyErr_SetString(PyExc_TypeError,
+			"parameter(name), with name (string).");
 		return NULL;
 	}
 
@@ -2581,7 +2586,8 @@ sourceFetch(sourceObject *self, PyObject *args)
 				str = Py_None;
 			}
 			else
-				str = PyStr_FromString(PQgetvalue(self->result, self->current_row, j));
+				str = PyStr_FromString(
+					PQgetvalue(self->result, self->current_row, j));
 
 			PyTuple_SET_ITEM(rowtuple, j, str);
 		}
