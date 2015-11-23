@@ -1141,6 +1141,13 @@ class TestConfigFunctions(unittest.TestCase):
         point = pg.get_decimal_point()
         self.assertIsInstance(point, str)
         self.assertEqual(point, '.')
+        pg.set_decimal_point(',')
+        try:
+            r = pg.get_decimal_point()
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, ',')
 
     def testSetDecimalPoint(self):
         d = pg.Decimal
@@ -1159,18 +1166,25 @@ class TestConfigFunctions(unittest.TestCase):
                 break
         else:
             self.SkipTest("cannot set English money locale")
-        pg.set_decimal_point('.')
         try:
             r = query("select '34.25'::money")
         except pg.ProgrammingError:
             # this can happen if the currency signs cannot be
             # converted using the encoding of the test database
             self.skipTest('database does not support money')
-        r = r.getresult()[0][0]
+        pg.set_decimal_point('.')
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
         self.assertEqual(r, d('34.25'))
+        r = query("select '34.25'::money")
         pg.set_decimal_point(',')
-        r = query("select '34.25'::money").getresult()[0][0]
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
         self.assertNotEqual(r, d('34.25'))
         # then try with German localization (using the comma)
         for lc in 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8':
@@ -1182,35 +1196,44 @@ class TestConfigFunctions(unittest.TestCase):
                 break
         else:
             self.SkipTest("cannot set German money locale")
+        try:
+            r = query("select '34,25'::money")
+        except pg.ProgrammingError:
+            self.skipTest('database does not support money')
         pg.set_decimal_point(',')
         try:
-            r = query("select '34,25'::money")
-        except pg.ProgrammingError:
-            self.skipTest('database does not support money')
-        r = r.getresult()[0][0]
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
         self.assertEqual(r, d('34.25'))
+        r = query("select '34,25'::money")
         pg.set_decimal_point('.')
         try:
-            r = query("select '34,25'::money")
-        except pg.ProgrammingError:
-            self.skipTest('database does not support money')
-        r = r.getresult()[0][0]
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
         self.assertNotEqual(r, d('34.25'))
-        pg.set_decimal_point(point)
 
     def testSetDecimal(self):
         d = pg.Decimal
         query = self.c.query
-        r = query("select 3425::numeric").getresult()[0][0]
+        try:
+            r = query("select 3425::numeric")
+        except pg.ProgrammingError:
+            self.skipTest('database does not support numeric')
+        r = r.getresult()[0][0]
         self.assertIsInstance(r, d)
         self.assertEqual(r, d('3425'))
+        r = query("select 3425::numeric")
         pg.set_decimal(long)
-        r = query("select 3425::numeric").getresult()[0][0]
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal(d)
         self.assertNotIsInstance(r, d)
         self.assertIsInstance(r, long)
         self.assertEqual(r, long(3425))
-        pg.set_decimal(d)
 
     def testSetNamedresult(self):
         query = self.c.query
