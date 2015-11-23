@@ -540,6 +540,7 @@ class TestParamQueries(unittest.TestCase):
 
     def setUp(self):
         self.c = connect()
+        self.c.query('set client_encoding = utf8')
 
     def tearDown(self):
         self.c.close()
