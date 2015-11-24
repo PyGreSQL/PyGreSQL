@@ -1139,8 +1139,10 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testGetDecimalPoint(self):
         point = pg.get_decimal_point()
+        # error if a parameter is passed
+        self.assertRaises(TypeError, pg.get_decimal_point, point)
         self.assertIsInstance(point, str)
-        self.assertEqual(point, '.')
+        self.assertEqual(point, '.')  # the default setting
         pg.set_decimal_point(',')
         try:
             r = pg.get_decimal_point()
@@ -1152,12 +1154,28 @@ class TestConfigFunctions(unittest.TestCase):
     def testSetDecimalPoint(self):
         d = pg.Decimal
         point = pg.get_decimal_point()
+        self.assertRaises(TypeError, pg.set_decimal_point)
+        # error if decimal point is not a string
+        self.assertRaises(TypeError, pg.set_decimal_point, 0)
+        # error if more than one decimal point passed
+        self.assertRaises(TypeError, pg.set_decimal_point, '.', ',')
+        self.assertRaises(TypeError, pg.set_decimal_point, '.,')
+        # error if decimal point is not a punctuation character
+        self.assertRaises(TypeError, pg.set_decimal_point, '0')
         query = self.c.query
-        # check that money values can be interpreted correctly
-        # if and only if the decimal point is set appropriately
-        # for the current lc_monetary setting
+        # check that money values are interpreted as decimal values
+        # only if decimal_point is set, and that the result is correct
+        # only if it is set suitable for the current lc_monetary setting
+        select_money = "select '34.25'::money"
+        proper_money = d(34.25)
+        bad_money = d(3425)
+        en_locales = 'en', 'en_US', 'en_US.utf8', 'en_US.UTF-8'
+        en_money = '$34.25', '$ 34.25', '34.25$', '34.25 $', '34.25 Dollar'
+        de_locales = 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8'
+        de_money = ('34,25€', '34,25 €', '€34,25' '€ 34,25',
+            '34,25 EUR', '34,25 Euro', '34,25 DM')
         # first try with English localization (using the point)
-        for lc in 'en', 'en_US', 'en_US.utf8', 'en_US.UTF-8':
+        for lc in en_locales:
             try:
                 query("set lc_monetary='%s'" % lc)
             except pg.ProgrammingError:
@@ -1167,27 +1185,44 @@ class TestConfigFunctions(unittest.TestCase):
         else:
             self.SkipTest("cannot set English money locale")
         try:
-            r = query("select '34.25'::money")
+            r = query(select_money)
         except pg.ProgrammingError:
             # this can happen if the currency signs cannot be
             # converted using the encoding of the test database
             self.skipTest('database does not support money')
+        pg.set_decimal_point(None)
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertIn(r, en_money)
+        r = query(select_money)
         pg.set_decimal_point('.')
         try:
             r = r.getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
-        self.assertEqual(r, d('34.25'))
-        r = query("select '34.25'::money")
+        self.assertEqual(r, proper_money)
+        r = query(select_money)
         pg.set_decimal_point(',')
         try:
             r = r.getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
-        self.assertNotEqual(r, d('34.25'))
+        self.assertIsInstance(r, d)
+        self.assertEqual(r, bad_money)
+        r = query(select_money)
+        pg.set_decimal_point('!')
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, d)
+        self.assertEqual(r, bad_money)
         # then try with German localization (using the comma)
-        for lc in 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8':
+        for lc in de_locales:
             try:
                 query("set lc_monetary='%s'" % lc)
             except pg.ProgrammingError:
@@ -1196,24 +1231,36 @@ class TestConfigFunctions(unittest.TestCase):
                 break
         else:
             self.SkipTest("cannot set German money locale")
+        r = query(select_money)
+        pg.set_decimal_point(None)
         try:
-            r = query("select '34,25'::money")
-        except pg.ProgrammingError:
-            self.skipTest('database does not support money')
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertIn(r, de_money)
+        r = query(select_money)
         pg.set_decimal_point(',')
         try:
             r = r.getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
-        self.assertEqual(r, d('34.25'))
-        r = query("select '34,25'::money")
+        self.assertEqual(r, proper_money)
+        r = query(select_money)
         pg.set_decimal_point('.')
         try:
             r = r.getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
-        self.assertNotEqual(r, d('34.25'))
+        self.assertEqual(r, bad_money)
+        r = query(select_money)
+        pg.set_decimal_point('!')
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertEqual(r, bad_money)
 
     def testSetDecimal(self):
         d = pg.Decimal

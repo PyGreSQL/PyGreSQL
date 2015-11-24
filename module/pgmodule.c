@@ -108,7 +108,7 @@ static PyObject *pg_default_passwd;	/* default password */
 
 static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL; /* function for getting named results */
-static char *decimal_point = "."; /* decimal point used in money values */
+static char decimal_point = '.'; /* decimal point used in money values */
 
 static int pg_encoding_utf8 = 0;
 static int pg_encoding_latin1 = 0;
@@ -3283,13 +3283,15 @@ queryGetResult(queryObject *self, PyObject *args)
 						break;
 
 					case 5:  /* money */
+						/* convert to decimal only if decimal point is set */
+						if (!decimal_point) goto default_case;
 						for (k = 0;
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
 							if (isdigit((int)*s))
 								cashbuf[k++] = *s;
-							else if (*s == *decimal_point)
+							else if (*s == decimal_point)
 								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
@@ -3317,6 +3319,7 @@ queryGetResult(queryObject *self, PyObject *args)
 						break;
 
 					default:
+					default_case:
 #if IS_PY3
 						if (encoding == pg_encoding_utf8)
 							val = PyUnicode_DecodeUTF8(s, strlen(s), "strict");
@@ -3431,14 +3434,17 @@ queryDictResult(queryObject *self, PyObject *args)
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:  /* money */
+					case 5:  /* pgmoney */
+						/* convert to decimal only if decimal point is set */
+						if (!decimal_point) goto default_case;
+
 						for (k = 0;
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
 							if (isdigit((int)*s))
 								cashbuf[k++] = *s;
-							else if (*s == *decimal_point)
+							else if (*s == decimal_point)
 								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
@@ -3466,6 +3472,7 @@ queryDictResult(queryObject *self, PyObject *args)
 						break;
 
 					default:
+					default_case:
 						val = PyStr_FromString(s);
 						break;
 				}
@@ -3789,13 +3796,24 @@ static PyObject *
 pgSetDecimalPoint(PyObject *self, PyObject * args)
 {
 	PyObject *ret = NULL;
-	char *s;
+	char *s = NULL;
 
-	if (PyArg_ParseTuple(args, "s", &s))
-	{
-		decimal_point = s;
-		Py_INCREF(Py_None); ret = Py_None;
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "z", &s)) {
+		if (!s)
+			s = "\0";
+		else if (*s && (*(s+1) || !ispunct(*s)))
+		 	s = NULL;
 	}
+
+	if (s) {
+		decimal_point = *s;
+		Py_INCREF(Py_None); ret = Py_None;
+	} else {
+		PyErr_SetString(PyExc_TypeError,
+			"set_decimal_point() takes a punctuation character");
+	}
+
 	return ret;
 }
 
@@ -3807,17 +3825,22 @@ static PyObject *
 pgGetDecimalPoint(PyObject *self, PyObject * args)
 {
 	PyObject *ret = NULL;
+	char s[2];
 
 	if (PyArg_ParseTuple(args, ""))
 	{
-		ret = PyStr_FromString(decimal_point);
+		if (decimal_point) {
+			s[0] = decimal_point; s[1] = '\0';
+			ret = PyStr_FromString(s);
+		} else {
+			Py_INCREF(Py_None); ret = Py_None;
+		}
 	}
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			" get_decimal_point() takes no parameter");
+			"get_decimal_point() takes no parameter");
 	}
-
 
 	return ret;
 }
