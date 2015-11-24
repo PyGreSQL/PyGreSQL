@@ -3289,14 +3289,14 @@ queryGetResult(queryObject *self, PyObject *args)
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit((int)*s))
+							if (*s >= '0' && *s <= '9')
 								cashbuf[k++] = *s;
 							else if (*s == decimal_point)
 								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
-						cashbuf[k] = 0;
+						cashbuf[k] = '\0';
 						s = cashbuf;
 
 					/* FALLTHROUGH */ /* no break */
@@ -3442,14 +3442,14 @@ queryDictResult(queryObject *self, PyObject *args)
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit((int)*s))
+							if (*s >= '0' && *s <= '9')
 								cashbuf[k++] = *s;
 							else if (*s == decimal_point)
 								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
 						}
-						cashbuf[k] = 0;
+						cashbuf[k] = '\0';
 						s = cashbuf;
 
 					/* FALLTHROUGH */ /* no break */
@@ -3802,7 +3802,7 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 	if (PyArg_ParseTuple(args, "z", &s)) {
 		if (!s)
 			s = "\0";
-		else if (*s && (*(s+1) || !ispunct((int)*s)))
+		else if (*s && (*(s+1) || !strchr(".,;: '*/_`|", *s)))
 		 	s = NULL;
 	}
 
@@ -3811,7 +3811,7 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 		Py_INCREF(Py_None); ret = Py_None;
 	} else {
 		PyErr_SetString(PyExc_TypeError,
-			"set_decimal_point() takes a punctuation character");
+			"set_decimal_point() expects a decimal mark character");
 	}
 
 	return ret;

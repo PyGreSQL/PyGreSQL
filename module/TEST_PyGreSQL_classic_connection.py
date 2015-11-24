@@ -1150,6 +1150,25 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_decimal_point(point)
         self.assertIsInstance(r, str)
         self.assertEqual(r, ',')
+        pg.set_decimal_point("'")
+        try:
+            r = pg.get_decimal_point()
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, "'")
+        pg.set_decimal_point('')
+        try:
+            r = pg.get_decimal_point()
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsNone(r)
+        pg.set_decimal_point(None)
+        try:
+            r = pg.get_decimal_point()
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsNone(r)
 
     def testSetDecimalPoint(self):
         d = pg.Decimal
@@ -1198,6 +1217,14 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertIn(r, en_money)
         r = query(select_money)
+        pg.set_decimal_point('')
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertIn(r, en_money)
+        r = query(select_money)
         pg.set_decimal_point('.')
         try:
             r = r.getresult()[0][0]
@@ -1214,7 +1241,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, d)
         self.assertEqual(r, bad_money)
         r = query(select_money)
-        pg.set_decimal_point('!')
+        pg.set_decimal_point("'")
         try:
             r = r.getresult()[0][0]
         finally:
@@ -1244,6 +1271,14 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertIn(r, de_money)
         r = query(select_money)
+        pg.set_decimal_point('')
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertIn(r, de_money)
+        r = query(select_money)
         pg.set_decimal_point(',')
         try:
             r = r.getresult()[0][0]
@@ -1259,7 +1294,7 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_decimal_point(point)
         self.assertEqual(r, bad_money)
         r = query(select_money)
-        pg.set_decimal_point('!')
+        pg.set_decimal_point("'")
         try:
             r = r.getresult()[0][0]
         finally:
