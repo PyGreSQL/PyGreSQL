@@ -3802,7 +3802,7 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 	if (PyArg_ParseTuple(args, "z", &s)) {
 		if (!s)
 			s = "\0";
-		else if (*s && (*(s+1) || !ispunct(*s)))
+		else if (*s && (*(s+1) || !ispunct((int)*s)))
 		 	s = NULL;
 	}
 
