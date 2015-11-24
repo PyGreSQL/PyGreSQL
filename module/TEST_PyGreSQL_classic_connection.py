@@ -1189,7 +1189,7 @@ class TestConfigFunctions(unittest.TestCase):
         except pg.ProgrammingError:
             # this can happen if the currency signs cannot be
             # converted using the encoding of the test database
-            self.skipTest('database does not support money')
+            self.skipTest("database does not support English money")
         pg.set_decimal_point(None)
         try:
             r = r.getresult()[0][0]
@@ -1231,7 +1231,11 @@ class TestConfigFunctions(unittest.TestCase):
                 break
         else:
             self.SkipTest("cannot set German money locale")
-        r = query(select_money)
+        select_money = select_money.replace('.', ',')
+        try:
+            r = query(select_money)
+        except pg.ProgrammingError:
+            self.skipTest("database does not support English money")
         pg.set_decimal_point(None)
         try:
             r = r.getresult()[0][0]
