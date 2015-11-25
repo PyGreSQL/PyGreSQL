@@ -196,7 +196,7 @@ class NotificationHandler(object):
         if not db:
             db = self.db
         if self.listening:
-            q = 'notify "%s"' % (stop and self.stop_event or self.event)
+            q = 'notify "%s"' % (self.stop_event if stop else self.event)
             if payload:
                 q += ", '%s'" % payload
             return db.query(q)
@@ -560,7 +560,7 @@ class DB(object):
         if isinstance(newpkey, dict):
             # make sure that all classes have a namespace
             self._pkeys = dict([
-                ('.' in cl and cl or 'public.' + cl, pkey)
+                (cl if '.' in cl else 'public.' + cl, pkey)
                 for cl, pkey in newpkey.items()])
             return self._pkeys
 
@@ -595,7 +595,7 @@ class DB(object):
                 self._pkeys.setdefault(cl, []).append(pkey)
             # (only) for composite primary keys, the values will be frozensets
             for cl, pkey in self._pkeys.items():
-                self._pkeys[cl] = len(pkey) > 1 and frozenset(pkey) or pkey[0]
+                self._pkeys[cl] = frozenset(pkey) if len(pkey) > 1 else pkey[0]
             self._do_debug(self._pkeys)
 
         # will raise an exception if primary key doesn't exist
@@ -773,7 +773,7 @@ class DB(object):
         if not res:
             raise _db_error('No such record in %s where %s' % (qcl, where))
         for att, value in res[0].items():
-            arg[att == 'oid' and qoid or att] = value
+            arg[qoid if att == 'oid' else att] = value
         return arg
 
     def insert(self, cl, d=None, **kw):
@@ -804,7 +804,7 @@ class DB(object):
         names, values = ', '.join(names), ', '.join(values)
         selectable = self.has_table_privilege(qcl)
         if selectable and self.server_version >= 80200:
-            ret = ' RETURNING %s*' % ('oid' in attnames and 'oid, ' or '')
+            ret = ' RETURNING %s*' % ('oid, ' if 'oid' in attnames else '')
         else:
             ret = ''
         q = 'INSERT INTO %s (%s) VALUES (%s)%s' % (qcl, names, values, ret)
@@ -813,7 +813,7 @@ class DB(object):
         if ret:
             res = res.dictresult()
             for att, value in res[0].items():
-                d[att == 'oid' and qoid or att] = value
+                d[qoid if att == 'oid' else att] = value
         elif isinstance(res, int):
             d[qoid] = res
             if selectable:
@@ -874,7 +874,7 @@ class DB(object):
         values = ', '.join(values)
         selectable = self.has_table_privilege(qcl)
         if selectable and self.server_version >= 880200:
-            ret = ' RETURNING %s*' % ('oid' in attnames and 'oid, ' or '')
+            ret = ' RETURNING %s*' % ('oid, ' if 'oid' in attnames else '')
         else:
             ret = ''
         q = 'UPDATE %s SET %s WHERE %s%s' % (qcl, values, where, ret)
@@ -883,7 +883,7 @@ class DB(object):
         if ret:
             res = res.dictresult()[0]
             for att, value in res.items():
-                d[att == 'oid' and qoid or att] = value
+                d[qoid if att == 'oid' else att] = value
         else:
             if selectable:
                 if qoid in d:

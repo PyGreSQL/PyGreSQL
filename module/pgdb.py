@@ -250,7 +250,7 @@ class pgdbCursor(object):
             pass
         elif isinstance(val, float):
             if isinf(val):
-                return val < 0 and "'-Infinity'" or "'Infinity'"
+                return "'-Infinity'" if val < 0 else "'Infinity'"
             elif isnan(val):
                 return "'NaN'"
         elif val is None:
