@@ -541,6 +541,167 @@ class TestSimpleQueries(unittest.TestCase):
         query("drop table test_table")
 
 
+class TestUnicodeQueries(unittest.TestCase):
+    """"Test unicode strings as queries via a basic pg connection."""
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query('set client_encoding=utf8')
+
+    def tearDown(self):
+        self.c.close()
+
+    def testGetresulAscii(self):
+        result = u'Hello, world!'
+        q = u"select '%s'" % result
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testDictresulAscii(self):
+        result = u'Hello, world!'
+        q = u"select '%s' as greeting" % result
+        v = self.c.query(q).dictresult()[0]['greeting']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testGetresultUtf8(self):
+        result = u'Hello, wörld & мир!'
+        q = u"select '%s'" % result
+        if not unicode_strings:
+            result = result.encode('utf8')
+        # pass the query as unicode
+        try:
+            v = self.c.query(q).getresult()[0][0]
+        except pg.ProgrammingError:
+            self.skipTest("database does not support utf8")
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('utf8')
+        # pass the query as bytes
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testDictresultUtf8(self):
+        result = u'Hello, wörld & мир!'
+        q = u"select '%s' as greeting" % result
+        if not unicode_strings:
+            result = result.encode('utf8')
+        try:
+            v = self.c.query(q).dictresult()[0]['greeting']
+        except pg.ProgrammingError:
+            self.skipTest("database does not support utf8")
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('utf8')
+        v = self.c.query(q).dictresult()[0]['greeting']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testDictresultLatin1(self):
+        try:
+            self.c.query('set client_encoding=latin1')
+        except pg.ProgrammingError:
+            self.skipTest("database does not support latin1")
+        result = u'Hello, wörld!'
+        q = u"select '%s'" % result
+        if not unicode_strings:
+            result = result.encode('latin1')
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('latin1')
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testDictresultLatin1(self):
+        try:
+            self.c.query('set client_encoding=latin1')
+        except pg.ProgrammingError:
+            self.skipTest("database does not support latin1")
+        result = u'Hello, wörld!'
+        q = u"select '%s' as greeting" % result
+        if not unicode_strings:
+            result = result.encode('latin1')
+        v = self.c.query(q).dictresult()[0]['greeting']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('latin1')
+        v = self.c.query(q).dictresult()[0]['greeting']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testGetresultCyrillic(self):
+        try:
+            self.c.query('set client_encoding=iso_8859_5')
+        except pg.ProgrammingError:
+            self.skipTest("database does not support cyrillic")
+        result = u'Hello, мир!'
+        q = u"select '%s'" % result
+        if not unicode_strings:
+            result = result.encode('cyrillic')
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('cyrillic')
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testDictresultCyrillic(self):
+        try:
+            self.c.query('set client_encoding=iso_8859_5')
+        except pg.ProgrammingError:
+            self.skipTest("database does not support cyrillic")
+        result = u'Hello, мир!'
+        q = u"select '%s' as greeting" % result
+        if not unicode_strings:
+            result = result.encode('cyrillic')
+        v = self.c.query(q).dictresult()[0]['greeting']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('cyrillic')
+        v = self.c.query(q).dictresult()[0]['greeting']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testGetresultLatin9(self):
+        try:
+            self.c.query('set client_encoding=latin9')
+        except pg.ProgrammingError:
+            self.skipTest("database does not support latin9")
+        result = u'smœrebrœd with pražská šunka (pay in ¢, £, €, or ¥)'
+        q = u"select '%s'" % result
+        if not unicode_strings:
+            result = result.encode('latin9')
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('latin9')
+        v = self.c.query(q).getresult()[0][0]
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+    def testDictresultLatin9(self):
+        try:
+            self.c.query('set client_encoding=latin9')
+        except pg.ProgrammingError:
+            self.skipTest("database does not support latin9")
+        result = u'smœrebrœd with pražská šunka (pay in ¢, £, €, or ¥)'
+        q = u"select '%s' as menu" % result
+        if not unicode_strings:
+            result = result.encode('latin9')
+        v = self.c.query(q).dictresult()[0]['menu']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+        q = q.encode('latin9')
+        v = self.c.query(q).dictresult()[0]['menu']
+        self.assertIsInstance(v, str)
+        self.assertEqual(v, result)
+
+
 class TestParamQueries(unittest.TestCase):
     """"Test queries with parameters via a basic pg connection."""
 
@@ -693,15 +854,6 @@ class TestParamQueries(unittest.TestCase):
         garbage = r"'\{}+()-#[]oo324"
         self.assertEqual(self.c.query("select $1::text AS garbage", (garbage,)
             ).dictresult(), [{'garbage': garbage}])
-
-    def testUnicodeQuery(self):
-        query = self.c.query
-        self.assertEqual(query(u"select 1+1").getresult(), [(2,)])
-        if unicode_strings:
-            self.assertEqual(query("select 'Hello, wörld!'").getresult(),
-                [('Hello, wörld!',)])
-        else:
-            self.assertRaises(TypeError, query, u"select 'Hello, wörld!'")
 
 
 class TestInserttable(unittest.TestCase):

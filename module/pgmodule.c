@@ -1073,8 +1073,9 @@ static char connQuery__doc__[] =
 static PyObject *
 connQuery(connObject *self, PyObject *args)
 {
-	char		*query;
+	PyObject	*query_obj;
 	PyObject	*oargs = NULL;
+	char		*query = NULL;
 	PGresult	*result;
 	queryObject *npgobj;
 	const char*	encoding_name=NULL;
@@ -1089,9 +1090,38 @@ connQuery(connObject *self, PyObject *args)
 	}
 
 	/* get query args */
-	if (!PyArg_ParseTuple(args, "s|O", &query, &oargs))
+	if (!PyArg_ParseTuple(args, "O|O", &query_obj, &oargs))
 	{
-		PyErr_SetString(PyExc_TypeError, "query(sql, [args]), with sql (string).");
+		return NULL;
+	}
+
+	encoding = PQclientEncoding(self->cnx);
+	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
+			&& encoding != pg_encoding_ascii)
+		/* should be translated to Python here */
+		encoding_name = pg_encoding_to_char(encoding);
+
+	if (PyBytes_Check(query_obj))
+	{
+		query = PyBytes_AsString(query_obj);
+	}
+	else if (PyUnicode_Check(query_obj))
+	{
+		if (encoding == pg_encoding_utf8)
+			query_obj = PyUnicode_AsUTF8String(query_obj);
+		else if (encoding == pg_encoding_latin1)
+			query_obj = PyUnicode_AsLatin1String(query_obj);
+		else if (encoding == pg_encoding_ascii)
+			query_obj = PyUnicode_AsASCIIString(query_obj);
+		else
+			query_obj = PyUnicode_AsEncodedString(query_obj,
+				encoding_name, "strict");
+		if (!query_obj) return NULL; /* pass the UnicodeEncodeError */
+		query = PyBytes_AsString(query_obj);
+	}
+	if (!query) {
+		PyErr_SetString(PyExc_TypeError,
+			"query command must be a string.");
 		return NULL;
 	}
 
@@ -1110,12 +1140,6 @@ connQuery(connObject *self, PyObject *args)
 
 		nparms = (int)PySequence_Size(oargs);
 	}
-
-	encoding = PQclientEncoding(self->cnx);
-	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
-			&& encoding != pg_encoding_ascii)
-		/* should be translated to Python here */
-		encoding_name = pg_encoding_to_char(encoding);
 
 	/* gets result */
 	if (nparms)
@@ -3285,6 +3309,7 @@ queryGetResult(queryObject *self, PyObject *args)
 					case 5:  /* money */
 						/* convert to decimal only if decimal point is set */
 						if (!decimal_point) goto default_case;
+
 						for (k = 0;
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
@@ -3376,6 +3401,10 @@ queryDictResult(queryObject *self, PyObject *args)
 				m,
 				n,
 			   *typ;
+#if IS_PY3
+	int			encoding;
+	const char *encoding_name=NULL;
+#endif
 
 	/* checks args (args == NULL for an internal call) */
 	if (args && !PyArg_ParseTuple(args, ""))
@@ -3384,6 +3413,14 @@ queryDictResult(queryObject *self, PyObject *args)
 			"method dictresult() takes no parameters.");
 		return NULL;
 	}
+
+#if IS_PY3
+	encoding = self->encoding;
+	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
+			&& encoding != pg_encoding_ascii)
+		/* should be translated to Python here */
+		encoding_name = pg_encoding_to_char(encoding);
+#endif
 
 	/* stores result in list */
 	m = PQntuples(self->result);
@@ -3434,7 +3471,7 @@ queryDictResult(queryObject *self, PyObject *args)
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:  /* pgmoney */
+					case 5:  /* money */
 						/* convert to decimal only if decimal point is set */
 						if (!decimal_point) goto default_case;
 
@@ -3473,7 +3510,21 @@ queryDictResult(queryObject *self, PyObject *args)
 
 					default:
 					default_case:
-						val = PyStr_FromString(s);
+#if IS_PY3
+						if (encoding == pg_encoding_utf8)
+							val = PyUnicode_DecodeUTF8(s, strlen(s), "strict");
+						else if (encoding == pg_encoding_latin1)
+							val = PyUnicode_DecodeLatin1(s, strlen(s), "strict");
+						else if (encoding == pg_encoding_ascii)
+							val = PyUnicode_DecodeASCII(s, strlen(s), "strict");
+						else
+							val = PyUnicode_Decode(s, strlen(s),
+								encoding_name, "strict");
+						if (!val)
+							val = PyBytes_FromString(s);
+#else
+						val = PyBytes_FromString(s);
+#endif
 						break;
 				}
 
