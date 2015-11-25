@@ -28,6 +28,8 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 # both that copyright notice and this permission notice appear in
 # supporting documentation.
 
+from __future__ import print_function
+
 from _pg import *
 
 import select

@@ -63,6 +63,8 @@ Basic usage:
 
 """
 
+from __future__ import print_function
+
 from _pg import *
 
 from datetime import date, time, datetime, timedelta

@@ -11,8 +11,6 @@ These tests need a database to test against.
 
 """
 
-from __future__ import print_function
-
 try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
