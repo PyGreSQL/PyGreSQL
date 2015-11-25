@@ -225,30 +225,28 @@ class NotificationHandler(object):
         self.listen()
         _ilist = [self.db.fileno()]
 
-        while True:
+        while self.listening:
             ilist, _olist, _elist = select.select(_ilist, [], [], self.timeout)
-            if ilist == []:  # we timed out
-                self.unlisten()
-                self.callback(None)
-                break
-            else:
-                notice = self.db.getnotify()
-                if notice is None:
-                    continue
-                event, pid, extra = notice
-                if event in (self.event, self.stop_event):
+            if ilist:
+                while self.listening:
+                    notice = self.db.getnotify()
+                    if not notice:  # no more messages
+                        break
+                    event, pid, extra = notice
+                    if event not in (self.event, self.stop_event):
+                        self.unlisten()
+                        raise _db_error(
+                            'listening for "%s" and "%s", but notified of "%s"'
+                            % (self.event, self.stop_event, event))
+                    if event == self.stop_event:
+                        self.unlisten()
                     self.arg_dict['pid'] = pid
                     self.arg_dict['event'] = event
                     self.arg_dict['extra'] = extra
                     self.callback(self.arg_dict)
-                    if event == self.stop_event:
-                        self.unlisten()
-                        break
-                else:
-                    self.unlisten()
-                    raise _db_error(
-                        'listening for "%s" and "%s", but notified of "%s"'
-                        % (self.event, self.stop_event, event))
+            else:   # we timed out
+                self.unlisten()
+                self.callback(None)
 
 
 def pgnotify(*args, **kw):
