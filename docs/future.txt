@@ -10,7 +10,6 @@ To Do
 -----
 
 - Add docs for the pgdb module (everything specific to PyGreSQL) (#5).
-- The large object and direct access functions need much more attention (#6).
 - The fetch method should use real cursors (#7).
 - The C module needs to be cleaned up and redundant code merged,
   and should get its own unit test module (#8).
