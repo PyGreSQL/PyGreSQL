@@ -934,22 +934,49 @@ class TestConfigFunctions(unittest.TestCase):
         # if and only if the decimal point is set appropriately
         # for the current lc_monetary setting
         query("set lc_monetary='en_US.UTF-8'")
+        pg.set_decimal_point(None)
+        try:
+            r = query("select '34.25'::money").getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertIn(r, (
+            '$34.25', '$ 34.25', '34.25$', '34.25 $', '34.25 Dollar'))
         pg.set_decimal_point('.')
-        r = query("select '34.25'::money").getresult()[0][0]
+        try:
+            r = query("select '34.25'::money").getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
         self.assertEqual(r, d('34.25'))
         pg.set_decimal_point(',')
-        r = query("select '34.25'::money").getresult()[0][0]
+        try:
+            r = query("select '34.25'::money").getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
         self.assertNotEqual(r, d('34.25'))
         query("set lc_monetary='de_DE.UTF-8'")
+        pg.set_decimal_point(None)
+        try:
+            r = query("select '34,25'::money").getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
+        self.assertIsInstance(r, str)
+        self.assertIn(r, ('34,25€', '34,25 €', '€34,25' '€ 34,25',
+            '34,25 EUR', '34,25 Euro', '34,25 DM'))
         pg.set_decimal_point(',')
-        r = query("select '34,25'::money").getresult()[0][0]
+        try:
+            r = query("select '34,25'::money").getresult()[0][0]
+        finally:
+            pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
         self.assertEqual(r, d('34.25'))
-        pg.set_decimal_point('.')
+        try:
+            pg.set_decimal_point('.')
+        finally:
+            pg.set_decimal_point(point)
         r = query("select '34,25'::money").getresult()[0][0]
         self.assertNotEqual(r, d('34.25'))
-        pg.set_decimal_point(point)
 
     def testSetDecimal(self):
         d = pg.Decimal
@@ -958,11 +985,13 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, d)
         self.assertEqual(r, d('3425'))
         pg.set_decimal(long)
-        r = query("select 3425::numeric").getresult()[0][0]
+        try:
+            r = query("select 3425::numeric").getresult()[0][0]
+        finally:
+            pg.set_decimal(d)
         self.assertNotIsInstance(r, d)
         self.assertIsInstance(r, long)
         self.assertEqual(r, 3425L)
-        pg.set_decimal(d)
 
     @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testSetNamedresult(self):

@@ -119,7 +119,7 @@ int *get_type_array(PGresult *result, int nfields);
 
 static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL; /* function for getting named results */
-static char *decimal_point = "."; /* decimal point used in money values */
+static char decimal_point = '.'; /* decimal point used in money values */
 
 
 /* --------------------------------------------------------------------- */
@@ -2170,13 +2170,15 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						break;
 
 					case 5:  /* money */
+						/* convert to decimal only if decimal point is set */
+						if (!decimal_point) goto default_case;
 						for (k = 0;
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s))
+							if (*s >= '0' && *s <= '9')
 								cashbuf[k++] = *s;
-							else if (*s == *decimal_point)
+							else if (*s == decimal_point)
 								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
@@ -2200,6 +2202,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						break;
 
 					default:
+					default_case:
 						val = PyString_FromString(s);
 						break;
 				}
@@ -2297,13 +2300,16 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						break;
 
 					case 5:  /* money */
+						/* convert to decimal only if decimal point is set */
+						if (!decimal_point) goto default_case;
+
 						for (k = 0;
 							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
 							 s++)
 						{
-							if (isdigit(*s))
+							if (*s >= '0' && *s <= '9')
 								cashbuf[k++] = *s;
-							else if (*s == *decimal_point)
+							else if (*s == decimal_point)
 								cashbuf[k++] = '.';
 							else if (*s == '(' || *s == '-')
 								cashbuf[k++] = '-';
@@ -2327,6 +2333,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						break;
 
 					default:
+					default_case:
 						val = PyString_FromString(s);
 						break;
 				}
@@ -3701,13 +3708,24 @@ static PyObject *
 set_decimal_point(PyObject *self, PyObject * args)
 {
 	PyObject *ret = NULL;
-	char *s;
+	char *s = NULL;
 
-	if (PyArg_ParseTuple(args, "s", &s))
-	{
-		decimal_point = s;
-		Py_INCREF(Py_None); ret = Py_None;
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "z", &s)) {
+		if (!s)
+			s = "\0";
+		else if (*s && (*(s+1) || !strchr(".,;: '*/_`|", *s)))
+		 	s = NULL;
 	}
+
+	if (s) {
+		decimal_point = *s;
+		Py_INCREF(Py_None); ret = Py_None;
+	} else {
+		PyErr_SetString(PyExc_TypeError,
+			"set_decimal_point() expects a decimal mark character");
+	}
+
 	return ret;
 }
 
@@ -3719,17 +3737,22 @@ static PyObject *
 get_decimal_point(PyObject *self, PyObject * args)
 {
 	PyObject *ret = NULL;
+	char s[2];
 
 	if (PyArg_ParseTuple(args, ""))
 	{
-		ret = PyString_FromString(decimal_point);
+		if (decimal_point) {
+			s[0] = decimal_point; s[1] = '\0';
+			ret = PyString_FromString(s);
+		} else {
+			Py_INCREF(Py_None); ret = Py_None;
+		}
 	}
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			" get_decimal_point() takes no parameter");
+			"get_decimal_point() takes no parameter");
 	}
-
 
 	return ret;
 }
