@@ -255,25 +255,29 @@ class TestHasConnect(unittest.TestCase):
 
 
 class TestEscapeFunctions(unittest.TestCase):
-    """"Test pg escape and unescape functions."""
+    """Test pg escape and unescape functions.
+
+    The libpq interface memorizes some parameters of the last opened
+    connection that influence the result of these functions.
+    Therefore we cannot do rigid tests of these functions here.
+    We leave this for the test module that runs with a database.
+
+    """
 
     def testEscapeString(self):
         f = pg.escape_string
         self.assertEqual(f('plain'), 'plain')
-        self.assertEqual(f("that's k\xe4se"), "that''s k\xe4se")
-        self.assertEqual(f(r"It's fine to have a \ inside."),
-            r"It''s fine to have a \\ inside.")
+        self.assertEqual(f("that's cheese"), "that''s cheese")
 
     def testEscapeBytea(self):
         f = pg.escape_bytea
         self.assertEqual(f('plain'), 'plain')
-        self.assertEqual(f("that's k\xe4se"), "that''s k\\\\344se")
-        self.assertEqual(f('O\x00ps\xff!'), r'O\\000ps\\377!')
+        self.assertEqual(f("that's cheese"), "that''s cheese")
 
     def testUnescapeBytea(self):
         f = pg.unescape_bytea
         self.assertEqual(f('plain'), 'plain')
-        self.assertEqual(f("that's k\\344se"), "that's k\xe4se")
+        self.assertEqual(f("das is' k\\303\\244se"), "das is' käse")
         self.assertEqual(f(r'O\000ps\377!'), 'O\x00ps\xff!')
 
 
