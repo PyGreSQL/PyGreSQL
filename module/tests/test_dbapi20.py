@@ -3,8 +3,10 @@
 # $Id$
 
 import unittest
-import dbapi20
+
 import pgdb
+
+from . import dbapi20
 
 # We need a database to test against.
 # If LOCAL_PyGreSQL.py exists we will get our information from that.
@@ -13,7 +15,7 @@ dbname = 'dbapi20_test'
 dbhost = ''
 dbport = 5432
 try:
-    from LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *
 except ImportError:
     pass
 

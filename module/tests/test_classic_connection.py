@@ -33,7 +33,7 @@ dbhost = None
 dbport = 5432
 
 try:
-    from LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *
 except ImportError:
     pass
 

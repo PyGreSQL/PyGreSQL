@@ -31,7 +31,7 @@ dbport = 5432
 debug = False  # let DB wrapper print debugging output
 
 try:
-    from LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *
 except ImportError:
     pass
 
