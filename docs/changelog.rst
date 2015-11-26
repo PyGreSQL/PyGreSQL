@@ -3,6 +3,12 @@ ChangeLog
 
 Version 4.2
 -----------
+- Set a better default for the user option "escaping-funcs".
+- Greatly improve unit testing.
+- Force build to compile with no errors.
+- Fix decimal point handling
+- Add option to return money as string
+- Fix notification handler (Thanks Patrick TJ McPhee).
 
 Version 4.1.1 (2013-01-08)
 --------------------------
