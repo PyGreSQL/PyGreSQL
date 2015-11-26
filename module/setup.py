@@ -178,6 +178,7 @@ setup(
         libraries=libraries, extra_compile_args=extra_compile_args)],
     zip_safe=False,
     cmdclass=dict(build_ext=build_pg_ext),
+    test_suite='tests.discover',
     classifiers=[
         "Development Status :: 6 - Mature",
         "Intended Audience :: Developers",
