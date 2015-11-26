@@ -1459,25 +1459,41 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_decimal_point(point)
         self.assertEqual(r, bad_money)
 
+    def testGetDecimal(self):
+        decimal_class = pg.get_decimal()
+        # error if a parameter is passed
+        self.assertRaises(TypeError, pg.get_decimal, decimal_class)
+        self.assertIs(decimal_class, pg.Decimal)  # the default setting
+        pg.set_decimal(int)
+        try:
+            r = pg.get_decimal()
+        finally:
+            pg.set_decimal(decimal_class)
+        self.assertIs(r, int)
+        r = pg.get_decimal()
+        self.assertIs(r, decimal_class)
+
     def testSetDecimal(self):
-        d = pg.Decimal
+        decimal_class = pg.get_decimal()
+        # error if no parameter is passed
+        self.assertRaises(TypeError, pg.set_decimal)
         query = self.c.query
         try:
             r = query("select 3425::numeric")
         except pg.ProgrammingError:
             self.skipTest('database does not support numeric')
         r = r.getresult()[0][0]
-        self.assertIsInstance(r, d)
-        self.assertEqual(r, d('3425'))
+        self.assertIsInstance(r, decimal_class)
+        self.assertEqual(r, decimal_class('3425'))
         r = query("select 3425::numeric")
-        pg.set_decimal(long)
+        pg.set_decimal(int)
         try:
             r = r.getresult()[0][0]
         finally:
-            pg.set_decimal(d)
-        self.assertNotIsInstance(r, d)
-        self.assertIsInstance(r, long)
-        self.assertEqual(r, long(3425))
+            pg.set_decimal(decimal_class)
+        self.assertNotIsInstance(r, decimal_class)
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, int(3425))
 
     def testGetBool(self):
         use_bool = pg.get_bool()
@@ -1516,6 +1532,8 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testSetBool(self):
         use_bool = pg.get_bool()
+        # error if no parameter is passed
+        self.assertRaises(TypeError, pg.set_bool)
         query = self.c.query
         try:
             r = query("select true::bool")
@@ -1541,7 +1559,16 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertIs(r, 't')
 
+    def testGetBool(self):
+        namedresult = pg.get_namedresult()
+        # error if a parameter is passed
+        self.assertRaises(TypeError, pg.get_namedresult, namedresult)
+        self.assertIs(namedresult, pg._namedresult)  # the default setting
+
     def testSetNamedresult(self):
+        namedresult = pg.get_namedresult()
+        self.assertTrue(callable(namedresult))
+
         query = self.c.query
 
         r = query("select 1 as x, 2 as y").namedresult()[0]
@@ -1552,24 +1579,13 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
         self.assertEqual(r.__class__.__name__, 'Row')
 
-        _namedresult = pg._namedresult
-        self.assertTrue(callable(_namedresult))
-        pg.set_namedresult(_namedresult)
-
-        r = query("select 1 as x, 2 as y").namedresult()[0]
-        self.assertIsInstance(r, tuple)
-        self.assertEqual(r, (1, 2))
-        self.assertIsNot(type(r), tuple)
-        self.assertEqual(r._fields, ('x', 'y'))
-        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
-        self.assertEqual(r.__class__.__name__, 'Row')
-
-        def _listresult(q):
+        def listresult(q):
             return [list(row) for row in q.getresult()]
 
-        pg.set_namedresult(_listresult)
-
+        pg.set_namedresult(listresult)
         try:
+            r = pg.get_namedresult()
+            self.assertIs(r, listresult)
             r = query("select 1 as x, 2 as y").namedresult()[0]
             self.assertIsInstance(r, list)
             self.assertEqual(r, [1, 2])
@@ -1577,7 +1593,10 @@ class TestConfigFunctions(unittest.TestCase):
             self.assertFalse(hasattr(r, '_fields'))
             self.assertNotEqual(r.__class__.__name__, 'Row')
         finally:
-            pg.set_namedresult(_namedresult)
+            pg.set_namedresult(namedresult)
+
+        r = pg.get_namedresult()
+        self.assertIs(r, namedresult)
 
 
 class TestStandaloneEscapeFunctions(unittest.TestCase):

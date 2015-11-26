@@ -4054,37 +4054,6 @@ static PyObject
 	return to_obj;
 }
 
-/* set decimal point */
-static char pgSetDecimalPoint__doc__[] =
-"set_decimal_point() -- set decimal point to be used for money values.";
-
-static PyObject *
-pgSetDecimalPoint(PyObject *self, PyObject * args)
-{
-	PyObject *ret = NULL;
-	char *s = NULL;
-
-	/* gets arguments */
-	if (PyArg_ParseTuple(args, "z", &s))
-	{
-		if (!s)
-			s = "\0";
-		else if (*s && (*(s+1) || !strchr(".,;: '*/_`|", *s)))
-		 	s = NULL;
-	}
-
-	if (s)
-	{
-		decimal_point = *s;
-		Py_INCREF(Py_None); ret = Py_None;
-	} else {
-		PyErr_SetString(PyExc_TypeError,
-			"set_decimal_point() expects a decimal mark character");
-	}
-
-	return ret;
-}
-
 /* get decimal point */
 static char pgGetDecimalPoint__doc__[] =
 "get_decimal_point() -- get decimal point to be used for money values.";
@@ -4114,7 +4083,56 @@ pgGetDecimalPoint(PyObject *self, PyObject * args)
 	return ret;
 }
 
-/* set decimal */
+/* set decimal point */
+static char pgSetDecimalPoint__doc__[] =
+"set_decimal_point(char) -- set decimal point to be used for money values.";
+
+static PyObject *
+pgSetDecimalPoint(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	char *s = NULL;
+
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "z", &s))
+	{
+		if (!s)
+			s = "\0";
+		else if (*s && (*(s+1) || !strchr(".,;: '*/_`|", *s)))
+		 	s = NULL;
+	}
+
+	if (s)
+	{
+		decimal_point = *s;
+		Py_INCREF(Py_None); ret = Py_None;
+	} else {
+		PyErr_SetString(PyExc_TypeError,
+			"set_decimal_point() expects a decimal mark character");
+	}
+
+	return ret;
+}
+
+/* get decimal type */
+static char pgGetDecimal__doc__[] =
+"get_decimal() -- set a decimal type to be used for numeric values.";
+
+static PyObject *
+pgGetDecimal(PyObject *self, PyObject *args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = decimal ? decimal : Py_None;
+		Py_INCREF(ret);
+	}
+
+	return ret;
+}
+
+/* set decimal type */
 static char pgSetDecimal__doc__[] =
 "set_decimal(cls) -- set a decimal type to be used for numeric values.";
 
@@ -4140,30 +4158,11 @@ pgSetDecimal(PyObject *self, PyObject *args)
 			PyErr_SetString(PyExc_TypeError,
 				"decimal type must be None or callable");
 	}
-	return ret;
-}
-
-/* set usage of bool values */
-static char pgSetBool__doc__[] =
-"set_bool() -- set whether boolean values should be converted to bool.";
-
-static PyObject *
-pgSetBool(PyObject *self, PyObject * args)
-{
-	PyObject *ret = NULL;
-	int			i;
-
-	/* gets arguments */
-	if (PyArg_ParseTuple(args, "i", &i))
-	{
-		use_bool = i ? 1 : 0;
-		Py_INCREF(Py_None); ret = Py_None;
-	}
 
 	return ret;
 }
 
-/* ge usage of bool values */
+/* get usage of bool values */
 static char pgGetBool__doc__[] =
 "get_bool() -- check whether boolean values are converted to bool.";
 
@@ -4181,7 +4180,45 @@ pgGetBool(PyObject *self, PyObject * args)
 	return ret;
 }
 
-/* set named result */
+/* set usage of bool values */
+static char pgSetBool__doc__[] =
+"set_bool(bool) -- set whether boolean values should be converted to bool.";
+
+static PyObject *
+pgSetBool(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	int			i;
+
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "i", &i))
+	{
+		use_bool = i ? 1 : 0;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+
+	return ret;
+}
+
+/* get named result factory */
+static char pgGetNamedresult__doc__[] =
+"get_namedresult(cls) -- get the function used for getting named results.";
+
+static PyObject *
+pgGetNamedresult(PyObject *self, PyObject *args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = namedresult ? namedresult : Py_None;
+		Py_INCREF(ret);
+	}
+
+	return ret;
+}
+
+/* set named result factory */
 static char pgSetNamedresult__doc__[] =
 "set_namedresult(cls) -- set a function to be used for getting named results.";
 
@@ -4201,6 +4238,7 @@ pgSetNamedresult(PyObject *self, PyObject *args)
 		else
 			PyErr_SetString(PyExc_TypeError, "parameter must be callable");
 	}
+
 	return ret;
 }
 
@@ -4556,14 +4594,18 @@ static struct PyMethodDef pgMethods[] = {
 			pgEscapeBytea__doc__},
 	{"unescape_bytea", (PyCFunction) pgUnescapeBytea, METH_VARARGS,
 			pgUnescapeBytea__doc__},
-	{"set_decimal_point", (PyCFunction) pgSetDecimalPoint, METH_VARARGS,
-			pgSetDecimalPoint__doc__},
 	{"get_decimal_point", (PyCFunction) pgGetDecimalPoint, METH_VARARGS,
 			pgGetDecimalPoint__doc__},
+	{"set_decimal_point", (PyCFunction) pgSetDecimalPoint, METH_VARARGS,
+			pgSetDecimalPoint__doc__},
+	{"get_decimal", (PyCFunction) pgGetDecimal, METH_VARARGS,
+			pgGetDecimal__doc__},
 	{"set_decimal", (PyCFunction) pgSetDecimal, METH_VARARGS,
 			pgSetDecimal__doc__},
-	{"set_bool", (PyCFunction) pgSetBool, METH_VARARGS, pgSetBool__doc__},
 	{"get_bool", (PyCFunction) pgGetBool, METH_VARARGS, pgGetBool__doc__},
+	{"set_bool", (PyCFunction) pgSetBool, METH_VARARGS, pgSetBool__doc__},
+	{"get_namedresult", (PyCFunction) pgGetNamedresult, METH_VARARGS,
+			pgGetNamedresult__doc__},
 	{"set_namedresult", (PyCFunction) pgSetNamedresult, METH_VARARGS,
 			pgSetNamedresult__doc__},
 

@@ -338,11 +338,22 @@ class TestConfigFunctions(unittest.TestCase):
         pg.set_decimal_point(point)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '*')
+        r = pg.get_decimal_point()
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, point)
+
+    def testGetDecimal(self):
+        r = pg.get_decimal()
+        self.assertIs(r, pg.Decimal)
 
     def testSetDecimal(self):
         decimal_class = pg.Decimal
-        pg.set_decimal(long)
+        pg.set_decimal(int)
+        r = pg.get_decimal()
         pg.set_decimal(decimal_class)
+        self.assertIs(r, int)
+        r = pg.get_decimal()
+        self.assertIs(r, decimal_class)
 
     def testGetBool(self):
         r = pg.get_bool()
@@ -361,10 +372,23 @@ class TestConfigFunctions(unittest.TestCase):
         pg.set_bool(use_bool)
         self.assertIsInstance(r, bool)
         self.assertIs(r, False)
+        r = pg.get_bool()
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, use_bool)
+
+    def testGetNamedresult(self):
+        r = pg.get_namedresult()
+        self.assertIs(r, pg._namedresult)
 
     def testSetNamedresult(self):
-        pg.set_namedresult(lambda q: q.getresult())
-        pg.set_namedresult(pg._namedresult)
+        namedresult = pg.get_namedresult()
+        f = lambda q: q.getresult()
+        pg.set_namedresult(f)
+        r = pg.get_namedresult()
+        pg.set_namedresult(namedresult)
+        self.assertIs(r, f)
+        r = pg.get_namedresult()
+        self.assertIs(r, namedresult)
 
 
 class TestModuleConstants(unittest.TestCase):
