@@ -335,14 +335,32 @@ class TestConfigFunctions(unittest.TestCase):
         point = pg.get_decimal_point()
         pg.set_decimal_point('*')
         r = pg.get_decimal_point()
+        pg.set_decimal_point(point)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '*')
-        pg.set_decimal_point(point)
 
     def testSetDecimal(self):
         decimal_class = pg.Decimal
         pg.set_decimal(long)
         pg.set_decimal(decimal_class)
+
+    def testGetBool(self):
+        r = pg.get_bool()
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, False)
+
+    def testSetBoool(self):
+        use_bool = pg.get_bool()
+        pg.set_bool(True)
+        r = pg.get_bool()
+        pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
+        pg.set_bool(False)
+        r = pg.get_bool()
+        pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, False)
 
     def testSetNamedresult(self):
         pg.set_namedresult(lambda q: q.getresult())

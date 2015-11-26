@@ -109,6 +109,7 @@ static PyObject *pg_default_passwd;	/* default password */
 static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL; /* function for getting named results */
 static char decimal_point = '.'; /* decimal point used in money values */
+static int use_bool = 0; /* whether or not bool objects shall be returned */
 
 static int pg_encoding_utf8 = 0;
 static int pg_encoding_latin1 = 0;
@@ -207,7 +208,8 @@ typedef struct
 #define PYGRES_FLOAT 3
 #define PYGRES_DECIMAL 4
 #define PYGRES_MONEY 5
-#define PYGRES_DEFAULT 6
+#define PYGRES_BOOL 6
+#define PYGRES_DEFAULT 7
 
 /* --------------------------------------------------------------------- */
 /* Internal Functions													 */
@@ -281,6 +283,10 @@ get_type_array(PGresult *result, int nfields)
 
 			case CASHOID:
 				typ[j] = PYGRES_MONEY;
+				break;
+
+			case BOOLOID:
+				typ[j] = PYGRES_BOOL;
 				break;
 
 			default:
@@ -3459,8 +3465,8 @@ queryGetResult(queryObject *self, PyObject *args)
 						}
 						cashbuf[k] = '\0';
 						s = cashbuf;
+						/* FALLTHROUGH */ /* no break here */
 
-					/* FALLTHROUGH */ /* no break */
 					case PYGRES_DECIMAL:
 						if (decimal)
 						{
@@ -3478,6 +3484,16 @@ queryGetResult(queryObject *self, PyObject *args)
 						}
 						Py_DECREF(tmp_obj);
 						break;
+
+					case PYGRES_BOOL:
+						/* convert to bool only if bool_type is set */
+						if (use_bool)
+						{
+							val = *s == 't' ? Py_True : Py_False;
+							Py_INCREF(val);
+							break;
+						}
+						/* FALLTHROUGH */ /* no break here */
 
 					default:
 					default_case:
@@ -3620,8 +3636,8 @@ queryDictResult(queryObject *self, PyObject *args)
 						}
 						cashbuf[k] = '\0';
 						s = cashbuf;
+						/* FALLTHROUGH */ /* no break here */
 
-					/* FALLTHROUGH */ /* no break */
 					case PYGRES_DECIMAL:
 						if (decimal)
 						{
@@ -3639,6 +3655,16 @@ queryDictResult(queryObject *self, PyObject *args)
 						}
 						Py_DECREF(tmp_obj);
 						break;
+
+					case PYGRES_BOOL:
+						/* convert to bool only if bool_type is set */
+						if (use_bool)
+						{
+							val = *s == 't' ? Py_True : Py_False;
+							Py_INCREF(val);
+							break;
+						}
+						/* FALLTHROUGH */ /* no break here */
 
 					default:
 					default_case:
@@ -4111,8 +4137,47 @@ pgSetDecimal(PyObject *self, PyObject *args)
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
-			PyErr_SetString(PyExc_TypeError, "decimal type must be None or callable");
+			PyErr_SetString(PyExc_TypeError,
+				"decimal type must be None or callable");
 	}
+	return ret;
+}
+
+/* set usage of bool values */
+static char pgSetBool__doc__[] =
+"set_bool() -- set whether boolean values should be converted to bool.";
+
+static PyObject *
+pgSetBool(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	int			i;
+
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "i", &i))
+	{
+		use_bool = i ? 1 : 0;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+
+	return ret;
+}
+
+/* ge usage of bool values */
+static char pgGetBool__doc__[] =
+"get_bool() -- check whether boolean values are converted to bool.";
+
+static PyObject *
+pgGetBool(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = use_bool ? Py_True : Py_False;
+		Py_INCREF(ret);
+	}
+
 	return ret;
 }
 
@@ -4497,6 +4562,8 @@ static struct PyMethodDef pgMethods[] = {
 			pgGetDecimalPoint__doc__},
 	{"set_decimal", (PyCFunction) pgSetDecimal, METH_VARARGS,
 			pgSetDecimal__doc__},
+	{"set_bool", (PyCFunction) pgSetBool, METH_VARARGS, pgSetBool__doc__},
+	{"get_bool", (PyCFunction) pgGetBool, METH_VARARGS, pgGetBool__doc__},
 	{"set_namedresult", (PyCFunction) pgSetNamedresult, METH_VARARGS,
 			pgSetNamedresult__doc__},
 

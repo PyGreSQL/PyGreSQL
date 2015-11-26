@@ -718,26 +718,34 @@ class TestParamQueries(unittest.TestCase):
         self.assertEqual(self.c.query("select $1::text", [None]
             ).getresult(), [(None,)])
 
-    def testQueryWithBoolParams(self):
+    def testQueryWithBoolParams(self, use_bool=None):
         query = self.c.query
-        self.assertEqual(query("select false").getresult(), [('f',)])
-        self.assertEqual(query("select true").getresult(), [('t',)])
-        self.assertEqual(query("select $1::bool", (None,)).getresult(),
-            [(None,)])
-        self.assertEqual(query("select $1::bool", ('f',)).getresult(), [('f',)])
-        self.assertEqual(query("select $1::bool", ('t',)).getresult(), [('t',)])
-        self.assertEqual(query("select $1::bool", ('false',)).getresult(),
-            [('f',)])
-        self.assertEqual(query("select $1::bool", ('true',)).getresult(),
-            [('t',)])
-        self.assertEqual(query("select $1::bool", ('n',)).getresult(), [('f',)])
-        self.assertEqual(query("select $1::bool", ('y',)).getresult(), [('t',)])
-        self.assertEqual(query("select $1::bool", (0,)).getresult(), [('f',)])
-        self.assertEqual(query("select $1::bool", (1,)).getresult(), [('t',)])
-        self.assertEqual(query("select $1::bool", (False,)).getresult(),
-            [('f',)])
-        self.assertEqual(query("select $1::bool", (True,)).getresult(),
-            [('t',)])
+        if use_bool is not None:
+            use_bool_default = pg.get_bool()
+            pg.set_bool(use_bool)
+        try:
+            v_false, v_true = (False, True) if use_bool else 'ft'
+            r_false, r_true = [(v_false,)], [(v_true,)]
+            self.assertEqual(query("select false").getresult(), r_false)
+            self.assertEqual(query("select true").getresult(), r_true)
+            q = "select $1::bool"
+            self.assertEqual(query(q, (None,)).getresult(), [(None,)])
+            self.assertEqual(query(q, ('f',)).getresult(), r_false)
+            self.assertEqual(query(q, ('t',)).getresult(), r_true)
+            self.assertEqual(query(q, ('false',)).getresult(), r_false)
+            self.assertEqual(query(q, ('true',)).getresult(), r_true)
+            self.assertEqual(query(q, ('n',)).getresult(), r_false)
+            self.assertEqual(query(q, ('y',)).getresult(), r_true)
+            self.assertEqual(query(q, (0,)).getresult(), r_false)
+            self.assertEqual(query(q, (1,)).getresult(), r_true)
+            self.assertEqual(query(q, (False,)).getresult(), r_false)
+            self.assertEqual(query(q, (True,)).getresult(), r_true)
+        finally:
+            if use_bool is not None:
+                pg.set_bool(use_bool_default)
+
+    def testQueryWithBoolParamsAndUseBool(self):
+        self.testQueryWithBoolParams(use_bool=True)
 
     def testQueryWithIntParams(self):
         query = self.c.query
@@ -1470,6 +1478,68 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertNotIsInstance(r, d)
         self.assertIsInstance(r, long)
         self.assertEqual(r, long(3425))
+
+    def testGetBool(self):
+        use_bool = pg.get_bool()
+        # error if a parameter is passed
+        self.assertRaises(TypeError, pg.get_bool, use_bool)
+        self.assertIsInstance(use_bool, bool)
+        self.assertIs(use_bool, False)  # the default setting
+        pg.set_bool(True)
+        try:
+            r = pg.get_bool()
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
+        pg.set_bool(False)
+        try:
+            r = pg.get_bool()
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, False)
+        pg.set_bool(1)
+        try:
+            r = pg.get_bool()
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
+        pg.set_bool(0)
+        try:
+            r = pg.get_bool()
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, False)
+
+    def testSetBool(self):
+        use_bool = pg.get_bool()
+        query = self.c.query
+        try:
+            r = query("select true::bool")
+        except pg.ProgrammingError:
+            self.skipTest('database does not support bool')
+        r = r.getresult()[0][0]
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, 't')
+        r = query("select true::bool")
+        pg.set_bool(True)
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
+        r = query("select true::bool")
+        pg.set_bool(False)
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, str)
+        self.assertIs(r, 't')
 
     def testSetNamedresult(self):
         query = self.c.query
