@@ -1,10 +1,8 @@
-==================
-PyGreSQL ChangeLog
-==================
+ChangeLog
+=========
 
 Version 4.2
 -----------
-
 - Set a better default for the user option "escaping-funcs".
 - Greatly improve unit testing.
 - Force build to compile with no errors.
@@ -49,7 +47,7 @@ Version 4.1 (2013-01-01)
 - The getnotify() method can now also return payload strings (#15).
 - Better support for notice processing with the new methods
   set_notice_receiver() and get_notice_receiver()
-  (as suggested by Michael Filonenko, see #12 and #37).
+  (as suggested by Michael Filonenko, see #37).
 - Open transactions are rolled back when pgdb connections are closed
   (as suggested by Peter Harris, see #46).
 - Connections and cursors can now be used with the "with" statement
@@ -61,7 +59,6 @@ Version 4.1 (2013-01-01)
 Version 4.0 (2009-01-01)
 ------------------------
 - Dropped support for Python below 2.3 and PostgreSQL below 7.4.
-- Added support for Python up to 2.6 and PostgreSQL up to 8.3.
 - Improved performance of fetchall() for large result sets
   by speeding up the type casts (as suggested by Peter Schuller).
 - Exposed exceptions as attributes of the connection object.

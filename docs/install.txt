@@ -1,13 +1,8 @@
-=====================
-PyGreSQL Installation
-=====================
-
-.. sectnum::
-.. contents:: Contents
-
+Installation
+============
 
 General
-=======
+-------
 
 You must first have installed Python and PostgreSQL on your system.
 If you want to access remote database only, you don't need to install
@@ -26,7 +21,7 @@ directory. To uninstall PyGreSQL, simply remove these three files again.
 
 
 Installing from a Binary Distribution
-=====================================
+-------------------------------------
 
 This is the easiest way to install PyGreSQL.
 
@@ -40,7 +35,7 @@ Note that the documentation is currently only included in the source package.
 
 
 Installing from Source
-======================
+----------------------
 
 If you want to install PyGreSQL from Source, or there is no binary
 package available for your platform, follow these instructions.

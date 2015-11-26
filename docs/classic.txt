@@ -589,7 +589,7 @@ Exceptions raised:
   :TypeError: invalid connection
 
 Description:
-  This methods try to get a notify from the server (from the SQL statement
+  This method tries to get a notify from the server (from the SQL statement
   NOTIFY). If the server returns no notify, the methods returns None.
   Otherwise, it returns a tuple (triplet) `(relname, pid, extra)`, where
   `relname` is the name of the notify, `pid` is the process id of the
@@ -813,7 +813,7 @@ Exceptions raised:
 
 Description:
   This methods allows to create large objects in a very simple way. You just
-  give the name of a file containing the data to be use.
+  give the name of a file containing the data to be used.
 
 Object attributes
 -----------------

@@ -384,7 +384,7 @@ Description:
   This function can be used to specify the Python class that shall be
   used by PyGreSQL to hold PostgreSQL numeric values. The default class
   is decimal.Decimal if available, otherwise the float type is used.
-  
+
 set_namedresult -- set a function that will convert to named tuples
 -------------------------------------------------------------------
 Syntax::
@@ -396,7 +396,7 @@ Parameters:
 
 Description:
   You can use this if you want to create different kinds of named tuples.
-  
+
 
 Module constants
 ----------------
