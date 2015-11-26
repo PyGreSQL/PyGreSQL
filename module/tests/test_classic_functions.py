@@ -265,7 +265,7 @@ class TestHasConnect(unittest.TestCase):
 
 
 class TestEscapeFunctions(unittest.TestCase):
-    """"Test pg escape and unescape functions.
+    """Test pg escape and unescape functions.
 
     The libpq interface memorizes some parameters of the last opened
     connection that influence the result of these functions.

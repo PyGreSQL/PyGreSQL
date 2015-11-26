@@ -63,7 +63,7 @@ def DB():
 
 
 class TestDBClassBasic(unittest.TestCase):
-    """"Test existence of the DB class wrapped pg connection methods."""
+    """Test existence of the DB class wrapped pg connection methods."""
 
     def setUp(self):
         self.db = DB()
@@ -278,7 +278,7 @@ class TestDBClassBasic(unittest.TestCase):
 
 
 class TestDBClass(unittest.TestCase):
-    """"Test the methods of the DB class wrapped pg connection."""
+    """Test the methods of the DB class wrapped pg connection."""
 
     @classmethod
     def setUpClass(cls):
@@ -1098,7 +1098,7 @@ class TestDBClass(unittest.TestCase):
 
 
 class TestSchemas(unittest.TestCase):
-    """"Test correct handling of schemas (namespaces)."""
+    """Test correct handling of schemas (namespaces)."""
 
     @classmethod
     def setUpClass(cls):

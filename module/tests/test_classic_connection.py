@@ -79,7 +79,7 @@ class TestCanConnect(unittest.TestCase):
 
 
 class TestConnectObject(unittest.TestCase):
-    """"Test existence of basic pg connection methods."""
+    """Test existence of basic pg connection methods."""
 
     def setUp(self):
         self.connection = connect()
@@ -260,7 +260,7 @@ class TestConnectObject(unittest.TestCase):
 
 
 class TestSimpleQueries(unittest.TestCase):
-    """"Test simple queries via a basic pg connection."""
+    """Test simple queries via a basic pg connection."""
 
     def setUp(self):
         self.c = connect()
@@ -542,7 +542,7 @@ class TestSimpleQueries(unittest.TestCase):
 
 
 class TestUnicodeQueries(unittest.TestCase):
-    """"Test unicode strings as queries via a basic pg connection."""
+    """Test unicode strings as queries via a basic pg connection."""
 
     def setUp(self):
         self.c = connect()
@@ -703,7 +703,7 @@ class TestUnicodeQueries(unittest.TestCase):
 
 
 class TestParamQueries(unittest.TestCase):
-    """"Test queries with parameters via a basic pg connection."""
+    """Test queries with parameters via a basic pg connection."""
 
     def setUp(self):
         self.c = connect()
@@ -865,7 +865,7 @@ class TestParamQueries(unittest.TestCase):
 
 
 class TestInserttable(unittest.TestCase):
-    """"Test inserttable method."""
+    """Test inserttable method."""
 
     @classmethod
     def setUpClass(cls):
@@ -1096,7 +1096,7 @@ class TestInserttable(unittest.TestCase):
 
 
 class TestDirectSocketAccess(unittest.TestCase):
-    """"Test copy command with direct socket access."""
+    """Test copy command with direct socket access."""
 
     @classmethod
     def setUpClass(cls):
@@ -1196,7 +1196,7 @@ class TestDirectSocketAccess(unittest.TestCase):
 
 
 class TestNotificatons(unittest.TestCase):
-    """"Test notification support."""
+    """Test notification support."""
 
     def setUp(self):
         self.c = connect()
@@ -1600,7 +1600,7 @@ class TestConfigFunctions(unittest.TestCase):
 
 
 class TestStandaloneEscapeFunctions(unittest.TestCase):
-    """"Test pg escape functions.
+    """Test pg escape functions.
 
     The libpq interface memorizes some parameters of the last opened
     connection that influence the result of these functions.  Therefore
