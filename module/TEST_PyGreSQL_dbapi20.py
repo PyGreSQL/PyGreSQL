@@ -245,21 +245,22 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertTrue(output4)
 
     def test_bool(self):
-        values = [[0, False], [1, True], [2, None],
-                  [3, 't'], [4, 'f'], [5, 'true'], [6, 'false']]
+        values = [False, True, None, 't', 'f', 'true', 'false']
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
             cur.execute(
                 "create table %s (n smallint, booltest bool)" % table)
-            cur.executemany("insert into %s values (%%s,%%s)" % table, values)
+            params = enumerate(values)
+            cur.executemany("insert into %s values (%%s,%%s)" % table, params)
             cur.execute("select * from %s order by 1" % table)
             rows = cur.fetchall()
         finally:
             con.close()
-        values[3][1] = values[5][1] = True
-        values[4][1] = values[6][1] = False
+        rows = [row[1] for row in rows]
+        values[3] = values[5] = True
+        values[4] = values[6] = False
         self.assertEqual(rows, values)
 
     def test_nextset(self):
