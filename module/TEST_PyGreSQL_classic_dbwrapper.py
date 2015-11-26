@@ -40,6 +40,11 @@ try:
 except NameError:  # Python >= 3.0
     long = int
 
+try:
+    unicode
+except NameError:  # Python >= 3.0
+    unicode = str
+
 windows = os.name == 'nt'
 
 # There is a known a bug in libpq under Windows which can cause
@@ -212,7 +217,7 @@ class TestDBClassBasic(unittest.TestCase):
             '\\x', '').replace('\\', ''), '')
 
     def testMethodUnescapeBytea(self):
-        self.assertEqual(self.db.unescape_bytea(''), '')
+        self.assertEqual(self.db.unescape_bytea(''), b'')
 
     def testMethodQuery(self):
         query = self.db.query
@@ -313,8 +318,18 @@ class TestDBClass(unittest.TestCase):
 
     def testEscapeLiteral(self):
         f = self.db.escape_literal
-        self.assertEqual(f("plain"), "'plain'")
-        self.assertEqual(f("that's k\xe4se"), "'that''s k\xe4se'")
+        r = f(b"plain")
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b"'plain'")
+        r = f(u"plain")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u"'plain'")
+        r = f(u"that's käse".encode('utf-8'))
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u"'that''s käse'".encode('utf-8'))
+        r = f(u"that's käse")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u"'that''s käse'")
         self.assertEqual(f(r"It's fine to have a \ inside."),
             r" E'It''s fine to have a \\ inside.'")
         self.assertEqual(f('No "quotes" must be escaped.'),
@@ -322,8 +337,18 @@ class TestDBClass(unittest.TestCase):
 
     def testEscapeIdentifier(self):
         f = self.db.escape_identifier
-        self.assertEqual(f("plain"), '"plain"')
-        self.assertEqual(f("that's k\xe4se"), '"that\'s k\xe4se"')
+        r = f(b"plain")
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'"plain"')
+        r = f(u"plain")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'"plain"')
+        r = f(u"that's käse".encode('utf-8'))
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u'"that\'s käse"'.encode('utf-8'))
+        r = f(u"that's käse")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'"that\'s käse"')
         self.assertEqual(f(r"It's fine to have a \ inside."),
             '"It\'s fine to have a \\ inside."')
         self.assertEqual(f('All "quotes" must be escaped.'),
@@ -331,8 +356,18 @@ class TestDBClass(unittest.TestCase):
 
     def testEscapeString(self):
         f = self.db.escape_string
-        self.assertEqual(f("plain"), "plain")
-        self.assertEqual(f("that's k\xe4se"), "that''s k\xe4se")
+        r = f(b"plain")
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b"plain")
+        r = f(u"plain")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u"plain")
+        r = f(u"that's käse".encode('utf-8'))
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u"that''s käse".encode('utf-8'))
+        r = f(u"that's käse")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u"that''s käse")
         self.assertEqual(f(r"It's fine to have a \ inside."),
             r"It''s fine to have a \ inside.")
 
@@ -341,38 +376,38 @@ class TestDBClass(unittest.TestCase):
         # note that escape_byte always returns hex output since Pg 9.0,
         # regardless of the bytea_output setting
         r = f(b'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, r'\x706c61696e')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'\\x706c61696e')
         r = f(u'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, r'\x706c61696e')
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'\\x706c61696e')
         r = f(u"das is' käse".encode('utf-8'))
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, r'\x64617320697327206bc3a47365')
-        r = f("das is' käse")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, r'\x64617320697327206bc3a47365')
-        self.assertEqual(f(b'O\x00ps\xff!'), r'\x4f007073ff21')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'\\x64617320697327206bc3a47365')
+        r = f(u"das is' käse")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'\\x64617320697327206bc3a47365')
+        self.assertEqual(f(b'O\x00ps\xff!'), b'\\x4f007073ff21')
 
     def testUnescapeBytea(self):
         f = self.db.unescape_bytea
         r = f(b'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(b"das is' k\\303\\244se")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is' käse")
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u"das is' käse".encode('utf8'))
         r = f(u"das is' k\\303\\244se")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is' käse")
-        self.assertEqual(f(r'O\\000ps\\377!'), r'O\000ps\377!')
-        self.assertEqual(f(r'\\x706c61696e'), r'\x706c61696e')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u"das is' käse".encode('utf8'))
+        self.assertEqual(f(r'O\\000ps\\377!'), b'O\\000ps\\377!')
+        self.assertEqual(f(r'\\x706c61696e'), b'\\x706c61696e')
         self.assertEqual(f(r'\\x746861742773206be47365'),
-            r'\x746861742773206be47365')
-        self.assertEqual(f(r'\\x4f007073ff21'), r'\x4f007073ff21')
+            b'\\x746861742773206be47365')
+        self.assertEqual(f(r'\\x4f007073ff21'), b'\\x4f007073ff21')
 
     def testQuote(self):
         f = self.db._quote
@@ -1034,16 +1069,16 @@ class TestDBClass(unittest.TestCase):
         query('drop table if exists bytea_test')
         query('create table bytea_test ('
             'data bytea)')
-        s = "It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
+        s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
         r = self.db.escape_bytea(s)
-        query('insert into bytea_test values('
-            "'%s')" % r)
+        query('insert into bytea_test values($1)', (r,))
         r = query('select * from bytea_test').getresult()
         self.assertTrue(len(r) == 1)
         r = r[0]
         self.assertTrue(len(r) == 1)
         r = r[0]
         r = self.db.unescape_bytea(r)
+        self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         query('drop table bytea_test')
 

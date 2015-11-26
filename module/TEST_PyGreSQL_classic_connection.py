@@ -1531,38 +1531,36 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
     def testEscapeString(self):
         f = pg.escape_string
         r = f(b'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'plain')
         r = f(u"das is' käse".encode('utf-8'))
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is'' käse")
-        if unicode_strings:
-            r = f("das is' käse")
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, "das is'' käse")
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u"das is'' käse".encode('utf-8'))
+        r = f(u"that's cheesy")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u"that''s cheesy")
         r = f(r"It's bad to have a \ inside.")
         self.assertEqual(r, r"It''s bad to have a \\ inside.")
 
     def testEscapeBytea(self):
         f = pg.escape_bytea
         r = f(b'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'plain')
         r = f(u"das is' käse".encode('utf-8'))
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, r"das is'' k\\303\\244se")
-        if unicode_strings:
-            r = f("das is' käse")
-            self.assertIsInstance(r, str)
-            self.assertEqual(r, r"das is'' k\\303\\244se")
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b"das is'' k\\\\303\\\\244se")
+        r = f(u"that's cheesy")
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u"that''s cheesy")
         r = f(b'O\x00ps\xff!')
-        self.assertEqual(r, r'O\\000ps\\377!')
+        self.assertEqual(r, b'O\\\\000ps\\\\377!')
 
 
 if __name__ == '__main__':

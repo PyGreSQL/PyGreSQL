@@ -78,6 +78,11 @@ except NameError:  # Python >= 3.0
     long = int
 
 try:
+    unicode
+except NameError:  # Python >= 3.0
+    unicode = str
+
+try:
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
@@ -240,11 +245,11 @@ class pgdbCursor(object):
         """Quote value depending on its type."""
         if isinstance(val, (datetime, date, time, timedelta)):
             val = str(val)
-        elif isinstance(val, str) and str is not bytes:
-            val = val.encode('utf8')
-        if isinstance(val, bytes):
+        if isinstance(val, basestring):
             if isinstance(val, Binary):
                 val = self._cnx.escape_bytea(val)
+                if bytes is not str:  # Python >= 3.0
+                    val = val.decode('ascii')
             else:
                 val = self._cnx.escape_string(val)
             val = "'%s'" % val
@@ -351,7 +356,7 @@ class pgdbCursor(object):
         except DatabaseError:
             raise
         except Error as err:
-            raise _db_error("error '%s' in '%s'" % (err, sql))
+            raise _db_error("error in '%s': '%s' " % (sql, err))
         except Exception as err:
             raise _op_error("internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
@@ -685,7 +690,7 @@ def TimestampFromTicks(ticks):
     return Timestamp(*localtime(ticks)[:6])
 
 
-class Binary(str):
+class Binary(bytes):
     """construct an object capable of holding a binary (long) string value."""
 
 

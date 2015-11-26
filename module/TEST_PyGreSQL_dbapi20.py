@@ -1,4 +1,5 @@
 #! /usr/bin/python
+# -*- coding: utf-8 -*-
 # $Id$
 
 import unittest
@@ -15,6 +16,11 @@ try:
     from LOCAL_PyGreSQL import *
 except ImportError:
     pass
+
+try:
+    long
+except NameError:  # Python >= 3.0
+    long = int
 
 
 class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
@@ -60,7 +66,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def test_fetch_2_rows(self):
         Decimal = pgdb.decimal_type()
-        values = ['test', pgdb.Binary('\xff\x52\xb2'),
+        values = ['test', pgdb.Binary(b'\xff\x52\xb2'),
             True, 5, 6, 5.7, Decimal('234.234234'), Decimal('75.45'),
             '2011-07-17', '15:47:42', '2008-10-20 15:25:35', '15:31:05',
             7897234]
@@ -91,8 +97,21 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute("select * from %s" % table)
             rows = cur.fetchall()
             self.assertEqual(len(rows), 2)
-            self.assertEqual(rows[0], values)
-            self.assertEqual(rows[0], rows[1])
+            row0 = rows[0]
+            self.assertEqual(row0, values)
+            self.assertEqual(row0, rows[1])
+            self.assertIsInstance(row0[0], str)
+            self.assertIsInstance(row0[1], bytes)
+            self.assertIsInstance(row0[2], bool)
+            self.assertIsInstance(row0[3], int)
+            self.assertIsInstance(row0[4], long)
+            self.assertIsInstance(row0[5], float)
+            self.assertIsInstance(row0[6], Decimal)
+            self.assertIsInstance(row0[7], Decimal)
+            self.assertIsInstance(row0[8], str)
+            self.assertIsInstance(row0[9], str)
+            self.assertIsInstance(row0[10], str)
+            self.assertIsInstance(row0[11], str)
         finally:
             con.close()
 
@@ -119,7 +138,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute(
                 "create table %s (n smallint, floattest float)" % table)
             params = enumerate(values)
-            cur.executemany("insert into %s values(%%s,%%s)" % table, params)
+            cur.executemany("insert into %s values (%%s,%%s)" % table, params)
             cur.execute("select * from %s order by 1" % table)
             rows = cur.fetchall()
         finally:
@@ -137,6 +156,72 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 self.assertTrue(isnan(outval))
             else:
                 self.assertEqual(inval, outval)
+
+    def test_unicode_with_utf8(self):
+        table = self.table_prefix + 'booze'
+        input = u"He wes Leovenaðes sone — liðe him be Drihten"
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s (t text)" % table)
+            try:
+                cur.execute("set client_encoding=utf8")
+                cur.execute(u"select '%s'" % input)
+            except Exception:
+                self.skipTest("database does not support utf8")
+            output1 = cur.fetchone()[0]
+            cur.execute("insert into %s values (%%s)" % table, (input,))
+            cur.execute("select * from %s" % table)
+            output2 = cur.fetchone()[0]
+            cur.execute("select t = '%s' from %s" % (input, table))
+            output3 = cur.fetchone()[0]
+            cur.execute("select t = %%s from %s" % table, (input,))
+            output4 = cur.fetchone()[0]
+        finally:
+            con.close()
+        if str is bytes:  # Python < 3.0
+            input = input.encode('utf8')
+        self.assertIsInstance(output1, str)
+        self.assertEqual(output1, input)
+        self.assertIsInstance(output2, str)
+        self.assertEqual(output2, input)
+        self.assertIsInstance(output3, bool)
+        self.assertTrue(output3)
+        self.assertIsInstance(output4, bool)
+        self.assertTrue(output4)
+
+    def test_unicode_with_latin1(self):
+        table = self.table_prefix + 'booze'
+        input = u"Ehrt den König seine Würde, ehret uns der Hände Fleiß."
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s (t text)" % table)
+            try:
+                cur.execute("set client_encoding=latin1")
+                cur.execute(u"select '%s'" % input)
+            except Exception:
+                self.skipTest("database does not support latin1")
+            output1 = cur.fetchone()[0]
+            cur.execute("insert into %s values (%%s)" % table, (input,))
+            cur.execute("select * from %s" % table)
+            output2 = cur.fetchone()[0]
+            cur.execute("select t = '%s' from %s" % (input, table))
+            output3 = cur.fetchone()[0]
+            cur.execute("select t = %%s from %s" % table, (input,))
+            output4 = cur.fetchone()[0]
+        finally:
+            con.close()
+        if str is bytes:  # Python < 3.0
+            input = input.encode('latin1')
+        self.assertIsInstance(output1, str)
+        self.assertEqual(output1, input)
+        self.assertIsInstance(output2, str)
+        self.assertEqual(output2, input)
+        self.assertIsInstance(output3, bool)
+        self.assertTrue(output3)
+        self.assertIsInstance(output4, bool)
+        self.assertTrue(output4)
 
     def test_set_decimal_type(self):
         decimal_type = pgdb.decimal_type()

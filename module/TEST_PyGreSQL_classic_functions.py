@@ -26,7 +26,10 @@ try:
 except NameError:  # Python >= 3.0
     long = int
 
-unicode_strings = str is not bytes
+try:
+    unicode
+except NameError:  # Python >= 3.0
+    unicode = str
 
 
 class TestAuxiliaryFunctions(unittest.TestCase):
@@ -274,11 +277,11 @@ class TestEscapeFunctions(unittest.TestCase):
     def testEscapeString(self):
         f = pg.escape_string
         r = f(b'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'plain')
         r = f("that's cheese")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s cheese")
@@ -286,11 +289,11 @@ class TestEscapeFunctions(unittest.TestCase):
     def testEscapeBytea(self):
         f = pg.escape_bytea
         r = f(b'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, unicode)
+        self.assertEqual(r, u'plain')
         r = f("that's cheese")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s cheese")
@@ -298,19 +301,21 @@ class TestEscapeFunctions(unittest.TestCase):
     def testUnescapeBytea(self):
         f = pg.unescape_bytea
         r = f(b'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'plain')
         r = f(b"das is' k\\303\\244se")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is' käse")
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u"das is' käse".encode('utf-8'))
         r = f(u"das is' k\\303\\244se")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "das is' käse")
-        r = f(r'O\\000ps\\377!')
-        self.assertEqual(r, r'O\000ps\377!')
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, u"das is' käse".encode('utf-8'))
+        r = f(b'O\\000ps\\377!')
+        self.assertEqual(r, b'O\x00ps\xff!')
+        r = f(u'O\\000ps\\377!')
+        self.assertEqual(r, b'O\x00ps\xff!')
 
 
 class TestConfigFunctions(unittest.TestCase):

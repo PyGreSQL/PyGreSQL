@@ -147,7 +147,7 @@ static PyTypeObject connType;
 static void notice_receiver(void *, const PGresult *);
 
 /* --------------------------------------------------------------------- */
-/* Object declarations */
+/* Object declarations													 */
 /* --------------------------------------------------------------------- */
 typedef struct
 {
@@ -164,6 +164,7 @@ typedef struct
 	int			valid;			/* validity flag */
 	connObject	*pgcnx;			/* parent connection object */
 	PGresult	*result;		/* result content */
+	int			encoding; 		/* client encoding */
 	int			result_type;	/* result type (DDL/DML/DQL) */
 	long		arraysize;		/* array size for fetch method */
 	int			current_row;	/* current selected row */
@@ -199,10 +200,49 @@ typedef struct
 #define is_largeObject(v) (PyType(v) == &largeType)
 #endif /* LARGE_OBJECTS */
 
+/* define internal types */
+
+#define PYGRES_INT 1
+#define PYGRES_LONG 2
+#define PYGRES_FLOAT 3
+#define PYGRES_DECIMAL 4
+#define PYGRES_MONEY 5
+#define PYGRES_DEFAULT 6
 
 /* --------------------------------------------------------------------- */
-/* Internal Functions */
+/* Internal Functions													 */
 /* --------------------------------------------------------------------- */
+
+/* shared function for encoding and decoding strings */
+
+PyObject *
+get_decoded_string(char *str, Py_ssize_t size, int encoding)
+{
+	if (encoding == pg_encoding_utf8)
+		return PyUnicode_DecodeUTF8(str, size, "strict");
+	if (encoding == pg_encoding_latin1)
+		return PyUnicode_DecodeLatin1(str, size, "strict");
+	if (encoding == pg_encoding_ascii)
+		return PyUnicode_DecodeASCII(str, size, "strict");
+	/* encoding name should be properly translated to Python here */
+	return PyUnicode_Decode(str, size,
+		pg_encoding_to_char(encoding), "strict");
+}
+
+PyObject *
+get_encoded_string(PyObject *unicode_obj, int encoding)
+ {
+	if (encoding == pg_encoding_utf8)
+		return PyUnicode_AsUTF8String(unicode_obj);
+	if (encoding == pg_encoding_latin1)
+		return PyUnicode_AsLatin1String(unicode_obj);
+	if (encoding == pg_encoding_ascii)
+		return PyUnicode_AsASCIIString(unicode_obj);
+	/* encoding name should be properly translated to Python here */
+	return PyUnicode_AsEncodedString(unicode_obj,
+		pg_encoding_to_char(encoding), "strict");
+}
+
 /* shared functions for converting PG types to Python types */
 static int *
 get_type_array(PGresult *result, int nfields)
@@ -223,29 +263,28 @@ get_type_array(PGresult *result, int nfields)
 			case INT2OID:
 			case INT4OID:
 			case OIDOID:
-				typ[j] = 1;
+				typ[j] = PYGRES_INT;
 				break;
 
 			case INT8OID:
-				typ[j] = 2;
+				typ[j] = PYGRES_LONG;
 				break;
 
 			case FLOAT4OID:
 			case FLOAT8OID:
-				typ[j] = 3;
+				typ[j] = PYGRES_FLOAT;
 				break;
 
 			case NUMERICOID:
-				typ[j] = 4;
+				typ[j] = PYGRES_DECIMAL;
 				break;
 
 			case CASHOID:
-				typ[j] = 5;
+				typ[j] = PYGRES_MONEY;
 				break;
 
 			default:
-				typ[j] = 6;
-				break;
+				typ[j] = PYGRES_DEFAULT;
 		}
 	}
 
@@ -387,7 +426,6 @@ format_result(const PGresult *res)
 							break;
 						default:
 							aligns[j] = 'l';
-							break;
 					}
 				}
 			}
@@ -500,7 +538,7 @@ format_result(const PGresult *res)
 }
 
 /* --------------------------------------------------------------------- */
-/* large objects                                                         */
+/* large objects														 */
 /* --------------------------------------------------------------------- */
 #ifdef LARGE_OBJECTS
 
@@ -665,7 +703,7 @@ largeRead(largeObject *self, PyObject *args)
 	buffer = PyBytes_FromStringAndSize((char *) NULL, size);
 
 	if ((size = lo_read(self->pgcnx->cnx, self->lo_fd,
-	    PyBytes_AS_STRING((PyBytesObject *)(buffer)), size)) < 0)
+		PyBytes_AS_STRING((PyBytesObject *)(buffer)), size)) < 0)
 	{
 		PyErr_SetString(PyExc_IOError, "error while reading.");
 		Py_XDECREF(buffer);
@@ -900,7 +938,8 @@ largeUnlink(largeObject *self, PyObject *args)
 
 /* get the list of large object attributes */
 static PyObject *
-largeDir(largeObject *self) {
+largeDir(largeObject *self)
+{
 	PyObject *attrs;
 
 	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
@@ -995,25 +1034,25 @@ static PyTypeObject largeType = {
 	0,								/* tp_as_sequence */
 	0,								/* tp_as_mapping */
 	0,								/* tp_hash */
-	0,                              /* tp_call */
+	0,								/* tp_call */
 	(reprfunc) largeStr,			/* tp_str */
 	(getattrofunc) largeGetAttr,	/* tp_getattro */
-	0,                              /* tp_setattro */
-	0,                              /* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,             /* tp_flags */
+	0,								/* tp_setattro */
+	0,								/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,				/* tp_flags */
 	large__doc__,					/* tp_doc */
-	0,                              /* tp_traverse */
-	0,                              /* tp_clear */
-	0,                              /* tp_richcompare */
-	0,                              /* tp_weaklistoffset */
-	0,                              /* tp_iter */
-	0,                              /* tp_iternext */
+	0,								/* tp_traverse */
+	0,								/* tp_clear */
+	0,								/* tp_richcompare */
+	0,								/* tp_weaklistoffset */
+	0,								/* tp_iter */
+	0,								/* tp_iternext */
 	largeMethods,					/* tp_methods */
 };
 #endif /* LARGE_OBJECTS */
 
 /* --------------------------------------------------------------------- */
-/* connection object */
+/* connection object													 */
 /* --------------------------------------------------------------------- */
 static void
 connDelete(connObject *self)
@@ -1078,7 +1117,6 @@ connQuery(connObject *self, PyObject *args)
 	char		*query = NULL;
 	PGresult	*result;
 	queryObject *npgobj;
-	const char*	encoding_name=NULL;
 	int			encoding,
 				status,
 				nparms = 0;
@@ -1096,10 +1134,6 @@ connQuery(connObject *self, PyObject *args)
 	}
 
 	encoding = PQclientEncoding(self->cnx);
-	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
-			&& encoding != pg_encoding_ascii)
-		/* should be translated to Python here */
-		encoding_name = pg_encoding_to_char(encoding);
 
 	if (PyBytes_Check(query_obj))
 	{
@@ -1107,19 +1141,12 @@ connQuery(connObject *self, PyObject *args)
 	}
 	else if (PyUnicode_Check(query_obj))
 	{
-		if (encoding == pg_encoding_utf8)
-			query_obj = PyUnicode_AsUTF8String(query_obj);
-		else if (encoding == pg_encoding_latin1)
-			query_obj = PyUnicode_AsLatin1String(query_obj);
-		else if (encoding == pg_encoding_ascii)
-			query_obj = PyUnicode_AsASCIIString(query_obj);
-		else
-			query_obj = PyUnicode_AsEncodedString(query_obj,
-				encoding_name, "strict");
+		query_obj = get_encoded_string(query_obj, encoding);
 		if (!query_obj) return NULL; /* pass the UnicodeEncodeError */
 		query = PyBytes_AsString(query_obj);
 	}
-	if (!query) {
+	if (!query)
+	{
 		PyErr_SetString(PyExc_TypeError,
 			"query command must be a string.");
 		return NULL;
@@ -1176,21 +1203,11 @@ connQuery(connObject *self, PyObject *args)
 			}
 			else if (PyBytes_Check(obj))
 			{
-				*s = obj;
-				*p = PyBytes_AsString(*s);
-				*l = (int)PyBytes_Size(*s);
+				PyBytes_AsStringAndSize(*s = obj, p, (Py_ssize_t *)l);
 			}
 			else if (PyUnicode_Check(obj))
 			{
-				if (encoding == pg_encoding_utf8)
-					*s = PyUnicode_AsUTF8String(obj);
-				else if (encoding == pg_encoding_latin1)
-					*s = PyUnicode_AsLatin1String(obj);
-				else if (encoding == pg_encoding_ascii)
-					*s = PyUnicode_AsASCIIString(obj);
-				else
-					*s = PyUnicode_AsEncodedString(obj,
-						encoding_name, "strict");
+				*s = get_encoded_string(obj, encoding);
 				if (!*s)
 				{
 					free(lparms); free(parms); free(str);
@@ -1203,8 +1220,7 @@ connQuery(connObject *self, PyObject *args)
 					}
 					return NULL; /* pass the UnicodeEncodeError */
 				}
-				*p = PyBytes_AsString(*s);
-				*l = (int)PyBytes_Size(*s);
+				PyBytes_AsStringAndSize(*s, p, (Py_ssize_t *)l);
 			}
 			else
 			{
@@ -1298,7 +1314,6 @@ connQuery(connObject *self, PyObject *args)
 			default:
 				set_dberror(InternalError,
 					"internal error: unknown result status.", result);
-				break;
 		}
 
 		PQclear(result);
@@ -1445,7 +1460,6 @@ connInsertTable(connObject *self, PyObject *args)
 	char		*table,
 				*buffer,
 				*bufpt;
-	const char *encoding_name=NULL;
 	int			encoding;
 	size_t		bufsiz;
 	PyObject	*list,
@@ -1514,10 +1528,6 @@ connInsertTable(connObject *self, PyObject *args)
 	}
 
 	encoding = PQclientEncoding(self->cnx);
-	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
-			&& encoding != pg_encoding_ascii)
-		/* should be translated to Python here */
-		encoding_name = pg_encoding_to_char(encoding);
 
 	PQclear(result);
 
@@ -1597,16 +1607,7 @@ connInsertTable(connObject *self, PyObject *args)
 			}
 			else if (PyUnicode_Check(item))
 			{
-				PyObject *s;
-				if (encoding == pg_encoding_utf8)
-					s = PyUnicode_AsUTF8String(item);
-				else if (encoding == pg_encoding_latin1)
-					s = PyUnicode_AsLatin1String(item);
-				else if (encoding == pg_encoding_ascii)
-					s = PyUnicode_AsASCIIString(item);
-				else
-					s = PyUnicode_AsEncodedString(item,
-						encoding_name, "strict");
+				PyObject *s = get_encoded_string(item, encoding);
 				if (!s)
 				{
 					free(buffer);
@@ -1761,20 +1762,44 @@ static char connEscapeLiteral__doc__[] =
 static PyObject *
 connEscapeLiteral(connObject *self, PyObject *args)
 {
-	char *str; /* our string argument */
-	int str_length; /* length of string */
-	char *esc; /* the escaped version of the string */
-	PyObject *ret; /* string object to return */
+	PyObject   *from_obj, /* the object that was passed in */
+			   *to_obj; /* string object to return */
+	char 	   *from=NULL, /* our string argument as encoded string */
+		 	   *to; /* the result as encoded string */
+	Py_ssize_t 	from_length; /* length of string */
+	size_t		to_length; /* length of result */
+	int			encoding = -1; /* client encoding */
 
-	if (!PyArg_ParseTuple(args, "s#", &str, &str_length))
+	if (!PyArg_ParseTuple(args, "O", &from_obj))
 		return NULL;
-	esc = PQescapeLiteral(self->cnx, str, (size_t)str_length);
-	ret = Py_BuildValue("s", esc);
-	if (esc)
-		PQfreemem(esc);
-	if (!ret) /* pass on exception */
+
+	if (PyBytes_Check(from_obj))
+	{
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	else if (PyUnicode_Check(from_obj))
+	{
+		encoding = PQclientEncoding(self->cnx);
+		from_obj = get_encoded_string(from_obj, encoding);
+		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	if (!from)
+	{
+		PyErr_SetString(PyExc_TypeError, "escape_literal() expects a string.");
 		return NULL;
-	return ret;
+	}
+
+	to = PQescapeLiteral(self->cnx, from, (size_t)from_length);
+	to_length = strlen(to);
+
+	if (encoding == -1)
+		to_obj = PyBytes_FromStringAndSize(to, to_length);
+	else
+		to_obj = get_decoded_string(to, to_length, encoding);
+	if (to)
+		PQfreemem(to);
+	return to_obj;
 }
 
 /* escape identifier */
@@ -1784,20 +1809,45 @@ static char connEscapeIdentifier__doc__[] =
 static PyObject *
 connEscapeIdentifier(connObject *self, PyObject *args)
 {
-	char *str; /* our string argument */
-	int str_length; /* length of string */
-	char *esc; /* the escaped version of the string */
-	PyObject *ret; /* string object to return */
+	PyObject   *from_obj, /* the object that was passed in */
+			   *to_obj; /* string object to return */
+	char 	   *from=NULL, /* our string argument as encoded string */
+		 	   *to; /* the result as encoded string */
+	Py_ssize_t 	from_length; /* length of string */
+	size_t		to_length; /* length of result */
+	int			encoding = -1; /* client encoding */
 
-	if (!PyArg_ParseTuple(args, "s#", &str, &str_length))
+	if (!PyArg_ParseTuple(args, "O", &from_obj))
 		return NULL;
-	esc = PQescapeIdentifier(self->cnx, str, (size_t)str_length);
-	ret = Py_BuildValue("s", esc);
-	if (esc)
-		PQfreemem(esc);
-	if (!ret) /* pass on exception */
+
+	if (PyBytes_Check(from_obj))
+	{
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	else if (PyUnicode_Check(from_obj))
+	{
+		encoding = PQclientEncoding(self->cnx);
+		from_obj = get_encoded_string(from_obj, encoding);
+		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	if (!from)
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"escape_identifier() expects a string.");
 		return NULL;
-	return ret;
+	}
+
+	to = PQescapeIdentifier(self->cnx, from, (size_t)from_length);
+	to_length = strlen(to);
+
+	if (encoding == -1)
+		to_obj = PyBytes_FromStringAndSize(to, to_length);
+	else
+		to_obj = get_decoded_string(to, to_length, encoding);
+	if (to)
+		PQfreemem(to);
+	return to_obj;
 }
 
 #endif	/* ESCAPING_FUNCS */
@@ -1809,14 +1859,34 @@ static char connEscapeString__doc__[] =
 static PyObject *
 connEscapeString(connObject *self, PyObject *args)
 {
-	char *from; /* our string argument */
-	char *to=NULL; /* the result */
-	int from_length; /* length of string */
-	int to_length; /* length of result */
-	PyObject *ret; /* string object to return */
+	PyObject   *from_obj, /* the object that was passed in */
+			   *to_obj; /* string object to return */
+	char 	   *from=NULL, /* our string argument as encoded string */
+		 	   *to; /* the result as encoded string */
+	Py_ssize_t 	from_length; /* length of string */
+	size_t		to_length; /* length of result */
+	int			encoding = -1; /* client encoding */
 
-	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+	if (!PyArg_ParseTuple(args, "O", &from_obj))
 		return NULL;
+
+	if (PyBytes_Check(from_obj))
+	{
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	else if (PyUnicode_Check(from_obj))
+	{
+		encoding = PQclientEncoding(self->cnx);
+		from_obj = get_encoded_string(from_obj, encoding);
+		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	if (!from)
+	{
+		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string.");
+		return NULL;
+	}
+
 	to_length = 2*from_length + 1;
 	if (to_length < from_length) /* overflow */
 	{
@@ -1824,14 +1894,16 @@ connEscapeString(connObject *self, PyObject *args)
 		from_length = (from_length - 1)/2;
 	}
 	to = (char *)malloc(to_length);
-	to_length = (int)PQescapeStringConn(self->cnx,
+	to_length = PQescapeStringConn(self->cnx,
 		to, from, (size_t)from_length, NULL);
-	ret = Py_BuildValue("s#", to, to_length);
+
+	if (encoding == -1)
+		to_obj = PyBytes_FromStringAndSize(to, to_length);
+	else
+		to_obj = get_decoded_string(to, to_length, encoding);
 	if (to)
 		free(to);
-	if (!ret) /* pass on exception */
-		return NULL;
-	return ret;
+	return to_obj;
 }
 
 /* escape bytea */
@@ -1841,21 +1913,44 @@ static char connEscapeBytea__doc__[] =
 static PyObject *
 connEscapeBytea(connObject *self, PyObject *args)
 {
-	unsigned char *from; /* our string argument */
-	unsigned char *to; /* the result */
-	int from_length; /* length of string */
-	size_t to_length; /* length of result */
-	PyObject *ret; /* string object to return */
+	PyObject   *from_obj, /* the object that was passed in */
+			   *to_obj; /* string object to return */
+	char 	   *from=NULL, /* our string argument as encoded string */
+		 	   *to; /* the result as encoded string */
+	Py_ssize_t 	from_length; /* length of string */
+	size_t		to_length; /* length of result */
+	int			encoding = -1; /* client encoding */
 
-	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+	if (!PyArg_ParseTuple(args, "O", &from_obj))
 		return NULL;
-	to = PQescapeByteaConn(self->cnx, from, (int)from_length, &to_length);
-	ret = Py_BuildValue("s", to);
+
+	if (PyBytes_Check(from_obj))
+	{
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	else if (PyUnicode_Check(from_obj))
+	{
+		encoding = PQclientEncoding(self->cnx);
+		from_obj = get_encoded_string(from_obj, encoding);
+		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	if (!from)
+	{
+		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string.");
+		return NULL;
+	}
+
+	to = (char *)PQescapeByteaConn(self->cnx,
+	 	(unsigned char *)from, (size_t)from_length, &to_length);
+
+	if (encoding == -1)
+		to_obj = PyBytes_FromStringAndSize(to, to_length - 1);
+	else
+		to_obj = get_decoded_string(to, to_length - 1, encoding);
 	if (to)
-		PQfreemem((void *)to);
-	if (!ret) /* pass on exception */
-		return NULL;
-	return ret;
+		PQfreemem(to);
+	return to_obj;
 }
 
 #ifdef LARGE_OBJECTS
@@ -2187,7 +2282,8 @@ connGetNotify(connObject *self, PyObject *args)
 
 /* get the list of connection attributes */
 static PyObject *
-connDir(connObject *self) {
+connDir(connObject *self)
+{
 	PyObject *attrs;
 
 	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
@@ -2341,7 +2437,7 @@ static PyTypeObject connType = {
 	(getattrofunc) connGetAttr,	/* tp_getattro */
 	0,							/* tp_setattro */
 	0,							/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,         /* tp_flags */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
 	0,							/* tp_doc */
 	0,							/* tp_traverse */
 	0,							/* tp_clear */
@@ -2353,7 +2449,7 @@ static PyTypeObject connType = {
 };
 
 /* --------------------------------------------------------------------- */
-/* source object */
+/* source object														 */
 /* --------------------------------------------------------------------- */
 /* checks source object validity */
 static int
@@ -2436,7 +2532,9 @@ static char sourceExecute__doc__[] =
 static PyObject *
 sourceExecute(sourceObject *self, PyObject *args)
 {
-	char		*query;
+	PyObject	*query_obj;
+	char		*query = NULL;
+	int			encoding;
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_CNX))
@@ -2447,9 +2545,26 @@ sourceExecute(sourceObject *self, PyObject *args)
 		return NULL;
 
 	/* get query args */
-	if (!PyArg_ParseTuple(args, "s", &query))
+	if (!PyArg_ParseTuple(args, "O", &query_obj))
 	{
-		PyErr_SetString(PyExc_TypeError, "execute(sql), with sql (string).");
+		return NULL;
+	}
+
+	encoding = PQclientEncoding(self->pgcnx->cnx);
+
+	if (PyBytes_Check(query_obj))
+	{
+		query = PyBytes_AsString(query_obj);
+	}
+	else if (PyUnicode_Check(query_obj))
+	{
+		query_obj = get_encoded_string(query_obj, encoding);
+		if (!query_obj) return NULL; /* pass the UnicodeEncodeError */
+		query = PyBytes_AsString(query_obj);
+	}
+	if (!query)
+	{
+		PyErr_SetString(PyExc_TypeError, "executed sql must be a string.");
 		return NULL;
 	}
 
@@ -2462,6 +2577,7 @@ sourceExecute(sourceObject *self, PyObject *args)
 	self->max_row = 0;
 	self->current_row = 0;
 	self->num_fields = 0;
+	self->encoding = encoding;
 
 	/* gets result */
 	Py_BEGIN_ALLOW_THREADS
@@ -2514,7 +2630,6 @@ sourceExecute(sourceObject *self, PyObject *args)
 		default:
 			set_dberror(InternalError, "internal error: "
 				"unknown result status.", self->result);
-			break;
 	}
 
 	/* frees result and returns error */
@@ -2564,12 +2679,13 @@ static char sourceFetch__doc__[] =
 static PyObject *
 sourceFetch(sourceObject *self, PyObject *args)
 {
-	PyObject   *rowtuple,
-			   *reslist,
-			   *str;
+	PyObject   *reslist;
 	int			i,
-				j;
+				k;
 	long		size;
+#if IS_PY3
+	int			encoding;
+#endif
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL))
@@ -2593,9 +2709,16 @@ sourceFetch(sourceObject *self, PyObject *args)
 	if (!(reslist = PyList_New(0)))
 		return NULL;
 
+#if IS_PY3
+	encoding = self->encoding;
+#endif
+
 	/* builds result */
-	for (i = 0; i < size; i++)
+	for (i = 0, k = self->current_row; i < size; i++, k++)
 	{
+		PyObject   *rowtuple;
+		int			j;
+
 		if (!(rowtuple = PyTuple_New(self->num_fields)))
 		{
 			Py_DECREF(reslist);
@@ -2604,23 +2727,35 @@ sourceFetch(sourceObject *self, PyObject *args)
 
 		for (j = 0; j < self->num_fields; j++)
 		{
-			if (PQgetisnull(self->result, self->current_row, j))
+			PyObject   *str;
+
+			if (PQgetisnull(self->result, k, j))
 			{
 				Py_INCREF(Py_None);
 				str = Py_None;
 			}
-			else
-				str = PyStr_FromString(
-					PQgetvalue(self->result, self->current_row, j));
-
+			else {
+				char *s = PQgetvalue(self->result, k, j);
+				Py_ssize_t size = PQgetlength(self->result, k, j);
+#if IS_PY3
+				if (PQfformat(self->result, j) == 0) /* textual format */
+				{
+					str = get_decoded_string(s, size, encoding);
+					if (!str) /* cannot decode */
+						str = PyBytes_FromStringAndSize(s, size);
+				}
+				else
+#endif
+				str = PyBytes_FromStringAndSize(s, size);
+			}
 			PyTuple_SET_ITEM(rowtuple, j, str);
 		}
 
 		PyList_Append(reslist, rowtuple);
 		Py_DECREF(rowtuple);
-		self->current_row++;
 	}
 
+	self->current_row = k;
 	return reslist;
 }
 
@@ -2857,7 +2992,8 @@ sourceField(sourceObject *self, PyObject *args)
 
 /* get the list of source object attributes */
 static PyObject *
-sourceDir(connObject *self) {
+sourceDir(connObject *self)
+{
 	PyObject *attrs;
 
 	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
@@ -3228,17 +3364,13 @@ static char queryGetResult__doc__[] =
 static PyObject *
 queryGetResult(queryObject *self, PyObject *args)
 {
-	PyObject   *rowtuple,
-			   *reslist,
-			   *val;
+	PyObject   *reslist;
 	int			i,
-				j,
 				m,
 				n,
-			   *typ;
+			   *coltypes;
 #if IS_PY3
 	int			encoding;
-	const char *encoding_name=NULL;
 #endif
 
 	/* checks args (args == NULL for an internal call) */
@@ -3249,23 +3381,23 @@ queryGetResult(queryObject *self, PyObject *args)
 		return NULL;
 	}
 
-#if IS_PY3
-	encoding = self->encoding;
-	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
-			&& encoding != pg_encoding_ascii)
-		/* should be translated to Python here */
-		encoding_name = pg_encoding_to_char(encoding);
-#endif
-
 	/* stores result in tuple */
 	m = PQntuples(self->result);
 	n = PQnfields(self->result);
-	reslist = PyList_New(m);
+	if (!(reslist = PyList_New(m)))
+		return NULL;
 
-	typ = get_type_array(self->result, n);
+#if IS_PY3
+	encoding = self->encoding;
+#endif
+
+	coltypes = get_type_array(self->result, n);
 
 	for (i = 0; i < m; i++)
 	{
+		PyObject   *rowtuple;
+		int			j;
+
 		if (!(rowtuple = PyTuple_New(n)))
 		{
 			Py_DECREF(reslist);
@@ -3275,10 +3407,7 @@ queryGetResult(queryObject *self, PyObject *args)
 
 		for (j = 0; j < n; j++)
 		{
-			int			k;
-			char	   *s = PQgetvalue(self->result, i, j);
-			char		cashbuf[64];
-			PyObject   *tmp_obj;
+			PyObject * val;
 
 			if (PQgetisnull(self->result, i, j))
 			{
@@ -3286,17 +3415,24 @@ queryGetResult(queryObject *self, PyObject *args)
 				val = Py_None;
 			}
 			else
-				switch (typ[j])
+			{
+				char	   *s = PQgetvalue(self->result, i, j);
+				char		cashbuf[64];
+				int			k;
+				Py_ssize_t	size;
+				PyObject   *tmp_obj;
+
+				switch (coltypes[j])
 				{
-					case 1:  /* int2/4 */
+					case PYGRES_INT:
 						val = PyInt_FromString(s, NULL, 10);
 						break;
 
-					case 2:  /* int8 */
+					case PYGRES_LONG:
 						val = PyLong_FromString(s, NULL, 10);
 						break;
 
-					case 3:  /* float/double */
+					case PYGRES_FLOAT:
 						tmp_obj = PyStr_FromString(s);
 #if IS_PY3
 						val = PyFloat_FromString(tmp_obj);
@@ -3306,13 +3442,13 @@ queryGetResult(queryObject *self, PyObject *args)
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:  /* money */
+					case PYGRES_MONEY:
 						/* convert to decimal only if decimal point is set */
 						if (!decimal_point) goto default_case;
 
 						for (k = 0;
-							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
-							 s++)
+							*s && k < sizeof(cashbuf)/sizeof(cashbuf[0]) - 1;
+							s++)
 						{
 							if (*s >= '0' && *s <= '9')
 								cashbuf[k++] = *s;
@@ -3325,7 +3461,7 @@ queryGetResult(queryObject *self, PyObject *args)
 						s = cashbuf;
 
 					/* FALLTHROUGH */ /* no break */
-					case 4:  /* numeric */
+					case PYGRES_DECIMAL:
 						if (decimal)
 						{
 							tmp_obj = Py_BuildValue("(s)", s);
@@ -3345,23 +3481,19 @@ queryGetResult(queryObject *self, PyObject *args)
 
 					default:
 					default_case:
+						size = PQgetlength(self->result, i, j);
 #if IS_PY3
-						if (encoding == pg_encoding_utf8)
-							val = PyUnicode_DecodeUTF8(s, strlen(s), "strict");
-						else if (encoding == pg_encoding_latin1)
-							val = PyUnicode_DecodeLatin1(s, strlen(s), "strict");
-						else if (encoding == pg_encoding_ascii)
-							val = PyUnicode_DecodeASCII(s, strlen(s), "strict");
+						if (PQfformat(self->result, j) == 0) /* text */
+						{
+							val = get_decoded_string(s, size, encoding);
+							if (!val) /* cannot decode */
+								val = PyBytes_FromStringAndSize(s, size);
+						}
 						else
-							val = PyUnicode_Decode(s, strlen(s),
-								encoding_name, "strict");
-						if (!val)
-							val = PyBytes_FromString(s);
-#else
-						val = PyBytes_FromString(s);
 #endif
-						break;
+						val = PyBytes_FromStringAndSize(s, size);
 				}
+			}
 
 			if (!val)
 			{
@@ -3378,7 +3510,7 @@ queryGetResult(queryObject *self, PyObject *args)
 	}
 
 exit:
-	free(typ);
+	free(coltypes);
 
 	/* returns list */
 	return reslist;
@@ -3393,17 +3525,13 @@ static char queryDictResult__doc__[] =
 static PyObject *
 queryDictResult(queryObject *self, PyObject *args)
 {
-	PyObject   *dict,
-			   *reslist,
-			   *val;
+	PyObject   *reslist;
 	int			i,
-				j,
 				m,
 				n,
-			   *typ;
+			   *coltypes;
 #if IS_PY3
 	int			encoding;
-	const char *encoding_name=NULL;
 #endif
 
 	/* checks args (args == NULL for an internal call) */
@@ -3414,23 +3542,23 @@ queryDictResult(queryObject *self, PyObject *args)
 		return NULL;
 	}
 
-#if IS_PY3
-	encoding = self->encoding;
-	if (encoding != pg_encoding_utf8 && encoding != pg_encoding_latin1
-			&& encoding != pg_encoding_ascii)
-		/* should be translated to Python here */
-		encoding_name = pg_encoding_to_char(encoding);
-#endif
-
 	/* stores result in list */
 	m = PQntuples(self->result);
 	n = PQnfields(self->result);
-	reslist = PyList_New(m);
+	if (!(reslist = PyList_New(m)))
+		return NULL;
 
-	typ = get_type_array(self->result, n);
+#if IS_PY3
+	encoding = self->encoding;
+#endif
+
+	coltypes = get_type_array(self->result, n);
 
 	for (i = 0; i < m; i++)
 	{
+		PyObject   *dict;
+		int			j;
+
 		if (!(dict = PyDict_New()))
 		{
 			Py_DECREF(reslist);
@@ -3440,10 +3568,7 @@ queryDictResult(queryObject *self, PyObject *args)
 
 		for (j = 0; j < n; j++)
 		{
-			int			k;
-			char	   *s = PQgetvalue(self->result, i, j);
-			char		cashbuf[64];
-			PyObject   *tmp_obj;
+			PyObject * val;
 
 			if (PQgetisnull(self->result, i, j))
 			{
@@ -3451,17 +3576,24 @@ queryDictResult(queryObject *self, PyObject *args)
 				val = Py_None;
 			}
 			else
-				switch (typ[j])
+			{
+				char	   *s = PQgetvalue(self->result, i, j);
+				char		cashbuf[64];
+				int			k;
+				Py_ssize_t	size;
+				PyObject   *tmp_obj;
+
+				switch (coltypes[j])
 				{
-					case 1:  /* int2/4 */
+					case PYGRES_INT:
 						val = PyInt_FromString(s, NULL, 10);
 						break;
 
-					case 2:  /* int8 */
+					case PYGRES_LONG:
 						val = PyLong_FromString(s, NULL, 10);
 						break;
 
-					case 3:  /* float/double */
+					case PYGRES_FLOAT:
 						tmp_obj = PyBytes_FromString(s);
 #if IS_PY3
 						val = PyFloat_FromString(tmp_obj);
@@ -3471,13 +3603,13 @@ queryDictResult(queryObject *self, PyObject *args)
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:  /* money */
+					case PYGRES_MONEY:
 						/* convert to decimal only if decimal point is set */
 						if (!decimal_point) goto default_case;
 
 						for (k = 0;
-							 *s && k < sizeof(cashbuf) / sizeof(cashbuf[0]) - 1;
-							 s++)
+							*s && k < sizeof(cashbuf)/sizeof(cashbuf[0]) - 1;
+							s++)
 						{
 							if (*s >= '0' && *s <= '9')
 								cashbuf[k++] = *s;
@@ -3490,7 +3622,7 @@ queryDictResult(queryObject *self, PyObject *args)
 						s = cashbuf;
 
 					/* FALLTHROUGH */ /* no break */
-					case 4:  /* numeric */
+					case PYGRES_DECIMAL:
 						if (decimal)
 						{
 							tmp_obj = Py_BuildValue("(s)", s);
@@ -3510,23 +3642,19 @@ queryDictResult(queryObject *self, PyObject *args)
 
 					default:
 					default_case:
+						size = PQgetlength(self->result, i, j);
 #if IS_PY3
-						if (encoding == pg_encoding_utf8)
-							val = PyUnicode_DecodeUTF8(s, strlen(s), "strict");
-						else if (encoding == pg_encoding_latin1)
-							val = PyUnicode_DecodeLatin1(s, strlen(s), "strict");
-						else if (encoding == pg_encoding_ascii)
-							val = PyUnicode_DecodeASCII(s, strlen(s), "strict");
+						if (PQfformat(self->result, j) == 0) /* text */
+						{
+							val = get_decoded_string(s, size, encoding);
+							if (!val) /* cannot decode */
+								val = PyBytes_FromStringAndSize(s, size);
+						}
 						else
-							val = PyUnicode_Decode(s, strlen(s),
-								encoding_name, "strict");
-						if (!val)
-							val = PyBytes_FromString(s);
-#else
-						val = PyBytes_FromString(s);
 #endif
-						break;
+						val = PyBytes_FromStringAndSize(s, size);
 				}
+			}
 
 			if (!val)
 			{
@@ -3544,7 +3672,7 @@ queryDictResult(queryObject *self, PyObject *args)
 	}
 
 exit:
-	free(typ);
+	free(coltypes);
 
 	/* returns list */
 	return reslist;
@@ -3653,7 +3781,8 @@ noticeStr(noticeObject *self)
 
 /* get the list of notice attributes */
 static PyObject *
-noticeDir(noticeObject *self) {
+noticeDir(noticeObject *self)
+{
 	PyObject *attrs;
 
 	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
@@ -3765,14 +3894,34 @@ static char pgEscapeString__doc__[] =
 static PyObject *
 pgEscapeString(PyObject *self, PyObject *args)
 {
-	char *from; /* our string argument */
-	char *to=NULL; /* the result */
-	int from_length; /* length of string */
-	int to_length; /* length of result */
-	PyObject *ret; /* string object to return */
+	PyObject   *from_obj, /* the object that was passed in */
+			   *to_obj; /* string object to return */
+	char 	   *from=NULL, /* our string argument as encoded string */
+		 	   *to; /* the result as encoded string */
+	Py_ssize_t 	from_length; /* length of string */
+	size_t		to_length; /* length of result */
+	int			encoding = -1; /* client encoding */
 
-	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+	if (!PyArg_ParseTuple(args, "O", &from_obj))
 		return NULL;
+
+	if (PyBytes_Check(from_obj))
+	{
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	else if (PyUnicode_Check(from_obj))
+	{
+		encoding = pg_encoding_ascii;
+		from_obj = get_encoded_string(from_obj, encoding);
+		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	if (!from)
+	{
+		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string.");
+		return NULL;
+	}
+
 	to_length = 2*from_length + 1;
 	if (to_length < from_length) /* overflow */
 	{
@@ -3781,12 +3930,14 @@ pgEscapeString(PyObject *self, PyObject *args)
 	}
 	to = (char *)malloc(to_length);
 	to_length = (int)PQescapeString(to, from, (size_t)from_length);
-	ret = Py_BuildValue("s#", to, to_length);
+
+	if (encoding == -1)
+		to_obj = PyBytes_FromStringAndSize(to, to_length);
+	else
+		to_obj = get_decoded_string(to, to_length, encoding);
 	if (to)
 		free(to);
-	if (!ret) /* pass on exception */
-		return NULL;
-	return ret;
+	return to_obj;
 }
 
 /* escape bytea */
@@ -3796,21 +3947,44 @@ static char pgEscapeBytea__doc__[] =
 static PyObject *
 pgEscapeBytea(PyObject *self, PyObject *args)
 {
-	unsigned char *from; /* our string argument */
-	unsigned char *to; /* the result */
-	int from_length; /* length of string */
-	size_t to_length; /* length of result */
-	PyObject *ret; /* string object to return */
+	PyObject   *from_obj, /* the object that was passed in */
+			   *to_obj; /* string object to return */
+	char 	   *from=NULL, /* our string argument as encoded string */
+		 	   *to; /* the result as encoded string */
+	Py_ssize_t 	from_length; /* length of string */
+	size_t		to_length; /* length of result */
+	int			encoding = -1; /* client encoding */
 
-	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+	if (!PyArg_ParseTuple(args, "O", &from_obj))
 		return NULL;
-	to = PQescapeBytea(from, (int)from_length, &to_length);
-	ret = Py_BuildValue("s", to);
+
+	if (PyBytes_Check(from_obj))
+	{
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	else if (PyUnicode_Check(from_obj))
+	{
+		encoding = pg_encoding_ascii;
+		from_obj = get_encoded_string(from_obj, encoding);
+		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	if (!from)
+	{
+		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string.");
+		return NULL;
+	}
+
+	to = (char *)PQescapeBytea(
+		(unsigned char*)from, (size_t)from_length, &to_length);
+
+	if (encoding == -1)
+		to_obj = PyBytes_FromStringAndSize(to, to_length - 1);
+	else
+		to_obj = get_decoded_string(to, to_length - 1, encoding);
 	if (to)
-		PQfreemem((void *)to);
-	if (!ret) /* pass on exception */
-		return NULL;
-	return ret;
+		PQfreemem(to);
+	return to_obj;
 }
 
 /* unescape bytea */
@@ -3820,23 +3994,38 @@ static char pgUnescapeBytea__doc__[] =
 static PyObject
 *pgUnescapeBytea(PyObject *self, PyObject *args)
 {
-	unsigned char *from; /* our string argument */
-	unsigned char *to; /* the result */
-	int from_length; /* length of string */
-	size_t to_length; /* length of result string */
-	PyObject *ret; /* string object to return */
+	PyObject   *from_obj, /* the object that was passed in */
+			   *to_obj; /* string object to return */
+	char 	   *from=NULL, /* our string argument as encoded string */
+		 	   *to; /* the result as encoded string */
+	Py_ssize_t 	from_length; /* length of string */
+	size_t		to_length; /* length of result */
 
-	if (!PyArg_ParseTuple(args, "s#", &from, &from_length))
+	if (!PyArg_ParseTuple(args, "O", &from_obj))
 		return NULL;
-	to = PQunescapeBytea(from, &to_length);
-	if (!to)
-	    return NULL;
-	ret = Py_BuildValue("s#", to, (int)to_length);
+
+	if (PyBytes_Check(from_obj))
+	{
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	else if (PyUnicode_Check(from_obj))
+	{
+		from_obj = get_encoded_string(from_obj, pg_encoding_ascii);
+		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+	}
+	if (!from)
+	{
+		PyErr_SetString(PyExc_TypeError, "unescape_bytea() expects a string.");
+		return NULL;
+	}
+
+	to = (char *)PQunescapeBytea((unsigned char*)from, &to_length);
+
+	to_obj = PyBytes_FromStringAndSize(to, to_length);
 	if (to)
-	    PQfreemem((void *)to);
-	if (!ret) /* pass on exception */
-		return NULL;
-	return ret;
+		PQfreemem(to);
+	return to_obj;
 }
 
 /* set decimal point */
@@ -3850,14 +4039,16 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 	char *s = NULL;
 
 	/* gets arguments */
-	if (PyArg_ParseTuple(args, "z", &s)) {
+	if (PyArg_ParseTuple(args, "z", &s))
+	{
 		if (!s)
 			s = "\0";
 		else if (*s && (*(s+1) || !strchr(".,;: '*/_`|", *s)))
 		 	s = NULL;
 	}
 
-	if (s) {
+	if (s)
+	{
 		decimal_point = *s;
 		Py_INCREF(Py_None); ret = Py_None;
 	} else {
@@ -3880,7 +4071,8 @@ pgGetDecimalPoint(PyObject *self, PyObject * args)
 
 	if (PyArg_ParseTuple(args, ""))
 	{
-		if (decimal_point) {
+		if (decimal_point)
+		{
 			s[0] = decimal_point; s[1] = '\0';
 			ret = PyStr_FromString(s);
 		} else {
