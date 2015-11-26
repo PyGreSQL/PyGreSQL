@@ -120,7 +120,7 @@ int *get_type_array(PGresult *result, int nfields);
 static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL; /* function for getting named results */
 static char decimal_point = '.'; /* decimal point used in money values */
-
+static int use_bool = 0; /* whether or not bool objects shall be returned */
 
 /* --------------------------------------------------------------------- */
 /* OBJECTS DECLARATION */
@@ -337,6 +337,16 @@ check_source_obj(pgsourceobject *self, int level)
 	return 1;
 }
 
+/* define internal types */
+
+#define PYGRES_INT 1
+#define PYGRES_LONG 2
+#define PYGRES_FLOAT 3
+#define PYGRES_DECIMAL 4
+#define PYGRES_MONEY 5
+#define PYGRES_BOOL 6
+#define PYGRES_DEFAULT 7
+
 /* shared functions for converting PG types to Python types */
 int *
 get_type_array(PGresult *result, int nfields)
@@ -357,28 +367,32 @@ get_type_array(PGresult *result, int nfields)
 			case INT2OID:
 			case INT4OID:
 			case OIDOID:
-				typ[j] = 1;
+				typ[j] = PYGRES_INT;
 				break;
 
 			case INT8OID:
-				typ[j] = 2;
+				typ[j] = PYGRES_LONG;
 				break;
 
 			case FLOAT4OID:
 			case FLOAT8OID:
-				typ[j] = 3;
+				typ[j] = PYGRES_FLOAT;
 				break;
 
 			case NUMERICOID:
-				typ[j] = 4;
+				typ[j] = PYGRES_DECIMAL;
 				break;
 
 			case CASHOID:
-				typ[j] = 5;
+				typ[j] = PYGRES_MONEY;
+				break;
+
+			case BOOLOID:
+				typ[j] = PYGRES_BOOL;
 				break;
 
 			default:
-				typ[j] = 6;
+				typ[j] = PYGRES_DEFAULT;
 				break;
 		}
 	}
@@ -2155,21 +2169,21 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 			else
 				switch (typ[j])
 				{
-					case 1:  /* int2/4 */
+					case PYGRES_INT:
 						val = PyInt_FromString(s, NULL, 10);
 						break;
 
-					case 2:  /* int8 */
+					case PYGRES_LONG:
 						val = PyLong_FromString(s, NULL, 10);
 						break;
 
-					case 3:  /* float/double */
+					case PYGRES_FLOAT:
 						tmp_obj = PyString_FromString(s);
 						val = PyFloat_FromString(tmp_obj, NULL);
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:  /* money */
+					case PYGRES_MONEY:
 						/* convert to decimal only if decimal point is set */
 						if (!decimal_point) goto default_case;
 						for (k = 0;
@@ -2185,9 +2199,9 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						}
 						cashbuf[k] = 0;
 						s = cashbuf;
+						/* FALLTHROUGH */ /* no break */
 
-					/* FALLTHROUGH */ /* no break */
-					case 4:  /* numeric */
+					case PYGRES_DECIMAL:
 						if (decimal)
 						{
 							tmp_obj = Py_BuildValue("(s)", s);
@@ -2200,6 +2214,16 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 						}
 						Py_DECREF(tmp_obj);
 						break;
+
+					case PYGRES_BOOL:
+						/* convert to bool only if bool_type is set */
+						if (use_bool)
+						{
+							val = *s == 't' ? Py_True : Py_False;
+							Py_INCREF(val);
+							break;
+						}
+						/* FALLTHROUGH */ /* no break */
 
 					default:
 					default_case:
@@ -2285,21 +2309,21 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 			else
 				switch (typ[j])
 				{
-					case 1:  /* int2/4 */
+					case PYGRES_INT:
 						val = PyInt_FromString(s, NULL, 10);
 						break;
 
-					case 2:  /* int8 */
+					case PYGRES_LONG:
 						val = PyLong_FromString(s, NULL, 10);
 						break;
 
-					case 3:  /* float/double */
+					case PYGRES_FLOAT:
 						tmp_obj = PyString_FromString(s);
 						val = PyFloat_FromString(tmp_obj, NULL);
 						Py_DECREF(tmp_obj);
 						break;
 
-					case 5:  /* money */
+					case PYGRES_MONEY:
 						/* convert to decimal only if decimal point is set */
 						if (!decimal_point) goto default_case;
 
@@ -2316,9 +2340,9 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						}
 						cashbuf[k] = 0;
 						s = cashbuf;
+						/* FALLTHROUGH */ /* no break */
 
-					/* FALLTHROUGH */ /* no break */
-					case 4:  /* numeric */
+					case PYGRES_DECIMAL:
 						if (decimal)
 						{
 							tmp_obj = Py_BuildValue("(s)", s);
@@ -2331,6 +2355,16 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 						}
 						Py_DECREF(tmp_obj);
 						break;
+
+					case PYGRES_BOOL:
+						/* convert to bool only if bool_type is set */
+						if (use_bool)
+						{
+							val = *s == 't' ? Py_True : Py_False;
+							Py_INCREF(val);
+							break;
+						}
+						/* FALLTHROUGH */ /* no break */
 
 					default:
 					default_case:
@@ -3700,9 +3734,38 @@ static PyObject
 	return ret;
 }
 
+/* get decimal point */
+static char get_decimal_point__doc__[] =
+"get_decimal_point() -- get decimal point to be used for money values.";
+
+static PyObject *
+get_decimal_point(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	char s[2];
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		if (decimal_point)
+		{
+			s[0] = decimal_point; s[1] = '\0';
+			ret = PyString_FromString(s);
+		} else {
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"get_decimal_point() takes no parameter");
+	}
+
+	return ret;
+}
+
 /* set decimal point */
 static char set_decimal_point__doc__[] =
-"set_decimal_point() -- set decimal point to be used for money values.";
+"set_decimal_point(char) -- set decimal point to be used for money values.";
 
 static PyObject *
 set_decimal_point(PyObject *self, PyObject * args)
@@ -3729,35 +3792,25 @@ set_decimal_point(PyObject *self, PyObject * args)
 	return ret;
 }
 
-/* get decimal point */
-static char get_decimal_point__doc__[] =
-"get_decimal_point() -- get decimal point to be used for money values.";
+/* get decimal type */
+static char get_decimal__doc__[] =
+"get_decimal() -- set a decimal type to be used for numeric values.";
 
 static PyObject *
-get_decimal_point(PyObject *self, PyObject * args)
+get_decimal(PyObject *self, PyObject *args)
 {
 	PyObject *ret = NULL;
-	char s[2];
 
 	if (PyArg_ParseTuple(args, ""))
 	{
-		if (decimal_point) {
-			s[0] = decimal_point; s[1] = '\0';
-			ret = PyString_FromString(s);
-		} else {
-			Py_INCREF(Py_None); ret = Py_None;
-		}
-	}
-	else
-	{
-		PyErr_SetString(PyExc_TypeError,
-			"get_decimal_point() takes no parameter");
+		ret = decimal ? decimal : Py_None;
+		Py_INCREF(ret);
 	}
 
 	return ret;
 }
 
-/* set decimal */
+/* set decimal type */
 static char set_decimal__doc__[] =
 "set_decimal(cls) -- set a decimal type to be used for numeric values.";
 
@@ -3780,12 +3833,70 @@ set_decimal(PyObject *self, PyObject *args)
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
-			PyErr_SetString(PyExc_TypeError, "decimal type must be None or callable");
+			PyErr_SetString(PyExc_TypeError,
+				"decimal type must be None or callable");
 	}
+
 	return ret;
 }
 
-/* set named result */
+/* get usage of bool values */
+static char get_bool__doc__[] =
+"get_bool() -- check whether boolean values are converted to bool.";
+
+static PyObject *
+get_bool(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = use_bool ? Py_True : Py_False;
+		Py_INCREF(ret);
+	}
+
+	return ret;
+}
+
+/* set usage of bool values */
+static char set_bool__doc__[] =
+"set_bool(bool) -- set whether boolean values should be converted to bool.";
+
+static PyObject *
+set_bool(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	int			i;
+
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "i", &i))
+	{
+		use_bool = i ? 1 : 0;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+
+	return ret;
+}
+
+/* get named result factory */
+static char get_namedresult__doc__[] =
+"get_namedresult(cls) -- get the function used for getting named results.";
+
+static PyObject *
+get_namedresult(PyObject *self, PyObject *args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = namedresult ? namedresult : Py_None;
+		Py_INCREF(ret);
+	}
+
+	return ret;
+}
+
+/* set named result factory */
 static char set_namedresult__doc__[] =
 "set_namedresult(cls) -- set a function to be used for getting named results.";
 
@@ -3805,6 +3916,7 @@ set_namedresult(PyObject *self, PyObject *args)
 		else
 			PyErr_SetString(PyExc_TypeError, "parameter must be callable");
 	}
+
 	return ret;
 }
 
@@ -4159,12 +4271,18 @@ static struct PyMethodDef pg_methods[] = {
 			escape_bytea__doc__},
 	{"unescape_bytea", (PyCFunction) unescape_bytea, METH_VARARGS,
 			unescape_bytea__doc__},
-	{"set_decimal_point", (PyCFunction) set_decimal_point, METH_VARARGS,
-			set_decimal_point__doc__},
 	{"get_decimal_point", (PyCFunction) get_decimal_point, METH_VARARGS,
 			get_decimal_point__doc__},
+	{"set_decimal_point", (PyCFunction) set_decimal_point, METH_VARARGS,
+			set_decimal_point__doc__},
+	{"get_decimal", (PyCFunction) get_decimal, METH_VARARGS,
+			get_decimal__doc__},
 	{"set_decimal", (PyCFunction) set_decimal, METH_VARARGS,
 			set_decimal__doc__},
+	{"get_bool", (PyCFunction) get_bool, METH_VARARGS, get_bool__doc__},
+	{"set_bool", (PyCFunction) set_bool, METH_VARARGS, set_bool__doc__},
+	{"get_namedresult", (PyCFunction) get_namedresult, METH_VARARGS,
+			get_namedresult__doc__},
 	{"set_namedresult", (PyCFunction) set_namedresult, METH_VARARGS,
 			set_namedresult__doc__},
 

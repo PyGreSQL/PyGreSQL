@@ -156,6 +156,25 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             else:
                 self.assertEqual(inval, outval)
 
+    def test_bool(self):
+        values = [False, True, None, 't', 'f', 'true', 'false']
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute(
+                "create table %s (n smallint, booltest bool)" % table)
+            params = enumerate(values)
+            cur.executemany("insert into %s values (%%s,%%s)" % table, params)
+            cur.execute("select * from %s order by 1" % table)
+            rows = cur.fetchall()
+        finally:
+            con.close()
+        rows = [row[1] for row in rows]
+        values[3] = values[5] = True
+        values[4] = values[6] = False
+        self.assertEqual(rows, values)
+
     def test_set_decimal_type(self):
         decimal_type = pgdb.decimal_type()
         self.assert_(decimal_type is not None and callable(decimal_type))
