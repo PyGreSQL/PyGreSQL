@@ -157,6 +157,27 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             else:
                 self.assertEqual(inval, outval)
 
+    def test_set_decimal_type(self):
+        decimal_type = pgdb.decimal_type()
+        self.assertTrue(decimal_type is not None and callable(decimal_type))
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            self.assertTrue(pgdb.decimal_type(int) is int)
+            cur.execute('select 42')
+            value = cur.fetchone()[0]
+            self.assertTrue(isinstance(value, int))
+            self.assertEqual(value, 42)
+            self.assertTrue(pgdb.decimal_type(float) is float)
+            cur.execute('select 4.25')
+            value = cur.fetchone()[0]
+            self.assertTrue(isinstance(value, float))
+            self.assertEqual(value, 4.25)
+        finally:
+            con.close()
+            pgdb.decimal_type(decimal_type)
+        self.assertTrue(pgdb.decimal_type() is decimal_type)
+
     def test_unicode_with_utf8(self):
         table = self.table_prefix + 'booze'
         input = u"He wes Leovenaðes sone — liðe him be Drihten"
@@ -223,26 +244,23 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertIsInstance(output4, bool)
         self.assertTrue(output4)
 
-    def test_set_decimal_type(self):
-        decimal_type = pgdb.decimal_type()
-        self.assertTrue(decimal_type is not None and callable(decimal_type))
+    def test_bool(self):
+        values = [[0, False], [1, True], [2, None],
+                  [3, 't'], [4, 'f'], [5, 'true'], [6, 'false']]
+        table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
-            self.assertTrue(pgdb.decimal_type(int) is int)
-            cur.execute('select 42')
-            value = cur.fetchone()[0]
-            self.assertTrue(isinstance(value, int))
-            self.assertEqual(value, 42)
-            self.assertTrue(pgdb.decimal_type(float) is float)
-            cur.execute('select 4.25')
-            value = cur.fetchone()[0]
-            self.assertTrue(isinstance(value, float))
-            self.assertEqual(value, 4.25)
+            cur.execute(
+                "create table %s (n smallint, booltest bool)" % table)
+            cur.executemany("insert into %s values (%%s,%%s)" % table, values)
+            cur.execute("select * from %s order by 1" % table)
+            rows = cur.fetchall()
         finally:
             con.close()
-            pgdb.decimal_type(decimal_type)
-        self.assertTrue(pgdb.decimal_type() is decimal_type)
+        values[3][1] = values[5][1] = True
+        values[4][1] = values[6][1] = False
+        self.assertEqual(rows, values)
 
     def test_nextset(self):
         con = self._connect()
