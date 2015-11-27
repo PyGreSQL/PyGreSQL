@@ -66,14 +66,14 @@ Basic usage:
 from _pg import *
 try:
     frozenset
-except NameError:  # Python < 2.4
+except NameError:  # Python < 2.4, unsupported
     from sets import ImmutableSet as frozenset
 from datetime import date, time, datetime, timedelta
 from time import localtime
-try:  # use Decimal if available
+try:
     from decimal import Decimal
     set_decimal(Decimal)
-except ImportError:  # otherwise (Python < 2.4)
+except ImportError:  # Python < 2.4, unsupported
     Decimal = float  # use float instead of Decimal
 try:
     from math import isnan, isinf

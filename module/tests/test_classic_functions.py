@@ -22,6 +22,10 @@ import re
 import pg  # the module under test
 
 try:
+    from decimal import Decimal
+except ImportError:  # Python < 2.4, unsupported
+    Decimal = None
+try:
     from collections import namedtuple
 except ImportError:  # Python < 2.6
     namedtuple = None
@@ -312,7 +316,7 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testGetDecimal(self):
         r = pg.get_decimal()
-        self.assertIs(r, pg.Decimal)
+        self.assertIs(r, Decimal)
 
     def testSetDecimal(self):
         decimal_class = pg.Decimal

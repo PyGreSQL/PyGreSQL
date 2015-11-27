@@ -34,12 +34,12 @@ import select
 import warnings
 try:
     frozenset
-except NameError:  # Python < 2.4
+except NameError:  # Python < 2.4, unsupported
     from sets import ImmutableSet as frozenset
 try:
     from decimal import Decimal
     set_decimal(Decimal)
-except ImportError:  # Python < 2.4
+except ImportError:  # Python < 2.4, unsupported
     Decimal = float
 try:
     from collections import namedtuple

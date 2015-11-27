@@ -22,10 +22,11 @@ for general information.
 This version has been built and unit tested on:
  - NetBSD
  - FreeBSD
- - openSUSE 12.2
+ - openSUSE
+ - Ubuntu
  - Windows 7 with both MinGW and Visual Studio
- - PostgreSQL 8.4, 9.0 and 9.2 32 and 64bit
- - Python 2.5, 2.6 and 2.7 32 and 64bit
+ - PostgreSQL 8.4 and 9.3 64bit
+ - Python 2.4, 2.5, 2.6 and 2.7 32 and 64bit
 
 | D'Arcy J.M. Cain
 | darcy@PyGreSQL.org
