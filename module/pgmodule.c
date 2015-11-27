@@ -2611,9 +2611,7 @@ pg_query(pgobject *self, PyObject *args)
 					*s = PyUnicode_AsEncodedString(obj, enc, "strict");
 				if (*s == NULL)
 				{
-					free(lparms); free(parms); free(str);
-					PyErr_SetString(PyExc_UnicodeError, "query parameter"
-						" could not be decoded (bad client encoding)");
+					free(lparms); free(parms);
 					while (i--)
 					{
 						if (*--s)
@@ -2621,6 +2619,9 @@ pg_query(pgobject *self, PyObject *args)
 							Py_DECREF(*s);
 						}
 					}
+ 					free(str);
+					PyErr_SetString(PyExc_UnicodeError, "query parameter"
+						" could not be decoded (bad client encoding)");
 					return NULL;
 				}
 				*p = PyString_AsString(*s);
@@ -2631,9 +2632,7 @@ pg_query(pgobject *self, PyObject *args)
 				*s = PyObject_Str(obj);
 				if (*s == NULL)
 				{
-					free(lparms); free(parms); free(str);
-					PyErr_SetString(PyExc_TypeError,
-						"query parameter has no string representation");
+					free(lparms); free(parms);
 					while (i--)
 					{
 						if (*--s)
@@ -2641,6 +2640,9 @@ pg_query(pgobject *self, PyObject *args)
 							Py_DECREF(*s);
 						}
 					}
+					free(str);
+					PyErr_SetString(PyExc_TypeError,
+						"query parameter has no string representation");
 					return NULL;
 				}
 				*p = PyString_AsString(*s);
