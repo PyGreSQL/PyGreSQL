@@ -21,6 +21,11 @@ import re
 
 import pg  # the module under test
 
+try:
+    from collections import namedtuple
+except ImportError:  # Python < 2.6
+    namedtuple = None
+
 
 class TestAuxiliaryFunctions(unittest.TestCase):
     """Test the auxiliary functions external to the connection class."""
@@ -341,14 +346,23 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testGetNamedresult(self):
         r = pg.get_namedresult()
-        self.assertIs(r, pg._namedresult)
+        if namedtuple:
+            self.assertTrue(callable(r))
+            self.assertIs(r, pg._namedresult)
+        else:
+            self.assertIsNone(r)
 
     def testSetNamedresult(self):
         namedresult = pg.get_namedresult()
+        self.assertRaises(TypeError, pg.set_namedresult)
+        self.assertRaises(TypeError, pg.set_namedresult, None)
         f = lambda q: q.getresult()
         pg.set_namedresult(f)
         r = pg.get_namedresult()
-        pg.set_namedresult(namedresult)
+        if namedtuple or namedresult is not None:
+            pg.set_namedresult(namedresult)
+        else:
+            namedresult = f
         self.assertIs(r, f)
         r = pg.get_namedresult()
         self.assertIs(r, namedresult)

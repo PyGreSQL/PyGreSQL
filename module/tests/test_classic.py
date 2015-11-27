@@ -308,7 +308,7 @@ class UtilityTest(unittest.TestCase):
             self.assertFalse(target.listening)
         finally:
             target.close()
-            if thread.is_alive():
+            if thread.isAlive():
                 thread.join(5)
 
     def test_notify_other_options(self):

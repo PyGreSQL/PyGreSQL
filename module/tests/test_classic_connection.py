@@ -204,7 +204,7 @@ class TestConnectObject(unittest.TestCase):
         thread.start()  # run the query
         while 1:  # make sure the query is really running
             time.sleep(0.1)
-            if thread.is_alive() or time.time() - t1 > 5:
+            if thread.isAlive() or time.time() - t1 > 5:
                 break
         r = self.connection.cancel()  # cancel the running query
         thread.join()  # wait for the thread to end
@@ -1193,6 +1193,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertIs(r, 't')
 
+    @unittest.skipUnless(namedtuple, 'Named tuples not available')
     def testGetNamedresult(self):
         namedresult = pg.get_namedresult()
         # error if a parameter is passed
