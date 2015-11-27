@@ -360,7 +360,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, False)
 
-    def testSetBoool(self):
+    def testSetBool(self):
         use_bool = pg.get_bool()
         pg.set_bool(True)
         r = pg.get_bool()
