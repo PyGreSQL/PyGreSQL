@@ -941,7 +941,10 @@ class TestConfigFunctions(unittest.TestCase):
         # check that money values can be interpreted correctly
         # if and only if the decimal point is set appropriately
         # for the current lc_monetary setting
-        query("set lc_monetary='en_US.UTF-8'")
+        try:
+            query("set lc_monetary='en_US.UTF-8'")
+        except pg.ProgrammingError:
+            self.skipTest("cannot set English money locale")
         pg.set_decimal_point(None)
         try:
             r = query("select '34.25'::money").getresult()[0][0]
@@ -963,7 +966,10 @@ class TestConfigFunctions(unittest.TestCase):
         finally:
             pg.set_decimal_point(point)
         self.assertNotEqual(r, d('34.25'))
-        query("set lc_monetary='de_DE.UTF-8'")
+        try:
+            query("set lc_monetary='de_DE.UTF-8'")
+        except pg.ProgrammingError:
+            self.skipTest("cannot set German money locale")
         pg.set_decimal_point(None)
         try:
             r = query("select '34,25'::money").getresult()[0][0]
