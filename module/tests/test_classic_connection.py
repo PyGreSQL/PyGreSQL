@@ -1344,8 +1344,8 @@ class TestConfigFunctions(unittest.TestCase):
         # only if decimal_point is set, and that the result is correct
         # only if it is set suitable for the current lc_monetary setting
         select_money = "select '34.25'::money"
-        proper_money = d(34.25)
-        bad_money = d(3425)
+        proper_money = d('34.25')
+        bad_money = d('3425')
         en_locales = 'en', 'en_US', 'en_US.utf8', 'en_US.UTF-8'
         en_money = '$34.25', '$ 34.25', '34.25$', '34.25 $', '34.25 Dollar'
         de_locales = 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8'
