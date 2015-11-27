@@ -28,8 +28,11 @@ dbport = 5432
 
 try:
     from .LOCAL_PyGreSQL import *
-except ImportError:
-    pass
+except (ImportError, ValueError):
+    try:
+        from LOCAL_PyGreSQL import *
+    except ImportError:
+        pass
 
 windows = os.name == 'nt'
 

@@ -6,7 +6,10 @@ import unittest
 
 import pgdb
 
-from . import dbapi20
+try:
+    from . import dbapi20
+except (ImportError, ValueError, SystemError):
+    import dbapi20
 
 # We need a database to test against.
 # If LOCAL_PyGreSQL.py exists we will get our information from that.
@@ -16,8 +19,11 @@ dbhost = ''
 dbport = 5432
 try:
     from .LOCAL_PyGreSQL import *
-except ImportError:
-    pass
+except (ImportError, ValueError):
+    try:
+        from LOCAL_PyGreSQL import *
+    except ImportError:
+        pass
 
 try:
     long

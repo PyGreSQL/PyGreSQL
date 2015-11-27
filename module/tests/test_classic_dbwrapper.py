@@ -32,8 +32,11 @@ debug = False  # let DB wrapper print debugging output
 
 try:
     from .LOCAL_PyGreSQL import *
-except ImportError:
-    pass
+except (ImportError, ValueError):
+    try:
+        from LOCAL_PyGreSQL import *
+    except ImportError:
+        pass
 
 try:
     long

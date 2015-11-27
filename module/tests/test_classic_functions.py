@@ -378,6 +378,7 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testGetNamedresult(self):
         r = pg.get_namedresult()
+        self.assertTrue(callable(r))
         self.assertIs(r, pg._namedresult)
 
     def testSetNamedresult(self):
