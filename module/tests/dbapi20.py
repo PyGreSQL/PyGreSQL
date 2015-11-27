@@ -15,7 +15,11 @@ __rcs_id__  = '$Id$'
 __version__ = '$Revision: 1.5 $'[11:-2]
 __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'
 
-import unittest
+try:
+    import unittest2 as unittest  # for Python < 2.7
+except ImportError:
+    import unittest
+
 import time
 
 # $Log: not supported by cvs2svn $

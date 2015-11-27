@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 # $Id$
 
-import unittest
+try:
+    import unittest2 as unittest  # for Python < 2.7
+except ImportError:
+    import unittest
 
 import pgdb
 
