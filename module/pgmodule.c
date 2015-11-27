@@ -603,7 +603,7 @@ largeNew(connObject *pgcnx, Oid oid)
 static void
 largeDealloc(largeObject *self)
 {
-	if (self->lo_fd >= 0 && check_cnx_obj(self->pgcnx))
+	if (self->lo_fd >= 0 && self->pgcnx->valid)
 		lo_close(self->pgcnx->cnx, self->lo_fd);
 
 	Py_XDECREF(self->pgcnx);
@@ -986,7 +986,7 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 			Py_INCREF(self->pgcnx);
 			return (PyObject *) (self->pgcnx);
 		}
-
+		PyErr_Clear();
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
@@ -996,7 +996,7 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 	{
 		if (check_lo_obj(self, 0))
 			return PyInt_FromLong(self->lo_oid);
-
+		PyErr_Clear();
 		Py_INCREF(Py_None);
 		return Py_None;
 	}

@@ -362,29 +362,15 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, unlink, 0)
         # unlinking when object is still open
         self.obj.open(pg.INV_WRITE)
+        self.assertIsNotNone(self.obj.oid)
+        self.assertNotEqual(0, self.obj.oid)
         self.assertRaises(IOError, unlink)
         data = b'some data to be sold'
         self.obj.write(data)
         self.obj.close()
-        oid = self.obj.oid
-        self.assertIsInstance(oid, int)
-        self.assertNotEqual(oid, 0)
-        obj = self.pgcnx.getlo(oid)
-        try:
-            self.assertIsNot(obj, self.obj)
-            self.assertEqual(obj.oid, oid)
-            obj.open(pg.INV_READ)
-            r = obj.read(80)
-            obj.close()
-            self.assertIsInstance(r, bytes)
-            self.assertEqual(r, data)
-        finally:
-            del obj
+        # unlinking after object has been closed
         unlink()
-        try:
-            self.assertIsNone(self.obj.oid)
-        except SystemError:
-            pass
+        self.assertIsNone(self.obj.oid)
 
     def testSize(self):
         size = self.obj.size
