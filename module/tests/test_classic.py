@@ -2,11 +2,16 @@
 
 from __future__ import with_statement
 
+try:
+    import unittest2 as unittest  # for Python < 2.7
+except ImportError:
+    import unittest
+
 import sys
 from functools import partial
 from time import sleep
 from threading import Thread
-import unittest
+
 from pg import *
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
@@ -345,22 +350,24 @@ class UtilityTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    suite = unittest.TestSuite()
-
-    if len(sys.argv) > 1: test_list = sys.argv[1:]
-    else: test_list = unittest.getTestCaseNames(UtilityTest, 'test_')
-
     if len(sys.argv) == 2 and sys.argv[1] == '-l':
         print '\n'.join(unittest.getTestCaseNames(UtilityTest, 'test_'))
-        sys.exit(1)
+        sys.exit(0)
 
+    test_list = [name for name in sys.argv[1:] if not name.startswith('-')]
+    if not test_list:
+        test_list = unittest.getTestCaseNames(UtilityTest, 'test_')
+
+    suite = unittest.TestSuite()
     for test_name in test_list:
         try:
             suite.addTest(UtilityTest(test_name))
-        except:
+        except Exception:
             print "\n ERROR: %s.\n" % sys.exc_value
             sys.exit(1)
 
-    rc = unittest.TextTestRunner(verbosity=1).run(suite)
-    sys.exit(len(rc.errors+rc.failures) != 0)
-
+    verbosity = '-v' in sys.argv[1:] and 2 or 1
+    failfast = '-l' in sys.argv[1:]
+    runner = unittest.TextTestRunner(verbosity=verbosity, failfast=failfast)
+    rc = runner.run(suite)
+    sys.exit(1 if rc.errors or rc.failures else 0)
