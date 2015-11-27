@@ -1360,7 +1360,7 @@ class TestConfigFunctions(unittest.TestCase):
             else:
                 break
         else:
-            self.SkipTest("cannot set English money locale")
+            self.skipTest("cannot set English money locale")
         try:
             r = query(select_money)
         except pg.ProgrammingError:
@@ -1415,7 +1415,7 @@ class TestConfigFunctions(unittest.TestCase):
             else:
                 break
         else:
-            self.SkipTest("cannot set German money locale")
+            self.skipTest("cannot set German money locale")
         select_money = select_money.replace('.', ',')
         try:
             r = query(select_money)
@@ -1559,7 +1559,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertIs(r, 't')
 
-    def testGetBool(self):
+    def testGetNamedresult(self):
         namedresult = pg.get_namedresult()
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_namedresult, namedresult)
