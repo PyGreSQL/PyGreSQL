@@ -1,18 +1,18 @@
 #! /usr/bin/python
 
-from __future__ import with_statement
-
 try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
 
 import sys
-from functools import partial
 from time import sleep
 from threading import Thread
 
 from pg import *
+
+# check whether the "with" statement is supported
+no_with = sys.version_info[:2] < (2, 5)
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
@@ -121,10 +121,13 @@ class UtilityTest(unittest.TestCase):
         db.insert('_test_schema', _test=1235)
         self.assertEqual(d['dvar'], 999)
 
+    @unittest.skipIf(no_with, 'context managers not supported')
     def test_context_manager(self):
         db = opendb()
         t = '_test_schema'
         d = dict(_test=1235)
+        # wrap "with" statements to avoid SyntaxError in Python < 2.5
+        exec """from __future__ import with_statement\nif True:
         with db:
             db.insert(t, d)
             d['_test'] += 1
@@ -140,7 +143,7 @@ class UtilityTest(unittest.TestCase):
             d['_test'] += 1
             db.insert(t, d)
             d['_test'] += 1
-            db.insert(t, d)
+            db.insert(t, d)\n"""
         self.assertTrue(db.get(t, 1235))
         self.assertTrue(db.get(t, 1236))
         self.assertRaises(DatabaseError, db.get, t, 1237)
@@ -247,8 +250,11 @@ class UtilityTest(unittest.TestCase):
         two_payloads = options.get('two_payloads')
         db = opendb()
         # Get function under test, can be standalone or DB method.
-        fut = db.notification_handler if run_as_method else partial(
-            NotificationHandler, db)
+        if run_as_method:
+            fut = db.notification_handler
+        else:
+            # functools.partial is not available in Python < 2.5
+            fut = lambda *args: NotificationHandler(db, *args)
         arg_dict = dict(event=None, called=False)
         self.notify_timeout = False
         # Listen for 'event_1'.
@@ -331,8 +337,10 @@ class UtilityTest(unittest.TestCase):
         for run_as_method in False, True:
             db = opendb()
             # Get function under test, can be standalone or DB method.
-            fut = db.notification_handler if run_as_method else partial(
-                NotificationHandler, db)
+            if run_as_method:
+                fut = db.notification_handler
+            else:
+                fut = lambda *args: NotificationHandler(db, *args)
             arg_dict = dict(event=None, called=False)
             self.notify_timeout = False
             # Listen for 'event_1' with timeout of 10ms.
@@ -370,4 +378,4 @@ if __name__ == '__main__':
     failfast = '-l' in sys.argv[1:]
     runner = unittest.TextTestRunner(verbosity=verbosity, failfast=failfast)
     rc = runner.run(suite)
-    sys.exit(1 if rc.errors or rc.failures else 0)
+    sys.exit((rc.errors or rc.failures) and 1 or 0)

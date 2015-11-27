@@ -175,7 +175,7 @@ class TestConnectObject(unittest.TestCase):
         query = self.connection.query
         # check that client encoding gets reset
         encoding = query('show client_encoding').getresult()[0][0].upper()
-        changed_encoding = 'LATIN1' if encoding == 'UTF8' else 'UTF8'
+        changed_encoding = encoding == 'UTF8' and 'LATIN1' or 'UTF8'
         self.assertNotEqual(encoding, changed_encoding)
         self.connection.query("set client_encoding=%s" % changed_encoding)
         new_encoding = query('show client_encoding').getresult()[0][0].upper()
@@ -491,8 +491,7 @@ class TestSimpleQueries(unittest.TestCase):
             print r
         except Exception:
             pass
-        finally:
-            sys.stdout = stdout
+        sys.stdout = stdout
         f.seek(0)
         r = f.read()
         f.close()
@@ -525,7 +524,7 @@ class TestParamQueries(unittest.TestCase):
             use_bool_default = pg.get_bool()
             pg.set_bool(use_bool)
         try:
-            v_false, v_true = (False, True) if use_bool else 'ft'
+            v_false, v_true = use_bool and (False, True) or 'ft'
             r_false, r_true = [(v_false,)], [(v_true,)]
             self.assertEqual(query("select false").getresult(), r_false)
             self.assertEqual(query("select true").getresult(), r_true)

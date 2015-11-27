@@ -1,11 +1,19 @@
 #! /usr/bin/python
 # $Id$
 
-from __future__ import with_statement
+try:
+    import unittest2 as unittest  # for Python < 2.7
+except ImportError:
+    import unittest
 
-import unittest
-import dbapi20
+import sys
+
 import pgdb
+
+import dbapi20
+
+# check whether the "with" statement is supported
+no_with = sys.version_info[:2] < (2, 5)
 
 # We need a database to test against.
 # If LOCAL_PyGreSQL.py exists we will get our information from that.
@@ -217,9 +225,12 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(con.DataError, pgdb.DataError)
         self.assertEqual(con.NotSupportedError, pgdb.NotSupportedError)
 
+    @unittest.skipIf(no_with, 'context managers not supported')
     def test_connection_as_contextmanager(self):
         table = self.table_prefix + 'booze'
         con = self._connect()
+        # wrap "with" statements to avoid SyntaxError in Python < 2.5
+        exec """from __future__ import with_statement\nif True:
         try:
             cur = con.cursor()
             cur.execute("create table %s (n smallint check(n!=4))" % table)
@@ -248,7 +259,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             rows = cur.fetchall()
             rows = [row[0] for row in rows]
         finally:
-            con.close()
+            con.close()\n"""
         self.assertEqual(rows, [1, 2, 5, 6, 9])
 
     def test_cursor_connection(self):
@@ -257,10 +268,13 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(cur.connection, con)
         cur.close()
 
+    @unittest.skipIf(no_with, 'context managers not supported')
     def test_cursor_as_contextmanager(self):
         con = self._connect()
+        # wrap "with" statements to avoid SyntaxError in Python < 2.5
+        exec """from __future__ import with_statement\nif True:
         with con.cursor() as cur:
-            self.assertEqual(cur.connection, con)
+            self.assertEqual(cur.connection, con)\n"""
 
     def test_pgdb_type(self):
         self.assertEqual(pgdb.STRING, pgdb.STRING)

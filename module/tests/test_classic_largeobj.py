@@ -398,8 +398,7 @@ class TestLargeObjects(unittest.TestCase):
             print self.obj
         except Exception:
             pass
-        finally:
-            sys.stdout = stdout
+        sys.stdout = stdout
         f.seek(0)
         r = f.read()
         f.close()

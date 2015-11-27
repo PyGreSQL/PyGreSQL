@@ -11,16 +11,19 @@ These tests need a database to test against.
 
 """
 
-from __future__ import with_statement
-
 try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
 
+import sys
+
 import pg  # the module under test
 
 from decimal import Decimal
+
+# check whether the "with" statement is supported
+no_with = sys.version_info[:2] < (2, 5)
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
@@ -961,10 +964,13 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, [1, 2, 5, 7, 9])
         query("drop table test_table")
 
+    @unittest.skipIf(no_with, 'context managers not supported')
     def testContextManager(self):
         query = self.db.query
         query("drop table if exists test_table")
         query("create table test_table (n integer check(n>0))")
+        # wrap "with" statements to avoid SyntaxError in Python < 2.5
+        exec """from __future__ import with_statement\nif True:
         with self.db:
             query("insert into test_table values (1)")
             query("insert into test_table values (2)")
@@ -984,7 +990,7 @@ class TestDBClass(unittest.TestCase):
         except pg.ProgrammingError, error:
             self.assertTrue('check' in str(error))
         with self.db:
-            query("insert into test_table values (7)")
+            query("insert into test_table values (7)")\n"""
         r = [r[0] for r in query(
             "select * from test_table order by 1").getresult()]
         self.assertEqual(r, [1, 2, 5, 7])
