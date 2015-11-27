@@ -1216,7 +1216,7 @@ connQuery(connObject *self, PyObject *args)
 				*s = get_encoded_string(obj, encoding);
 				if (!*s)
 				{
-					free(lparms); free(parms); free(str);
+					free(lparms); free(parms);
 					while (i--)
 					{
 						if (*--s)
@@ -1224,7 +1224,9 @@ connQuery(connObject *self, PyObject *args)
 							Py_DECREF(*s);
 						}
 					}
-					return NULL; /* pass the UnicodeEncodeError */
+					free(str);
+					/* pass the UnicodeEncodeError */
+					return NULL;
 				}
 				PyBytes_AsStringAndSize(*s, p, (Py_ssize_t *)l);
 			}
@@ -1233,7 +1235,7 @@ connQuery(connObject *self, PyObject *args)
 				*s = PyObject_Str(obj);
 				if (!*s)
 				{
-					free(lparms); free(parms); free(str);
+					free(lparms); free(parms);
 					while (i--)
 					{
 						if (*--s)
@@ -1241,6 +1243,7 @@ connQuery(connObject *self, PyObject *args)
 							Py_DECREF(*s);
 						}
 					}
+					free(str);
 					PyErr_SetString(PyExc_TypeError,
 						"query parameter has no string representation");
 					return NULL;
