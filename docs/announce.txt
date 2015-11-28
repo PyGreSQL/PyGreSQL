@@ -3,12 +3,12 @@ PyGreSQL Announcements
 ======================
 
 -------------------------------
-Release of PyGreSQL version 4.2
+Release of PyGreSQL version 5.0
 -------------------------------
 
-Release 4.2 of PyGreSQL.
+Release 5.0 of PyGreSQL.
 
-It is available at: http://pygresql.org/files/PyGreSQL-4.2.tgz.
+It is available at: http://pygresql.org/files/PyGreSQL-5.0.tgz.
 
 If you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.
@@ -22,10 +22,11 @@ for general information.
 This version has been built and unit tested on:
  - NetBSD
  - FreeBSD
- - openSUSE 12.2
+ - openSUSE
+ - Ubuntu
  - Windows 7 with both MinGW and Visual Studio
- - PostgreSQL 8.4, 9.0 and 9.2 32 and 64bit
- - Python 2.5, 2.6 and 2.7 32 and 64bit
+ - PostgreSQL 9.0 and 9.3 64bit
+ - Python 2.6, 2.7, 3.3, 3.4 and 3.5 32 and 64bit
 
 | D'Arcy J.M. Cain
 | darcy@PyGreSQL.org

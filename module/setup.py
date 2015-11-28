@@ -21,7 +21,7 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-The supported versions are Python 2.6-3.5 and PostgreSQL 9.0-9.5.
+The supported versions are Python 2.6-2.7, 3.3-3.5 and PostgreSQL 9.0-9.5.
 
 Use as follows:
 python setup.py build   # to build the module
@@ -40,7 +40,8 @@ version = '5.0a0'
 
 import sys
 
-if not (2, 6) <= sys.version_info[:2] <= (3, 5):
+if (not (2, 6) <= sys.version_info[:2] <= (2, 7)
+        and not (3, 3) <= sys.version_info[:2] <= (3, 5)):
     raise Exception("Sorry, PyGreSQL %s"
         " does not support this Python version" % version)
 
@@ -185,7 +186,14 @@ setup(
         "License :: OSI Approved :: Python Software Foundation License",
         "Operating System :: OS Independent",
         "Programming Language :: C",
-        "Programming Language :: Python",
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         "Programming Language :: SQL",
         "Topic :: Database",
         "Topic :: Database :: Front-Ends",
