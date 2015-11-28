@@ -354,7 +354,7 @@ get_type_array(PGresult *result, int nfields)
 	int *typ;
 	int j;
 
-	if (!(typ = malloc(sizeof(int) * nfields)))
+	if (!(typ = PyMem_Malloc(sizeof(int) * nfields)))
 	{
 		PyErr_SetString(PyExc_MemoryError, "memory error in getresult().");
 		return NULL;
@@ -414,8 +414,8 @@ format_result(const PGresult *res)
 
 	if (n > 0)
 	{
-		char * const aligns = (char *) malloc(n * sizeof(char));
-		int * const sizes = (int *) malloc(n * sizeof(int));
+		char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
+		int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
 
 		if (aligns && sizes)
 		{
@@ -484,7 +484,7 @@ format_result(const PGresult *res)
 			/* plus size of footer */
 			size += 40;
 			/* is the buffer size that needs to be allocated */
-			buffer = (char *) malloc(size);
+			buffer = (char *) PyMem_Malloc(size);
 			if (buffer)
 			{
 				char *p = buffer;
@@ -541,13 +541,13 @@ format_result(const PGresult *res)
 					*p++ = '\n';
 				}
 				/* free memory */
-				free(aligns);
-				free(sizes);
+				PyMem_Free(aligns);
+				PyMem_Free(sizes);
 				/* create the footer */
 				sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
 				/* return the result */
 				result = PyString_FromString(buffer);
-				free(buffer);
+				PyMem_Free(buffer);
 				return result;
 			}
 			else
@@ -557,10 +557,8 @@ format_result(const PGresult *res)
 				return NULL;
 			}
 		} else {
-			if (aligns)
-				free(aligns);
-			if (sizes)
-				free(aligns);
+			PyMem_Free(aligns);
+			PyMem_Free(sizes);
 			PyErr_SetString(PyExc_MemoryError,
 				"Not enough memory for formatting the query result.");
 			return NULL;
@@ -2246,7 +2244,7 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 	}
 
 exit:
-	free(typ);
+	PyMem_Free(typ);
 
 	/* returns list */
 	return reslist;
@@ -2388,7 +2386,7 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 	}
 
 exit:
-	free(typ);
+	PyMem_Free(typ);
 
 	/* returns list */
 	return reslist;
@@ -2529,7 +2527,7 @@ static PyObject *
 pg_query(pgobject *self, PyObject *args)
 {
 	char		*query;
-	PyObject	*oargs = NULL;
+	PyObject	*param_obj = NULL;
 	PGresult	*result;
 	pgqueryobject *npgobj;
 	int			status,
@@ -2542,128 +2540,120 @@ pg_query(pgobject *self, PyObject *args)
 	}
 
 	/* get query args */
-	if (!PyArg_ParseTuple(args, "s|O", &query, &oargs))
+	if (!PyArg_ParseTuple(args, "s|O", &query, &param_obj))
 	{
 		PyErr_SetString(PyExc_TypeError, "query(sql, [args]), with sql (string).");
 		return NULL;
 	}
 
-	/* If oargs is passed, ensure it's a non-empty tuple. We want to treat
+	/* If param_obj is passed, ensure it's a non-empty tuple. We want to treat
 	 * an empty tuple the same as no argument since we'll get that when the
 	 * caller passes no arguments to db.query(), and historic behaviour was
 	 * to call PQexec() in that case, which can execute multiple commands. */
-	if (oargs)
+	if (param_obj)
 	{
-		if (!PyTuple_Check(oargs) && !PyList_Check(oargs))
-		{
-			PyErr_SetString(PyExc_TypeError, "query parameters must be a tuple or list.");
+		param_obj = PySequence_Fast(param_obj,
+			"query parameters must be a sequence.");
+		if (!param_obj)
 			return NULL;
-		}
+		nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
 
-		nparms = (int)PySequence_Size(oargs);
+		/* if there's a single argument and it's a list or tuple, it
+		 * contains the positional arguments. */
+		if (nparms == 1)
+		{
+			PyObject *first_obj = PySequence_Fast_GET_ITEM(param_obj, 0);
+			if (PyList_Check(first_obj) || PyTuple_Check(first_obj))
+			{
+				Py_DECREF(param_obj);
+				param_obj = PySequence_Fast(first_obj, NULL);
+				nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
+			}
+		}
 	}
 
 	/* gets result */
 	if (nparms)
 	{
 		/* prepare arguments */
-		PyObject	**str, **s, *obj = PySequence_GetItem(oargs, 0);
+		PyObject	**str, **s;
 		char		**parms, **p, *enc=NULL;
-		int			*lparms, *l;
 		register int i;
 
-		/* if there's a single argument and it's a list or tuple, it
-		 * contains the positional aguments. */
-		if (nparms == 1 && (PyList_Check(obj) || PyTuple_Check(obj)))
-		{
-			oargs = obj;
-			nparms = (int)PySequence_Size(oargs);
+		str = (PyObject **)PyMem_Malloc(nparms * sizeof(*str));
+		parms = (char **)PyMem_Malloc(nparms * sizeof(*parms));
+		if (!str || !parms) {
+			PyMem_Free(parms);
+			PyMem_Free(str);
+			Py_XDECREF(param_obj);
+			PyErr_SetString(PyExc_MemoryError, "memory error in query().");
+			return NULL;
 		}
-		str = (PyObject **)malloc(nparms * sizeof(*str));
-		parms = (char **)malloc(nparms * sizeof(*parms));
-		lparms = (int *)malloc(nparms * sizeof(*lparms));
 
 		/* convert optional args to a list of strings -- this allows
 		 * the caller to pass whatever they like, and prevents us
 		 * from having to map types to OIDs */
-		for (i = 0, s=str, p=parms, l=lparms; i < nparms; i++, s++, p++, l++)
+		for (i = 0, s=str, p=parms; i < nparms; i++, p++)
 		{
-			obj = PySequence_GetItem(oargs, i);
+			PyObject *obj = PySequence_Fast_GET_ITEM(param_obj, i);
 
 			if (obj == Py_None)
 			{
-				*s = NULL;
 				*p = NULL;
-				*l = 0;
 			}
 			else if (PyUnicode_Check(obj))
 			{
+				PyObject *str_obj;
 				if (!enc)
 					enc = (char *)pg_encoding_to_char(
 						PQclientEncoding(self->cnx));
 				if (!strcmp(enc, "UTF8"))
-					*s = PyUnicode_AsUTF8String(obj);
+					str_obj = PyUnicode_AsUTF8String(obj);
 				else if (!strcmp(enc, "LATIN1"))
-					*s = PyUnicode_AsLatin1String(obj);
+					str_obj = PyUnicode_AsLatin1String(obj);
 				else if (!strcmp(enc, "SQL_ASCII"))
-					*s = PyUnicode_AsASCIIString(obj);
+					str_obj = PyUnicode_AsASCIIString(obj);
 				else
-					*s = PyUnicode_AsEncodedString(obj, enc, "strict");
-				if (*s == NULL)
+					str_obj = PyUnicode_AsEncodedString(obj, enc, "strict");
+				if (!str_obj)
 				{
-					free(lparms); free(parms);
-					while (i--)
-					{
-						if (*--s)
-						{
-							Py_DECREF(*s);
-						}
-					}
- 					free(str);
+					PyMem_Free(parms);
+					while (s != str) { s--; Py_DECREF(*s); }
+					PyMem_Free(str);
+					Py_XDECREF(param_obj);
 					PyErr_SetString(PyExc_UnicodeError, "query parameter"
 						" could not be decoded (bad client encoding)");
 					return NULL;
 				}
-				*p = PyString_AsString(*s);
-				*l = (int)PyString_Size(*s);
+				*s++ = str_obj;
+				*p = PyString_AsString(str_obj);
 			}
 			else
 			{
-				*s = PyObject_Str(obj);
-				if (*s == NULL)
+				PyObject *str_obj = PyObject_Str(obj);
+				if (!str_obj)
 				{
-					free(lparms); free(parms);
-					while (i--)
-					{
-						if (*--s)
-						{
-							Py_DECREF(*s);
-						}
-					}
-					free(str);
+					PyMem_Free(parms);
+					while (s != str) { s--; Py_DECREF(*s); }
+					PyMem_Free(str);
+					Py_XDECREF(param_obj);
 					PyErr_SetString(PyExc_TypeError,
 						"query parameter has no string representation");
 					return NULL;
 				}
-				*p = PyString_AsString(*s);
-				*l = (int)PyString_Size(*s);
+				*s++ = str_obj;
+				*p = PyString_AsString(str_obj);
 			}
 		}
 
 		Py_BEGIN_ALLOW_THREADS
 		result = PQexecParams(self->cnx, query, nparms,
-			NULL, (const char * const *)parms, lparms, NULL, 0);
+			NULL, (const char * const *)parms, NULL, NULL, 0);
 		Py_END_ALLOW_THREADS
 
-		free(lparms); free(parms);
-		for (i = 0, s=str; i < nparms; i++, s++)
-		{
-			if (*s)
-			{
-				Py_DECREF(*s);
-			}
-		}
-		free(str);
+		PyMem_Free(parms);
+		while (s != str) { s--; Py_DECREF(*s); }
+		PyMem_Free(str);
 	}
 	else
 	{
@@ -2671,6 +2661,9 @@ pg_query(pgobject *self, PyObject *args)
 		result = PQexec(self->cnx, query);
 		Py_END_ALLOW_THREADS
 	}
+
+	/* we don't need the params any more */
+	Py_XDECREF(param_obj);
 
 	/* checks result validity */
 	if (!result)
@@ -2912,7 +2905,7 @@ pg_inserttable(pgobject *self, PyObject *args)
 	}
 
 	/* allocate buffer */
-	if (!(buffer = malloc(MAX_BUFFER_SIZE)))
+	if (!(buffer = PyMem_Malloc(MAX_BUFFER_SIZE)))
 	{
 		PyErr_SetString(PyExc_MemoryError,
 			"can't allocate insert buffer.");
@@ -2928,7 +2921,7 @@ pg_inserttable(pgobject *self, PyObject *args)
 
 	if (!result)
 	{
-		free(buffer);
+		PyMem_Free(buffer);
 		PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
 		return NULL;
 	}
@@ -2961,7 +2954,7 @@ pg_inserttable(pgobject *self, PyObject *args)
 		{
 			if (j != n)
 			{
-				free(buffer);
+				PyMem_Free(buffer);
 				PyErr_SetString(PyExc_TypeError,
 					"arrays contained in second arg must have same size.");
 				return NULL;
@@ -3037,7 +3030,7 @@ pg_inserttable(pgobject *self, PyObject *args)
 
 			if (bufsiz <= 0)
 			{
-				free(buffer);
+				PyMem_Free(buffer);
 				PyErr_SetString(PyExc_MemoryError,
 					"insert buffer overflow.");
 				return NULL;
@@ -3052,7 +3045,7 @@ pg_inserttable(pgobject *self, PyObject *args)
 		{
 			PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
 			PQendcopy(self->cnx);
-			free(buffer);
+			PyMem_Free(buffer);
 			return NULL;
 		}
 	}
@@ -3062,18 +3055,18 @@ pg_inserttable(pgobject *self, PyObject *args)
 	{
 		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
 		PQendcopy(self->cnx);
-		free(buffer);
+		PyMem_Free(buffer);
 		return NULL;
 	}
 
 	if (PQendcopy(self->cnx))
 	{
 		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
-		free(buffer);
+		PyMem_Free(buffer);
 		return NULL;
 	}
 
-	free(buffer);
+	PyMem_Free(buffer);
 
 	/* no error : returns nothing */
 	Py_INCREF(Py_None);
@@ -3207,12 +3200,11 @@ pg_escape_string(pgobject *self, PyObject *args)
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
 	}
-	to = (char *)malloc(to_length);
+	to = (char *)PyMem_Malloc(to_length);
 	to_length = (int)PQescapeStringConn(self->cnx,
 		to, from, (size_t)from_length, NULL);
 	ret = Py_BuildValue("s#", to, to_length);
-	if (to)
-		free(to);
+	PyMem_Free(to);
 	if (!ret) /* pass on exception */
 		return NULL;
 	return ret;
@@ -3679,11 +3671,10 @@ escape_string(PyObject *self, PyObject *args)
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
 	}
-	to = (char *)malloc(to_length);
+	to = (char *)PyMem_Malloc(to_length);
 	to_length = (int)PQescapeString(to, from, (size_t)from_length);
 	ret = Py_BuildValue("s#", to, to_length);
-	if (to)
-		free(to);
+	PyMem_Free(to);
 	if (!ret) /* pass on exception */
 		return NULL;
 	return ret;
