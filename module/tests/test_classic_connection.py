@@ -716,9 +716,13 @@ class TestParamQueries(unittest.TestCase):
         self.c.close()
 
     def testQueryWithNoneParam(self):
+        self.assertRaises(TypeError, self.c.query, "select $1", None)
+        self.assertRaises(TypeError, self.c.query, "select $1+$2", None, None)
         self.assertEqual(self.c.query("select $1::integer", (None,)
             ).getresult(), [(None,)])
         self.assertEqual(self.c.query("select $1::text", [None]
+            ).getresult(), [(None,)])
+        self.assertEqual(self.c.query("select $1::text", [[None]]
             ).getresult(), [(None,)])
 
     def testQueryWithBoolParams(self, use_bool=None):

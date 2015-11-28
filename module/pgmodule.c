@@ -252,7 +252,7 @@ get_type_array(PGresult *result, int nfields)
 	int *typ;
 	int j;
 
-	if (!(typ = malloc(sizeof(int) * nfields)))
+	if (!(typ = PyMem_Malloc(sizeof(int) * nfields)))
 	{
 		PyErr_SetString(PyExc_MemoryError, "memory error in getresult().");
 		return NULL;
@@ -388,8 +388,8 @@ format_result(const PGresult *res)
 
 	if (n > 0)
 	{
-		char * const aligns = (char *) malloc(n * sizeof(char));
-		int * const sizes = (int *) malloc(n * sizeof(int));
+		char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
+		int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
 
 		if (aligns && sizes)
 		{
@@ -457,7 +457,7 @@ format_result(const PGresult *res)
 			/* plus size of footer */
 			size += 40;
 			/* is the buffer size that needs to be allocated */
-			buffer = (char *) malloc(size);
+			buffer = (char *) PyMem_Malloc(size);
 			if (buffer)
 			{
 				char *p = buffer;
@@ -514,13 +514,13 @@ format_result(const PGresult *res)
 					*p++ = '\n';
 				}
 				/* free memory */
-				free(aligns);
-				free(sizes);
+				PyMem_Free(aligns);
+				PyMem_Free(sizes);
 				/* create the footer */
 				sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
 				/* return the result */
 				result = PyStr_FromString(buffer);
-				free(buffer);
+				PyMem_Free(buffer);
 				return result;
 			}
 			else
@@ -530,10 +530,8 @@ format_result(const PGresult *res)
 				return NULL;
 			}
 		} else {
-			if (aligns)
-				free(aligns);
-			if (sizes)
-				free(aligns);
+			PyMem_Free(aligns);
+			PyMem_Free(sizes);
 			PyErr_SetString(PyExc_MemoryError,
 				"Not enough memory for formatting the query result.");
 			return NULL;
@@ -1119,8 +1117,8 @@ static PyObject *
 connQuery(connObject *self, PyObject *args)
 {
 	PyObject	*query_obj;
-	PyObject	*oargs = NULL;
-	char		*query = NULL;
+	PyObject	*param_obj = NULL;
+	char		*query;
 	PGresult	*result;
 	queryObject *npgobj;
 	int			encoding,
@@ -1134,7 +1132,7 @@ connQuery(connObject *self, PyObject *args)
 	}
 
 	/* get query args */
-	if (!PyArg_ParseTuple(args, "O|O", &query_obj, &oargs))
+	if (!PyArg_ParseTuple(args, "O|O", &query_obj, &param_obj))
 	{
 		return NULL;
 	}
@@ -1144,6 +1142,7 @@ connQuery(connObject *self, PyObject *args)
 	if (PyBytes_Check(query_obj))
 	{
 		query = PyBytes_AsString(query_obj);
+		query_obj = NULL;
 	}
 	else if (PyUnicode_Check(query_obj))
 	{
@@ -1151,122 +1150,119 @@ connQuery(connObject *self, PyObject *args)
 		if (!query_obj) return NULL; /* pass the UnicodeEncodeError */
 		query = PyBytes_AsString(query_obj);
 	}
-	if (!query)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError,
 			"query command must be a string.");
 		return NULL;
 	}
 
-	/* If oargs is passed, ensure it's a non-empty tuple. We want to treat
+	/* If param_obj is passed, ensure it's a non-empty tuple. We want to treat
 	 * an empty tuple the same as no argument since we'll get that when the
 	 * caller passes no arguments to db.query(), and historic behaviour was
 	 * to call PQexec() in that case, which can execute multiple commands. */
-	if (oargs)
+	if (param_obj)
 	{
-		if (!PyTuple_Check(oargs) && !PyList_Check(oargs))
+		param_obj = PySequence_Fast(param_obj,
+			"query parameters must be a sequence.");
+		if (!param_obj)
 		{
-			PyErr_SetString(PyExc_TypeError,
-				"query parameters must be a tuple or list.");
+			Py_XDECREF(query_obj);
 			return NULL;
 		}
+		nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
 
-		nparms = (int)PySequence_Size(oargs);
+		/* if there's a single argument and it's a list or tuple, it
+		 * contains the positional arguments. */
+		if (nparms == 1)
+		{
+			PyObject *first_obj = PySequence_Fast_GET_ITEM(param_obj, 0);
+			if (PyList_Check(first_obj) || PyTuple_Check(first_obj))
+			{
+				Py_DECREF(param_obj);
+				param_obj = PySequence_Fast(first_obj, NULL);
+				nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
+			}
+		}
 	}
 
 	/* gets result */
 	if (nparms)
 	{
 		/* prepare arguments */
-		PyObject	**str, **s, *obj = PySequence_GetItem(oargs, 0);
+		PyObject	**str, **s;
 		char		**parms, **p;
-		int			*lparms, *l;
 		register int i;
 
-		/* if there's a single argument and it's a list or tuple, it
-		 * contains the positional aguments. */
-		if (nparms == 1 && (PyList_Check(obj) || PyTuple_Check(obj)))
-		{
-			oargs = obj;
-			nparms = (int)PySequence_Size(oargs);
+		str = (PyObject **)PyMem_Malloc(nparms * sizeof(*str));
+		parms = (char **)PyMem_Malloc(nparms * sizeof(*parms));
+		if (!str || !parms) {
+			PyMem_Free(parms);
+			PyMem_Free(str);
+			Py_XDECREF(query_obj);
+			Py_XDECREF(param_obj);
+			PyErr_SetString(PyExc_MemoryError, "memory error in query().");
+			return NULL;
 		}
-		str = (PyObject **)malloc(nparms * sizeof(*str));
-		parms = (char **)malloc(nparms * sizeof(*parms));
-		lparms = (int *)malloc(nparms * sizeof(*lparms));
 
 		/* convert optional args to a list of strings -- this allows
 		 * the caller to pass whatever they like, and prevents us
 		 * from having to map types to OIDs */
-		for (i = 0, s=str, p=parms, l=lparms; i < nparms; i++, s++, p++, l++)
+		for (i = 0, s=str, p=parms; i < nparms; i++, p++)
 		{
-			obj = PySequence_GetItem(oargs, i);
+			PyObject *obj = PySequence_Fast_GET_ITEM(param_obj, i);
 
 			if (obj == Py_None)
 			{
-				*s = NULL;
 				*p = NULL;
-				*l = 0;
 			}
 			else if (PyBytes_Check(obj))
 			{
-				PyBytes_AsStringAndSize(*s = obj, p, (Py_ssize_t *)l);
+				*p = PyBytes_AsString(obj);
 			}
 			else if (PyUnicode_Check(obj))
 			{
-				*s = get_encoded_string(obj, encoding);
-				if (!*s)
+				PyObject *str_obj = get_encoded_string(obj, encoding);
+				if (!str_obj)
 				{
-					free(lparms); free(parms);
-					while (i--)
-					{
-						if (*--s)
-						{
-							Py_DECREF(*s);
-						}
-					}
-					free(str);
+					PyMem_Free(parms);
+					while (s != str) { s--; Py_DECREF(*s); }
+					PyMem_Free(str);
+					Py_XDECREF(query_obj);
+					Py_XDECREF(param_obj);
 					/* pass the UnicodeEncodeError */
 					return NULL;
 				}
-				PyBytes_AsStringAndSize(*s, p, (Py_ssize_t *)l);
+				*s++ = str_obj;
+				*p = PyBytes_AsString(str_obj);
 			}
 			else
 			{
-				*s = PyObject_Str(obj);
-				if (!*s)
+				PyObject *str_obj = PyObject_Str(obj);
+				if (!str_obj)
 				{
-					free(lparms); free(parms);
-					while (i--)
-					{
-						if (*--s)
-						{
-							Py_DECREF(*s);
-						}
-					}
-					free(str);
+					PyMem_Free(parms);
+					while (s != str) { s--; Py_DECREF(*s); }
+					PyMem_Free(str);
+					Py_XDECREF(query_obj);
+					Py_XDECREF(param_obj);
 					PyErr_SetString(PyExc_TypeError,
 						"query parameter has no string representation");
 					return NULL;
 				}
-				*p = PyStr_AsString(*s);
-				*l = (int)strlen(*p);
+				*s++ = str_obj;
+				*p = PyStr_AsString(str_obj);
 			}
 		}
 
 		Py_BEGIN_ALLOW_THREADS
 		result = PQexecParams(self->cnx, query, nparms,
-			NULL, (const char * const *)parms, lparms, NULL, 0);
+			NULL, (const char * const *)parms, NULL, NULL, 0);
 		Py_END_ALLOW_THREADS
 
-		free(lparms); free(parms);
-		for (i = 0, s=str; i < nparms; i++, s++)
-		{
-			if (*s)
-			{
-				Py_DECREF(*s);
-			}
-		}
-		free(str);
+		PyMem_Free(parms);
+		while (s != str) { s--; Py_DECREF(*s); }
+		PyMem_Free(str);
 	}
 	else
 	{
@@ -1274,6 +1270,10 @@ connQuery(connObject *self, PyObject *args)
 		result = PQexec(self->cnx, query);
 		Py_END_ALLOW_THREADS
 	}
+
+	/* we don't need the query and its params any more */
+	Py_XDECREF(query_obj);
+	Py_XDECREF(param_obj);
 
 	/* checks result validity */
 	if (!result)
@@ -1515,7 +1515,7 @@ connInsertTable(connObject *self, PyObject *args)
 	}
 
 	/* allocate buffer */
-	if (!(buffer = malloc(MAX_BUFFER_SIZE)))
+	if (!(buffer = PyMem_Malloc(MAX_BUFFER_SIZE)))
 	{
 		PyErr_SetString(PyExc_MemoryError,
 			"can't allocate insert buffer.");
@@ -1531,7 +1531,7 @@ connInsertTable(connObject *self, PyObject *args)
 
 	if (!result)
 	{
-		free(buffer);
+		PyMem_Free(buffer);
 		PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
 		return NULL;
 	}
@@ -1566,7 +1566,7 @@ connInsertTable(connObject *self, PyObject *args)
 		{
 			if (j != n)
 			{
-				free(buffer);
+				PyMem_Free(buffer);
 				PyErr_SetString(PyExc_TypeError,
 					"arrays contained in second arg must have same size.");
 				return NULL;
@@ -1619,7 +1619,7 @@ connInsertTable(connObject *self, PyObject *args)
 				PyObject *s = get_encoded_string(item, encoding);
 				if (!s)
 				{
-					free(buffer);
+					PyMem_Free(buffer);
 					return NULL; /* pass the UnicodeEncodeError */
 				}
 				const char* t = PyBytes_AsString(s);
@@ -1662,7 +1662,7 @@ connInsertTable(connObject *self, PyObject *args)
 
 			if (bufsiz <= 0)
 			{
-				free(buffer);
+				PyMem_Free(buffer);
 				PyErr_SetString(PyExc_MemoryError,
 					"insert buffer overflow.");
 				return NULL;
@@ -1677,7 +1677,7 @@ connInsertTable(connObject *self, PyObject *args)
 		{
 			PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
 			PQendcopy(self->cnx);
-			free(buffer);
+			PyMem_Free(buffer);
 			return NULL;
 		}
 	}
@@ -1687,18 +1687,18 @@ connInsertTable(connObject *self, PyObject *args)
 	{
 		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
 		PQendcopy(self->cnx);
-		free(buffer);
+		PyMem_Free(buffer);
 		return NULL;
 	}
 
 	if (PQendcopy(self->cnx))
 	{
 		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
-		free(buffer);
+		PyMem_Free(buffer);
 		return NULL;
 	}
 
-	free(buffer);
+	PyMem_Free(buffer);
 
 	/* no error : returns nothing */
 	Py_INCREF(Py_None);
@@ -1773,7 +1773,7 @@ connEscapeLiteral(connObject *self, PyObject *args)
 {
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
-	char 	   *from=NULL, /* our string argument as encoded string */
+	char 	   *from, /* our string argument as encoded string */
 		 	   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
@@ -1785,6 +1785,7 @@ connEscapeLiteral(connObject *self, PyObject *args)
 	if (PyBytes_Check(from_obj))
 	{
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+		from_obj = NULL;
 	}
 	else if (PyUnicode_Check(from_obj))
 	{
@@ -1793,7 +1794,7 @@ connEscapeLiteral(connObject *self, PyObject *args)
 		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
 	}
-	if (!from)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError, "escape_literal() expects a string.");
 		return NULL;
@@ -1801,6 +1802,8 @@ connEscapeLiteral(connObject *self, PyObject *args)
 
 	to = PQescapeLiteral(self->cnx, from, (size_t)from_length);
 	to_length = strlen(to);
+
+	Py_XDECREF(from_obj);
 
 	if (encoding == -1)
 		to_obj = PyBytes_FromStringAndSize(to, to_length);
@@ -1820,7 +1823,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 {
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
-	char 	   *from=NULL, /* our string argument as encoded string */
+	char 	   *from, /* our string argument as encoded string */
 		 	   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
@@ -1832,6 +1835,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 	if (PyBytes_Check(from_obj))
 	{
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+		from_obj = NULL;
 	}
 	else if (PyUnicode_Check(from_obj))
 	{
@@ -1840,7 +1844,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
 	}
-	if (!from)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError,
 			"escape_identifier() expects a string.");
@@ -1849,6 +1853,8 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 
 	to = PQescapeIdentifier(self->cnx, from, (size_t)from_length);
 	to_length = strlen(to);
+
+	Py_XDECREF(from_obj);
 
 	if (encoding == -1)
 		to_obj = PyBytes_FromStringAndSize(to, to_length);
@@ -1870,7 +1876,7 @@ connEscapeString(connObject *self, PyObject *args)
 {
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
-	char 	   *from=NULL, /* our string argument as encoded string */
+	char 	   *from, /* our string argument as encoded string */
 		 	   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
@@ -1882,6 +1888,7 @@ connEscapeString(connObject *self, PyObject *args)
 	if (PyBytes_Check(from_obj))
 	{
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+		from_obj = NULL;
 	}
 	else if (PyUnicode_Check(from_obj))
 	{
@@ -1890,7 +1897,7 @@ connEscapeString(connObject *self, PyObject *args)
 		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
 	}
-	if (!from)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string.");
 		return NULL;
@@ -1902,16 +1909,17 @@ connEscapeString(connObject *self, PyObject *args)
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
 	}
-	to = (char *)malloc(to_length);
+	to = (char *)PyMem_Malloc(to_length);
 	to_length = PQescapeStringConn(self->cnx,
 		to, from, (size_t)from_length, NULL);
+
+	Py_XDECREF(from_obj);
 
 	if (encoding == -1)
 		to_obj = PyBytes_FromStringAndSize(to, to_length);
 	else
 		to_obj = get_decoded_string(to, to_length, encoding);
-	if (to)
-		free(to);
+	PyMem_Free(to);
 	return to_obj;
 }
 
@@ -1924,7 +1932,7 @@ connEscapeBytea(connObject *self, PyObject *args)
 {
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
-	char 	   *from=NULL, /* our string argument as encoded string */
+	char 	   *from, /* our string argument as encoded string */
 		 	   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
@@ -1936,6 +1944,7 @@ connEscapeBytea(connObject *self, PyObject *args)
 	if (PyBytes_Check(from_obj))
 	{
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+		from_obj = NULL;
 	}
 	else if (PyUnicode_Check(from_obj))
 	{
@@ -1944,7 +1953,7 @@ connEscapeBytea(connObject *self, PyObject *args)
 		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
 	}
-	if (!from)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string.");
 		return NULL;
@@ -1952,6 +1961,8 @@ connEscapeBytea(connObject *self, PyObject *args)
 
 	to = (char *)PQescapeByteaConn(self->cnx,
 	 	(unsigned char *)from, (size_t)from_length, &to_length);
+
+	Py_XDECREF(from_obj);
 
 	if (encoding == -1)
 		to_obj = PyBytes_FromStringAndSize(to, to_length - 1);
@@ -2542,7 +2553,7 @@ static PyObject *
 sourceExecute(sourceObject *self, PyObject *args)
 {
 	PyObject	*query_obj;
-	char		*query = NULL;
+	char		*query;
 	int			encoding;
 
 	/* checks validity */
@@ -2564,6 +2575,7 @@ sourceExecute(sourceObject *self, PyObject *args)
 	if (PyBytes_Check(query_obj))
 	{
 		query = PyBytes_AsString(query_obj);
+		query_obj = NULL;
 	}
 	else if (PyUnicode_Check(query_obj))
 	{
@@ -2571,7 +2583,7 @@ sourceExecute(sourceObject *self, PyObject *args)
 		if (!query_obj) return NULL; /* pass the UnicodeEncodeError */
 		query = PyBytes_AsString(query_obj);
 	}
-	if (!query)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError, "executed sql must be a string.");
 		return NULL;
@@ -2592,6 +2604,9 @@ sourceExecute(sourceObject *self, PyObject *args)
 	Py_BEGIN_ALLOW_THREADS
 	self->result = PQexec(self->pgcnx->cnx, query);
 	Py_END_ALLOW_THREADS
+
+	/* we don't need the query any more */
+	Py_XDECREF(query_obj);
 
 	/* checks result validity */
 	if (!self->result)
@@ -3529,7 +3544,7 @@ queryGetResult(queryObject *self, PyObject *args)
 	}
 
 exit:
-	free(coltypes);
+	PyMem_Free(coltypes);
 
 	/* returns list */
 	return reslist;
@@ -3701,7 +3716,7 @@ queryDictResult(queryObject *self, PyObject *args)
 	}
 
 exit:
-	free(coltypes);
+	PyMem_Free(coltypes);
 
 	/* returns list */
 	return reslist;
@@ -3925,7 +3940,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 {
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
-	char 	   *from=NULL, /* our string argument as encoded string */
+	char 	   *from, /* our string argument as encoded string */
 		 	   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
@@ -3937,6 +3952,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 	if (PyBytes_Check(from_obj))
 	{
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+		from_obj = NULL;
 	}
 	else if (PyUnicode_Check(from_obj))
 	{
@@ -3945,7 +3961,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
 	}
-	if (!from)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string.");
 		return NULL;
@@ -3957,15 +3973,16 @@ pgEscapeString(PyObject *self, PyObject *args)
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
 	}
-	to = (char *)malloc(to_length);
+	to = (char *)PyMem_Malloc(to_length);
 	to_length = (int)PQescapeString(to, from, (size_t)from_length);
+
+	Py_XDECREF(from_obj);
 
 	if (encoding == -1)
 		to_obj = PyBytes_FromStringAndSize(to, to_length);
 	else
 		to_obj = get_decoded_string(to, to_length, encoding);
-	if (to)
-		free(to);
+	PyMem_Free(to);
 	return to_obj;
 }
 
@@ -3978,7 +3995,7 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 {
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
-	char 	   *from=NULL, /* our string argument as encoded string */
+	char 	   *from, /* our string argument as encoded string */
 		 	   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
@@ -3990,6 +4007,7 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 	if (PyBytes_Check(from_obj))
 	{
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+		from_obj = NULL;
 	}
 	else if (PyUnicode_Check(from_obj))
 	{
@@ -3998,7 +4016,7 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
 	}
-	if (!from)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string.");
 		return NULL;
@@ -4006,6 +4024,8 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 
 	to = (char *)PQescapeBytea(
 		(unsigned char*)from, (size_t)from_length, &to_length);
+
+	Py_XDECREF(from_obj);
 
 	if (encoding == -1)
 		to_obj = PyBytes_FromStringAndSize(to, to_length - 1);
@@ -4025,7 +4045,7 @@ static PyObject
 {
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
-	char 	   *from=NULL, /* our string argument as encoded string */
+	char 	   *from, /* our string argument as encoded string */
 		 	   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
@@ -4036,6 +4056,7 @@ static PyObject
 	if (PyBytes_Check(from_obj))
 	{
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
+		from_obj = NULL;
 	}
 	else if (PyUnicode_Check(from_obj))
 	{
@@ -4043,13 +4064,15 @@ static PyObject
 		if (!from_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(from_obj, &from, &from_length);
 	}
-	if (!from)
+	else
 	{
 		PyErr_SetString(PyExc_TypeError, "unescape_bytea() expects a string.");
 		return NULL;
 	}
 
 	to = (char *)PQunescapeBytea((unsigned char*)from, &to_length);
+
+	Py_XDECREF(from_obj);
 
 	to_obj = PyBytes_FromStringAndSize(to, to_length);
 	if (to)
