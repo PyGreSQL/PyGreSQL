@@ -536,10 +536,6 @@ class DB(object):
         be substituted for the corresponding numbered parameter. Parameter
         values can also be given as a single list or tuple argument.
 
-        Note that the query string must not be passed as a unicode value,
-        but you can pass arguments as unicode values if they can be decoded
-        using the current client encoding.
-
         """
         # Wraps shared library function for debugging.
         if not self.db:
