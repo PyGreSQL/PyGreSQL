@@ -35,7 +35,11 @@ PostgreSQL features from a Python script.
 PyGreSQL is developed and tested on a NetBSD system, but it should also
 run on most other platforms where PostgreSQL and Python is running.  It is
 based on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.fr).
-D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
+D'Arcy (darcy@PyGreSQL.org) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
+PyGreSQL is developed and tested by the core team of D'Arcy Cain
+(darcy@PyGreSQL.org) and Christoph Zwerschke (cito@PyGreSQL.org) as
+well as many contributors through the mailing list.  See the change
+log for specific acknowledgments.
 The current version PyGreSQL 5.0 needs PostgreSQL 9.0 and Python 2.6 or above.
