@@ -42,4 +42,5 @@ PyGreSQL is developed and tested by the core team of D'Arcy Cain
 (darcy@PyGreSQL.org) and Christoph Zwerschke (cito@PyGreSQL.org) as
 well as many contributors through the mailing list.  See the change
 log for specific acknowledgments.
+
 The current version PyGreSQL 5.0 needs PostgreSQL 9.0 and Python 2.6 or above.
