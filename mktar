@@ -1,6 +1,6 @@
 #! /bin/sh
 
-VERSION=4.2
+VERSION=5.0
 
 # small safety test
 if [ ! -f module/pgmodule.c ]
