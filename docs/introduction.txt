@@ -8,7 +8,7 @@ PostgreSQL features from a Python script.
 
 | This software is copyright &copy; 1995, Pascal Andre.
 | Further modifications are copyright &copy; 1997-2008 by D'Arcy J.M. Cain.
-| Further modifications are copyright &copy; 2009-2012 by the PyGreSQL team
+| Further modifications are copyright &copy; 2009-2015 by the PyGreSQL team
 
 **PostgreSQL** is a highly scalable, SQL compliant, open source
 object-relational database management system. With more than 15 years

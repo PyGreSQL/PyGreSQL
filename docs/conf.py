@@ -44,7 +44,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'PyGreSQL'
-copyright = u'2012, The PyGreSQL team'
+copyright = u'2015, The PyGreSQL team'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
