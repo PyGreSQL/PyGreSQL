@@ -1087,7 +1087,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, s)
         query('drop table bytea_test')
 
-    def testInsertUpdateBytea(self):
+    def testInsertUpdateGetBytea(self):
         query = self.db.query
         query('drop table if exists bytea_test')
         query('create table bytea_test (n smallint primary key, data bytea)')
@@ -1099,10 +1099,6 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 5)
         self.assertIn('data', r)
         r = r['data']
-        # the following two lines should be removed once insert()
-        # will be enhanced to adapt the types of return values
-        self.assertIsInstance(r, str)
-        r = self.db.unescape_bytea(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         # update as bytes
@@ -1113,10 +1109,6 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 5)
         self.assertIn('data', r)
         r = r['data']
-        # the following two lines should be removed once update()
-        # will be enhanced to adapt the types of return values
-        self.assertIsInstance(r, str)
-        r = self.db.unescape_bytea(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         r = query('select * from bytea_test where n=5').getresult()
@@ -1127,6 +1119,14 @@ class TestDBClass(unittest.TestCase):
         r = r[1]
         self.assertIsInstance(r, str)
         r = self.db.unescape_bytea(r)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, s)
+        r = self.db.get('bytea_test', dict(n=5))
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 5)
+        self.assertIn('data', r)
+        r = r['data']
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         query('drop table bytea_test')

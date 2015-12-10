@@ -758,6 +758,7 @@ class DB(object):
                 keyname = self.pkey(qcl)
             except KeyError:
                 raise _prg_error('Class %s has no primary key' % qcl)
+        attnames = self.get_attnames(qcl)
         # We want the oid for later updates if that isn't the key
         if keyname == 'oid':
             if isinstance(arg, dict):
@@ -765,26 +766,29 @@ class DB(object):
                     raise _db_error('%s not in arg' % qoid)
             else:
                 arg = {qoid: arg}
+            what = '*'
             where = 'oid = %s' % arg[qoid]
-            attnames = '*'
         else:
-            attnames = self.get_attnames(qcl)
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
             if not isinstance(arg, dict):
                 if len(keyname) > 1:
                     raise _prg_error('Composite key needs dict as arg')
                 arg = dict([(k, arg) for k in keyname])
+            what = ', '.join(attnames)
             where = ' AND '.join(['%s = %s'
                 % (k, self._quote(arg[k], attnames[k])) for k in keyname])
-            attnames = ', '.join(attnames)
-        q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (attnames, qcl, where)
+        q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (what, qcl, where)
         self._do_debug(q)
         res = self.db.query(q).dictresult()
         if not res:
             raise _db_error('No such record in %s where %s' % (qcl, where))
-        for att, value in res[0].items():
-            arg[qoid if att == 'oid' else att] = value
+        for n, value in res[0].items():
+            if n == 'oid':
+                n = qoid
+            elif attnames.get(n) == 'bytea':
+                value = self.unescape_bytea(value)
+            arg[n] = value
         return arg
 
     def insert(self, cl, d=None, **kw):
@@ -822,9 +826,13 @@ class DB(object):
         self._do_debug(q)
         res = self.db.query(q)
         if ret:
-            res = res.dictresult()
-            for att, value in res[0].items():
-                d[qoid if att == 'oid' else att] = value
+            res = res.dictresult()[0]
+            for n, value in res.items():
+                if n == 'oid':
+                    n = qoid
+                elif attnames.get(n) == 'bytea':
+                    value = self.unescape_bytea(value)
+                d[n] = value
         elif isinstance(res, int):
             d[qoid] = res
             if selectable:
@@ -893,8 +901,12 @@ class DB(object):
         res = self.db.query(q)
         if ret:
             res = res.dictresult()[0]
-            for att, value in res.items():
-                d[qoid if att == 'oid' else att] = value
+            for n, value in res.items():
+                if n == 'oid':
+                    n = qoid
+                elif attnames.get(n) == 'bytea':
+                    value = self.unescape_bytea(value)
+                d[n] = value
         else:
             if selectable:
                 if qoid in d:
