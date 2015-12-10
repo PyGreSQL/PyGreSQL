@@ -383,10 +383,21 @@ class DB(object):
             d = str(d)
         return d
 
+    if bytes is str:  # Python < 3.0
+        """Quote bytes value."""
+
+        def _quote_bytea(self, d):
+            return "'%s'" % self.escape_bytea(d)
+
+    else:
+
+        def _quote_bytea(self, d):
+            return "'%s'" % self.escape_bytea(d).decode('ascii')
+
     _quote_funcs = dict(  # quote methods for each type
         text=_quote_text, bool=_quote_bool, date=_quote_date,
         int=_quote_num, num=_quote_num, float=_quote_num,
-        money=_quote_money)
+        money=_quote_money, bytea=_quote_bytea)
 
     def _quote(self, d, t):
         """Return quotes if needed."""
@@ -688,6 +699,8 @@ class DB(object):
                     typ = 'num'
                 elif typ.startswith('money'):
                     typ = 'money'
+                elif typ.startswith('bytea'):
+                    typ = 'bytea'
                 else:
                     typ = 'text'
                 t[att] = typ

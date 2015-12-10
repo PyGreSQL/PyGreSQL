@@ -1071,16 +1071,61 @@ class TestDBClass(unittest.TestCase):
     def testBytea(self):
         query = self.db.query
         query('drop table if exists bytea_test')
-        query('create table bytea_test ('
-            'data bytea)')
+        query('create table bytea_test (n smallint primary key, data bytea)')
         s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
         r = self.db.escape_bytea(s)
-        query('insert into bytea_test values($1)', (r,))
-        r = query('select * from bytea_test').getresult()
-        self.assertTrue(len(r) == 1)
+        query('insert into bytea_test values(3,$1)', (r,))
+        r = query('select * from bytea_test where n=3').getresult()
+        self.assertEqual(len(r), 1)
         r = r[0]
-        self.assertTrue(len(r) == 1)
+        self.assertEqual(len(r), 2)
+        self.assertEqual(r[0], 3)
+        r = r[1]
+        self.assertIsInstance(r, str)
+        r = self.db.unescape_bytea(r)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, s)
+        query('drop table bytea_test')
+
+    def testInsertUpdateBytea(self):
+        query = self.db.query
+        query('drop table if exists bytea_test')
+        query('create table bytea_test (n smallint primary key, data bytea)')
+        # insert as bytes
+        s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
+        r = self.db.insert('bytea_test', n=5, data=s)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 5)
+        self.assertIn('data', r)
+        r = r['data']
+        # the following two lines should be removed once insert()
+        # will be enhanced to adapt the types of return values
+        self.assertIsInstance(r, str)
+        r = self.db.unescape_bytea(r)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, s)
+        # update as bytes
+        s += b"and now even more \x00 nasty \t stuff!\f"
+        r = self.db.update('bytea_test', n=5, data=s)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 5)
+        self.assertIn('data', r)
+        r = r['data']
+        # the following two lines should be removed once update()
+        # will be enhanced to adapt the types of return values
+        self.assertIsInstance(r, str)
+        r = self.db.unescape_bytea(r)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, s)
+        r = query('select * from bytea_test where n=5').getresult()
+        self.assertEqual(len(r), 1)
         r = r[0]
+        self.assertEqual(len(r), 2)
+        self.assertEqual(r[0], 5)
+        r = r[1]
+        self.assertIsInstance(r, str)
         r = self.db.unescape_bytea(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
