@@ -884,7 +884,7 @@ class DB(object):
             return d
         values = ', '.join(values)
         selectable = self.has_table_privilege(qcl)
-        if selectable and self.server_version >= 880200:
+        if selectable and self.server_version >= 80200:
             ret = ' RETURNING %s*' % ('oid, ' if 'oid' in attnames else '')
         else:
             ret = ''
