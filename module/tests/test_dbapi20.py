@@ -42,9 +42,15 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         try:
             con = self._connect()
             con.close()
-        except pgdb.Error:
+        except pgdb.Error:  # try to create a missing database
             import pg
-            pg.DB('postgres',dbhost,dbport).query('create database ' + dbname)
+            try:  # first try to log in as superuser
+                db = pg.DB('postgres', dbhost or None, dbport or -1,
+                    user='postgres')
+            except Exception:  # then try to log in as current user
+                db = pg.DB('postgres', dbhost or None, dbport or -1)
+            db.query('create database ' + dbname)
+
 
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
