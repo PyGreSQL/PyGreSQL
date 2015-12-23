@@ -44,7 +44,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             con.close()
         except pgdb.Error:
             import pg
-            pg.DB().query('create database ' + dbname)
+            pg.DB('postgres',dbhost,dbport).query('create database ' + dbname)
 
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
