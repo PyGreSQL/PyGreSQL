@@ -1,0 +1,11 @@
+include *.c
+include *.h
+include *.py
+include *.cfg
+recursive-include tests *.py
+
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.o
+global-exclude *.so
+global-exclude _pg.*
