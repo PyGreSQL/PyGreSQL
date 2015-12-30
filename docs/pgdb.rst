@@ -204,7 +204,7 @@ operate on the database in the way described in the next section.
 pgdbCursor -- The cursor object
 ===============================
 
-.. class:: pgdb.Cursor
+.. class:: pgdbCursor
 
 These objects represent a database cursor, which is used to manage the context
 of a fetch operation. Cursors created from the same connection are not
@@ -215,14 +215,14 @@ The default PostgreSQL transaction isolation level is "read committed".
 
 Cursor objects respond to the following methods and attributes.
 
-Note that ``pgdb.Cursor`` objects also implement both the iterator and the
+Note that ``pgdbCursor`` objects also implement both the iterator and the
 context manager protocol, i.e. you can iterate over them and you can use them
 in a ``with`` statement.
 
 description -- details regarding the result columns
 ---------------------------------------------------
 
-.. attribute:: Cursor.description
+.. attribute:: pgdbCursor.description
 
     This read-only attribute is a sequence of 7-item sequences.
 
@@ -245,7 +245,7 @@ description -- details regarding the result columns
 rowcount -- number of rows of the result
 ----------------------------------------
 
-.. attribute:: Cursor.rowcount
+.. attribute:: pgdbCursor.rowcount
 
     This read-only attribute specifies the number of rows that the last
     :meth:`pgdbCursor.execute` or :meth:`pgdbCursor.executemany` call produced
@@ -411,6 +411,8 @@ at a time.
 
 pgdbType -- Type objects and constructors
 =========================================
+
+.. class:: pgdbType
 
 The :attr:`pgdbCursor.description` attribute returns information about each
 of the result columns of a query. The *type_code* must compare equal to one
