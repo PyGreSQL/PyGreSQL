@@ -18,7 +18,7 @@ Contents:
    interface
    classic
    db_api
-   svn
+   source
    mailinglist
    future
    examples
