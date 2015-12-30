@@ -6,7 +6,11 @@ Version 5.0
 - This version runs on both Python 2 and Python 3.
 - The supported versions are Python 2.6, 2.7, 3.3, 3.4 and 3.5.
 - The supported PostgreSQL versions are 9.0, 9.1, 9.2, 9.3 and 9.4.
-
+- The names of the various types supported by the classic and DB-API 2
+  modules have been renamed to become simpler, more intuitive and in
+  line with the names used in the DB-API 2 documentation.
+  Since the API provides objects of these types only by the use of
+  constructor functions, this should not cause any incompatibilities.
 
 Version 4.2
 -----------
@@ -64,7 +68,6 @@ Version 4.1 (2013-01-01)
 - New method use_regtypes() that can be called to let getattnames()
   return regular type names instead of the simplified classic types (#44).
 
-
 Version 4.0 (2009-01-01)
 ------------------------
 - Dropped support for Python below 2.3 and PostgreSQL below 7.4.
@@ -111,7 +114,6 @@ Version 4.0 (2009-01-01)
   if no primary key was found.
 - delete() now also works based on the primary key if no oid available
   and returns whether the row existed or not.
-
 
 Version 3.8.1 (2006-06-05)
 --------------------------

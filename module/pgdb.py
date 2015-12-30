@@ -164,12 +164,12 @@ def _op_error(msg):
     return _db_error(msg, OperationalError)
 
 
-class pgdbTypeCache(dict):
+class TypeCache(dict):
     """Cache for database types."""
 
     def __init__(self, cnx):
         """Initialize type cache for connection."""
-        super(pgdbTypeCache, self).__init__()
+        super(TypeCache, self).__init__()
         self._src = cnx.source()
 
     @staticmethod
@@ -215,7 +215,7 @@ class _quotedict(dict):
 
 ### Cursor Object
 
-class pgdbCursor(object):
+class Cursor(object):
     """Cursor object."""
 
     def __init__(self, dbcnx):
@@ -293,7 +293,7 @@ class pgdbCursor(object):
         You can overwrite this with a custom row factory,
         e.g. a dict factory:
 
-            class DictCursor(pgdb.pgdbCursor):
+            class DictCursor(pgdb.Cursor):
 
                 def row_factory(self, row):
                     return {desc[0]:value
@@ -441,7 +441,7 @@ class pgdbCursor(object):
 
 ### Connection Objects
 
-class pgdbCnx(object):
+class Connection(object):
     """Connection object."""
 
     # expose the exceptions as attributes on the connection object
@@ -460,7 +460,7 @@ class pgdbCnx(object):
         """Create a database connection object."""
         self._cnx = cnx  # connection
         self._tnx = False  # transaction state
-        self._type_cache = pgdbTypeCache(cnx)
+        self._type_cache = TypeCache(cnx)
         try:
             self._cnx.source()
         except Exception:
@@ -530,7 +530,7 @@ class pgdbCnx(object):
         """Return a new cursor object using the connection."""
         if self._cnx:
             try:
-                return pgdbCursor(self)
+                return Cursor(self)
             except Exception:
                 raise _op_error("invalid connection")
         else:
@@ -602,12 +602,12 @@ def connect(dsn=None,
     # open the connection
     cnx = _connect_(dbbase, dbhost, dbport, dbopt,
         dbtty, dbuser, dbpasswd)
-    return pgdbCnx(cnx)
+    return Connection(cnx)
 
 
 ### Types Handling
 
-class pgdbType(frozenset):
+class Type(frozenset):
     """Type class for a couple of PostgreSQL data types.
 
     PostgreSQL is object-oriented: types are dynamic.
@@ -618,44 +618,44 @@ class pgdbType(frozenset):
     def __new__(cls, values):
         if isinstance(values, basestring):
             values = values.split()
-        return super(pgdbType, cls).__new__(cls, values)
+        return super(Type, cls).__new__(cls, values)
 
     def __eq__(self, other):
         if isinstance(other, basestring):
             return other in self
         else:
-            return super(pgdbType, self).__eq__(other)
+            return super(Type, self).__eq__(other)
 
     def __ne__(self, other):
         if isinstance(other, basestring):
             return other not in self
         else:
-            return super(pgdbType, self).__ne__(other)
+            return super(Type, self).__ne__(other)
 
 
 # Mandatory type objects defined by DB-API 2 specs:
 
-STRING = pgdbType('char bpchar name text varchar')
-BINARY = pgdbType('bytea')
-NUMBER = pgdbType('int2 int4 serial int8 float4 float8 numeric money')
-DATETIME = pgdbType('date time timetz timestamp timestamptz datetime abstime'
+STRING = Type('char bpchar name text varchar')
+BINARY = Type('bytea')
+NUMBER = Type('int2 int4 serial int8 float4 float8 numeric money')
+DATETIME = Type('date time timetz timestamp timestamptz datetime abstime'
     ' interval tinterval timespan reltime')
-ROWID = pgdbType('oid oid8')
+ROWID = Type('oid oid8')
 
 
 # Additional type objects (more specific):
 
-BOOL = pgdbType('bool')
-SMALLINT = pgdbType('int2')
-INTEGER = pgdbType('int2 int4 int8 serial')
-LONG = pgdbType('int8')
-FLOAT = pgdbType('float4 float8')
-NUMERIC = pgdbType('numeric')
-MONEY = pgdbType('money')
-DATE = pgdbType('date')
-TIME = pgdbType('time timetz')
-TIMESTAMP = pgdbType('timestamp timestamptz datetime abstime')
-INTERVAL = pgdbType('interval tinterval timespan reltime')
+BOOL = Type('bool')
+SMALLINT = Type('int2')
+INTEGER = Type('int2 int4 int8 serial')
+LONG = Type('int8')
+FLOAT = Type('float4 float8')
+NUMERIC = Type('numeric')
+MONEY = Type('money')
+DATE = Type('date')
+TIME = Type('time timetz')
+TIMESTAMP = Type('timestamp timestamptz datetime abstime')
+INTERVAL = Type('interval tinterval timespan reltime')
 
 
 # Mandatory type helpers defined by DB-API 2 specs:

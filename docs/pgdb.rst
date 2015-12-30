@@ -9,6 +9,7 @@
 
 Introduction
 ============
+
 You may either choose to use the "classic" PyGreSQL interface
 provided by the :mod:`pg` module or else the
 DB-API 2.0 compliant interface provided by the :mod:`pgdb` module.
@@ -47,11 +48,11 @@ connect -- Open a PostgreSQL connection
     :param str host: the hostname of the database
     :param database: the name of the database
     :returns: a connection object
-    :rtype: :class:`pgdbCnx`
+    :rtype: :class:`Connection`
     :raises pgdb.OperationalError: error connecting to the database
 
 This function takes parameters specifying how to connect to a PostgreSQL
-database and returns a :class:`pgdbCnx` object using these parameters.
+database and returns a :class:`Connection` object using these parameters.
 If specified, the *dsn* parameter must be a string with the format
 ``'host:base:user:passwd:opt:tty'``. All of the parts specified in the *dsn*
 are optional. You can also specify the parameters individually using keyword
@@ -138,20 +139,20 @@ The errors that can be raised by the :mod:`pgdb` module are the following:
     supported by the database.
 
 
-pgdbCnx -- The connection object
-================================
+Connection -- The connection object
+===================================
 
-.. class:: pgdbCnx
+.. class:: Connection
 
 These connection objects respond to the following methods.
 
-Note that ``pgdb.pgdbCnx`` objects also implement the context manager protocol,
+Note that ``pgdb.Connection`` objects also implement the context manager protocol,
 i.e. you can use them in a ``with`` statement.
 
 close -- close the connection
 -----------------------------
 
-.. method:: pgdbCnx.close()
+.. method:: Connection.close()
 
     Close the connection now (rather than whenever it is deleted)
 
@@ -166,7 +167,7 @@ first will cause an implicit rollback to be performed.
 commit -- commit the connection
 -------------------------------
 
-.. method:: pgdbCnx.commit()
+.. method:: Connection.commit()
 
     Commit any pending transaction to the database
 
@@ -177,7 +178,7 @@ Note that connections always use a transaction, there is no auto-commit.
 rollback -- roll back the connection
 ------------------------------------
 
-.. method:: pgdbCnx.rollback()
+.. method:: Connection.rollback()
 
     Roll back any pending transaction to the database
 
@@ -190,21 +191,21 @@ cause an implicit rollback to be performed.
 cursor -- return a new cursor object
 ------------------------------------
 
-.. method:: pgdbCnx.cusor()
+.. method:: Connection.cusor()
 
     Return a new cursor object using the connection
 
     :returns: a connection object
-    :rtype: :class:`pgdbCursor`
+    :rtype: :class:`Cursor`
 
-This method returns a new :class:`pgdbCursor` object that can be used to
+This method returns a new :class:`Cursor` object that can be used to
 operate on the database in the way described in the next section.
 
 
-pgdbCursor -- The cursor object
-===============================
+Cursor -- The cursor object
+===========================
 
-.. class:: pgdbCursor
+.. class:: Cursor
 
 These objects represent a database cursor, which is used to manage the context
 of a fetch operation. Cursors created from the same connection are not
@@ -215,14 +216,14 @@ The default PostgreSQL transaction isolation level is "read committed".
 
 Cursor objects respond to the following methods and attributes.
 
-Note that ``pgdbCursor`` objects also implement both the iterator and the
+Note that ``Cursor`` objects also implement both the iterator and the
 context manager protocol, i.e. you can iterate over them and you can use them
 in a ``with`` statement.
 
 description -- details regarding the result columns
 ---------------------------------------------------
 
-.. attribute:: pgdbCursor.description
+.. attribute:: Cursor.description
 
     This read-only attribute is a sequence of 7-item sequences.
 
@@ -240,15 +241,15 @@ description -- details regarding the result columns
 
     This attribute will be ``None`` for operations that do not return rows
     or if the cursor has not had an operation invoked via the
-    :meth:`pgdbCursor.execute` or :meth:`pgdbCursor.executemany` method yet.
+    :meth:`Cursor.execute` or :meth:`Cursor.executemany` method yet.
 
 rowcount -- number of rows of the result
 ----------------------------------------
 
-.. attribute:: pgdbCursor.rowcount
+.. attribute:: Cursor.rowcount
 
     This read-only attribute specifies the number of rows that the last
-    :meth:`pgdbCursor.execute` or :meth:`pgdbCursor.executemany` call produced
+    :meth:`Cursor.execute` or :meth:`Cursor.executemany` call produced
     (for DQL statements like SELECT) or affected (for DML statements like
     UPDATE or INSERT ). The attribute is -1 in case no such method call has
     been performed on the cursor or the rowcount of the last operation
@@ -257,7 +258,7 @@ rowcount -- number of rows of the result
 close -- close the cursor
 -------------------------
 
-.. method:: pgdbCursor.close()
+.. method:: Cursor.close()
 
     Close the cursor now (rather than whenever it is deleted)
 
@@ -270,7 +271,7 @@ with the cursor.
 execute -- execute a database operation
 ---------------------------------------
 
-.. method:: pgdbCursor.execute(operation, [parameters])
+.. method:: Cursor.execute(operation, [parameters])
 
     Prepare and execute a database operation (query or command)
 
@@ -289,12 +290,12 @@ but different parameters are bound to it (many times).
 
 The parameters may also be specified as list of tuples to e.g. insert multiple
 rows in a single operation, but this kind of usage is deprecated:
-:meth:`pgdbCursor.executemany` should be used instead.
+:meth:`Cursor.executemany` should be used instead.
 
 executemany -- execute many similar database operations
 -------------------------------------------------------
 
-.. method:: pgdbCursor.executemany(operation, [seq_of_parameters])
+.. method:: Cursor.executemany(operation, [seq_of_parameters])
 
     Prepare and execute many similar database operations (queries or commands)
 
@@ -311,7 +312,7 @@ e.g. ``" ... WHERE name=%(name)s"``.
 fetchone -- fetch next row of the query result
 ----------------------------------------------
 
-.. method:: pgdbCursor.fetchone()
+.. method:: Cursor.fetchone()
 
     Fetch the next row of a query result set
 
@@ -322,13 +323,13 @@ Fetch the next row of a query result set, returning a single tuple,
 or ``None`` when no more data is available.
 
 An :exc:`Error` (or subclass) exception is raised if the previous call to
-:meth:`pgdbCursor.execute` or :meth:`pgdbCursor.executemany` did not produce
+:meth:`Cursor.execute` or :meth:`Cursor.executemany` did not produce
 any result set or no call was issued yet.
 
 fetchmany -- fetch next set of rows of the query result
 -------------------------------------------------------
 
-.. method:: pgdbCursor.fetchmany([size=None], [keep=False])
+.. method:: Cursor.fetchmany([size=None], [keep=False])
 
     Fetch the next set of rows of a query result
 
@@ -352,18 +353,18 @@ If this is not possible due to the specified number of rows not being
 available, fewer rows may be returned.
 
 An :exc:`Error` (or subclass) exception is raised if the previous call to
-:meth:`pgdbCursor.execute` or :meth:`pgdbCursor.executemany` did not produce
+:meth:`Cursor.execute` or :meth:`Cursor.executemany` did not produce
 any result set or no call was issued yet.
 
 Note there are performance considerations involved with the *size* parameter.
 For optimal performance, it is usually best to use the :attr:`arraysize`
 attribute. If the *size* parameter is used, then it is best for it to retain
-the same value from one :meth:`pgdbCursor.fetchmany` call to the next.
+the same value from one :meth:`Cursor.fetchmany` call to the next.
 
 fetchall -- fetch all rows of the query result
 ----------------------------------------------
 
-.. method:: pgdbCursor.fetchall()
+.. method:: Cursor.fetchall()
 
     Fetch all (remaining) rows of a query result
 
@@ -377,7 +378,7 @@ of this operation.
 row_factory -- process a row of the query result
 ------------------------------------------------
 
-.. method:: pgdbCursor.row_factory(row)
+.. method:: Cursor.row_factory(row)
 
     Process rows before they are returned
 
@@ -389,7 +390,7 @@ Note that this method is not part of the DB-API 2 standard.
 You can overwrite this method with a custom row factory, e.g.
 if you want to return rows as dicts instead of tuples::
 
-    class DictCursor(pgdb.pgdbCursor):
+    class DictCursor(pgdb.Cursor):
 
         def row_factory(self, row):
             return {desc[0]:value
@@ -400,23 +401,23 @@ if you want to return rows as dicts instead of tuples::
 arraysize - the number of rows to fetch at a time
 -------------------------------------------------
 
-.. attribute:: pgdbCursor.arraysize
+.. attribute:: Cursor.arraysize
 
     The number of rows to fetch at a time
 
 This read/write attribute specifies the number of rows to fetch at a time with
-:meth:`pgdbCursor.fetchmany`. It defaults to 1 meaning to fetch a single row
+:meth:`Cursor.fetchmany`. It defaults to 1 meaning to fetch a single row
 at a time.
 
 
-pgdbType -- Type objects and constructors
-=========================================
+Type -- Type objects and constructors
+=====================================
 
-.. class:: pgdbType
+.. class:: Type
 
-The :attr:`pgdbCursor.description` attribute returns information about each
+The :attr:`Cursor.description` attribute returns information about each
 of the result columns of a query. The *type_code* must compare equal to one
-of the :class:`pgdbType` objects defined below. Type objects can be equal to
+of the :class:`Type` objects defined below. Type objects can be equal to
 more than one type code (e.g. :class:`DATETIME` is equal to the type codes
 for date, time and timestamp columns).
 

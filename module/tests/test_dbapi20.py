@@ -50,7 +50,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             con = self._connect()
             con.close()
         except pgdb.Error:  # try to create a missing database
-            warning.
             import pg
             try:  # first try to log in as superuser
                 db = pg.DB('postgres', dbhost or None, dbport or -1,
@@ -63,15 +62,15 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         dbapi20.DatabaseAPI20Test.tearDown(self)
 
     def test_row_factory(self):
-        class myCursor(pgdb.pgdbCursor):
+
+        class DictCursor(pgdb.Cursor):
+
             def row_factory(self, row):
-                d = {}
-                for idx, col in enumerate(self.description):
-                    d[col[0]] = row[idx]
-                return d
+                return {desc[0]:value
+                    for desc, value in zip(self.description, row)}
 
         con = self._connect()
-        cur = myCursor(con)
+        cur = DictCursor(con)
         ret = cur.execute("select 1 as a, 2 as b")
         self.assertTrue(ret is cur, 'execute() should return cursor')
         self.assertEqual(cur.fetchone(), {'a': 1, 'b': 2})
