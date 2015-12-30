@@ -1,6 +1,13 @@
 #! /bin/sh
 
-echo "Making HTML docs..."
+# small safety test
+if [ ! -f module/pgmodule.c ]
+then
+	echo "Hmmm.  Are you sure you are in the right directory?"
+	exit 1
+fi
 
-python ./buildhtml.py --stylesheet docs.css --link-stylesheet --prune=docs/CVS docs
+echo "Making Sphinx docs..."
 
+cd docs
+make html
