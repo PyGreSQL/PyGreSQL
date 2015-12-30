@@ -103,7 +103,7 @@ paramstyle = 'pyformat'
 
 # shortcut methods are not supported by default
 # since they have been excluded from DB API 2
-# and are not recommended by the DB SIG;
+# and are not recommended by the DB SIG.
 
 shortcutmethods = 0
 
@@ -286,23 +286,23 @@ class pgdbCursor(object):
             params = tuple(map(self._quote, params))
         return string % params
 
+    @staticmethod
     def row_factory(row):
         """Process rows before they are returned.
 
         You can overwrite this with a custom row factory,
         e.g. a dict factory:
 
-        class myCursor(pgdb.pgdbCursor):
-            def cursor.row_factory(self, row):
-                d = {}
-                for idx, col in enumerate(self.description):
-                    d[col[0]] = row[idx]
-                return d
-        cursor = myCursor(cnx)
+            class DictCursor(pgdb.pgdbCursor):
+
+                def row_factory(self, row):
+                    return {desc[0]:value
+                        for desc, value in zip(self.description, row)}
+
+            cur = DictCursor(con)
 
         """
         return row
-    row_factory = staticmethod(row_factory)
 
     def close(self):
         """Close the cursor object."""
@@ -428,15 +428,15 @@ class pgdbCursor(object):
         """Not supported."""
         raise NotSupportedError("nextset() is not supported")
 
+    @staticmethod
     def setinputsizes(sizes):
         """Not supported."""
         pass  # unsupported, but silently passed
-    setinputsizes = staticmethod(setinputsizes)
 
+    @staticmethod
     def setoutputsize(size, column=0):
         """Not supported."""
         pass  # unsupported, but silently passed
-    setoutputsize = staticmethod(setoutputsize)
 
 
 ### Connection Objects
