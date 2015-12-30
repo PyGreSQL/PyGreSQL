@@ -189,7 +189,7 @@ get/set_deftty -- default debug tty [DV]
 
 This method returns the current default debug terminal specification, or
 ``None`` if the environment variables should be used. Environment variables
-won't be looked up.
+won't be looked up. Note that this is ignored in newer PostgreSQL versions.
 
 .. function:: set_deftty(terminal)
 
@@ -204,6 +204,7 @@ won't be looked up.
 This methods sets the default debug terminal value for new connections.
 If ``None`` is supplied as parameter, environment variables will be used
 in future connections. It returns the previous setting for default terminal.
+Note that this is ignored in newer PostgreSQL versions.
 
 get/set_defbase -- default database name [DV]
 ---------------------------------------------
