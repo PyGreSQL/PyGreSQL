@@ -11,6 +11,10 @@ Version 5.0
   line with the names used in the DB-API 2 documentation.
   Since the API provides objects of these types only by the use of
   constructor functions, this should not cause any incompatibilities.
+- The tty parameter and attribute of database connections has been
+  removed since it is not supported any more since PostgreSQL 7.4.
+- The 7-tuples returned by the description attribute of a pgdb cursor
+  are now named tuples, i.e. their elements can be also accessed by name.
 
 Version 4.2
 -----------

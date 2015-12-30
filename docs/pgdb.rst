@@ -224,19 +224,21 @@ description -- details regarding the result columns
 
 .. attribute:: Cursor.description
 
-    This read-only attribute is a sequence of 7-item sequences.
+    This read-only attribute is a sequence of 7-item named tuples.
 
-    Each of these sequences contains information describing one result column:
+    Each of these named tuples contains information describing
+    one result column:
 
-    - *name*
-    - *type_code*
-    - *display_size*
-    - *internal_size*
-    - *precision*
-    - *scale*
-    - *null_ok*
+        - *name*
+        - *type_code*
+        - *display_size*
+        - *internal_size*
+        - *precision*
+        - *scale*
+        - *null_ok*
 
-    Note that *precision*, *scale* and *null_ok* are not implemented.
+    Note that *display_size*, *precision*, *scale* and *null_ok*
+    are not implemented.
 
     This attribute will be ``None`` for operations that do not return rows
     or if the cursor has not had an operation invoked via the

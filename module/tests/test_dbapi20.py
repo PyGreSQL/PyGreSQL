@@ -75,6 +75,24 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertTrue(ret is cur, 'execute() should return cursor')
         self.assertEqual(cur.fetchone(), {'a': 1, 'b': 2})
 
+    def test_description_named(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute("select 123456789::int8 as col")
+        desc = cur.description
+        self.assertIsInstance(desc, list)
+        self.assertEqual(len(desc), 1)
+        desc = desc[0]
+        self.assertIsInstance(desc, tuple)
+        self.assertEqual(desc.name, 'col')
+        self.assertEqual(desc.type_code, 'int8')
+        self.assertIsNone(desc.display_size)
+        self.assertIsInstance(desc.internal_size, int)
+        self.assertEqual(desc.internal_size, 8)
+        self.assertIsNone(desc.precision)
+        self.assertIsNone(desc.scale)
+        self.assertIsNone(desc.null_ok)
+
     def test_cursor_iteration(self):
         con = self._connect()
         cur = con.cursor()

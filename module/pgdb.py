@@ -48,7 +48,8 @@ Basic usage:
     cursor.description # returns information about the columns
     #	[(column_name, type_name, display_size,
     #		internal_size, precision, scale, null_ok), ...]
-    # Note that precision, scale and null_ok are not implemented.
+    # Note that display_size, precision, scale and null_ok
+    # are not implemented.
 
     cursor.rowcount # number of rows available in the result set
     # Available after a call to execute.
@@ -71,6 +72,7 @@ from datetime import date, time, datetime, timedelta
 from time import localtime
 from decimal import Decimal
 from math import isnan, isinf
+from collections import namedtuple
 
 try:
     long
@@ -196,8 +198,7 @@ class TypeCache(dict):
             res = self._src.fetch(1)[0]
             # The column name is omitted from the return value.
             # It will have to be prepended by the caller.
-            res = (res[0], None, int(res[1]),
-                None, None, None)
+            res = (res[0], None, int(res[1]), None, None, None)
             self[oid] = res
             return res
 
@@ -364,8 +365,8 @@ class Cursor(object):
             self.rowcount = self._src.ntuples
             getdescr = self._type_cache.getdescr
             coltypes = self._src.listinfo()
-            self.description = [
-                typ[1:2] + getdescr(typ[2]) for typ in coltypes]
+            self.description = [CursorDescription(
+                typ[1], *getdescr(typ[2])) for typ in coltypes]
             self.lastrowid = None
         else:
             self.rowcount = totrows
@@ -437,6 +438,11 @@ class Cursor(object):
     def setoutputsize(size, column=0):
         """Not supported."""
         pass  # unsupported, but silently passed
+
+
+CursorDescription = namedtuple('CursorDescription',
+    ['name', 'type_code', 'display_size', 'internal_size',
+     'precision', 'scale', 'null_ok'])
 
 
 ### Connection Objects
