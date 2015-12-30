@@ -19,7 +19,7 @@ http://www.python.org/peps/pep-0249.html
 Basic usage:
 
     pgdb.connect(connect_string) # open a connection
-    # connect_string = 'host:database:user:password:opt:tty'
+    # connect_string = 'host:database:user:password:opt'
     # All parts are optional. You may also pass host through
     # password as keyword arguments. To pass a port,
     # pass it in the host keyword parameter:
@@ -566,7 +566,6 @@ def connect(dsn=None,
     dbuser = ""
     dbpasswd = ""
     dbopt = ""
-    dbtty = ""
     try:
         params = dsn.split(":")
         dbhost = params[0]
@@ -574,7 +573,6 @@ def connect(dsn=None,
         dbuser = params[2]
         dbpasswd = params[3]
         dbopt = params[4]
-        dbtty = params[5]
     except (AttributeError, IndexError, TypeError):
         pass
 
@@ -600,8 +598,7 @@ def connect(dsn=None,
         dbuser = None
 
     # open the connection
-    cnx = _connect_(dbbase, dbhost, dbport, dbopt,
-        dbtty, dbuser, dbpasswd)
+    cnx = _connect_(dbbase, dbhost, dbport, dbopt, dbuser, dbpasswd)
     return Connection(cnx)
 
 

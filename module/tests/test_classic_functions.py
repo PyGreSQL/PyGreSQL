@@ -247,14 +247,6 @@ class TestHasConnect(unittest.TestCase):
         pg.set_defopt(d0)
         self.assertEqual(pg.get_defopt(), d0)
 
-    def testDefTty(self):
-        d0 = pg.get_deftty()
-        d1 = 'pgtesttty'
-        pg.set_deftty(d1)
-        self.assertEqual(pg.get_deftty(), d1)
-        pg.set_deftty(d0)
-        self.assertEqual(pg.get_deftty(), d0)
-
     def testDefBase(self):
         d0 = pg.get_defbase()
         d1 = 'pgtestdb'

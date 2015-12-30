@@ -100,7 +100,6 @@ const char *__movename[5] =
 static PyObject *pg_default_host;	/* default database host */
 static PyObject *pg_default_base;	/* default database name */
 static PyObject *pg_default_opt;	/* default connection options */
-static PyObject *pg_default_tty;	/* default debug tty */
 static PyObject *pg_default_port;	/* default connection port */
 static PyObject *pg_default_user;	/* default username */
 static PyObject *pg_default_passwd;	/* default password */
@@ -2307,8 +2306,8 @@ connDir(connObject *self)
 	PyObject *attrs;
 
 	attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-	PyObject_CallMethod(attrs, "extend", "[ssssssssss]",
-		"host", "port", "db", "options", "tty", "error", "status", "user",
+	PyObject_CallMethod(attrs, "extend", "[sssssssss]",
+		"host", "port", "db", "options", "error", "status", "user",
 		"protocol_version", "server_version");
 
 	return attrs;
@@ -2404,10 +2403,6 @@ connGetAttr(connObject *self, PyObject *nameobj)
 	/* selected options */
 	if (!strcmp(name, "options"))
 		return PyStr_FromString(PQoptions(self->cnx));
-
-	/* selected postgres tty */
-	if (!strcmp(name, "tty"))
-		return PyStr_FromString(PQtty(self->cnx));
 
 	/* error (status) message */
 	if (!strcmp(name, "error"))
@@ -3169,18 +3164,17 @@ static PyTypeObject sourceType = {
 
 /* connects to a database */
 static char pgConnect__doc__[] =
-"connect(dbname, host, port, opt, tty) -- connect to a PostgreSQL database "
+"connect(dbname, host, port, opt) -- connect to a PostgreSQL database "
 "using specified parameters (optionals, keywords aware).";
 
 static PyObject *
 pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 {
 	static const char *kwlist[] = {"dbname", "host", "port", "opt",
-	"tty", "user", "passwd", NULL};
+	"user", "passwd", NULL};
 
 	char	   *pghost,
 			   *pgopt,
-			   *pgtty,
 			   *pgdbname,
 			   *pguser,
 			   *pgpasswd;
@@ -3188,7 +3182,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 	char		port_buffer[20];
 	connObject   *npgobj;
 
-	pghost = pgopt = pgtty = pgdbname = pguser = pgpasswd = NULL;
+	pghost = pgopt = pgdbname = pguser = pgpasswd = NULL;
 	pgport = -1;
 
 	/*
@@ -3197,8 +3191,8 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 	 * don't declare kwlist as const char *kwlist[] then it complains when
 	 * I try to assign all those constant strings to it.
 	 */
-	if (!PyArg_ParseTupleAndKeywords(args, dict, "|zzizzzz", (char **) kwlist,
-		&pgdbname, &pghost, &pgport, &pgopt, &pgtty, &pguser, &pgpasswd))
+	if (!PyArg_ParseTupleAndKeywords(args, dict, "|zzizzz", (char **) kwlist,
+		&pgdbname, &pghost, &pgport, &pgopt, &pguser, &pgpasswd))
 		return NULL;
 
 #ifdef DEFAULT_VARS
@@ -3211,9 +3205,6 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 
 	if ((!pgopt) && (pg_default_opt != Py_None))
 		pgopt = PyBytes_AsString(pg_default_opt);
-
-	if ((!pgtty) && (pg_default_tty != Py_None))
-		pgtty = PyBytes_AsString(pg_default_tty);
 
 	if ((!pgdbname) && (pg_default_base != Py_None))
 		pgdbname = PyBytes_AsString(pg_default_base);
@@ -3245,7 +3236,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 	Py_BEGIN_ALLOW_THREADS
 #endif
 	npgobj->cnx = PQsetdbLogin(pghost, pgport == -1 ? NULL : port_buffer,
-		pgopt, pgtty, pgdbname, pguser, pgpasswd);
+		pgopt, NULL, pgdbname, pguser, pgpasswd);
 #ifdef PQsetdbLoginIsThreadSafe
 	Py_END_ALLOW_THREADS
 #endif
@@ -4423,58 +4414,6 @@ pgSetDefOpt(PyObject *self, PyObject *args)
 	return old;
 }
 
-/* gets default tty */
-static char pgGetDefTTY__doc__[] =
-"get_deftty() -- return default database debug terminal.";
-
-static PyObject *
-pgGetDefTTY(PyObject *self, PyObject *args)
-{
-	/* checks args */
-	if (!PyArg_ParseTuple(args, ""))
-	{
-		PyErr_SetString(PyExc_TypeError,
-			"method get_deftty() takes no parameter.");
-		return NULL;
-	}
-
-	Py_XINCREF(pg_default_tty);
-	return pg_default_tty;
-}
-
-/* sets default tty */
-static char pgSetDefTTY__doc__[] =
-"set_deftty(string) -- set default database debug terminal. "
-"Return previous value.";
-
-static PyObject *
-pgSetDefTTY(PyObject *self, PyObject *args)
-{
-	char	   *temp = NULL;
-	PyObject   *old;
-
-	/* gets arguments */
-	if (!PyArg_ParseTuple(args, "z", &temp))
-	{
-		PyErr_SetString(PyExc_TypeError,
-			"set_deftty(name), with name (string/None).");
-		return NULL;
-	}
-
-	/* adjusts value */
-	old = pg_default_tty;
-
-	if (temp)
-		pg_default_tty = PyStr_FromString(temp);
-	else
-	{
-		Py_INCREF(Py_None);
-		pg_default_tty = Py_None;
-	}
-
-	return old;
-}
-
 /* gets default username */
 static char pgGetDefUser__doc__[] =
 "get_defuser() -- return default database username.";
@@ -4642,8 +4581,6 @@ static struct PyMethodDef pgMethods[] = {
 	{"set_defbase", pgSetDefBase, METH_VARARGS, pgSetDefBase__doc__},
 	{"get_defopt", pgGetDefOpt, METH_VARARGS, pgGetDefOpt__doc__},
 	{"set_defopt", pgSetDefOpt, METH_VARARGS, pgSetDefOpt__doc__},
-	{"get_deftty", pgGetDefTTY, METH_VARARGS, pgGetDefTTY__doc__},
-	{"set_deftty", pgSetDefTTY, METH_VARARGS, pgSetDefTTY__doc__},
 	{"get_defport", pgGetDefPort, METH_VARARGS, pgGetDefPort__doc__},
 	{"set_defport", pgSetDefPort, METH_VARARGS, pgSetDefPort__doc__},
 	{"get_defuser", pgGetDefUser, METH_VARARGS, pgGetDefUser__doc__},
@@ -4773,8 +4710,6 @@ MODULE_INIT_FUNC(_pg)
 	pg_default_opt = Py_None;
 	Py_INCREF(Py_None);
 	pg_default_port = Py_None;
-	Py_INCREF(Py_None);
-	pg_default_tty = Py_None;
 	Py_INCREF(Py_None);
 	pg_default_user = Py_None;
 	Py_INCREF(Py_None);

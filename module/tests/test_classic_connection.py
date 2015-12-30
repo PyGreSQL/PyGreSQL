@@ -115,7 +115,7 @@ class TestConnectObject(unittest.TestCase):
 
     def testAllConnectAttributes(self):
         attributes = '''db error host options port
-            protocol_version server_version status tty user'''.split()
+            protocol_version server_version status user'''.split()
         connection_attributes = [a for a in dir(self.connection)
             if not a.startswith('__') and not self.is_method(a)]
         self.assertEqual(attributes, connection_attributes)
@@ -166,11 +166,6 @@ class TestConnectObject(unittest.TestCase):
         status_ok = 1
         self.assertIsInstance(self.connection.status, int)
         self.assertEqual(self.connection.status, status_ok)
-
-    def testAttributeTty(self):
-        def_tty = ''
-        self.assertIsInstance(self.connection.tty, str)
-        self.assertEqual(self.connection.tty, def_tty)
 
     def testAttributeUser(self):
         no_user = 'Deprecated facility'

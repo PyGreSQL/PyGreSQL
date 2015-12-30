@@ -51,7 +51,7 @@ standard environment variables should be used.
 connect -- Open a PostgreSQL connection
 ---------------------------------------
 
-.. function:: connect([dbname], [host], [port], [opt], [tty], [user], [passwd])
+.. function:: connect([dbname], [host], [port], [opt], [user], [passwd])
 
     Open a :mod:`pg` connection
 
@@ -63,8 +63,6 @@ connect -- Open a PostgreSQL connection
     :type port: int
     :param opt: connection options (*None* = :data:`defopt`)
     :type opt: str or None
-    :param tty: debug terminal (*None* = :data:`deftty`)
-    :type tty: str or None
     :param user: PostgreSQL user (*None* = :data:`defuser`)
     :type user: str or None
     :param passwd: password for user (*None* = :data:`defpasswd`)
@@ -175,35 +173,6 @@ won't be looked up.
 This methods sets the default connection options value for new connections.
 If ``None`` is supplied as parameter, environment variables will be used in
 future connections. It returns the previous setting for default options.
-
-get/set_deftty -- default debug tty [DV]
-----------------------------------------
-
-.. function:: get_deftty()
-
-    Get the default debug terminal
-
-    :returns: the current default debug terminal specification
-    :rtype: str or None
-    :raises TypeError: too many arguments
-
-This method returns the current default debug terminal specification, or
-``None`` if the environment variables should be used. Environment variables
-won't be looked up.
-
-.. function:: set_deftty(terminal)
-
-    Set the default debug terminal
-
-    :param terminal: the new default debug terminal
-    :type terminal: str or None
-    :returns: the previous default debug terminal specification
-    :rtype: str or None
-    :raises TypeError: bad argument type, or too many arguments
-
-This methods sets the default debug terminal value for new connections.
-If ``None`` is supplied as parameter, environment variables will be used
-in future connections. It returns the previous setting for default terminal.
 
 get/set_defbase -- default database name [DV]
 ---------------------------------------------
@@ -839,10 +808,6 @@ the connection and its status. These attributes are:
 .. attribute:: Connection.options
 
    the connection options (str)
-
-.. attribute:: Connection.tty
-
-   the connection debug terminal (str)
 
 .. attribute:: Connection.user
 

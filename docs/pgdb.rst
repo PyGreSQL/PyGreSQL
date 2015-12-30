@@ -54,12 +54,11 @@ connect -- Open a PostgreSQL connection
 This function takes parameters specifying how to connect to a PostgreSQL
 database and returns a :class:`Connection` object using these parameters.
 If specified, the *dsn* parameter must be a string with the format
-``'host:base:user:passwd:opt:tty'``. All of the parts specified in the *dsn*
+``'host:base:user:passwd:opt'``. All of the parts specified in the *dsn*
 are optional. You can also specify the parameters individually using keyword
 arguments, which always take precedence. The *host* can also contain a port
 if specified in the format ``'host:port'``. In the *opt* part of the *dsn*
-you can pass command-line options to the server, the *tty* part is used to
-send server debug output.
+you can pass command-line options to the server.
 
 Example::
 

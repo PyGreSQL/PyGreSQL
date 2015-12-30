@@ -130,7 +130,6 @@ class TestDBClassBasic(unittest.TestCase):
             'start',
             'status',
             'transaction',
-            'tty',
             'unescape_bytea',
             'update',
             'use_regtypes',
@@ -190,13 +189,6 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertIsInstance(status, int)
         self.assertEqual(status, status_ok)
         self.assertEqual(status, self.db.db.status)
-
-    def testAttributeTty(self):
-        def_tty = ''
-        tty = self.db.tty
-        self.assertIsInstance(tty, str)
-        self.assertEqual(tty, def_tty)
-        self.assertEqual(tty, self.db.db.tty)
 
     def testAttributeUser(self):
         no_user = 'Deprecated facility'
