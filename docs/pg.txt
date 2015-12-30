@@ -17,17 +17,17 @@ The following part of the documentation covers only the older :mod:`pg` API.
 
 The :mod:`pg` module handles three types of objects,
 
-- the :class:`pgobject`, which handles the connection
+- the :class:`Connection` instances, which handle the connection
   and all the requests to the database,
-- the :class:`pglarge` object, which handles
+- the :class:`LargeObject` instances, which handle
   all the accesses to PostgreSQL large objects,
-- the :class:`pgqueryobject` that handles query results
+- the :class:`Query` instances that handle query results
 
 and it provides a convenient wrapper class :class:`DB`
-for the :class:`pgobject`.
+for the basic :class:`Connection` class.
 
 If you want to see a simple example of the use of some of these functions,
-see the :doc:`examples` page.
+please have a look at the :doc:`examples`.
 
 
 Module functions and constants
@@ -68,8 +68,8 @@ connect -- Open a PostgreSQL connection
     :type user: str or None
     :param passwd: password for user (*None* = :data:`defpasswd`)
     :type passwd: str or None
-    :returns: If successful, the :class:`pgobject` handling the connection
-    :rtype: :class:`pgobject`
+    :returns: If successful, the :class:`Connection` handling the connection
+    :rtype: :class:`Connection`
     :raises TypeError: bad argument type, or too many arguments
     :raises SyntaxError: duplicate argument definition
     :raises pg.InternalError: some error occurred during pg connection definition
@@ -308,7 +308,7 @@ This is useful when inserting data values as literal constants
 in SQL commands. Certain characters (such as quotes and backslashes)
 must be escaped to prevent them from being interpreted specially
 by the SQL parser. :func:`escape_string` performs this operation.
-Note that there is also a :class:`pgobject` method with the same name
+Note that there is also a :class:`Connection` method with the same name
 which takes connection properties into account.
 
 .. note::
@@ -339,7 +339,7 @@ escape_bytea -- escape binary data for use within SQL
 Escapes binary data for use within an SQL command with the type ``bytea``.
 As with :func:`escape_string`, this is only used when inserting data directly
 into an SQL command string.
-Note that there is also a :class:`pgobject` method with the same name
+Note that there is also a :class:`Connection` method with the same name
 which takes connection properties into account.
 
 Example::
@@ -362,8 +362,8 @@ unescape_bytea -- unescape data that has been retrieved as text
 
 Converts an escaped string representation of binary data into binary
 data -- the reverse of :func:`escape_bytea`. This is needed when retrieving
-``bytea`` data with one of the :meth:`pgqueryobject.getresult`,
-:meth:`pgqueryobject.dictresult` or :meth:`pgqueryobject.namedresult` methods.
+``bytea`` data with one of the :meth:`Query.getresult`,
+:meth:`Query.dictresult` or :meth:`Query.namedresult` methods.
 
 Example::
 
@@ -467,7 +467,7 @@ get/set_namedresult -- conversion to named tuples
     Get the function that converts to named tuples
 
 This function returns the function used by PyGreSQL to construct the
-result of the :meth:`pgqueryobject.namedresult` method.
+result of the :meth:`Query.namedresult` method.
 
 .. function:: set_namedresult(func)
 
@@ -476,7 +476,7 @@ result of the :meth:`pgqueryobject.namedresult` method.
     :param func: the function to be used to convert results to named tuples
 
 You can use this if you want to create different kinds of named tuples
-returned by the :meth:`pgqueryobject.namedresult` method.
+returned by the :meth:`Query.namedresult` method.
 
 
 Module constants
@@ -488,22 +488,22 @@ for more information about them. These constants are:
 
 .. data:: version, __version__
 
-   constants that give the current version
+    constants that give the current version
 
 .. data:: INV_READ, INV_WRITE
 
-   large objects access modes,
-   used by :meth:`pgobject.locreate` and :meth:`pglarge.open`
+    large objects access modes,
+    used by :meth:`Connection.locreate` and :meth:`LargeObject.open`
 
 .. data:: SEEK_SET, SEEK_CUR, SEEK_END:
 
-   positional flags, used by :meth:`pglarge.seek`
+    positional flags, used by :meth:`LargeObject.seek`
 
 
-pgobject -- The connection object
+Connection -- The connection object
 =================================
 
-.. class:: pgobject
+.. class:: Connection
 
 This object handles a connection to a PostgreSQL database. It embeds and
 hides all the parameters that define this connection, thus just leaving really
@@ -511,31 +511,31 @@ significant parameters in function calls.
 
 .. note::
 
-   Some methods give direct access to the connection socket.
-   *Do not use them unless you really know what you are doing.*
-   If you prefer disabling them,
-   set the ``-DNO_DIRECT`` option in the Python setup file.
-   These methods are specified by the tag [DA].
+    Some methods give direct access to the connection socket.
+    *Do not use them unless you really know what you are doing.*
+    If you prefer disabling them,
+    set the ``-DNO_DIRECT`` option in the Python setup file.
+    These methods are specified by the tag [DA].
 
 .. note::
 
-   Some other methods give access to large objects
-   (refer to PostgreSQL user manual for more information about these).
-   If you want to forbid access to these from the module,
-   set the ``-DNO_LARGE`` option in the Python setup file.
-   These methods are specified by the tag [LO].
+    Some other methods give access to large objects
+    (refer to PostgreSQL user manual for more information about these).
+    If you want to forbid access to these from the module,
+    set the ``-DNO_LARGE`` option in the Python setup file.
+    These methods are specified by the tag [LO].
 
 query -- execute a SQL command string
 -------------------------------------
 
-.. method:: pgobject.query(command, [args])
+.. method:: Connection.query(command, [args])
 
     Execute a SQL command string
 
     :param str command: SQL command
     :param args: optional positional arguments
     :returns: result values
-    :rtype: :class:`pgqueryobject`, None
+    :rtype: :class:`Query`, None
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
     :raises ValueError: empty SQL query or lost connection
@@ -549,9 +549,9 @@ or delete statement, or an insert statement that did not insert exactly one
 row in a table with OIDs, then the number of rows affected is returned as a
 string. If it is a statement that returns rows as a result (usually a select
 statement, but maybe also an ``"insert/update ... returning"`` statement),
-this method returns a :class:`pgqueryobject` that can be accessed via the
-:meth:`pgqueryobject.getresult`, :meth:`pgqueryobject.dictresult` or
-:meth:`pgqueryobject.namedresult` methods or simply printed.
+this method returns a :class:`Query` that can be accessed via the
+:meth:`Query.getresult`, :meth:`Query.dictresult` or
+:meth:`Query.namedresult` methods or simply printed.
 Otherwise, it returns ``None``.
 
 The query may optionally contain positional parameters of the form ``$1``,
@@ -573,24 +573,24 @@ Example::
 reset -- reset the connection
 -----------------------------
 
-.. method:: pgobject.reset()
+.. method:: Connection.reset()
 
-   Reset the :mod:`pg` connection
-
-   :rtype: None
-   :raises TypeError: too many (any) arguments
-   :raises TypeError: invalid connection
+    Reset the :mod:`pg` connection
+    
+    :rtype: None
+    :raises TypeError: too many (any) arguments
+    :raises TypeError: invalid connection
 
 This method resets the current database connection.
 
 cancel -- abandon processing of current SQL command
 ---------------------------------------------------
 
-.. method:: pgobject.cancel()
+.. method:: Connection.cancel()
 
-   :rtype: None
-   :raises TypeError: too many (any) arguments
-   :raises TypeError: invalid connection
+    :rtype: None
+    :raises TypeError: too many (any) arguments
+    :raises TypeError: invalid connection
 
 This method requests that the server abandon processing
 of the current SQL command.
@@ -598,12 +598,12 @@ of the current SQL command.
 close -- close the database connection
 --------------------------------------
 
-.. method:: pgobject.close()
+.. method:: Connection.close()
 
-   Close the :mod:`pg` connection
-
-   :rtype: None
-   :raises TypeError: too many (any) arguments
+    Close the :mod:`pg` connection
+    
+    :rtype: None
+    :raises TypeError: too many (any) arguments
 
 This method closes the database connection. The connection will
 be closed in any case when the connection is deleted but this
@@ -613,7 +613,7 @@ the DB-SIG API wrapper to implement a close function.
 fileno -- returns the socket used to connect to the database
 ------------------------------------------------------------
 
-.. method:: pgobject.fileno()
+.. method:: Connection.fileno()
 
    Return the socket used to connect to the database
 
@@ -628,14 +628,14 @@ to the database. This is useful for use in select calls, etc.
 getnotify -- get the last notify from the server
 ------------------------------------------------
 
-.. method:: pgobject.getnotify()
+.. method:: Connection.getnotify()
 
-   Get the last notify from the server
+    Get the last notify from the server
 
-   :returns: last notify from server
-   :rtype: tuple, None
-   :raises TypeError: too many parameters
-   :raises TypeError: invalid connection
+    :returns: last notify from server
+    :rtype: tuple, None
+    :raises TypeError: too many parameters
+    :raises TypeError: invalid connection
 
 This method tries to get a notify from the server (from the SQL statement
 NOTIFY). If the server returns no notify, the methods returns None.
@@ -643,21 +643,21 @@ Otherwise, it returns a tuple (triplet) *(relname, pid, extra)*, where
 *relname* is the name of the notify, *pid* is the process id of the
 connection that triggered the notify, and *extra* is a payload string
 that has been sent with the notification. Remember to do a listen query
-first, otherwise :meth:`pgobject.getnotify` will always return ``None``.
+first, otherwise :meth:`Connection.getnotify` will always return ``None``.
 
 inserttable -- insert a list into a table
 -----------------------------------------
 
-.. method:: pgobject.inserttable(table, values)
+.. method:: Connection.inserttable(table, values)
 
-   Insert a Python list into a database table
+    Insert a Python list into a database table
 
-   :param str table: the table name
-   :param list values: list of rows values
-   :rtype: None
-   :raises TypeError: invalid connection, bad argument type, or too many arguments
-   :raises MemoryError: insert buffer could not be allocated
-   :raises ValueError: unsupported values
+    :param str table: the table name
+    :param list values: list of rows values
+    :rtype: None
+    :raises TypeError: invalid connection, bad argument type, or too many arguments
+    :raises MemoryError: insert buffer could not be allocated
+    :raises ValueError: unsupported values
 
 This method allows to *quickly* insert large blocks of data in a table:
 It inserts the whole values list into the given table. Internally, it
@@ -667,69 +667,69 @@ values may contain string, integer, long or double (real) values.
 
 .. note::
 
-   **Be very careful**:
-   This method doesn't type check the fields according to the table definition;
-   it just look whether or not it knows how to handle such types.
+    **Be very careful**:
+    This method doesn't type check the fields according to the table definition;
+    it just look whether or not it knows how to handle such types.
 
 get/set_notice_receiver -- custom notice receiver
 -------------------------------------------------
 
-.. method:: pgobject.get_notice_receiver()
+.. method:: Connection.get_notice_receiver()
 
-   Get the current notice receiver
+    Get the current notice receiver
 
-   :returns: the current notice receiver callable
-   :rtype: callable, None
-   :raises TypeError: too many (any) arguments
+    :returns: the current notice receiver callable
+    :rtype: callable, None
+    :raises TypeError: too many (any) arguments
 
 This method gets the custom notice receiver callback function that has
-been set with :meth:`pgobject.set_notice_receiver`, or ``None`` if no
+been set with :meth:`Connection.set_notice_receiver`, or ``None`` if no
 custom notice receiver has ever been set on the connection.
 
-.. method:: pgobject.set_notice_receiver(proc)
+.. method:: Connection.set_notice_receiver(proc)
 
-   Set a custom notice receiver
+    Set a custom notice receiver
 
-   :param proc: the custom notice receiver callback function
-   :rtype: None
-   :raises TypeError: the specified notice receiver is not callable
+    :param proc: the custom notice receiver callback function
+    :rtype: None
+    :raises TypeError: the specified notice receiver is not callable
 
 This method allows setting a custom notice receiver callback function.
 When a notice or warning message is received from the server,
 or generated internally by libpq, and the message level is below
 the one set with ``client_min_messages``, the specified notice receiver
 function will be called. This function must take one parameter,
-the :class:`pgnotice` object, which provides the following read-only
+the :class:`Notice` object, which provides the following read-only
 attributes:
 
-    .. attribute:: pgnotice.pgcnx
+    .. attribute:: Notice.pgcnx
 
         the connection
 
-    .. attribute:: pgnotice.message
+    .. attribute:: Notice.message
 
         the full message with a trailing newline
 
-    .. attribute:: pgnotice.severity
+    .. attribute:: Notice.severity
 
         the level of the message, e.g. 'NOTICE' or 'WARNING'
 
-    .. attribute:: pgnotice.primary
+    .. attribute:: Notice.primary
 
         the primary human-readable error message
 
-    .. attribute:: pgnotice.detail
+    .. attribute:: Notice.detail
 
         an optional secondary error message
 
-    .. attribute:: pgnotice.hint
+    .. attribute:: Notice.hint
 
         an optional suggestion what to do about the problem
 
 putline -- write a line to the server socket [DA]
 -------------------------------------------------
 
-.. method:: pgobject.putline(line)
+.. method:: Connection.putline(line)
 
     Write a line to the server socket
 
@@ -742,7 +742,7 @@ This method allows to directly write a string to the server socket.
 getline -- get a line from server socket [DA]
 ---------------------------------------------
 
-.. method:: pgobject.getline()
+.. method:: Connection.getline()
 
     Get a line from server socket
 
@@ -757,7 +757,7 @@ This method allows to directly read a string from the server socket.
 endcopy -- synchronize client and server [DA]
 ---------------------------------------------
 
-.. method:: pgobject.endcopy()
+.. method:: Connection.endcopy()
 
     Synchronize client and server
 
@@ -771,13 +771,13 @@ This method ensure that client and server will be synchronized.
 locreate -- create a large object in the database [LO]
 ------------------------------------------------------
 
-.. method:: pgobject.locreate(mode)
+.. method:: Connection.locreate(mode)
 
     Create a large object in the database
 
     :param int mode: large object create mode
     :returns: object handling the PostGreSQL large object
-    :rtype: :class:`pglarge`
+    :rtype: :class:`LargeObject`
     :raises TypeError: invalid connection, bad parameter type, or too many parameters
     :raises pg.OperationalError: creation error
 
@@ -789,29 +789,29 @@ user manual for a description of the mode values.
 getlo -- build a large object from given oid [LO]
 -------------------------------------------------
 
-.. method:: pgobject.getlo(oid)
+.. method:: Connection.getlo(oid)
 
     Create a large object in the database
 
     :param int oid: OID of the existing large object
     :returns: object handling the PostGreSQL large object
-    :rtype: :class:`pglarge`
+    :rtype: :class:`LargeObject`
     :raises TypeError:  invalid connection, bad parameter type, or too many parameters
     :raises ValueError: bad OID value (0 is invalid_oid)
 
 This method allows to reuse a formerly created large object through the
-:class:`pglarge` interface, providing the user have its OID.
+:class:`LargeObject` interface, providing the user have its OID.
 
 loimport -- import a file to a large object [LO]
 ------------------------------------------------
 
-.. method:: pgobject.loimport(name)
+.. method:: Connection.loimport(name)
 
     Import a file to a large object
 
     :param str name: the name of the file to be imported
     :returns: object handling the PostGreSQL large object
-    :rtype: :class:`pglarge`
+    :rtype: :class:`LargeObject`
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises pg.OperationalError: error during file import
 
@@ -820,46 +820,46 @@ give the name of a file containing the data to be used.
 
 Object attributes
 -----------------
-Every :class:`pgobject` defines a set of read-only attributes that describe
+Every :class:`Connection` defines a set of read-only attributes that describe
 the connection and its status. These attributes are:
 
-.. attribute:: pgobject.host
+.. attribute:: Connection.host
 
    the host name of the server (str)
 
-.. attribute:: pgobject.port
+.. attribute:: Connection.port
 
    the port of the server (int)
 
-.. attribute:: pgobject.db
+.. attribute:: Connection.db
 
    the selected database (str)
 
-.. attribute:: pgobject.options
+.. attribute:: Connection.options
 
    the connection options (str)
 
-.. attribute:: pgobject.tty
+.. attribute:: Connection.tty
 
    the connection debug terminal (str)
 
-.. attribute:: pgobject.user
+.. attribute:: Connection.user
 
     user name on the database system (str)
 
-.. attribute:: pgobject.protocol_version
+.. attribute:: Connection.protocol_version
 
    the frontend/backend protocol being used (int)
 
-.. attribute:: pgobject.server_version
+.. attribute:: Connection.server_version
 
    the backend version (int, e.g. 80305 for 8.3.5)
 
-.. attribute:: pgobject.status
+.. attribute:: Connection.status
 
    the status of the connection (int: 1 = OK, 0 = bad)
 
-.. attribute:: pgobject.error
+.. attribute:: Connection.error
 
    the last warning/error message from the server (str)
 
@@ -869,7 +869,7 @@ The DB wrapper class
 
 .. class:: DB
 
-The :class:`pgobject` methods are wrapped in the class :class:`DB`.
+The :class:`Connection` methods are wrapped in the class :class:`DB`.
 The preferred way to use this module is as follows::
 
     import pg
@@ -914,7 +914,7 @@ You can also initialize the DB class with an existing :mod:`pg` or :mod:`pgdb`
 connection. Pass this connection as a single unnamed parameter, or as a
 single parameter named ``db``. This allows you to use all of the methods
 of the DB class with a DB-API 2 compliant connection. Note that the
-:meth:`pgobject.close` and :meth:`pgobject.reopen` methods are inoperative
+:meth:`Connection.close` and :meth:`Connection.reopen` methods are inoperative
 in this case.
 
 pkey -- return the primary key of a table
@@ -1080,14 +1080,14 @@ query -- execute a SQL command string
     :param str command: SQL command
     :param arg*: optional positional arguments
     :returns: result values
-    :rtype: :class:`pgqueryobject`, None
+    :rtype: :class:`Query`, None
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
     :raises ValueError: empty SQL query or lost connection
     :raises pg.ProgrammingError: error in query
     :raises pg.InternalError: error during query processing
 
-Similar to the :class:`pgobject` function with the same name, except that
+Similar to the :class:`Connection` function with the same name, except that
 positional arguments can be passed either as a single list or tuple, or as
 individual positional arguments.
 
@@ -1181,19 +1181,19 @@ unescape_bytea -- unescape data that has been retrieved as text
 See the module function with the same name.
 
 
-pgqueryobject methods
+Query methods
 =====================
 
-.. class:: pgqueryobject
+.. class:: Query
 
-The :class:`pgqueryobject` returned by :meth:`pgobject.query` and
+The :class:`Query` object returned by :meth:`Connection.query` and
 :meth:`DB.query` provides the following methods for accessing
 the results of the query:
 
 getresult -- get query values as list of tuples
 -----------------------------------------------
 
-.. method:: pgqueryobject.getresult()
+.. method:: Query.getresult()
 
     Get query values as list of tuples
 
@@ -1204,13 +1204,13 @@ getresult -- get query values as list of tuples
 
 This method returns the list of the values returned by the query.
 More information about this result may be accessed using
-:meth:`pgqueryobject.listfields`, :meth:`pgqueryobject.fieldname`
-and :meth:`pgqueryobject.fieldnum` methods.
+:meth:`Query.listfields`, :meth:`Query.fieldname`
+and :meth:`Query.fieldnum` methods.
 
 dictresult -- get query values as list of dictionaries
 ------------------------------------------------------
 
-.. method:: pgqueryobject.dictresult()
+.. method:: Query.dictresult()
 
     Get query values as list of dictionaries
 
@@ -1226,7 +1226,7 @@ used as the dictionary index.
 namedresult -- get query values as list of named tuples
 -------------------------------------------------------
 
-.. method:: pgqueryobject.namedresult()
+.. method:: Query.namedresult()
 
     Get query values as list of named tuples
 
@@ -1242,7 +1242,7 @@ with each row returned as a named tuple with proper field names.
 listfields -- list fields names of previous query result
 --------------------------------------------------------
 
-.. method:: pgqueryobject.listfields()
+.. method:: Query.listfields()
 
     List fields names of previous query result
 
@@ -1256,7 +1256,7 @@ query result. The fields are in the same order as the result values.
 fieldname, fieldnum -- field name/number conversion
 ---------------------------------------------------
 
-.. method:: pgqueryobject.fieldname(num)
+.. method:: Query.fieldname(num)
 
     Get field name from its number
 
@@ -1270,7 +1270,7 @@ This method allows to find a field name from its rank number. It can be
 useful for displaying a result. The fields are in the same order as the
 result values.
 
-.. method:: pgqueryobject.fieldnum(name)
+.. method:: Query.fieldnum(name)
 
     Get field number from its name
 
@@ -1288,34 +1288,35 @@ field rank in the result values list.
 ntuples -- return number of tuples in query object
 --------------------------------------------------
 
-.. method:: pgqueryobject.ntuples()
+.. method:: Query.ntuples()
 
     Return number of tuples in query object
 
-    :returns: number of tuples in :class:`pgqueryobject`
+    :returns: number of tuples in :class:`Query`
     :rtype: int
     :raises TypeError: Too many arguments.
 
 This method returns the number of tuples found in a query.
 
 
-pglarge -- Large Objects
-========================
+LargeObject -- Large Objects
+============================
 
-.. class:: pglarge
+.. class:: LargeObject
 
-Objects that are instances of the class :class:`pglarge` are used to handle
+Objects that are instances of the class :class:`LargeObject` are used to handle
 all the requests concerning a PostgreSQL large object. These objects embed
 and hide all the "recurrent" variables (object OID and connection), exactly
-in the same way :class:`pgobject` instances do, thus only keeping significant
-parameters in function calls. The class:`pglarge` object keeps a reference
-to the :class:`pgobject` used for its creation, sending requests though with
-its parameters. Any modification but dereferencing the :class:`pgobject`
-will thus affect the :class:`pglarge` object. Dereferencing the initial
-:class:`pgobject` is not a problem since Python won't deallocate it before
-the :class:`pglarge` object dereferences it. All functions return a generic
-error message on call error, whatever the exact error was. The :attr:`error`
-attribute of the object allows to get the exact error message.
+in the same way :class:`Connection` instances do, thus only keeping significant
+parameters in function calls. The class:`LargeObject` instance keeps a
+reference to the :class:`Connection` object used for its creation, sending
+requests though with its parameters. Any modification but dereferencing the
+:class:`Connection` object will thus affect the :class:`LargeObject` instance.
+Dereferencing the initial :class:`Connection` object is not a problem since
+Python won't deallocate it before the :class:`LargeObject` instance
+dereferences it. All functions return a generic error message on call error,
+whatever the exact error was. The :attr:`error` attribute of the object allows
+to get the exact error message.
 
 See also the PostgreSQL programmer's guide for more information about the
 large object interface.
@@ -1323,7 +1324,7 @@ large object interface.
 open -- open a large object
 ---------------------------
 
-.. method:: pglarge.open(mode)
+.. method:: LargeObject.open(mode)
 
     Open a large object
 
@@ -1339,7 +1340,7 @@ defined in the :mod:`pg` module (:const:`INV_READ`, :const:`INV_WRITE`).
 close -- close a large object
 -----------------------------
 
-.. method:: pglarge.close()
+.. method:: LargeObject.close()
 
     Close a large object
 
@@ -1354,7 +1355,7 @@ the Unix close() function.
 read, write, tell, seek, unlink -- file-like large object handling
 ------------------------------------------------------------------
 
-.. method:: pglarge.read(size)
+.. method:: LargeObject.read(size)
 
     Read data from large object
 
@@ -1369,7 +1370,7 @@ read, write, tell, seek, unlink -- file-like large object handling
 This function allows to read data from a large object, starting at current
 position.
 
-.. method:: pglarge.write(string)
+.. method:: LargeObject.write(string)
 
     Read data to large object
 
@@ -1381,7 +1382,7 @@ position.
 This function allows to write data to a large object, starting at current
 position.
 
-.. method:: pglarge.seek(offset, whence)
+.. method:: LargeObject.seek(offset, whence)
 
     Change current position in large object
 
@@ -1397,7 +1398,7 @@ This method allows to move the position cursor in the large object.
 The valid values for the whence parameter are defined as constants in the
 :mod:`pg` module (:const:`SEEK_SET`, :const:`SEEK_CUR`, :const:`SEEK_END`).
 
-.. method:: pglarge.tell()
+.. method:: LargeObject.tell()
 
     Return current position in large object
 
@@ -1409,7 +1410,7 @@ The valid values for the whence parameter are defined as constants in the
 
 This method allows to get the current position in the large object.
 
-.. method:: pglarge.unlink()
+.. method:: LargeObject.unlink()
 
     Delete large object
 
@@ -1423,7 +1424,7 @@ This methods unlinks (deletes) the PostgreSQL large object.
 size -- get the large object size
 ---------------------------------
 
-.. method:: pglarge.size()
+.. method:: LargeObject.size()
 
     Return the large object size
 
@@ -1440,7 +1441,7 @@ database. Currently, the large object needs to be opened first.
 export -- save a large object to a file
 ---------------------------------------
 
-.. method:: pglarge.export(name)
+.. method:: LargeObject.export(name)
 
     Export a large object to a file
 
@@ -1456,27 +1457,27 @@ server host.
 
 Object attributes
 -----------------
-:class:`pglarge` objects define a read-only set of attributes that allow
+:class:`LargeObject` objects define a read-only set of attributes that allow
 to get some information about it. These attributes are:
 
-.. attribute:: pglarge.oid
+.. attribute:: LargeObject.oid
 
-   the OID associated with the object (int)
+   the OID associated with the large object (int)
 
-.. attribute:: pglarge.pgcnx
+.. attribute:: LargeObject.pgcnx
 
-   the :class:`pgobject` associated with the object
+   the :class:`Connection` object associated with the large object
 
-.. attribute:: pglarge.error
+.. attribute:: LargeObject.error
 
-   the last warning/error message of the connection
+   the last warning/error message of the connection (str)
 
 .. note::
 
     **Be careful**:
-    In multithreaded environments, :attr:`pglarge.error` may be modified by
-    another thread using the same :class:`pgobject`. Remember these object
+    In multithreaded environments, :attr:`LargeObject.error` may be modified by
+    another thread using the same :class:`Connection`. Remember these object
     are shared, not duplicated. You should provide some locking to be able
-    if you want to check this. The :attr:`pglarge.oid` attribute is very
+    if you want to check this. The :attr:`LargeObject.oid` attribute is very
     interesting, because it allows you to reuse the OID later, creating the
-    :class:`pglarge` object with a :meth:`pgobject.getlo` method call.
+    :class:`LargeObject` object with a :meth:`Connection.getlo` method call.
