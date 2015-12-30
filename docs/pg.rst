@@ -157,7 +157,7 @@ get/set_defopt --  default connection options [DV]
     :rtype: str or None
     :raises TypeError: too many arguments
 
-This method returns the current default connection options  specification,
+This method returns the current default connection options specification,
 or ``None`` if the environment variables should be used. Environment variables
 won't be looked up.
 
