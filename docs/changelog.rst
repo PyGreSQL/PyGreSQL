@@ -57,7 +57,6 @@ Version 4.1 (2013-01-01)
 - New method use_regtypes() that can be called to let getattnames()
   return regular type names instead of the simplified classic types (#44).
 
-
 Version 4.0 (2009-01-01)
 ------------------------
 - Dropped support for Python below 2.3 and PostgreSQL below 7.4.
@@ -104,7 +103,6 @@ Version 4.0 (2009-01-01)
   if no primary key was found.
 - delete() now also works based on the primary key if no oid available
   and returns whether the row existed or not.
-
 
 Version 3.8.1 (2006-06-05)
 --------------------------

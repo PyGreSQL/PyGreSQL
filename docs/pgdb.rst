@@ -9,6 +9,7 @@
 
 Introduction
 ============
+
 You may either choose to use the "classic" PyGreSQL interface
 provided by the :mod:`pg` module or else the
 DB-API 2.0 compliant interface provided by the :mod:`pgdb` module.

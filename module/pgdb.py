@@ -101,7 +101,7 @@ paramstyle = 'pyformat'
 
 # shortcut methods are not supported by default
 # since they have been excluded from DB API 2
-# and are not recommended by the DB SIG;
+# and are not recommended by the DB SIG.
 
 shortcutmethods = 0
 
@@ -290,12 +290,14 @@ class pgdbCursor(object):
         You can overwrite this with a custom row factory,
         e.g. a dict factory:
 
-        class myCursor(pgdb.pgdbCursor):
-            def cursor.row_factory(self, row):
-                d = {}
-                for idx, col in enumerate(self.description):
-                    d[col[0]] = row[idx]
-                return d
+            class myCursor(pgdb.pgdbCursor):
+
+                def row_factory(self, row):
+                    d = {}
+                    for idx, col in enumerate(self.description):
+                        d[col[0]] = row[idx]
+                    return d
+
         cursor = myCursor(cnx)
 
         """
