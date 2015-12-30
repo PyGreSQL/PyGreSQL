@@ -16,8 +16,8 @@ Contents:
    changelog
    install
    interface
-   classic
-   db_api
+   pg
+   pgdb
    source
    mailinglist
    future
