@@ -501,7 +501,7 @@ for more information about them. These constants are:
 
 
 Connection -- The connection object
-=================================
+===================================
 
 .. class:: Connection
 
@@ -1182,7 +1182,7 @@ See the module function with the same name.
 
 
 Query methods
-=====================
+=============
 
 .. class:: Query
 
