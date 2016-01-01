@@ -6,6 +6,9 @@ Version 5.0
 - This version runs on both Python 2 and Python 3.
 - The supported versions are Python 2.6, 2.7, 3.3, 3.4 and 3.5.
 - The supported PostgreSQL versions are 9.0, 9.1, 9.2, 9.3 and 9.4.
+- The DB-API 2 module now always returns result rows as named tuples
+  instead of simply lists as before. The documentation explains how
+  you can restore the old behavior or use custom row objects instead.
 - The names of the various types supported by the classic and DB-API 2
   modules have been renamed to become simpler, more intuitive and in
   line with the names used in the DB-API 2 documentation.

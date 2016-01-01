@@ -190,7 +190,7 @@ cause an implicit rollback to be performed.
 cursor -- return a new cursor object
 ------------------------------------
 
-.. method:: Connection.cusor()
+.. method:: Connection.cursor()
 
     Return a new cursor object using the connection
 
@@ -199,6 +199,21 @@ cursor -- return a new cursor object
 
 This method returns a new :class:`Cursor` object that can be used to
 operate on the database in the way described in the next section.
+
+Attributes that are not part of the standard
+--------------------------------------------
+
+.. note::
+
+   The following attributes are not part of the DB-API 2 standard.
+
+.. attribute:: cursor_type
+
+    The default cursor type used by the connection
+
+If you want to use your own custom subclass of the :class:`Cursor` class
+with he connection, set this attribute to you custom cursor class. You will
+then get your custom cursor whenever you call :meth:`Connection.cursor`.
 
 
 Cursor -- The cursor object
@@ -318,10 +333,12 @@ fetchone -- fetch next row of the query result
     Fetch the next row of a query result set
 
     :returns: the next row of the query result set
-    :rtype: tuple or None
+    :rtype: named tuple or None
 
-Fetch the next row of a query result set, returning a single tuple,
-or ``None`` when no more data is available.
+Fetch the next row of a query result set, returning a single named tuple,
+or ``None`` when no more data is available. The field names of the named
+tuple are the same as the column names of the database query as long as
+they are valid Python identifiers.
 
 An :exc:`Error` (or subclass) exception is raised if the previous call to
 :meth:`Cursor.execute` or :meth:`Cursor.executemany` did not produce
@@ -339,10 +356,12 @@ fetchmany -- fetch next set of rows of the query result
     :param keep: if set to true, will keep the passed arraysize
     :tpye keep: bool
     :returns: the next set of rows of the query result
-    :rtype: list of tuples
+    :rtype: list of named tuples
 
-Fetch the next set of rows of a query result, returning a list of tuples.
-An empty sequence is returned when no more rows are available.
+Fetch the next set of rows of a query result, returning a list of named
+tuples. An empty sequence is returned when no more rows are available.
+The field names of the named tuple are the same as the column names of
+the database query as long as they are valid Python identifiers.
 
 The number of rows to fetch per call is specified by the *size* parameter.
 If it is not given, the cursor's :attr:`arraysize` determines the number of
@@ -370,34 +389,14 @@ fetchall -- fetch all rows of the query result
     Fetch all (remaining) rows of a query result
 
     :returns: the set of all rows of the query result
-    :rtype: list of tuples
+    :rtype: list of named tuples
 
-Fetch all (remaining) rows of a query result, returning them as list of tuples.
+Fetch all (remaining) rows of a query result, returning them as list of
+named tuples. The field names of the named tuple are the same as the column
+names of the database query as long as they are valid Python identifiers.
+
 Note that the cursor's :attr:`arraysize` attribute can affect the performance
 of this operation.
-
-row_factory -- process a row of the query result
-------------------------------------------------
-
-.. method:: Cursor.row_factory(row)
-
-    Process rows before they are returned
-
-    :param tuple row: the currently processed row of the result set
-    :returns: the transformed row that the cursor methods shall return
-
-Note that this method is not part of the DB-API 2 standard.
-
-You can overwrite this method with a custom row factory, e.g.
-if you want to return rows as dicts instead of tuples::
-
-    class DictCursor(pgdb.Cursor):
-
-        def row_factory(self, row):
-            return {desc[0]:value
-                for desc, value in zip(self.description, row)}
-
-    cur = DictCursor(con)
 
 arraysize - the number of rows to fetch at a time
 -------------------------------------------------
@@ -407,8 +406,78 @@ arraysize - the number of rows to fetch at a time
     The number of rows to fetch at a time
 
 This read/write attribute specifies the number of rows to fetch at a time with
-:meth:`Cursor.fetchmany`. It defaults to 1 meaning to fetch a single row
+:meth:`Cursor.fetchmany`. It defaults to 1, meaning to fetch a single row
 at a time.
+
+Methods and attributes that are not part of the standard
+--------------------------------------------------------
+
+.. note::
+
+   The following methods and attributes are not part of the DB-API 2 standard.
+
+.. method:: Cursor.row_factory(row)
+
+    Process rows before they are returned
+
+    :param tuple row: the currently processed row of the result set
+    :returns: the transformed row that the fetch methods shall return
+
+This method is used for processing result rows before returning them through
+one of the fetch methods. By default, rows are returned as named tuples.
+You can overwrite this method with a custom row factory if you want to
+return the rows as different kids of objects. This same row factory will then
+be used for all result sets. If you overwrite this method, the method
+:meth:`Cursor.build_row_factory` for creating row factories dynamically
+will be ignored.
+
+Note that named tuples are very efficient and can be easily converted to
+dicts (even OrderedDicts) by calling ``row._asdict()``. If you still want
+to return rows as dicts, you can create a custom cursor class like this::
+
+    class DictCursor(pgdb.Cursor):
+
+        def row_factory(self, row):
+            return {key: value for key, value in zip(self.colnames, row)}
+
+    cur = DictCursor(con)  # get one DictCursor instance or
+    con.cursor_type = DictCursor  # always use DictCursor instances
+
+
+.. method:: Cursor.build_row_factory()
+
+    Build a row factory based on the current description
+
+    :returns: callable with the signature of :meth:`Cursor.row_factory`
+
+This method returns row factories for creating named tuples. It is called
+whenever a new result set is created, and :attr:`Cursor.row_factory` is
+then assigned the return value of this method. You can overwrite this method
+with a custom row factory builder if you want to use different row factories
+for different result sets. Otherwise, you can also simply overwrite the
+:meth:`Cursor.row_factory` method. This method will then be ignored.
+
+The default implementation that delivers rows as named tuples essentially
+looks like this::
+
+    def build_row_factory(self):
+        return namedtuple('Row', self.colnames, rename=True)._make
+
+.. attribute:: Cursor.colnames
+
+    The list of columns names of the current result set
+
+The values in this list are the same values as the *name* elements
+in the :attr:`Cursor.description` attribute. Always use the latter
+if you want to remain standard compliant.
+
+.. attribute:: Cursor.coltypes
+
+    The list of columns types of the current result set
+
+The values in this list are the same values as the *type_code* elements
+in the :attr:`Cursor.description` attribute. Always use the latter
+if you want to remain standard compliant.
 
 
 Type -- Type objects and constructors
@@ -472,7 +541,9 @@ The :mod:`pgdb` module exports the following constructors and singletons:
 
     Used to describe the ``oid`` column of PostgreSQL database tables
 
-The following more specific types are not part of the DB-API 2 standard:
+.. note::
+
+  The following more specific types are not part of the DB-API 2 standard.
 
 .. class:: BOOL
 

@@ -66,72 +66,105 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
 
-    def test_cursortype(self):
-        con = self._connect()
-        self.assertIs(con.cursor_type, pgdb.Cursor)
-        cur = con.cursor()
-        self.assertIsInstance(cur, pgdb.Cursor)
-        self.assertNotIsInstance(cur, pgdb.ListCursor)
-        cur.close()
-        con.cursor_type = pgdb.ListCursor
-        cur = con.cursor()
-        self.assertIsInstance(cur, pgdb.Cursor)
-        self.assertIsInstance(cur, pgdb.ListCursor)
-        cur.close()
-        cur = con.cursor()
-        self.assertIsInstance(cur, pgdb.ListCursor)
-        cur.close()
-        con.close()
-        con = self._connect()
-        self.assertIs(con.cursor_type, pgdb.Cursor)
-        cur = con.cursor()
-        self.assertIsInstance(cur, pgdb.Cursor)
-        self.assertNotIsInstance(cur, pgdb.ListCursor)
-        cur.close()
-        con.close()
+    def test_cursor_type(self):
 
-    def test_list_cursor(self):
+        class TestCursor(pgdb.Cursor):
+            pass
+
         con = self._connect()
-        cur = con.list_cursor()
-        self.assertIsInstance(cur, pgdb.ListCursor)
-        cur.execute("select 1, 2, 3")
+        self.assertIs(con.cursor_type, pgdb.Cursor)
+        cur = con.cursor()
+        self.assertIsInstance(cur, pgdb.Cursor)
+        self.assertNotIsInstance(cur, TestCursor)
+        con.cursor_type = TestCursor
+        cur = con.cursor()
+        self.assertIsInstance(cur, TestCursor)
+        cur = con.cursor()
+        self.assertIsInstance(cur, TestCursor)
+        con = self._connect()
+        self.assertIs(con.cursor_type, pgdb.Cursor)
+        cur = con.cursor()
+        self.assertIsInstance(cur, pgdb.Cursor)
+        self.assertNotIsInstance(cur, TestCursor)
+
+    def test_row_factory(self):
+
+        class TestCursor(pgdb.Cursor):
+
+            def row_factory(self, row):
+                return dict(('column %s' % desc[0], value)
+                    for desc, value in zip(self.description, row))
+
+        con = self._connect()
+        con.cursor_type = TestCursor
+        cur = con.cursor()
+        self.assertIsInstance(cur, TestCursor)
+        res = cur.execute("select 1 as a, 2 as b")
+        self.assertIs(res, cur, 'execute() should return cursor')
         res = cur.fetchone()
-        cur.close()
-        con.close()
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res, {'column a': 1, 'column b': 2})
+        cur.execute("select 1 as a, 2 as b union select 3, 4 order by 1")
+        res = cur.fetchall()
         self.assertIsInstance(res, list)
-        self.assertEqual(res, [1, 2, 3])
+        self.assertEqual(len(res), 2)
+        self.assertIsInstance(res[0], dict)
+        self.assertEqual(res[0], {'column a': 1, 'column b': 2})
+        self.assertIsInstance(res[1], dict)
+        self.assertEqual(res[1], {'column a': 3, 'column b': 4})
 
-    def test_tuple_cursor(self):
-        con = self._connect()
-        cur = con.tuple_cursor()
-        self.assertIsInstance(cur, pgdb.Cursor)
-        cur.execute("select 1, 2, 3")
-        res = cur.fetchone()
-        cur.close()
-        con.close()
-        self.assertIsInstance(res, tuple)
-        self.assertEqual(res, (1, 2, 3))
-        self.assertRaises(AttributeError, getattr, res, '_fields')
+    def test_build_row_factory(self):
 
-    def test_named_tuple_cursor(self):
+        class TestCursor(pgdb.Cursor):
+
+            def build_row_factory(self):
+                keys = [desc[0] for desc in self.description]
+                return lambda row: dict((key, value)
+                    for key, value in zip(keys, row))
+
         con = self._connect()
-        cur = con.named_tuple_cursor()
-        self.assertIsInstance(cur, pgdb.NamedTupleCursor)
-        cur.execute("select 1 as abc, 2 as de, 3 as f")
+        con.cursor_type = TestCursor
+        cur = con.cursor()
+        self.assertIsInstance(cur, TestCursor)
+        cur.execute("select 1 as a, 2 as b")
         res = cur.fetchone()
-        cur.close()
-        con.close()
+        self.assertIsInstance(res, dict)
+        self.assertEqual(res, {'a': 1, 'b': 2})
+        cur.execute("select 1 as a, 2 as b union select 3, 4 order by 1")
+        res = cur.fetchall()
+        self.assertIsInstance(res, list)
+        self.assertEqual(len(res), 2)
+        self.assertIsInstance(res[0], dict)
+        self.assertEqual(res[0], {'a': 1, 'b': 2})
+        self.assertIsInstance(res[1], dict)
+        self.assertEqual(res[1], {'a': 3, 'b': 4})
+
+    def test_cursor_with_named_columns(self):
+        con = self._connect()
+        cur = con.cursor()
+        res = cur.execute("select 1 as abc, 2 as de, 3 as f")
+        self.assertIs(res, cur, 'execute() should return cursor')
+        res = cur.fetchone()
         self.assertIsInstance(res, tuple)
         self.assertEqual(res, (1, 2, 3))
         self.assertEqual(res._fields, ('abc', 'de', 'f'))
         self.assertEqual(res.abc, 1)
         self.assertEqual(res.de, 2)
         self.assertEqual(res.f, 3)
+        cur.execute("select 1 as one, 2 as two union select 3, 4 order by 1")
+        res = cur.fetchall()
+        self.assertIsInstance(res, list)
+        self.assertEqual(len(res), 2)
+        self.assertIsInstance(res[0], tuple)
+        self.assertEqual(res[0], (1, 2))
+        self.assertEqual(res[0]._fields, ('one', 'two'))
+        self.assertIsInstance(res[1], tuple)
+        self.assertEqual(res[1], (3, 4))
+        self.assertEqual(res[1]._fields, ('one', 'two'))
 
-    def test_named_tuple_cursor_with_bad_names(self):
+    def test_cursor_with_unnamed_columns(self):
         con = self._connect()
-        cur = con.named_tuple_cursor()
-        self.assertIsInstance(cur, pgdb.NamedTupleCursor)
+        cur = con.cursor()
         cur.execute("select 1, 2, 3")
         res = cur.fetchone()
         self.assertIsInstance(res, tuple)
@@ -158,53 +191,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(res._fields, ('column_0', 'column_1'))
         else:
             self.assertEqual(res._fields, ('abc', '_1'))
-        cur.close()
-        con.close()
-
-    def test_dict_cursor(self):
-        con = self._connect()
-        cur = con.dict_cursor()
-        self.assertIsInstance(cur, pgdb.DictCursor)
-        cur.execute("select 1 as abc, 2 as de, 3 as f")
-        res = cur.fetchone()
-        cur.close()
-        con.close()
-        self.assertIsInstance(res, dict)
-        self.assertEqual(res, {'abc': 1, 'de': 2, 'f': 3})
-        self.assertRaises(TypeError, res.popitem, last=True)
-
-    def test_ordered_dict_cursor(self):
-        con = self._connect()
-        cur = con.ordered_dict_cursor()
-        self.assertIsInstance(cur, pgdb.OrderedDictCursor)
-        cur.execute("select 1 as abc, 2 as de, 3 as f")
-        try:
-            res = cur.fetchone()
-        except pgdb.NotSupportedError:
-            if OrderedDict is None:
-                return
-            self.fail('OrderedDict supported by Python, but not by pgdb')
-        finally:
-            cur.close()
-            con.close()
-        self.assertIsInstance(res, dict)
-        self.assertEqual(res, {'abc': 1, 'de': 2, 'f': 3})
-        self.assertEqual(res.popitem(last=True), ('f', 3))
-
-    def test_row_factory(self):
-
-        class DictCursor(pgdb.Cursor):
-
-            def row_factory(self, row):
-                # not using dict comprehension to stay compatible with Py 2.6
-                return dict(('column %s' % desc[0], value)
-                    for desc, value in zip(self.description, row))
-
-        con = self._connect()
-        cur = DictCursor(con)
-        ret = cur.execute("select 1 as a, 2 as b")
-        self.assertTrue(ret is cur, 'execute() should return cursor')
-        self.assertEqual(cur.fetchone(), {'column a': 1, 'column b': 2})
 
     def test_colnames(self):
         con = self._connect()
@@ -226,7 +212,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertIsInstance(types, list)
         self.assertEqual(types, ['int2', 'int4', 'int8'])
 
-    def test_description_named(self):
+    def test_description_fields(self):
         con = self._connect()
         cur = con.cursor()
         cur.execute("select 123456789::int8 as col")
@@ -235,6 +221,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(len(desc), 1)
         desc = desc[0]
         self.assertIsInstance(desc, tuple)
+        self.assertEqual(len(desc), 7)
         self.assertEqual(desc.name, 'col')
         self.assertEqual(desc.type_code, 'int8')
         self.assertIsNone(desc.display_size)

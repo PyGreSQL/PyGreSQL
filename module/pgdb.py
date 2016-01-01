@@ -228,16 +228,21 @@ class _quotedict(dict):
 class Cursor(object):
     """Cursor object."""
 
-    row_factory = tuple  # the factory for creating result rows
-
     def __init__(self, dbcnx):
         """Create a cursor object for the database connection."""
         self.connection = self._dbcnx = dbcnx
         self._cnx = dbcnx._cnx
         self._type_cache = dbcnx._type_cache
         self._src = self._cnx.source()
-        self.colnames = self.coltypes = None
+        # the official attribute for describing the result columns
         self.description = None
+        # unofficial attributes for convenience and performance
+        self.colnames = self.coltypes = None
+        if self.row_factory is Cursor.row_factory:
+            # the row factory needs to be determined dynamically
+            self.row_factory = None
+        else:
+            self.build_row_factory = None
         self.rowcount = -1
         self.arraysize = 1
         self.lastrowid = None
@@ -302,8 +307,8 @@ class Cursor(object):
     def close(self):
         """Close the cursor object."""
         self._src.close()
-        self.colnames = self.coltypes = None
         self.description = None
+        self.colnames = self.coltypes = None
         self.rowcount = -1
         self.lastrowid = None
 
@@ -325,11 +330,11 @@ class Cursor(object):
         if not param_seq:
             # don't do anything without parameters
             return
-        self.colnames = self.coltypes = None
         self.description = None
+        self.colnames = self.coltypes = None
         self.rowcount = -1
         # first try to execute all queries
-        totrows = 0
+        rowcount = 0
         sql = "BEGIN"
         try:
             if not self._dbcnx._tnx:
@@ -347,7 +352,7 @@ class Cursor(object):
                     sql = operation
                 rows = self._src.execute(sql)
                 if rows:  # true if not DML
-                    totrows += rows
+                    rowcount += rows
                 else:
                     self.rowcount = -1
         except DatabaseError:
@@ -366,8 +371,10 @@ class Cursor(object):
             self.coltypes = [info[1] for info in description]
             self.description = description
             self.lastrowid = None
+            if self.build_row_factory:
+                self.row_factory = self.build_row_factory()
         else:
-            self.rowcount = totrows
+            self.rowcount = rowcount
             self.lastrowid = self._src.oidstatus()
         # return the cursor object, so you can write statements such as
         # "cursor.execute(...).fetchall()" or "for row in cursor.execute(...)"
@@ -434,60 +441,53 @@ class Cursor(object):
         """Not supported."""
         pass  # unsupported, but silently passed
 
+    @staticmethod
+    def row_factory(row):
+        """Process rows before they are returned.
+
+        You can overwrite this statically with a custom row factory, or
+        you can build a row factory dynamically with build_row_factory().
+
+        For example, you can create a Cursor class that returns rows as
+        Python dictionaries like this:
+
+            class DictCursor(pgdb.Cursor):
+
+                def row_factory(self, row):
+                    return {desc[0]: value
+                        for desc, value in zip(self.description, row)}
+
+            cur = DictCursor(con)  # get one DictCursor instance or
+            con.cursor_type = DictCursor  # always use DictCursor instances
+
+        """
+        raise NotImplementedError
+
+    def build_row_factory(self):
+        """Build a row factory based on the current description.
+
+        This implementation builds a row factory for creating named tuples.
+        You can overwrite this method if you want to dynamically create
+        different row factories whenever the column description changes.
+
+        """
+        colnames = self.colnames
+        if colnames:
+            try:
+                try:
+                    return namedtuple('Row', colnames, rename=True)._make
+                except TypeError:  # Python 2.6 and 3.0 do not support rename
+                    colnames = [v if v.isalnum() else 'column_%d' % n
+                             for n, v in enumerate(colnames)]
+                    return namedtuple('Row', colnames)._make
+            except ValueError:  # there is still a problem with the field names
+                colnames = ['column_%d' % n for n in range(len(colnames))]
+                return namedtuple('Row', colnames)._make
+
 
 CursorDescription = namedtuple('CursorDescription',
     ['name', 'type_code', 'display_size', 'internal_size',
      'precision', 'scale', 'null_ok'])
-
-
-class ListCursor(Cursor):
-    """Cursor object that returns rows as lists."""
-
-    row_factory = list
-
-
-class DictCursor(Cursor):
-    """Cursor object that returns rows as dictionaries."""
-
-    def row_factory(self, row):
-        """Turn a row from a tuple into a dictionary."""
-        # not using dict comprehension to stay compatible with Py 2.6
-        return dict((key, value) for key, value in zip(self.colnames, row))
-
-
-class OrderedDictCursor(Cursor):
-    """Cursor object that returns rows as ordered dictionaries."""
-
-    def row_factory(self, row):
-        """Turn a row from a tuple into an ordered dictionary."""
-        return OrderedDict(
-            (key, value) for key, value in zip(self.colnames, row))
-
-
-class NamedTupleCursor(Cursor):
-    """Cursor object that returns rows as named tuples."""
-
-    @property
-    def colnames(self):
-        return self._colnames
-
-    @colnames.setter
-    def colnames(self, value):
-        self._colnames = value
-        if value:
-            try:
-                try:
-                    factory = namedtuple('Row', value, rename=True)._make
-                except TypeError:  # Python 2.6 and 3.0 do not support rename
-                    value = [v if v.isalnum() else 'column_%d' % n
-                             for n, v in enumerate(value)]
-                    factory = namedtuple('Row', value)._make
-            except ValueError:
-                value = ['column_%d' % n for n in range(len(value))]
-                factory = namedtuple('Row', value)._make
-        else:
-            factory = tuple
-        self._colnames, self.row_factory = value, factory
 
 
 ### Connection Objects
@@ -513,7 +513,6 @@ class Connection(object):
         self._tnx = False  # transaction state
         self._type_cache = TypeCache(cnx)
         self.cursor_type = Cursor
-        self.row_type = tuple
         try:
             self._cnx.source()
         except Exception:
@@ -579,35 +578,15 @@ class Connection(object):
         else:
             raise _op_error("connection has been closed")
 
-    def cursor(self, cls=None):
+    def cursor(self):
         """Return a new cursor object using the connection."""
         if self._cnx:
             try:
-                return (cls or self.cursor_type)(self)
+                return self.cursor_type(self)
             except Exception:
                 raise _op_error("invalid connection")
         else:
             raise _op_error("connection has been closed")
-
-    def list_cursor(self):
-        """Return a new tuple cursor object using the connection."""
-        return self.cursor(ListCursor)
-
-    def tuple_cursor(self):
-        """Return a new tuple cursor object using the connection."""
-        return self.cursor(Cursor)
-
-    def named_tuple_cursor(self):
-        """Return a new named tuple cursor object using the connection."""
-        return self.cursor(NamedTupleCursor)
-
-    def dict_cursor(self):
-        """Return a new dict cursor object using the connection."""
-        return self.cursor(DictCursor)
-
-    def ordered_dict_cursor(self):
-        """Return a new ordered dict cursor object using the connection."""
-        return self.cursor(OrderedDictCursor)
 
     if shortcutmethods:  # otherwise do not implement and document this
 
