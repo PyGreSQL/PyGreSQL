@@ -89,6 +89,15 @@ try:
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
 
+try:
+    from collections import OrderedDict
+except ImportError:  # Python 2.6 or 3.0
+    try:
+        from ordereddict import OrderedDict
+    except Exception:
+        def OrderedDict(*args):
+            raise NotSupportedError('OrderedDict is not supported')
+
 set_decimal(Decimal)
 
 
@@ -219,12 +228,15 @@ class _quotedict(dict):
 class Cursor(object):
     """Cursor object."""
 
+    row_factory = tuple  # the factory for creating result rows
+
     def __init__(self, dbcnx):
         """Create a cursor object for the database connection."""
         self.connection = self._dbcnx = dbcnx
         self._cnx = dbcnx._cnx
         self._type_cache = dbcnx._type_cache
         self._src = self._cnx.source()
+        self.colnames = self.coltypes = None
         self.description = None
         self.rowcount = -1
         self.arraysize = 1
@@ -287,27 +299,10 @@ class Cursor(object):
             params = tuple(map(self._quote, params))
         return string % params
 
-    @staticmethod
-    def row_factory(row):
-        """Process rows before they are returned.
-
-        You can overwrite this with a custom row factory,
-        e.g. a dict factory:
-
-            class DictCursor(pgdb.Cursor):
-
-                def row_factory(self, row):
-                    return {desc[0]:value
-                        for desc, value in zip(self.description, row)}
-
-            cur = DictCursor(con)
-
-        """
-        return row
-
     def close(self):
         """Close the cursor object."""
         self._src.close()
+        self.colnames = self.coltypes = None
         self.description = None
         self.rowcount = -1
         self.lastrowid = None
@@ -330,6 +325,7 @@ class Cursor(object):
         if not param_seq:
             # don't do anything without parameters
             return
+        self.colnames = self.coltypes = None
         self.description = None
         self.rowcount = -1
         # first try to execute all queries
@@ -364,13 +360,14 @@ class Cursor(object):
         if self._src.resulttype == RESULT_DQL:
             self.rowcount = self._src.ntuples
             getdescr = self._type_cache.getdescr
-            coltypes = self._src.listinfo()
-            self.description = [CursorDescription(
-                typ[1], *getdescr(typ[2])) for typ in coltypes]
+            description = [CursorDescription(
+                info[1], *getdescr(info[2])) for info in self._src.listinfo()]
+            self.colnames = [info[0] for info in description]
+            self.coltypes = [info[1] for info in description]
+            self.description = description
             self.lastrowid = None
         else:
             self.rowcount = totrows
-            self.description = None
             self.lastrowid = self._src.oidstatus()
         # return the cursor object, so you can write statements such as
         # "cursor.execute(...).fetchall()" or "for row in cursor.execute(...)"
@@ -407,11 +404,9 @@ class Cursor(object):
             raise
         except Error as err:
             raise _db_error(str(err))
-        row_factory = self.row_factory
         typecast = self._type_cache.typecast
-        coltypes = [desc[1] for desc in self.description]
-        return [row_factory([typecast(*args)
-            for args in zip(coltypes, row)]) for row in result]
+        return [self.row_factory([typecast(typ, value)
+            for typ, value in zip(self.coltypes, row)]) for row in result]
 
     def __next__(self):
         """Return the next row (support for the iteration protocol)."""
@@ -445,6 +440,56 @@ CursorDescription = namedtuple('CursorDescription',
      'precision', 'scale', 'null_ok'])
 
 
+class ListCursor(Cursor):
+    """Cursor object that returns rows as lists."""
+
+    row_factory = list
+
+
+class DictCursor(Cursor):
+    """Cursor object that returns rows as dictionaries."""
+
+    def row_factory(self, row):
+        """Turn a row from a tuple into a dictionary."""
+        # not using dict comprehension to stay compatible with Py 2.6
+        return dict((key, value) for key, value in zip(self.colnames, row))
+
+
+class OrderedDictCursor(Cursor):
+    """Cursor object that returns rows as ordered dictionaries."""
+
+    def row_factory(self, row):
+        """Turn a row from a tuple into an ordered dictionary."""
+        return OrderedDict(
+            (key, value) for key, value in zip(self.colnames, row))
+
+
+class NamedTupleCursor(Cursor):
+    """Cursor object that returns rows as named tuples."""
+
+    @property
+    def colnames(self):
+        return self._colnames
+
+    @colnames.setter
+    def colnames(self, value):
+        self._colnames = value
+        if value:
+            try:
+                try:
+                    factory = namedtuple('Row', value, rename=True)._make
+                except TypeError:  # Python 2.6 and 3.0 do not support rename
+                    value = [v if v.isalnum() else 'column_%d' % n
+                             for n, v in enumerate(value)]
+                    factory = namedtuple('Row', value)._make
+            except ValueError:
+                value = ['column_%d' % n for n in range(len(value))]
+                factory = namedtuple('Row', value)._make
+        else:
+            factory = tuple
+        self._colnames, self.row_factory = value, factory
+
+
 ### Connection Objects
 
 class Connection(object):
@@ -467,6 +512,8 @@ class Connection(object):
         self._cnx = cnx  # connection
         self._tnx = False  # transaction state
         self._type_cache = TypeCache(cnx)
+        self.cursor_type = Cursor
+        self.row_type = tuple
         try:
             self._cnx.source()
         except Exception:
@@ -532,15 +579,35 @@ class Connection(object):
         else:
             raise _op_error("connection has been closed")
 
-    def cursor(self):
+    def cursor(self, cls=None):
         """Return a new cursor object using the connection."""
         if self._cnx:
             try:
-                return Cursor(self)
+                return (cls or self.cursor_type)(self)
             except Exception:
                 raise _op_error("invalid connection")
         else:
             raise _op_error("connection has been closed")
+
+    def list_cursor(self):
+        """Return a new tuple cursor object using the connection."""
+        return self.cursor(ListCursor)
+
+    def tuple_cursor(self):
+        """Return a new tuple cursor object using the connection."""
+        return self.cursor(Cursor)
+
+    def named_tuple_cursor(self):
+        """Return a new named tuple cursor object using the connection."""
+        return self.cursor(NamedTupleCursor)
+
+    def dict_cursor(self):
+        """Return a new dict cursor object using the connection."""
+        return self.cursor(DictCursor)
+
+    def ordered_dict_cursor(self):
+        """Return a new ordered dict cursor object using the connection."""
+        return self.cursor(OrderedDictCursor)
 
     if shortcutmethods:  # otherwise do not implement and document this
 
