@@ -76,7 +76,7 @@ def pg_version():
         if part.isdigit():
             part = int(part)
         parts.append(part)
-    return tuple(parts or [8])
+    return tuple(parts or [9])
 
 
 pg_version = pg_version()
@@ -129,11 +129,11 @@ class build_pg_ext(build_ext):
             define_macros.append(('LARGE_OBJECTS', None))
         if self.default_vars:
             define_macros.append(('DEFAULT_VARS', None))
-        if self.escaping_funcs:
+        if self.escaping_funcs and pg_version[0] >= 9:
             define_macros.append(('ESCAPING_FUNCS', None))
         if sys.platform == 'win32':
             bits = platform.architecture()[0]
-            if bits == '64bit': # we need to find libpq64
+            if bits == '64bit':  # we need to find libpq64
                 for path in os.environ['PATH'].split(os.pathsep) + [
                         r'C:\Program Files\PostgreSQL\libpq64']:
                     library_dir = os.path.join(path, 'lib')
@@ -150,13 +150,13 @@ class build_pg_ext(build_ext):
                         library_dirs.insert(1, library_dir)
                     if include_dir not in include_dirs:
                         include_dirs.insert(1, include_dir)
-                    libraries[0] += 'dll' # libpqdll instead of libpq
+                    libraries[0] += 'dll'  # libpqdll instead of libpq
                     break
             compiler = self.get_compiler()
-            if compiler == 'mingw32': # MinGW
-                if bits == '64bit': # needs MinGW-w64
+            if compiler == 'mingw32':  # MinGW
+                if bits == '64bit':  # needs MinGW-w64
                     define_macros.append(('MS_WIN64', None))
-            elif compiler == 'msvc': # Microsoft Visual C++
+            elif compiler == 'msvc':  # Microsoft Visual C++
                 libraries[0] = 'lib' + libraries[0]
 
 
@@ -164,7 +164,7 @@ setup(
     name="PyGreSQL",
     version=version,
     description="Python PostgreSQL Interfaces",
-    long_description=__doc__.split('\n\n', 2)[1], # first passage
+    long_description=__doc__.split('\n\n', 2)[1],  # first passage
     keywords="pygresql postgresql database api dbapi",
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",

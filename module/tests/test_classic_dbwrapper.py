@@ -298,8 +298,9 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         query('set client_encoding=utf8')
         query('set standard_conforming_strings=on')
-        query('set bytea_output=hex')
         query("set lc_monetary='C'")
+        query("set datestyle='ISO,YMD'")
+        query('set bytea_output=hex')
 
     def tearDown(self):
         self.db.close()
@@ -755,6 +756,7 @@ class TestDBClass(unittest.TestCase):
     def testInsert(self):
         insert = self.db.insert
         query = self.db.query
+        server_version = self.db.server_version
         for table in ('insert_test_table', 'test table for insert'):
             query('drop table if exists "%s"' % table)
             query('create table "%s" ('
@@ -817,6 +819,9 @@ class TestDBClass(unittest.TestCase):
                     data, change = test
                 expect = data.copy()
                 expect.update(change)
+                if data.get('m') and server_version < 910000:
+                    # PostgreSQL < 9.1 cannot directly convert numbers to money
+                    data['m'] = "'%s'::money" % data['m']
                 self.assertEqual(insert(table, data), data)
                 self.assertIn(oid_table, data)
                 oid = data[oid_table]
