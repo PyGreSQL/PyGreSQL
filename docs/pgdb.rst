@@ -191,7 +191,7 @@ cause an implicit rollback to be performed.
 cursor -- return a new cursor object
 ------------------------------------
 
-.. method:: pgdbCnx.cusor()
+.. method:: pgdbCnx.cursor()
 
     Return a new cursor object using the connection
 
@@ -225,9 +225,9 @@ description -- details regarding the result columns
 
 .. attribute:: pgdbCursor.description
 
-    This read-only attribute is a sequence of 7-item sequences.
+    This read-only attribute is a sequence of 7-item tuples.
 
-    Each of these sequences contains information describing one result column:
+    Each of these tuples contains information describing one result column:
 
     - *name*
     - *type_code*
@@ -237,7 +237,8 @@ description -- details regarding the result columns
     - *scale*
     - *null_ok*
 
-    Note that *precision*, *scale* and *null_ok* are not implemented.
+    Note that *display_size*, *precision*, *scale* and *null_ok*
+    are not implemented.
 
     This attribute will be ``None`` for operations that do not return rows
     or if the cursor has not had an operation invoked via the
@@ -317,9 +318,9 @@ fetchone -- fetch next row of the query result
     Fetch the next row of a query result set
 
     :returns: the next row of the query result set
-    :rtype: tuple or None
+    :rtype: list or None
 
-Fetch the next row of a query result set, returning a single tuple,
+Fetch the next row of a query result set, returning a single list,
 or ``None`` when no more data is available.
 
 An :exc:`Error` (or subclass) exception is raised if the previous call to
@@ -338,9 +339,9 @@ fetchmany -- fetch next set of rows of the query result
     :param keep: if set to true, will keep the passed arraysize
     :tpye keep: bool
     :returns: the next set of rows of the query result
-    :rtype: list of tuples
+    :rtype: list of lists
 
-Fetch the next set of rows of a query result, returning a list of tuples.
+Fetch the next set of rows of a query result, returning a list of lists.
 An empty sequence is returned when no more rows are available.
 
 The number of rows to fetch per call is specified by the *size* parameter.
@@ -369,9 +370,9 @@ fetchall -- fetch all rows of the query result
     Fetch all (remaining) rows of a query result
 
     :returns: the set of all rows of the query result
-    :rtype: list of tuples
+    :rtype: list of list
 
-Fetch all (remaining) rows of a query result, returning them as list of tuples.
+Fetch all (remaining) rows of a query result, returning them as list of lists.
 Note that the cursor's :attr:`arraysize` attribute can affect the performance
 of this operation.
 
@@ -382,19 +383,20 @@ row_factory -- process a row of the query result
 
     Process rows before they are returned
 
-    :param tuple row: the currently processed row of the result set
+    :param list row: the currently processed row of the result set
     :returns: the transformed row that the cursor methods shall return
 
-Note that this method is not part of the DB-API 2 standard.
+.. note::
+
+    This method is not part of the DB-API 2 standard.
 
 You can overwrite this method with a custom row factory, e.g.
-if you want to return rows as dicts instead of tuples::
+if you want to return rows as dicts instead of lists::
 
     class DictCursor(pgdb.pgdbCursor):
 
         def row_factory(self, row):
-            return {desc[0]:value
-                for desc, value in zip(self.description, row)}
+            return dict((d[0], v) for d, v in zip(self.description, row))
 
     cur = DictCursor(con)
 
@@ -471,7 +473,9 @@ The :mod:`pgdb` module exports the following constructors and singletons:
 
     Used to describe the ``oid`` column of PostgreSQL database tables
 
-The following more specific types are not part of the DB-API 2 standard:
+.. note:
+
+    The following more specific types are not part of the DB-API 2 standard.
 
 .. class:: BOOL
 
