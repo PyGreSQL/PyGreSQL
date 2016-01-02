@@ -85,6 +85,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         try:
             cur = con.cursor()
+            cur.execute("set datestyle to 'iso'")
             cur.execute("create table %s ("
                 "stringtest varchar,"
                 "binarytest bytea,"

@@ -120,6 +120,9 @@ class TestDBClassBasic(unittest.TestCase):
             'use_regtypes',
             'user',
         ]
+        if self.db.server_version < 90000:  # PostgreSQL < 9.0
+            attributes.remove('escape_identifier')
+            attributes.remove('escape_literal')
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)
@@ -190,9 +193,13 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertEqual(user, self.db.db.user)
 
     def testMethodEscapeLiteral(self):
+        if self.db.server_version < 90000:  # PostgreSQL < 9.0
+            self.skipTest('Escaping functions not supported')
         self.assertEqual(self.db.escape_literal(''), "''")
 
     def testMethodEscapeIdentifier(self):
+        if self.db.server_version < 90000:  # PostgreSQL < 9.0
+            self.skipTest('Escaping functions not supported')
         self.assertEqual(self.db.escape_identifier(''), '""')
 
     def testMethodEscapeString(self):
@@ -289,13 +296,19 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         query('set client_encoding=utf8')
         query('set standard_conforming_strings=on')
-        query('set bytea_output=hex')
         query("set lc_monetary='C'")
+        query("set datestyle='ISO,YMD'")
+        try:
+            query('set bytea_output=hex')
+        except pg.ProgrammingError:  # PostgreSQL < 9.0
+            pass
 
     def tearDown(self):
         self.db.close()
 
     def testEscapeLiteral(self):
+        if self.db.server_version < 90000:  # PostgreSQL < 9.0
+            self.skipTest('Escaping functions not supported')
         f = self.db.escape_literal
         self.assertEqual(f("plain"), "'plain'")
         self.assertEqual(f("that's k\xe4se"), "'that''s k\xe4se'")
@@ -305,6 +318,8 @@ class TestDBClass(unittest.TestCase):
             "'No \"quotes\" must be escaped.'")
 
     def testEscapeIdentifier(self):
+        if self.db.server_version < 90000:  # PostgreSQL < 9.0
+            self.skipTest('Escaping functions not supported')
         f = self.db.escape_identifier
         self.assertEqual(f("plain"), '"plain"')
         self.assertEqual(f("that's k\xe4se"), '"that\'s k\xe4se"')
@@ -322,11 +337,16 @@ class TestDBClass(unittest.TestCase):
 
     def testEscapeBytea(self):
         f = self.db.escape_bytea
-        # note that escape_byte always returns hex output since Pg 9.0,
+        # note that escape_byte always returns hex output since PostgreSQL 9.0,
         # regardless of the bytea_output setting
-        self.assertEqual(f("plain"), r"\x706c61696e")
-        self.assertEqual(f("that's k\xe4se"), r"\x746861742773206be47365")
-        self.assertEqual(f('O\x00ps\xff!'), r"\x4f007073ff21")
+        if self.db.server_version < 90000:
+            self.assertEqual(f("plain"), r"plain")
+            self.assertEqual(f("that's k\xe4se"), r"that''s k\344se")
+            self.assertEqual(f('O\x00ps\xff!'), r"O\000ps\377!")
+        else:
+            self.assertEqual(f("plain"), r"\x706c61696e")
+            self.assertEqual(f("that's k\xe4se"), r"\x746861742773206be47365")
+            self.assertEqual(f('O\x00ps\xff!'), r"\x4f007073ff21")
 
     def testUnescapeBytea(self):
         f = self.db.unescape_bytea
@@ -689,6 +709,7 @@ class TestDBClass(unittest.TestCase):
     def testInsert(self):
         insert = self.db.insert
         query = self.db.query
+        server_version = self.db.server_version
         for table in ('insert_test_table', 'test table for insert'):
             query('drop table if exists "%s"' % table)
             query('create table "%s" ('
@@ -716,7 +737,7 @@ class TestDBClass(unittest.TestCase):
                 dict(d=Decimal('123456789.9876543212345678987654321')),
                 dict(m=None), (dict(m=''), dict(m=None)),
                 dict(m=Decimal('-1234.56')),
-                (dict(m=('-1234.56')), dict(m=Decimal('-1234.56'))),
+                (dict(m='-1234.56'), dict(m=Decimal('-1234.56'))),
                 dict(m=Decimal('1234.56')), dict(m=Decimal('123456')),
                 (dict(m='1234.56'), dict(m=Decimal('1234.56'))),
                 (dict(m=1234.5), dict(m=Decimal('1234.5'))),
@@ -751,6 +772,9 @@ class TestDBClass(unittest.TestCase):
                     data, change = test
                 expect = data.copy()
                 expect.update(change)
+                if data.get('m') and server_version < 910000:
+                    # PostgreSQL < 9.1 cannot directly convert numbers to money
+                    data['m'] = "'%s'::money" % data['m']
                 self.assertEqual(insert(table, data), data)
                 self.assertIn(oid_table, data)
                 oid = data[oid_table]

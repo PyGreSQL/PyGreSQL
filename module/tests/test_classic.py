@@ -249,6 +249,8 @@ class UtilityTest(unittest.TestCase):
         call_notify = options.get('call_notify')
         two_payloads = options.get('two_payloads')
         db = opendb()
+        if db.server_version < 90000:  # PostgreSQL < 9.0
+            self.skipTest('Notify with payload not supported')
         # Get function under test, can be standalone or DB method.
         if run_as_method:
             fut = db.notification_handler
@@ -336,6 +338,8 @@ class UtilityTest(unittest.TestCase):
     def test_notify_timeout(self):
         for run_as_method in False, True:
             db = opendb()
+            if db.server_version < 90000:  # PostgreSQL < 9.0
+                self.skipTest('Notify with payload not supported')
             # Get function under test, can be standalone or DB method.
             if run_as_method:
                 fut = db.notification_handler

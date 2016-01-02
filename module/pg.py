@@ -197,6 +197,8 @@ class NotificationHandler(object):
         Note: If the main loop is running in another thread, you must pass
         a different database connection to avoid a collision.
 
+        The payload parameter is only supported in PostgreSQL >= 9.0.
+
         """
         if not db:
             db = self.db

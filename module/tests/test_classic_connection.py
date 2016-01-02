@@ -86,6 +86,9 @@ class TestConnectObject(unittest.TestCase):
             fileno get_notice_receiver getline getlo getnotify
             inserttable locreate loimport parameter putline query reset
             set_notice_receiver source transaction'''.split()
+        if self.connection.server_version < 90000:  # PostgreSQL < 9.0
+            methods.remove('escape_identifier')
+            methods.remove('escape_literal')
         connection_methods = [a for a in dir(self.connection)
             if callable(eval("self.connection." + a))]
         self.assertEqual(methods, connection_methods)
@@ -558,7 +561,7 @@ class TestParamQueries(unittest.TestCase):
             [(Decimal('2'),)])
         self.assertEqual(query("select 1, $1::integer", (2,)
             ).getresult(), [(1, 2)])
-        self.assertEqual(query("select 1 union select $1", (2,)
+        self.assertEqual(query("select 1 union select $1::integer", (2,)
             ).getresult(), [(1,), (2,)])
         self.assertEqual(query("select $1::integer+$2", (1, 2)
             ).getresult(), [(3,)])
@@ -816,7 +819,7 @@ class TestDirectSocketAccess(unittest.TestCase):
                 v = getline()
                 if i < n:
                     self.assertEqual(v, '%d\t%s' % data[i])
-                elif i == n:
+                elif i == n or self.c.server_version < 90000:
                     self.assertEqual(v, '\\.')
                 else:
                     self.assertIsNone(v)
@@ -842,6 +845,8 @@ class TestNotificatons(unittest.TestCase):
         self.c.close()
 
     def testGetNotify(self):
+        if self.c.server_version < 90000:  # PostgreSQL < 9.0
+            self.skipTest('Notify with payload not supported')
         getnotify = self.c.getnotify
         query = self.c.query
         self.assertIsNone(getnotify())
@@ -858,20 +863,16 @@ class TestNotificatons(unittest.TestCase):
             self.assertEqual(r[0], 'test_notify')
             self.assertEqual(r[2], '')
             self.assertIsNone(self.c.getnotify())
-            try:
-                query("notify test_notify, 'test_payload'")
-            except pg.ProgrammingError:  # PostgreSQL < 9.0
-                pass
-            else:
-                r = getnotify()
-                self.assertTrue(isinstance(r, tuple))
-                self.assertEqual(len(r), 3)
-                self.assertIsInstance(r[0], str)
-                self.assertIsInstance(r[1], int)
-                self.assertIsInstance(r[2], str)
-                self.assertEqual(r[0], 'test_notify')
-                self.assertEqual(r[2], 'test_payload')
-                self.assertIsNone(getnotify())
+            query("notify test_notify, 'test_payload'")
+            r = getnotify()
+            self.assertTrue(isinstance(r, tuple))
+            self.assertEqual(len(r), 3)
+            self.assertIsInstance(r[0], str)
+            self.assertIsInstance(r[1], int)
+            self.assertIsInstance(r[2], str)
+            self.assertEqual(r[0], 'test_notify')
+            self.assertEqual(r[2], 'test_payload')
+            self.assertIsNone(getnotify())
         finally:
             query('unlisten test_notify')
 
@@ -983,7 +984,7 @@ class TestConfigFunctions(unittest.TestCase):
         en_money = '$34.25', '$ 34.25', '34.25$', '34.25 $', '34.25 Dollar'
         de_locales = 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8'
         de_money = ('34,25€', '34,25 €', '€34,25' '€ 34,25',
-            '34,25 EUR', '34,25 Euro', '34,25 DM')
+            'EUR34,25', 'EUR 34,25', '34,25 EUR', '34,25 Euro', '34,25 DM')
         # first try with English localization (using the point)
         for lc in en_locales:
             try:
