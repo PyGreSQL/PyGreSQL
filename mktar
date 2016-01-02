@@ -19,12 +19,21 @@ else
 	SYMLINK=PyGreSQL.tgz
 fi
 
+# Package up as a source tarball in the distribution directory.
+# Note that this does essentially the same as "python setup.py sdist",
+# except this also makes the docs and bundles them as source and html.
+
 DISTDIR=/u/pyg/files
 TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
 
-MODFILES="module/pg.py module/pgdb.py module/pgmodule.c module/pgfs.h module/pgtypes.h module/setup.py"
-DOCFILES="docs/*.txt docs/*.html docs/*.css"
+MODFILES="module/pg.py module/pgdb.py module/pgmodule.c
+          module/pgfs.h module/pgtypes.h module/py3c.h
+          module/setup.py module/setup.cfg"
+DOCFILES="docs/Makefile docs/make.bat docs/*.rst
+          docs/_build/html/*.html docs/_build/html/*.js
+          docs/_build/html/_static"
+TESTFILES="module/tests/*.py"
 TUTFILES="tutorial/*.py"
 
 echo "Making source tarball..."
@@ -33,10 +42,12 @@ echo "Making source tarball..."
 
 rm -rf $TD
 mkdir $TD
-mkdir $TD/docs
+mkdir -p $TD/docs/_static
+mkdir $TD/tests
 mkdir $TD/tutorial
 cp $MODFILES $TD
-cp $DOCFILES $TD/docs
+cp -r $DOCFILES $TD/docs
+cp $TESTFILES $TD/tests
 cp $TUTFILES $TD/tutorial
 tar -cvzf $TF $TD
 chmod 644 $TF
