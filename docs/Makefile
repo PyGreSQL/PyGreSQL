@@ -1,5 +1,5 @@
 # Makefile for Sphinx documentation
-#
+# -*- Note: requires GNU Make -*-
 
 # You can set these variables from the command line.
 SPHINXOPTS    =

@@ -1,5 +1,8 @@
 #! /bin/sh
 
+MAKE=make
+which gmake && MAKE=gmake
+
 # small safety test
 if [ ! -f module/pgmodule.c ]
 then
@@ -10,4 +13,4 @@ fi
 echo "Making Sphinx docs..."
 
 cd docs
-make html
+${MAKE} html
