@@ -30,3 +30,4 @@ This version has been built and unit tested on:
 
 | D'Arcy J.M. Cain
 | darcy@PyGreSQL.org
+| and the PyGreSQL team
