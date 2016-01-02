@@ -420,7 +420,7 @@ Methods and attributes that are not part of the standard
 
     Process rows before they are returned
 
-    :param tuple row: the currently processed row of the result set
+    :param list row: the currently processed row of the result set
     :returns: the transformed row that the fetch methods shall return
 
 This method is used for processing result rows before returning them through
