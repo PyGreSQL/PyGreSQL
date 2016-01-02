@@ -48,6 +48,7 @@ if (not (2, 6) <= sys.version_info[:2] <= (2, 7)
 
 import os
 import platform
+import warnings
 try:
     from setuptools import setup
 except ImportError:
@@ -76,7 +77,7 @@ def pg_version():
         if part.isdigit():
             part = int(part)
         parts.append(part)
-    return tuple(parts or [9])
+    return tuple(parts or [9, 0])
 
 
 pg_version = pg_version()
@@ -119,6 +120,8 @@ class build_pg_ext(build_ext):
         self.large_objects = True
         self.default_vars = True
         self.escaping_funcs = pg_version[0] >= 9
+        if pg_version < (9, 0):
+            warnings.warn("PygreSQL does not support this PostgreSQL version.")
 
     def finalize_options(self):
         """Set final values for all build_pg options."""
