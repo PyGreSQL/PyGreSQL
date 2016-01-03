@@ -4,6 +4,8 @@ ChangeLog
 Version 4.2
 -----------
 - Set a better default for the user option "escaping-funcs".
+- The supported Python versions are 2.4 to 2.7.
+- PostgreSQL is supported in all versions from 8.3 to 9.4.
 - Force build to compile with no errors.
 - Fix decimal point handling.
 - Add option to return boolean values as bool objects.
