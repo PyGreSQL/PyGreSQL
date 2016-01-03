@@ -4,8 +4,8 @@ ChangeLog
 Version 5.0
 -----------
 - This version runs on both Python 2 and Python 3.
-- The supported versions are Python 2.6, 2.7, 3.3, 3.4 and 3.5.
-- The supported PostgreSQL versions are 9.0, 9.1, 9.2, 9.3 and 9.4.
+- The supported versions are Python 2.6 to 2.7, and 3.3 to 3.5.
+- PostgreSQL is supported in all versions from 9.0 to 9.4.
 - The DB-API 2 module now always returns result rows as named tuples
   instead of simply lists as before. The documentation explains how
   you can restore the old behavior or use custom row objects instead.
@@ -14,14 +14,18 @@ Version 5.0
   line with the names used in the DB-API 2 documentation.
   Since the API provides objects of these types only by the use of
   constructor functions, this should not cause any incompatibilities.
-- The tty parameter and attribute of database connections has been
-  removed since it is not supported any more since PostgreSQL 7.4.
+- The DB-API 2 module now supports the callproc() cursor method. Note
+  that output parameters are currently not replaced in the return value.
 - The 7-tuples returned by the description attribute of a pgdb cursor
   are now named tuples, i.e. their elements can be also accessed by name.
+- The tty parameter and attribute of database connections has been
+  removed since it is not supported any more since PostgreSQL 7.4.
 
 Version 4.2
 -----------
 - Set a better default for the user option "escaping-funcs".
+- The supported Python versions are 2.4 to 2.7.
+- PostgreSQL is supported in all versions from 8.3 to 9.4.
 - Force build to compile with no errors.
 - Fix decimal point handling.
 - Add option to return boolean values as bool objects.

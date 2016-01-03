@@ -325,6 +325,26 @@ all parameter tuples or mappings found in the sequence *seq_of_parameters*.
 Parameters are bounded to the query using Python extended format codes,
 e.g. ``" ... WHERE name=%(name)s"``.
 
+callproc -- Call a stored procedure
+-----------------------------------
+
+.. method:: Cursor.callproc(self, procname, [parameters]):
+
+    Call a stored database procedure with the given name
+
+    :param str procname: the name of the database function
+    :param parameters: a sequence of parameters (can be empty or omitted)
+
+This method calls a stored procedure (function) in the PostgreSQL database.
+
+The sequence of parameters must contain one entry for each input argument
+that the function expects. The result of the call is the same as this input
+sequence; replacement of output and input/output parameters in the return
+value is currently not supported.
+
+The function may also provide a result set as output. These can be requested
+through the standard fetch methods of the cursor.
+
 fetchone -- fetch next row of the query result
 ----------------------------------------------
 

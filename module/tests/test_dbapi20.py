@@ -66,6 +66,41 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
 
+    def test_callproc_no_params(self):
+        con = self._connect()
+        cur = con.cursor()
+        # note that now() does not change within a transaction
+        cur.execute('select now()')
+        now = cur.fetchone()[0]
+        res = cur.callproc('now')
+        self.assertIsNone(res)
+        res = cur.fetchone()[0]
+        self.assertEqual(res, now)
+
+    def test_callproc_bad_params(self):
+        con = self._connect()
+        cur = con.cursor()
+        self.assertRaises(TypeError, cur.callproc, 'lower', 42)
+        self.assertRaises(pgdb.ProgrammingError, cur.callproc, 'lower', (42,))
+
+    def test_callproc_one_param(self):
+        con = self._connect()
+        cur = con.cursor()
+        params = (42.4382,)
+        res = cur.callproc("round", params)
+        self.assertIs(res, params)
+        res = cur.fetchone()[0]
+        self.assertEqual(res, 42)
+
+    def test_callproc_two_params(self):
+        con = self._connect()
+        cur = con.cursor()
+        params = (9, 4)
+        res = cur.callproc("div", params)
+        self.assertIs(res, params)
+        res = cur.fetchone()[0]
+        self.assertEqual(res, 2)
+
     def test_cursor_type(self):
 
         class TestCursor(pgdb.Cursor):

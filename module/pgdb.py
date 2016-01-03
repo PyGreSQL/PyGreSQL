@@ -291,18 +291,18 @@ class Cursor(object):
                 'do not know how to handle type %s' % type(val))
         return val
 
-    def _quoteparams(self, string, params):
+    def _quoteparams(self, string, parameters):
         """Quote parameters.
 
         This function works for both mappings and sequences.
 
         """
-        if isinstance(params, dict):
-            params = _quotedict(params)
-            params.quote = self._quote
+        if isinstance(parameters, dict):
+            parameters = _quotedict(parameters)
+            parameters.quote = self._quote
         else:
-            params = tuple(map(self._quote, params))
-        return string % params
+            parameters = tuple(map(self._quote, parameters))
+        return string % parameters
 
     def close(self):
         """Close the cursor object."""
@@ -312,22 +312,22 @@ class Cursor(object):
         self.rowcount = -1
         self.lastrowid = None
 
-    def execute(self, operation, params=None):
+    def execute(self, operation, parameters=None):
         """Prepare and execute a database operation (query or command)."""
 
         # The parameters may also be specified as list of
         # tuples to e.g. insert multiple rows in a single
         # operation, but this kind of usage is deprecated:
-        if (params and isinstance(params, list)
-                and isinstance(params[0], tuple)):
-            return self.executemany(operation, params)
+        if (parameters and isinstance(parameters, list) and
+                isinstance(parameters[0], tuple)):
+            return self.executemany(operation, parameters)
         else:
             # not a list of tuples
-            return self.executemany(operation, [params])
+            return self.executemany(operation, [parameters])
 
-    def executemany(self, operation, param_seq):
+    def executemany(self, operation, seq_of_parameters):
         """Prepare operation and execute it against a parameter sequence."""
-        if not param_seq:
+        if not seq_of_parameters:
             # don't do anything without parameters
             return
         self.description = None
@@ -345,9 +345,9 @@ class Cursor(object):
                 except Exception:
                     raise _op_error("can't start transaction")
                 self._dbcnx._tnx = True
-            for params in param_seq:
-                if params:
-                    sql = self._quoteparams(operation, params)
+            for parameters in seq_of_parameters:
+                if parameters:
+                    sql = self._quoteparams(operation, parameters)
                 else:
                     sql = operation
                 rows = self._src.execute(sql)
@@ -414,6 +414,23 @@ class Cursor(object):
         typecast = self._type_cache.typecast
         return [self.row_factory([typecast(typ, value)
             for typ, value in zip(self.coltypes, row)]) for row in result]
+
+    def callproc(self, procname, parameters=None):
+        """Call a stored database procedure with the given name.
+
+        The sequence of parameters must contain one entry for each input
+        argument that the procedure expects. The result of the call is the
+        same as this input sequence; replacement of output and input/output
+        parameters in the return value is currently not supported.
+
+        The procedure may also provide a result set as output. These can be
+        requested through the standard fetch methods of the cursor.
+
+        """
+        n = parameters and len(parameters) or 0
+        query = 'select * from "%s"(%s)' % (procname, ','.join(n * ['%s']))
+        self.execute(query, parameters)
+        return parameters
 
     def __next__(self):
         """Return the next row (support for the iteration protocol)."""
