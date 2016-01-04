@@ -16,6 +16,11 @@ Version 5.0
   constructor functions, this should not cause any incompatibilities.
 - The DB-API 2 module now supports the callproc() cursor method. Note
   that output parameters are currently not replaced in the return value.
+- The DB-API 2 module no supports copy operations between data streams
+  on the client and database tables via the COPY command of PostgreSQL.
+  The cursor method copy_from() can be used to copy data from the database
+  to the client, and the cursor method copy_to() can be used to copy data
+  from the client to the database.
 - The 7-tuples returned by the description attribute of a pgdb cursor
   are now named tuples, i.e. their elements can be also accessed by name.
 - The tty parameter and attribute of database connections has been

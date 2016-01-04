@@ -267,9 +267,10 @@ rowcount -- number of rows of the result
     This read-only attribute specifies the number of rows that the last
     :meth:`Cursor.execute` or :meth:`Cursor.executemany` call produced
     (for DQL statements like SELECT) or affected (for DML statements like
-    UPDATE or INSERT ). The attribute is -1 in case no such method call has
-    been performed on the cursor or the rowcount of the last operation
-    cannot be determined by the interface.
+    UPDATE or INSERT). It is also set by the :meth:`Cursor.copy_from` and
+    :meth':`Cursor.copy_to` methods. The attribute is -1 in case no such
+    method call has been performed on the cursor or the rowcount of the
+    last operation cannot be determined by the interface.
 
 close -- close the cursor
 -------------------------
@@ -435,6 +436,83 @@ Methods and attributes that are not part of the standard
 .. note::
 
    The following methods and attributes are not part of the DB-API 2 standard.
+
+.. method:: Cursor.copy_from(stream, table, [format], [sep], [null], [size], [columns])
+
+	Copy data from an input stream to the specified table
+
+    :param stream: the input stream
+        (must be a file-like object, a string or an iterable returning strings)
+    :param str table: the name of a database table
+    :param str format: the format of the data in the input stream,
+        can be ``'text'`` (the default), ``'csv'``, or ``'binary'``
+    :param str sep: a single character separator
+        (the default is ``'\t'`` for text and ``','`` for csv)
+    :param str null: the textual representation of the ``NULL`` value,
+        can also be an empty string (the default is ``'\\N'``)
+    :param int size: the size of the buffer when reading file-like objects
+    :param list column: an optional list of column names
+    :returns: the cursor, so you can chain commands
+
+    :raises TypeError: parameters with wrong types
+    :raises ValueError: invalid parameters
+    :raises IOError: error when executing the copy operation
+
+This method can be used to copy data from an input stream on the client side
+to a database table on the server side using the ``COPY FROM`` command.
+The input stream can be provided in form of a file-like object (which must
+have a ``read()`` method), a string, or an iterable returning one row or
+multiple rows of input data on each iteration.
+
+The format must be text, csv or binary. The sep option sets the column
+separator (delimiter) used in the non binary formats. The null option sets
+the textual representation of ``NULL`` in the input.
+
+The size option sets the size of the buffer used when reading data from
+file-like objects.
+
+The copy operation can be restricted to a subset of columns. If no columns are
+specified, all of them will be copied.
+
+.. method:: Cursor.copy_to(stream, table, [format], [sep], [null], [decode], [columns])
+
+	Copy data from the specified table to an output stream
+
+    :param stream: the output stream (must be a file-like object or ``None``)
+    :param str table: the name of a database table or a ``SELECT`` query
+    :param str format: the format of the data in the input stream,
+        can be ``'text'`` (the default), ``'csv'``, or ``'binary'``
+    :param str sep: a single character separator
+        (the default is ``'\t'`` for text and ``','`` for csv)
+    :param str null: the textual representation of the ``NULL`` value,
+        can also be an empty string (the default is ``'\\N'``)
+    :param bool decode: whether decoded strings shall be returned
+        for non-binary formats (the default is True in Python 3)
+    :param list column: an optional list of column names
+    :returns: a generator if stream is set to ``None``, otherwise the cursor
+
+    :raises TypeError: parameters with wrong types
+    :raises ValueError: invalid parameters
+    :raises IOError: error when executing the copy operation
+
+This method can be used to copy data from a database table on the server side
+to an output stream on the client side using the ``COPY TO`` command.
+
+The output stream can be provided in form of a file-like object (which must
+have a ``write()`` method). Alternatively, if ``None`` is passed as the
+output stream, the method will return a generator yielding one row of output
+data on each iteration.
+
+Output will be returned as byte strings unless you set decode to true.
+
+Note that you can also use a ``SELECT`` query instead of the table name.
+
+The format must be text, csv or binary. The sep option sets the column
+separator (delimiter) used in the non binary formats. The null option sets
+the textual representation of ``NULL`` in the output.
+
+The copy operation can be restricted to a subset of columns. If no columns are
+specified, all of them will be copied.
 
 .. method:: Cursor.row_factory(row)
 

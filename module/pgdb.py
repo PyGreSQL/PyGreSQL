@@ -89,6 +89,7 @@ try:
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
 
+from collections import Iterable
 try:
     from collections import OrderedDict
 except ImportError:  # Python 2.6 or 3.0
@@ -431,6 +432,243 @@ class Cursor(object):
         query = 'select * from "%s"(%s)' % (procname, ','.join(n * ['%s']))
         self.execute(query, parameters)
         return parameters
+
+    def copy_from(self, stream, table,
+            format=None, sep=None, null=None, size=None, columns=None):
+        """Copy data from an input stream to the specified table.
+
+        The input stream can be a file-like object with a read() method or
+        it can also be an iterable returning a row or multiple rows of input
+        on each iteration.
+
+        The format must be text, csv or binary. The sep option sets the
+        column separator (delimiter) used in the non binary formats.
+        The null option sets the textual representation of NULL in the input.
+
+        The size option sets the size of the buffer used when reading data
+        from file-like objects.
+
+        The copy operation can be restricted to a subset of columns. If no
+        columns are specified, all of them will be copied.
+
+        """
+        binary_format = format == 'binary'
+        try:
+            read = stream.read
+        except AttributeError:
+            if size:
+                raise ValueError("size must only be set for file-like objects")
+            if binary_format:
+                input_type = bytes
+                type_name = 'byte strings'
+            else:
+                input_type = basestring
+                type_name = 'strings'
+
+            if isinstance(stream, basestring):
+                if not isinstance(stream, input_type):
+                    raise ValueError("the input must be %s" % type_name)
+                if not binary_format:
+                    if isinstance(stream, str):
+                        if not stream.endswith('\n'):
+                            stream += '\n'
+                    else:
+                        if not stream.endswith(b'\n'):
+                            stream += b'\n'
+
+                def chunks():
+                    yield stream
+
+            elif isinstance(stream, Iterable):
+
+                def chunks():
+                    for chunk in stream:
+                        if not isinstance(chunk, input_type):
+                            raise ValueError(
+                                "input stream must consist of %s" % type_name)
+                        if isinstance(chunk, str):
+                            if not chunk.endswith('\n'):
+                                chunk += '\n'
+                        else:
+                            if not chunk.endswith(b'\n'):
+                                chunk += b'\n'
+                        yield chunk
+
+            else:
+                raise TypeError("need an input stream to copy from")
+        else:
+            if size is None:
+                size = 8192
+            if size > 0:
+                if not isinstance(size, int):
+                    raise TypeError("the size option must be an integer")
+
+                def chunks():
+                    while True:
+                        buffer = read(size)
+                        yield buffer
+                        if not buffer or len(buffer) < size:
+                            break
+
+            else:
+
+                def chunks():
+                    yield read()
+
+        if not table or not isinstance(table, basestring):
+            raise TypeError("need a table to copy to")
+        if table.lower().startswith('select'):
+                raise ValueError("must specify a table, not a query")
+        else:
+            table = '"%s"' % (table,)
+        operation = ['copy %s' % (table,)]
+        options = []
+        params = []
+        if format is not None:
+            if not isinstance(format, basestring):
+                raise TypeError("the format options be a string")
+            if format not in ('text', 'csv', 'binary'):
+                raise ValueError("invalid format")
+            options.append('format %s' % (format,))
+        if sep is not None:
+            if not isinstance(sep, basestring):
+                raise TypeError("the sep option must be a string")
+            if format == 'binary':
+                raise ValueError("sep is not allowed with binary format")
+            if len(sep) != 1:
+                raise ValueError("sep must be a single one-byte character")
+            options.append('delimiter %s')
+            params.append(sep)
+        if null is not None:
+            if not isinstance(null, basestring):
+                raise TypeError("the null option must be a string")
+            options.append('null %s')
+            params.append(null)
+        if columns:
+            if not isinstance(columns, basestring):
+                columns = ','.join('"%s"' % (col,) for col in columns)
+            operation.append('(%s)' % (columns,))
+        operation.append("from stdin")
+        if options:
+            operation.append('(%s)' % ','.join(options))
+        operation = ' '.join(operation)
+
+        putdata = self._src.putdata
+        self.execute(operation, params)
+
+        try:
+            for chunk in chunks():
+                putdata(chunk)
+        except BaseException as error:
+            self.rowcount = -1
+            # the following call will re-raise the error
+            putdata(error)
+        else:
+            self.rowcount = putdata(None)
+
+        # return the cursor object, so you can chain operations
+        return self
+
+    def copy_to(self, stream, table,
+            format=None, sep=None, null=None, decode=None, columns=None):
+        """Copy data from the specified table to an output stream.
+
+        The output stream can be a file-like object with a write() method or
+        it can also be None, in which case the method will return a generator
+        yielding a row on each iteration.
+
+        Output will be returned as byte strings unless you set decode to true.
+
+        Note that you can also use a select query instead of the table name.
+
+        The format must be text, csv or binary. The sep option sets the
+        column separator (delimiter) used in the non binary formats.
+        The null option sets the textual representation of NULL in the output.
+
+        The copy operation can be restricted to a subset of columns. If no
+        columns are specified, all of them will be copied.
+
+        """
+        binary_format = format == 'binary'
+        if stream is not None:
+            try:
+                write = stream.write
+            except AttributeError:
+                raise TypeError("need an output stream to copy to")
+        if not table or not isinstance(table, basestring):
+            raise TypeError("need a table to copy to")
+        if table.lower().startswith('select'):
+            if columns:
+                raise ValueError("columns must be specified in the query")
+            table = '(%s)' % (table,)
+        else:
+            table = '"%s"' % (table,)
+        operation = ['copy %s' % (table,)]
+        options = []
+        params = []
+        if format is not None:
+            if not isinstance(format, basestring):
+                raise TypeError("the format options be a string")
+            if format not in ('text', 'csv', 'binary'):
+                raise ValueError("invalid format")
+            options.append('format %s' % (format,))
+        if sep is not None:
+            if not isinstance(sep, basestring):
+                raise TypeError("the sep option must be a string")
+            if binary_format:
+                raise ValueError("sep is not allowed with binary format")
+            if len(sep) != 1:
+                raise ValueError("sep must be a single one-byte character")
+            options.append('delimiter %s')
+            params.append(sep)
+        if null is not None:
+            if not isinstance(null, basestring):
+                raise TypeError("the null option must be a string")
+            options.append('null %s')
+            params.append(null)
+        if decode is None:
+            if format == 'binary':
+                decode = False
+            else:
+                decode = str is unicode
+        else:
+            if not isinstance(decode, (int, bool)):
+                raise TypeError("the decode option must be a boolean")
+            if decode and binary_format:
+                raise ValueError("decode is not allowed with binary format")
+        if columns:
+            if not isinstance(columns, basestring):
+                columns = ','.join('"%s"' % (col,) for col in columns)
+            operation.append('(%s)' % (columns,))
+
+        operation.append("to stdout")
+        if options:
+            operation.append('(%s)' % ','.join(options))
+        operation = ' '.join(operation)
+
+        getdata = self._src.getdata
+        self.execute(operation, params)
+
+        def copy():
+            while True:
+                row = getdata(decode)
+                if isinstance(row, int):
+                    if self.rowcount != row:
+                        self.rowcount = row
+                    break
+                self.rowcount += 1
+                yield row
+
+        if stream is None:
+            # no input stream, return the generator
+            return copy()
+
+        # write the rows to the file-like input stream
+        for row in copy():
+            write(row)
+
+        # return the cursor object, so you can chain operations
+        return self
 
     def __next__(self):
         """Return the next row (support for the iteration protocol)."""

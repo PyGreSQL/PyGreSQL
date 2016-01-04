@@ -2859,6 +2859,216 @@ sourceMovePrev(sourceObject *self, PyObject *args)
 	return pgsource_move(self, args, QUERY_MOVEPREV);
 }
 
+/* put copy data */
+static char sourcePutData__doc__[] =
+"getdata(buffer) -- send data to server during copy from stdin.";
+
+static PyObject *
+sourcePutData(sourceObject *self, PyObject *args)
+{
+	PyObject   *buffer_obj; /* the buffer object that was passed in */
+	char 	   *buffer; /* the buffer as encoded string */
+	Py_ssize_t 	nbytes; /* length of string */
+	char	   *errormsg = NULL; /* error message */
+	int			res; /* direct result of the operation */
+	PyObject   *ret; /* return value */
+
+	/* checks validity */
+	if (!check_source_obj(self, CHECK_CNX))
+		return NULL;
+
+	/* make sure that the connection object is valid */
+	if (!self->pgcnx->cnx)
+		return NULL;
+
+	if (!PyArg_ParseTuple(args, "O", &buffer_obj))
+		return NULL;
+
+	if (buffer_obj == Py_None) {
+		/* pass None for terminating the operation */
+		buffer = errormsg = NULL;
+		buffer_obj = NULL;
+	}
+	else if (PyBytes_Check(buffer_obj))
+	{
+		/* or pass a byte string */
+		PyBytes_AsStringAndSize(buffer_obj, &buffer, &nbytes);
+		buffer_obj = NULL;
+	}
+	else if (PyUnicode_Check(buffer_obj))
+	{
+		/* or pass a unicode string */
+		buffer_obj = get_encoded_string(
+			buffer_obj, PQclientEncoding(self->pgcnx->cnx));
+		if (!buffer_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(buffer_obj, &buffer, &nbytes);
+	}
+	else if (PyErr_GivenExceptionMatches(buffer_obj, PyExc_BaseException))
+	{
+		/* or pass a Python exception for sending an error message */
+		buffer_obj = PyObject_Str(buffer_obj);
+		if (PyUnicode_Check(buffer_obj))
+		{
+			PyObject *obj = buffer_obj;
+			buffer_obj = get_encoded_string(
+				obj, PQclientEncoding(self->pgcnx->cnx));
+			Py_DECREF(obj);
+			if (!buffer_obj) return NULL; /* pass the UnicodeEncodeError */
+		}
+		errormsg = PyBytes_AsString(buffer_obj);
+		buffer = NULL;
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"putdata() expects a buffer, None or an exception.");
+		return NULL;
+	}
+
+	/* checks validity */
+	if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
+	 		!self->pgcnx->cnx ||
+	 		PQresultStatus(self->result) != PGRES_COPY_IN)
+	{
+		PyErr_SetString(PyExc_IOError,
+			"connection is invalid or not in copy_in state.");
+		Py_XDECREF(buffer_obj);
+		return NULL;
+	}
+
+	if (buffer)
+	{
+		res = nbytes ? PQputCopyData(self->pgcnx->cnx, buffer, nbytes) : 1;
+	}
+	else
+	{
+		res = PQputCopyEnd(self->pgcnx->cnx, errormsg);
+	}
+
+	Py_XDECREF(buffer_obj);
+
+	if (res != 1)
+	{
+		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
+		return NULL;
+	}
+
+	if (buffer) /* buffer has been sent */
+	{
+		ret = Py_None;
+		Py_INCREF(ret);
+	}
+	else /* copy is done */
+	{
+		PGresult   *result; /* final result of the operation */
+
+		Py_BEGIN_ALLOW_THREADS;
+		result = PQgetResult(self->pgcnx->cnx);
+		Py_END_ALLOW_THREADS;
+
+		if (PQresultStatus(result) == PGRES_COMMAND_OK)
+		{
+			char   *temp;
+			long	num_rows;
+
+			temp = PQcmdTuples(result);
+			num_rows = temp[0] ? atol(temp) : -1;
+			ret = PyInt_FromLong(num_rows);
+		}
+		else
+		{
+			if (!errormsg) errormsg = PQerrorMessage(self->pgcnx->cnx);
+			PyErr_SetString(PyExc_IOError, errormsg);
+			ret = NULL;
+		}
+
+		PQclear(self->result);
+		self->result = NULL;
+		self->result_type = RESULT_EMPTY;
+	}
+
+	return ret; /* None or number of rows */
+}
+
+/* get copy data */
+static char sourceGetData__doc__[] =
+"getdata(decode) -- receive data to server during copy to stdout.";
+
+static PyObject *
+sourceGetData(sourceObject *self, PyObject *args)
+{
+	int		   *decode = 0; /* decode flag */
+	char 	   *buffer; /* the copied buffer as encoded byte string */
+	Py_ssize_t 	nbytes; /* length of the byte string */
+	PyObject   *ret; /* return value */
+
+	/* checks validity */
+	if (!check_source_obj(self, CHECK_CNX))
+		return NULL;
+
+	/* make sure that the connection object is valid */
+	if (!self->pgcnx->cnx)
+		return NULL;
+
+	if (!PyArg_ParseTuple(args, "|i", &decode))
+		return NULL;
+
+	/* checks validity */
+	if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
+	 		!self->pgcnx->cnx ||
+	 		PQresultStatus(self->result) != PGRES_COPY_OUT)
+	{
+		PyErr_SetString(PyExc_IOError,
+			"connection is invalid or not in copy_out state.");
+		return NULL;
+	}
+
+	nbytes = PQgetCopyData(self->pgcnx->cnx, &buffer, 0);
+
+	if (!nbytes || nbytes < -1) /* an error occurred */
+	{
+		PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
+		return NULL;
+	}
+
+	if (nbytes == -1) /* copy is done */
+	{
+		PGresult   *result; /* final result of the operation */
+
+		Py_BEGIN_ALLOW_THREADS;
+		result = PQgetResult(self->pgcnx->cnx);
+		Py_END_ALLOW_THREADS;
+
+		if (PQresultStatus(result) == PGRES_COMMAND_OK)
+		{
+			char   *temp;
+			long	num_rows;
+
+			temp = PQcmdTuples(result);
+			num_rows = temp[0] ? atol(temp) : -1;
+			ret = PyInt_FromLong(num_rows);
+		}
+		else
+		{
+			PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
+			ret = NULL;
+		}
+
+		PQclear(self->result);
+		self->result = NULL;
+		self->result_type = RESULT_EMPTY;
+	}
+	else /* a row has been returned */
+	{
+		ret = decode ? get_decoded_string(
+				buffer, nbytes, PQclientEncoding(self->pgcnx->cnx)) :
+			PyBytes_FromStringAndSize(buffer, nbytes);
+		PQfreemem(buffer);
+	}
+
+	return ret; /* buffer or number of rows */
+}
+
 /* finds field number from string/integer (internal use only) */
 static int
 sourceFieldindex(sourceObject *self, PyObject *param, const char *usage)
@@ -3041,6 +3251,10 @@ static PyMethodDef sourceMethods[] = {
 			sourceMoveNext__doc__},
 	{"moveprev", (PyCFunction) sourceMovePrev, METH_VARARGS,
 			sourceMovePrev__doc__},
+	{"putdata", (PyCFunction) sourcePutData, METH_VARARGS,
+			sourcePutData__doc__},
+	{"getdata", (PyCFunction) sourceGetData, METH_VARARGS,
+			sourceGetData__doc__},
 	{"field", (PyCFunction) sourceField, METH_VARARGS,
 			sourceField__doc__},
 	{"fieldinfo", (PyCFunction) sourceFieldInfo, METH_VARARGS,
