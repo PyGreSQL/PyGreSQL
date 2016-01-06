@@ -13,4 +13,5 @@ fi
 echo "Making Sphinx docs..."
 
 cd docs
+${MAKE} clean
 ${MAKE} html

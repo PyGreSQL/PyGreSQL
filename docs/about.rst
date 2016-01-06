@@ -1,14 +1,12 @@
-Introduction
-============
-
 **PyGreSQL** is an *open-source* `Python <http://www.python.org>`_ module
 that interfaces to a `PostgreSQL <http://www.postgresql.org>`_ database.
 It embeds the PostgreSQL query library to allow easy use of the powerful
 PostgreSQL features from a Python script.
 
-| This software is copyright &copy; 1995, Pascal Andre.
-| Further modifications are copyright &copy; 1997-2008 by D'Arcy J.M. Cain.
-| Further modifications are copyright &copy; 2009-2015 by the PyGreSQL team
+    | This software is copyright © 1995, Pascal Andre.
+    | Further modifications are copyright © 1997-2008 by D'Arcy J.M. Cain.
+    | Further modifications are copyright © 2009-2016 by the PyGreSQL team.
+    | For licensing details, see the full :doc:`copyright`.
 
 **PostgreSQL** is a highly scalable, SQL compliant, open source
 object-relational database management system. With more than 15 years
@@ -32,10 +30,11 @@ even for commercial use.
 It embeds the PostgreSQL query library to allow easy use of the powerful
 PostgreSQL features from a Python script.
 
-PyGreSQL is developed and tested on a NetBSD system, but it should also
-run on most other platforms where PostgreSQL and Python is running.  It is
-based on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.fr).
+PyGreSQL is developed and tested on a NetBSD system, but it also runs on
+most other platforms where PostgreSQL and Python is running.  It is based
+on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.fr).
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL 4.2 needs PostgreSQL 8.3 and Python 2.5 or above.
+The current version PyGreSQL 4.2 needs PostgreSQL 8.3 or newer and Python 2.5
+to 2.7. If you are using Python 3.x, you will need PyGreSQL 5.0 or newer.

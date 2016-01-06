@@ -5,7 +5,7 @@ General
 -------
 
 You must first have installed Python and PostgreSQL on your system.
-If you want to access remote database only, you don't need to install
+If you want to access remote databases only, you don't need to install
 the full PostgreSQL server, but only the C interface (libpq). If you
 are on Windows, make sure that the directory with libpq.dll is in your
 ``PATH`` environment variable.

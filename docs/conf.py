@@ -15,8 +15,9 @@ import sys
 import os
 import shlex
 
-# import Cloud
-import cloud_sptheme as csp
+# import Cloud theme
+# this will also automatically add the theme directory
+import cloud_sptheme
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -76,6 +77,14 @@ language = None
 # directories to ignore when looking for source files.
 exclude_patterns = ['_build']
 
+# List of pages which are included in other pages and therefore should
+# not appear in the toctree.
+exclude_patterns += ['about.rst',
+    'download/download.rst', 'download/files.rst',
+    'community/mailinglist.rst', 'community/source.rst',
+    'community/bugtracker.rst', 'community/support.rst',
+    'community/homes.rst']
+
 # The reST default role (used for this markup: `text`) for all documents.
 #default_role = None
 
@@ -112,10 +121,13 @@ html_theme = 'cloud'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-html_theme_options = {'defaultcollapsed': True}
+html_theme_options = {
+    'roottarget': 'contents/index',
+    'defaultcollapsed': True,
+    'shaded_decor': True}
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = [csp.get_theme_dir()]
+html_theme_path = ['_themes']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -131,7 +143,7 @@ html_theme_path = [csp.get_theme_dir()]
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-#html_favicon = None
+html_favicon = '_static/favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
