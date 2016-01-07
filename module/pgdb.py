@@ -650,6 +650,7 @@ class Cursor(object):
         self.execute(operation, params)
 
         def copy():
+            self.rowcount = 0
             while True:
                 row = getdata(decode)
                 if isinstance(row, int):

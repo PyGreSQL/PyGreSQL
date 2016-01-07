@@ -191,6 +191,9 @@ class TestCopy(unittest.TestCase):
     def check_table(self):
         self.assertEqual(self.table_data, self.data)
 
+    def check_rowcount(self, number=len(data)):
+        self.assertEqual(self.cursor.rowcount, number)
+
 
 class TestCopyFrom(TestCopy):
     """Test the copy_from method."""
@@ -229,15 +232,18 @@ class TestCopyFrom(TestCopy):
         ret = self.copy_from('42\tHello, world!')
         self.assertIs(ret, self.cursor)
         self.assertEqual(self.table_data, [(42, 'Hello, world!')])
+        self.check_rowcount(1)
 
     def test_input_string_with_newline(self):
         self.copy_from('42\tHello, world!\n')
         self.assertEqual(self.table_data, [(42, 'Hello, world!')])
+        self.check_rowcount(1)
 
     def test_input_string_multiple_rows(self):
         ret = self.copy_from(self.data_text)
         self.assertIs(ret, self.cursor)
         self.check_table()
+        self.check_rowcount()
 
     if str is unicode:
 
@@ -260,6 +266,7 @@ class TestCopyFrom(TestCopy):
     def test_input_iterable(self):
         self.copy_from(self.data_text.splitlines())
         self.check_table()
+        self.check_rowcount()
 
     def test_input_iterable_with_newlines(self):
         self.copy_from('%s\n' % row for row in self.data_text.splitlines())
@@ -299,8 +306,10 @@ class TestCopyFrom(TestCopy):
         self.copy_from('5\tFive', columns=['id', 'name'])
         self.assertEqual(self.table_data, [
             (1, None), (2, None), (3, 'Three'), (4, 'Four'), (5, 'Five')])
+        self.check_rowcount(5)
         self.assertRaises(pgdb.ProgrammingError, self.copy_from,
             '6\t42', columns=['id', 'age'])
+        self.check_rowcount(-1)
 
     def test_csv(self):
         self.copy_from(self.data_csv, format='csv')
@@ -310,10 +319,12 @@ class TestCopyFrom(TestCopy):
         stream = ('%d;"%s"\n' % row for row in self.data)
         self.copy_from(stream, format='csv', sep=';')
         self.check_table()
+        self.check_rowcount()
 
     def test_binary(self):
         self.assertRaises(IOError, self.copy_from,
             b'NOPGCOPY\n', format='binary')
+        self.check_rowcount(-1)
 
     def test_binary_with_sep(self):
         self.assertRaises(ValueError, self.copy_from,
@@ -332,6 +343,7 @@ class TestCopyFrom(TestCopy):
         self.check_table()
         self.assertEqual(len(stream), 0)
         self.assertEqual(stream.sizes, [8192])
+        self.check_rowcount()
 
     def test_size_positive(self):
         stream = self.data_file
@@ -341,6 +353,7 @@ class TestCopyFrom(TestCopy):
         self.check_table()
         self.assertEqual(len(stream), 0)
         self.assertEqual(stream.sizes, [size] * num_chunks)
+        self.check_rowcount()
 
     def test_size_negative(self):
         stream = self.data_file
@@ -348,6 +361,7 @@ class TestCopyFrom(TestCopy):
         self.check_table()
         self.assertEqual(len(stream), 0)
         self.assertEqual(stream.sizes, [None])
+        self.check_rowcount()
 
 
 class TestCopyTo(TestCopy):
@@ -396,6 +410,7 @@ class TestCopyTo(TestCopy):
         rows = ''.join(rows)
         self.assertIsInstance(rows, str)
         self.assertEqual(rows, self.data_text)
+        self.check_rowcount()
 
     if str is unicode:
 
@@ -419,12 +434,19 @@ class TestCopyTo(TestCopy):
             self.assertIsInstance(rows, unicode)
             self.assertEqual(rows, self.data_text.decode('utf-8'))
 
+    def test_rowcount_increment(self):
+        ret = self.copy_to()
+        self.assertIsInstance(ret, Iterable)
+        for n, row in enumerate(ret):
+            self.check_rowcount(n + 1)
+
     def test_decode(self):
         ret_raw = b''.join(self.copy_to(decode=False))
         ret_decoded = ''.join(self.copy_to(decode=True))
         self.assertIsInstance(ret_raw, bytes)
         self.assertIsInstance(ret_decoded, unicode)
         self.assertEqual(ret_decoded, ret_raw.decode('utf-8'))
+        self.check_rowcount()
 
     def test_sep(self):
         ret = list(self.copy_to(sep='-'))
@@ -469,6 +491,7 @@ class TestCopyTo(TestCopy):
         rows = ''.join(rows)
         self.assertIsInstance(rows, str)
         self.assertEqual(rows, self.data_csv)
+        self.check_rowcount(3)
 
     def test_csv_with_sep(self):
         rows = ''.join(self.copy_to(format='csv', sep=';'))
@@ -480,6 +503,7 @@ class TestCopyTo(TestCopy):
         for row in ret:
             self.assertTrue(row.startswith(b'PGCOPY\n\377\r\n\0'))
             break
+        self.check_rowcount(1)
 
     def test_binary_with_sep(self):
         self.assertRaises(ValueError, self.copy_to, format='binary', sep='\t')
@@ -496,6 +520,7 @@ class TestCopyTo(TestCopy):
         self.assertEqual(len(rows), 1)
         self.assertIsInstance(rows[0], str)
         self.assertEqual(rows[0], '%s!\n' % self.data[1][1])
+        self.check_rowcount(1)
 
     def test_file(self):
         stream = self.data_file
@@ -507,6 +532,7 @@ class TestCopyTo(TestCopy):
             data = data.encode('utf-8')
         sizes = [len(row) + 1 for row in data.splitlines()]
         self.assertEqual(stream.sizes, sizes)
+        self.check_rowcount()
 
 
 class TestBinary(TestCopy):
@@ -516,15 +542,18 @@ class TestBinary(TestCopy):
         # fill table from textual data
         self.cursor.copy_from(self.data_text, 'copytest', format='text')
         self.check_table()
+        self.check_rowcount()
         # get data back in binary format
         ret = self.cursor.copy_to(None, 'copytest', format='binary')
         self.assertIsInstance(ret, Iterable)
         data_binary = b''.join(ret)
         self.assertTrue(data_binary.startswith(b'PGCOPY\n\377\r\n\0'))
+        self.check_rowcount()
         self.truncate_table()
         # fill table from binary data
         self.cursor.copy_from(data_binary, 'copytest', format='binary')
         self.check_table()
+        self.check_rowcount()
 
 
 if __name__ == '__main__':
