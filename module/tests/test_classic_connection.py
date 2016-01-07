@@ -19,6 +19,7 @@ import sys
 import tempfile
 import threading
 import time
+import os
 
 import pg  # the module under test
 
@@ -38,6 +39,13 @@ try:
     from LOCAL_PyGreSQL import *
 except ImportError:
     pass
+
+windows = os.name == 'nt'
+
+# There is a known a bug in libpq under Windows which can cause
+# the interface to crash when calling PQhost():
+do_not_ask_for_host = windows
+do_not_ask_for_host_reason = 'libpq issue on Windows'
 
 
 def connect():
@@ -73,11 +81,17 @@ class TestConnectObject(unittest.TestCase):
         except pg.InternalError:
             pass
 
+    def is_method(self, attribute):
+        """Check if given attribute on the connection is a method."""
+        if do_not_ask_for_host and attribute == 'host':
+            return False
+        return callable(getattr(self.connection, attribute))
+
     def testAllConnectAttributes(self):
         attributes = '''db error host options port
             protocol_version server_version status tty user'''.split()
         connection_attributes = [a for a in dir(self.connection)
-            if not callable(eval("self.connection." + a))]
+            if not a.startswith('__') and not self.is_method(a)]
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
@@ -90,7 +104,7 @@ class TestConnectObject(unittest.TestCase):
             methods.remove('escape_identifier')
             methods.remove('escape_literal')
         connection_methods = [a for a in dir(self.connection)
-            if callable(eval("self.connection." + a))]
+            if not a.startswith('__') and self.is_method(a)]
         self.assertEqual(methods, connection_methods)
 
     def testAttributeDb(self):
@@ -100,6 +114,7 @@ class TestConnectObject(unittest.TestCase):
         error = self.connection.error
         self.assertTrue(not error or 'krb5_' in error)
 
+    @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
     def testAttributeHost(self):
         def_host = 'localhost'
         self.assertIsInstance(self.connection.host, str)

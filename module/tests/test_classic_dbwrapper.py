@@ -15,6 +15,7 @@ try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
+import os
 
 import sys
 
@@ -38,6 +39,13 @@ try:
     from LOCAL_PyGreSQL import *
 except ImportError:
     pass
+
+windows = os.name == 'nt'
+
+# There is a known a bug in libpq under Windows which can cause
+# the interface to crash when calling PQhost():
+do_not_ask_for_host = windows
+do_not_ask_for_host_reason = 'libpq issue on Windows'
 
 
 def DB():
@@ -138,6 +146,7 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertTrue(not error or 'krb5_' in error)
         self.assertEqual(self.db.error, self.db.db.error)
 
+    @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
     def testAttributeHost(self):
         def_host = 'localhost'
         host = self.db.host
