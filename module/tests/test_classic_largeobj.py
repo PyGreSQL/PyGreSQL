@@ -382,15 +382,25 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(IOError, export, f.name)
         self.obj.close()
         export(fname)
+        if windows:
+            f.close()
+            f = open(fname, 'rb')
         r = f.read()
         f.close()
+        if windows:
+            os.remove(fname)
         self.assertEqual(r, data)
 
     def testPrint(self):
         self.obj.open(pg.INV_WRITE)
         data = 'some object to be printed'
         self.obj.write(data)
-        f = tempfile.TemporaryFile()
+        if windows:
+            # TemporaryFiles don't work well here
+            fname = 'temp_test_pg_largeobj_export.txt'
+            f = open(fname, 'wb')
+        else:
+            f = tempfile.TemporaryFile()
         stdout, sys.stdout = sys.stdout, f
         try:
             print self.obj
@@ -399,9 +409,15 @@ class TestLargeObjects(unittest.TestCase):
         except Exception:
             pass
         sys.stdout = stdout
-        f.seek(0)
+        if windows:
+            f.close()
+            f = open(fname, 'rb')
+        else:
+            f.seek(0)
         r = f.read()
         f.close()
+        if windows:
+            os.remove(fname)
         oid = self.obj.oid
         self.assertEqual(r,
             'Opened large object, oid %d\n'
