@@ -59,7 +59,7 @@ The :mod:`pgdb` module exports the following constructors and singletons:
 
     Used to describe the ``oid`` column of PostgreSQL database tables
 
-.. note:
+.. note::
 
     The following more specific types are not part of the DB-API 2 standard.
 

@@ -180,7 +180,7 @@ row_factory -- process a row of the query result
     Process rows before they are returned
 
     :param list row: the currently processed row of the result set
-    :returns: the transformed row that the cursor methods shall return
+    :returns: the transformed row that the fetch methods shall return
 
 .. note::
 

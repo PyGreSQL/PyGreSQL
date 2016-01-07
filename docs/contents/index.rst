@@ -1,4 +1,3 @@
-
 The PyGreSQL documentation
 ==========================
 
