@@ -89,7 +89,7 @@ include_dirs = [get_python_inc(), pg_config('includedir')]
 library_dirs = [get_python_lib(), pg_config('libdir')]
 define_macros = [('PYGRESQL_VERSION', version)]
 undef_macros = []
-extra_compile_args = ['-O2', '-Wall', '-Werror', '-funsigned-char']
+extra_compile_args = ['-O2', '-funsigned-char', '-Wall', '-Werror']
 
 
 class build_pg_ext(build_ext):
@@ -161,6 +161,7 @@ class build_pg_ext(build_ext):
                     define_macros.append(('MS_WIN64', None))
             elif compiler == 'msvc':  # Microsoft Visual C++
                 libraries[0] = 'lib' + libraries[0]
+                extra_compile_args[1:] = ['-J', '-W3', '-WX']
 
 
 setup(
