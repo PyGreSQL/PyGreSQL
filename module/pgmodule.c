@@ -1903,7 +1903,7 @@ connEscapeString(connObject *self, PyObject *args)
 	}
 
 	to_length = 2*from_length + 1;
-	if (to_length < (size_t)from_length) /* overflow */
+	if ((Py_ssize_t)to_length < from_length) /* overflow */
 	{
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
@@ -2938,7 +2938,7 @@ sourcePutData(sourceObject *self, PyObject *args)
 
 	if (buffer)
 	{
-		res = nbytes ? PQputCopyData(self->pgcnx->cnx, buffer, nbytes) : 1;
+		res = nbytes ? PQputCopyData(self->pgcnx->cnx, buffer, (int)nbytes) : 1;
 	}
 	else
 	{
@@ -4173,7 +4173,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 	}
 
 	to_length = 2*from_length + 1;
-	if (to_length < (size_t)from_length) /* overflow */
+	if ((Py_ssize_t)to_length < from_length) /* overflow */
 	{
 		to_length = from_length;
 		from_length = (from_length - 1)/2;
