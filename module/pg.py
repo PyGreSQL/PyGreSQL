@@ -583,12 +583,6 @@ class DB(object):
         if qcl not in self._pkeys:
             # if not found, check again in case it was added after we started
             self._pkeys = {}
-            if self.server_version >= 80200:
-                # the ANY syntax works correctly only with PostgreSQL >= 8.2
-                any_indkey = "= ANY (pg_index.indkey)"
-            else:
-                any_indkey = "IN (%s)" % ', '.join(
-                    ['pg_index.indkey[%d]' % i for i in range(16)])
             for r in self.db.query(
                 "SELECT pg_namespace.nspname, pg_class.relname,"
                     " pg_attribute.attname FROM pg_class"
@@ -599,7 +593,8 @@ class DB(object):
                     " AND pg_attribute.attisdropped = 'f'"
                 " JOIN pg_index ON pg_index.indrelid = pg_class.oid"
                     " AND pg_index.indisprimary = 't'"
-                    " AND pg_attribute.attnum " + any_indkey).getresult():
+                    " AND pg_attribute.attnum"
+                        " = ANY (pg_index.indkey)").getresult():
                 cl, pkey = _join_parts(r[:2]), r[2]
                 self._pkeys.setdefault(cl, []).append(pkey)
             # (only) for composite primary keys, the values will be frozensets
@@ -818,7 +813,7 @@ class DB(object):
                 values.append(self._quote(d[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         selectable = self.has_table_privilege(qcl)
-        if selectable and self.server_version >= 80200:
+        if selectable:
             ret = ' RETURNING %s*' % ('oid, ' if 'oid' in attnames else '')
         else:
             ret = ''
@@ -892,7 +887,7 @@ class DB(object):
             return d
         values = ', '.join(values)
         selectable = self.has_table_privilege(qcl)
-        if selectable and self.server_version >= 80200:
+        if selectable:
             ret = ' RETURNING %s*' % ('oid, ' if 'oid' in attnames else '')
         else:
             ret = ''

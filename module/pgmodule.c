@@ -81,19 +81,6 @@ const char *__movename[5] =
 
 #define MAX_BUFFER_SIZE 8192	/* maximum transaction size */
 
-#ifndef PG_VERSION_NUM
-#ifdef PQnoPasswordSupplied
-#define PG_VERSION_NUM 80000
-#else
-#define PG_VERSION_NUM 70400
-#endif
-#endif
-
-/* Before 8.0, PQsetdbLogin was not thread-safe with kerberos. */
-#if PG_VERSION_NUM >= 80000 || !(defined(KRB4) || defined(KRB5))
-#define PQsetdbLoginIsThreadSafe 1
-#endif
-
 /* MODULE GLOBAL VARIABLES */
 
 #ifdef DEFAULT_VARS
@@ -2422,11 +2409,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 
 	/* backend version */
 	if (!strcmp(name, "server_version"))
-#if PG_VERSION_NUM < 80000
-		return PyInt_FromLong(PG_VERSION_NUM);
-#else
 		return PyInt_FromLong(PQserverVersion(self->cnx));
-#endif
 
 	return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
@@ -3446,14 +3429,10 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 		sprintf(port_buffer, "%d", pgport);
 	}
 
-#ifdef PQsetdbLoginIsThreadSafe
 	Py_BEGIN_ALLOW_THREADS
-#endif
 	npgobj->cnx = PQsetdbLogin(pghost, pgport == -1 ? NULL : port_buffer,
 		pgopt, NULL, pgdbname, pguser, pgpasswd);
-#ifdef PQsetdbLoginIsThreadSafe
 	Py_END_ALLOW_THREADS
-#endif
 
 	if (PQstatus(npgobj->cnx) == CONNECTION_BAD)
 	{
