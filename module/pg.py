@@ -590,9 +590,9 @@ class DB(object):
                     " ON pg_namespace.oid = pg_class.relnamespace"
                     " AND pg_namespace.nspname NOT LIKE 'pg_%'"
                 " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
-                    " AND pg_attribute.attisdropped = 'f'"
+                    " AND NOT pg_attribute.attisdropped"
                 " JOIN pg_index ON pg_index.indrelid = pg_class.oid"
-                    " AND pg_index.indisprimary = 't'"
+                    " AND pg_index.indisprimary"
                     " AND pg_attribute.attnum"
                         " = ANY (pg_index.indkey)").getresult():
                 cl, pkey = _join_parts(r[:2]), r[2]
@@ -666,7 +666,7 @@ class DB(object):
             " JOIN pg_type ON pg_type.oid = pg_attribute.atttypid"
             " WHERE pg_namespace.nspname = '%s' AND pg_class.relname = '%s'"
             " AND (pg_attribute.attnum > 0 OR pg_attribute.attname = 'oid')"
-            " AND pg_attribute.attisdropped = 'f'") % cl
+            " AND NOT pg_attribute.attisdropped") % cl
         q = self.db.query(q).getresult()
 
         if self._regtypes:
