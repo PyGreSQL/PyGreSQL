@@ -670,6 +670,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(can('test', 'insert'), True)
         self.assertEqual(can('test', 'update'), True)
         self.assertEqual(can('test', 'delete'), True)
+        self.assertEqual(can('pg_views', 'select'), True)
+        self.assertEqual(can('pg_views', 'delete'), False)
         self.assertRaises(pg.ProgrammingError, can, 'test', 'foobar')
         self.assertRaises(pg.ProgrammingError, can, 'table_does_not_exist')
 
@@ -757,6 +759,8 @@ class TestDBClass(unittest.TestCase):
         insert = self.db.insert
         query = self.db.query
         server_version = self.db.server_version
+        bool_on = pg.get_bool()
+        decimal = pg.get_decimal()
         for table in ('insert_test_table', 'test table for insert'):
             query('drop table if exists "%s"' % table)
             query('create table "%s" ('
@@ -819,6 +823,17 @@ class TestDBClass(unittest.TestCase):
                     data, change = test
                 expect = data.copy()
                 expect.update(change)
+                if bool_on:
+                    b = expect.get('b')
+                    if b is not None:
+                        expect['b'] = b == 't'
+                if decimal is not Decimal:
+                    d = expect.get('d')
+                    if d is not None:
+                        expect['d'] = decimal(d)
+                    m = expect.get('m')
+                    if m is not None:
+                        expect['m'] = decimal(m)
                 if data.get('m') and server_version < 910000:
                     # PostgreSQL < 9.1 cannot directly convert numbers to money
                     data['m'] = "'%s'::money" % data['m']
@@ -909,19 +924,20 @@ class TestDBClass(unittest.TestCase):
     def testClear(self):
         clear = self.db.clear
         query = self.db.query
+        f = False if pg.get_bool() else 'f'
         for table in ('clear_test_table', 'test table for clear'):
             query('drop table if exists "%s"' % table)
             query('create table "%s" ('
                 "n integer, b boolean, d date, t text)" % table)
             r = clear(table)
-            result = {'n': 0, 'b': 'f', 'd': '', 't': ''}
+            result = {'n': 0, 'b': f, 'd': '', 't': ''}
             self.assertEqual(r, result)
             r['a'] = r['n'] = 1
             r['d'] = r['t'] = 'x'
             r['b'] = 't'
             r['oid'] = long(1)
             r = clear(table, r)
-            result = {'a': 1, 'n': 0, 'b': 'f', 'd': '', 't': '',
+            result = {'a': 1, 'n': 0, 'b': f, 'd': '', 't': '',
                 'oid': long(1)}
             self.assertEqual(r, result)
             query('drop table "%s"' % table)
@@ -1141,6 +1157,36 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(s, ["select 1", "select 2"])
         finally:
             self.db.debug = debug
+
+
+class TestDBClassNonStdOpts(TestDBClass):
+    """Test the methods of the DB class with non-standard global options."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.saved_options = {}
+        cls.set_option('decimal', float)
+        not_bool = not pg.get_bool()
+        cls.set_option('bool', not_bool)
+        unnamed_result = lambda q: q.getresult()
+        cls.set_option('namedresult', unnamed_result)
+        super(TestDBClassNonStdOpts, cls).setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestDBClassNonStdOpts, cls).tearDownClass()
+        cls.reset_option('namedresult')
+        cls.reset_option('bool')
+        cls.reset_option('decimal')
+
+    @classmethod
+    def set_option(cls, option, value):
+        cls.saved_options[option] = getattr(pg, 'get_' + option)()
+        return getattr(pg, 'set_' + option)(value)
+
+    @classmethod
+    def reset_option(cls, option):
+        return getattr(pg, 'set_' + option)(cls.saved_options[option])
 
 
 class TestSchemas(unittest.TestCase):

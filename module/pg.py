@@ -340,6 +340,11 @@ class DB(object):
             else:
                 print(s)
 
+    @staticmethod
+    def _make_bool(d):
+        """Get boolean value corresponding to d."""
+        return bool(d) if get_bool() else ('t' if d else 'f')
+
     def _quote_text(self, d):
         """Quote text value."""
         if not isinstance(d, basestring):
@@ -354,9 +359,7 @@ class DB(object):
             if not d:
                 return 'NULL'
             d = d.lower() in self._bool_true
-        else:
-            d = bool(d)
-        return ("'f'", "'t'")[d]
+        return "'t'" if d else "'f'"
 
     _date_literals = frozenset('current_date current_time'
         ' current_timestamp localtime localtimestamp'.split())
@@ -722,7 +725,7 @@ class DB(object):
             return self._privileges[(qcl, privilege)]
         except KeyError:
             q = "SELECT has_table_privilege('%s', '%s')" % (qcl, privilege)
-            ret = self.db.query(q).getresult()[0][0] == 't'
+            ret = self.db.query(q).getresult()[0][0] == self._make_bool(True)
             self._privileges[(qcl, privilege)] = ret
             return ret
 
@@ -913,7 +916,7 @@ class DB(object):
     def clear(self, cl, a=None):
         """Clear all the attributes to values determined by the types.
 
-        Numeric types are set to 0, Booleans are set to 'f', and everything
+        Numeric types are set to 0, Booleans are set to false, and everything
         else is set to the empty string.  If the array argument is present,
         it is used as the array and any entries matching attribute names are
         cleared with everything else left unchanged.
@@ -932,7 +935,7 @@ class DB(object):
                     'num', 'numeric', 'money'):
                 a[n] = 0
             elif t in ('bool', 'boolean'):
-                a[n] = 'f'
+                a[n] = self._make_bool(False)
             else:
                 a[n] = ''
         return a
