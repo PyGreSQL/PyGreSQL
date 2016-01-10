@@ -271,20 +271,42 @@ as munged by get or passed as keyword, or on the primary key of the table.
 The return value is the number of deleted rows (i.e. 0 if the row did not
 exist and 1 if the row was deleted).
 
-escape_string -- escape a string for use within SQL
----------------------------------------------------
+escape_literal -- escape a literal string for use within SQL
+------------------------------------------------------------
 
-.. method:: DB.escape_string(string)
+.. method:: DB.escape_literal(string)
 
-    Escape a string for use within SQL
+    Escape a string for use within SQL as a literal constant
 
     :param str string: the string that is to be escaped
     :returns: the escaped string
     :rtype: str
 
-Similar to the module function with the same name, but the
-behavior of this method is adjusted depending on the connection properties
-(such as character encoding).
+This method escapes a string for use within an SQL command. This is useful
+when inserting data values as literal constants in SQL commands. Certain
+characters (such as quotes and backslashes) must be escaped to prevent them
+from being interpreted specially by the SQL parser.
+
+.. versionadded:: 4.1
+
+escape_identifier -- escape an identifier string for use within SQL
+-------------------------------------------------------------------
+
+.. method:: DB.escape_identifier(string)
+
+    Escape a string for use within SQL as an identifier
+
+    :param str string: the string that is to be escaped
+    :returns: the escaped string
+    :rtype: str
+
+This method escapes a string for use as an SQL identifier, such as a table,
+column, or function name. This is useful when a user-supplied identifier
+might contain special characters that would otherwise not be interpreted
+as part of the identifier by the SQL parser, or when the identifier might
+contain upper case characters whose case should be preserved.
+
+.. versionadded:: 4.1
 
 escape_bytea -- escape binary data for use within SQL
 -----------------------------------------------------
@@ -313,3 +335,22 @@ unescape_bytea -- unescape data that has been retrieved as text
     :rtype: str
 
 See the module function with the same name.
+
+use_regtypes -- determine use of regular type names
+---------------------------------------------------
+
+.. method:: DB.use_regtypes([regtypes])
+
+    Determine whether regular type names shall be used
+
+    :param bool regtypes: if passed, set whether regular type names shall be used
+    :returns: whether regular type names are used
+
+The :meth:`DB.get_attnames` method can return either simplified "classic"
+type names (the default) or more specific "regular" type names. Which kind
+of type names is used can be changed by calling :meth:`DB.get_regtypes`.
+If you pass a boolean, it sets whether regular type names shall be used.
+The method can also be used to check through its return value whether
+currently regular type names are used.
+
+.. versionadded:: 4.1

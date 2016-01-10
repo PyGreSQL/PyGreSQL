@@ -143,6 +143,9 @@ connection that triggered the notify, and *extra* is a payload string
 that has been sent with the notification. Remember to do a listen query
 first, otherwise :meth:`pgobject.getnotify` will always return ``None``.
 
+.. versionchanged:: 4.1
+    Support for payload strings was added in version 4.1.
+
 inserttable -- insert a list into a table
 -----------------------------------------
 
@@ -184,6 +187,8 @@ This method gets the custom notice receiver callback function that has
 been set with :meth:`pgobject.set_notice_receiver`, or ``None`` if no
 custom notice receiver has ever been set on the connection.
 
+.. versionadded:: 4.1
+
 .. method:: pgobject.set_notice_receiver(proc)
 
     Set a custom notice receiver
@@ -223,6 +228,8 @@ attributes:
     .. attribute:: pgnotice.hint
 
         an optional suggestion what to do about the problem
+
+.. versionadded:: 4.1
 
 putline -- write a line to the server socket [DA]
 -------------------------------------------------
@@ -349,9 +356,13 @@ the connection and its status. These attributes are:
 
    the frontend/backend protocol being used (int)
 
+.. versionadded:: 4.0
+
 .. attribute:: pgobject.server_version
 
    the backend version (int, e.g. 80305 for 8.3.5)
+
+.. versionadded:: 4.0
 
 .. attribute:: pgobject.status
 

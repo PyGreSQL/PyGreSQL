@@ -56,6 +56,8 @@ namedresult -- get query values as list of named tuples
 This method returns the list of the values returned by the query
 with each row returned as a named tuple with proper field names.
 
+.. versionadded:: 4.1
+
 listfields -- list fields names of previous query result
 --------------------------------------------------------
 

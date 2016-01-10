@@ -383,6 +383,8 @@ use ``set_decimal()`` to set a different decimal mark manually. A return
 value of ``None`` means monetary values are not interpreted as decimal
 numbers, but returned as strings including the formatting and currency.
 
+.. versionadded:: 4.1.1
+
 .. function:: set_decimal_point(string)
 
     Specify which decimal mark is used for interpreting monetary values
@@ -400,6 +402,8 @@ to decimal numbers, then you can call ``set_decimal(None)``, which will
 cause PyGreSQL to return monetary values as strings including their
 formatting and currency.
 
+.. versionadded:: 4.1.1
+
 get/set_bool -- whether boolean values are returned as bool objects
 -------------------------------------------------------------------
 
@@ -416,6 +420,8 @@ strings which are the values used internally by PostgreSQL. By default,
 conversion to bool objects is not activated, but you can enable
 this with the ``set_bool()`` method.
 
+.. versionadded:: 4.2
+
 .. function:: set_bool(on)
 
     Set whether boolean values are returned as bool objects
@@ -427,6 +433,8 @@ PostgreSQL boolean values converted to Python bool objects, or as
 ``'f'`` and ``'t'`` strings which are the values used internally by PostgreSQL.
 By default, conversion to bool objects is not activated, but you can
 enable this by calling ``set_bool(True)``.
+
+.. versionadded:: 4.2
 
 get/set_namedresult -- conversion to named tuples
 -------------------------------------------------

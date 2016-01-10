@@ -196,6 +196,8 @@ if you want to return rows as dicts instead of lists::
 
     cur = DictCursor(con)
 
+.. versionadded:: 4.0
+
 arraysize - the number of rows to fetch at a time
 -------------------------------------------------
 
