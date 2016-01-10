@@ -24,10 +24,4 @@ docs/      documentation directory
 
 tests/     a suite of unit tests for PyGreSQL
 
-tutorial/  demos directory
-
-           The samples contained in this directory have been taken
-           from the PostgreSQL manual and were used for module testing.
-           They demonstrate some PostgreSQL features.
-
 ========== =

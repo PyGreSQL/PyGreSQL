@@ -1,6 +1,8 @@
 pgobject -- The connection object
 =================================
 
+.. py:currentmodule:: pg
+
 .. class:: pgobject
 
 This object handles a connection to a PostgreSQL database. It embeds and

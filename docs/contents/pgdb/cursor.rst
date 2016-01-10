@@ -1,6 +1,8 @@
 pgdbCursor -- The cursor object
 ===============================
 
+.. py:currentmodule:: pgdb
+
 .. class:: pgdbCursor
 
 These objects represent a database cursor, which is used to manage the context

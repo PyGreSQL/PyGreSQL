@@ -1,6 +1,8 @@
 pgqueryobject methods
 =====================
 
+.. py:currentmodule:: pg
+
 .. class:: pgqueryobject
 
 The :class:`pgqueryobject` returned by :meth:`pgobject.query` and

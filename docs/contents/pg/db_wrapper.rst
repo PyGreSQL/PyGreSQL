@@ -1,6 +1,8 @@
 The DB wrapper class
 ====================
 
+.. py:currentmodule:: pg
+
 .. class:: DB
 
 The :class:`pgobject` methods are wrapped in the class :class:`DB`.

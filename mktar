@@ -40,7 +40,6 @@ DOCFILES="docs/Makefile docs/make.bat docs/*.rst
           docs/_static docs/_templates"
 HTMLFILES="docs/_build/html"
 TESTFILES="module/tests/*.py"
-TUTFILES="tutorial/*.py"
 
 echo "Making source tarball..."
 
@@ -50,12 +49,10 @@ rm -rf $TD
 mkdir $TD
 mkdir -p $TD/docs/_build/html
 mkdir $TD/tests
-mkdir $TD/tutorial
 cp $MODFILES $TD
 cp -r $DOCFILES $TD/docs
 cp -r $HTMLFILES $TD/docs/_build
 cp $TESTFILES $TD/tests
-cp $TUTFILES $TD/tutorial
 tar -cvzf $TF $TD
 chmod 644 $TF
 rm -rf $TD
@@ -63,4 +60,3 @@ rm -f $DISTDIR/$SYMLINK
 ln -s $TD.tgz $DISTDIR/$SYMLINK
 
 echo "$TF has been built"
-

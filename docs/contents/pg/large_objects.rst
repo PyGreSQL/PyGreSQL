@@ -1,6 +1,8 @@
 pglarge -- Large Objects
 ========================
 
+.. py:currentmodule:: pg
+
 .. class:: pglarge
 
 Objects that are instances of the class :class:`pglarge` are used to handle

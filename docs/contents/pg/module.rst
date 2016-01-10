@@ -1,6 +1,8 @@
 Module functions and constants
 ==============================
 
+.. py:currentmodule:: pg
+
 The :mod:`pg` module defines a few functions that allow to connect
 to a database and to define "default variables" that override
 the environment variables used by PostgreSQL.
@@ -18,7 +20,7 @@ standard environment variables should be used.
 connect -- Open a PostgreSQL connection
 ---------------------------------------
 
-.. function:: pg.connect([dbname], [host], [port], [opt], [tty], [user], [passwd])
+.. function:: connect([dbname], [host], [port], [opt], [tty], [user], [passwd])
 
     Open a :mod:`pg` connection
 

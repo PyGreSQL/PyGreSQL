@@ -1,6 +1,8 @@
 pgdbCnx -- The connection object
 ================================
 
+.. py:currentmodule:: pgdb
+
 .. class:: pgdbCnx
 
 These connection objects respond to the following methods.

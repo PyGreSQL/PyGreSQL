@@ -1,4 +1,4 @@
-General PyGreSQL programming information
+General PyGreSQL Programming Information
 ----------------------------------------
 
 PyGreSQL consists of two parts: the "classic" PyGreSQL interface

@@ -1,6 +1,8 @@
 Module functions and constants
 ==============================
 
+.. py:currentmodule:: pgdb
+
 The :mod:`pgdb` module defines a :func:`connect` function that allows to
 connect to a database, some global constants describing the capabilities
 of the module as well as several exception classes.
@@ -8,7 +10,7 @@ of the module as well as several exception classes.
 connect -- Open a PostgreSQL connection
 ---------------------------------------
 
-.. function:: pgdb.connect([dsn], [user], [password], [host], [database])
+.. function:: connect([dsn], [user], [password], [host], [database])
 
     Return a new connection to the database
 

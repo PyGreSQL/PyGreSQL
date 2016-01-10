@@ -1,6 +1,8 @@
 pgdbType -- Type objects and constructors
 =========================================
 
+.. py:currentmodule:: pgdb
+
 .. class:: pgdbType
 
 The :attr:`pgdbCursor.description` attribute returns information about each

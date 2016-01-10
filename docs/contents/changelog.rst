@@ -12,6 +12,7 @@ Version 4.2
 - Add option to return money values as string.
 - Fix notification handler (Thanks Patrick TJ McPhee).
 - Fix a small issue with large objects.
+- The tutorial files have become a chapter in the documentation.
 - Greatly improve unit testing, tests run with Python 2.4 to 2.7 again.
 
 Version 4.1.1 (2013-01-08)
