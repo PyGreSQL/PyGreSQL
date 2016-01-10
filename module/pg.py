@@ -104,7 +104,7 @@ def _split_parts(s):
 
 def _join_parts(s):
     """Join all parts of a dot separated string."""
-    return '.'.join([_is_quoted(p) and '"%s"' % p or p for p in s])
+    return '.'.join(['"%s"' % p if _is_quoted(p) else p for p in s])
 
 
 def _oid_key(qcl):
@@ -621,15 +621,15 @@ class DB(object):
             specifying which kind of relations you want to list.
 
         """
-        where = kinds and "pg_class.relkind IN (%s) AND" % ','.join(
-            ["'%s'" % x for x in kinds]) or ''
+        where = "pg_class.relkind IN (%s) AND" % ','.join(
+            ["'%s'" % x for x in kinds]) if kinds else ''
         return [_join_parts(x) for x in self.db.query(
-            "SELECT pg_namespace.nspname, pg_class.relname "
-            "FROM pg_class "
-            "JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace "
-            "WHERE %s pg_class.relname !~ '^Inv' AND "
-                "pg_class.relname !~ '^pg_' "
-            "ORDER BY 1, 2" % where).getresult()]
+            "SELECT pg_namespace.nspname, pg_class.relname"
+            " FROM pg_class "
+            " JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace "
+            " WHERE %s pg_namespace.nspname != 'information_schema'"
+                " AND pg_namespace.nspname !~ '^pg_' "
+            " ORDER BY 1, 2" % where).getresult()]
 
     def get_tables(self):
         """Return list of tables in connected database."""

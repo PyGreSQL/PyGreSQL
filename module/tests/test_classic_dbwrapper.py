@@ -595,6 +595,15 @@ class TestDBClass(unittest.TestCase):
     def testGetTables(self):
         get_tables = self.db.get_tables
         result1 = get_tables()
+        self.assertIsInstance(result1, list)
+        for t in result1:
+            t = t.split('.', 1)
+            self.assertGreaterEqual(len(t), 2)
+            if len(t) > 2:
+                self.assertTrue(t[1].startswith('"'))
+            t = t[0]
+            self.assertNotEqual(t, 'information_schema')
+            self.assertFalse(t.startswith('pg_'))
         tables = ('"A very Special Name"',
             '"A_MiXeD_quoted_NaMe"', 'a1', 'a2',
             'A_MiXeD_NaMe', '"another special name"',
