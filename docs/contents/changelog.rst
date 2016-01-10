@@ -10,6 +10,7 @@ Version 4.2
 - Fix decimal point handling.
 - Add option to return boolean values as bool objects.
 - Add option to return money values as string.
+- get_tables() does not list information schema tables any more.
 - Fix notification handler (Thanks Patrick TJ McPhee).
 - Fix a small issue with large objects.
 - The tutorial files have become a chapter in the documentation.
