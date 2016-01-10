@@ -1,223 +1,7 @@
-----------------------------------------------
-:mod:`pgdb` --- The DB-API Compliant Interface
-----------------------------------------------
-
-.. module:: pgdb
-
-.. contents:: Contents
-
-
-Introduction
-============
-
-You may either choose to use the "classic" PyGreSQL interface
-provided by the :mod:`pg` module or else the
-DB-API 2.0 compliant interface provided by the :mod:`pgdb` module.
-
-`DB-API 2.0 <http://www.python.org/dev/peps/pep-0249/>`_
-(Python Database API Specification v2.0)
-is a specification for connecting to databases (not only PostGreSQL)
-from Python that has been developed by the Python DB-SIG in 1999.
-
-The following documentation covers only the newer :mod:`pgdb` API.
-
-The authoritative programming information for the DB-API is :pep:`0249`
-
-A useful tutorial-like `introduction to the DB-API
-<http://www2.linuxjournal.com/lj-issues/issue49/2605.html>`_
-has been written by Andrew M. Kuchling for the LINUX Journal in 1998.
-
-
-Module functions and constants
-==============================
-
-The :mod:`pgdb` module defines a :func:`connect` function that allows to
-connect to a database, some global constants describing the capabilities
-of the module as well as several exception classes.
-
-connect -- Open a PostgreSQL connection
----------------------------------------
-
-.. function:: connect([dsn], [user], [password], [host], [database])
-
-    Return a new connection to the database
-
-    :param str dsn: data source name as string
-    :param str user: the database user name
-    :param str password: the database password
-    :param str host: the hostname of the database
-    :param database: the name of the database
-    :returns: a connection object
-    :rtype: :class:`Connection`
-    :raises pgdb.OperationalError: error connecting to the database
-
-This function takes parameters specifying how to connect to a PostgreSQL
-database and returns a :class:`Connection` object using these parameters.
-If specified, the *dsn* parameter must be a string with the format
-``'host:base:user:passwd:opt'``. All of the parts specified in the *dsn*
-are optional. You can also specify the parameters individually using keyword
-arguments, which always take precedence. The *host* can also contain a port
-if specified in the format ``'host:port'``. In the *opt* part of the *dsn*
-you can pass command-line options to the server.
-
-Example::
-
-    con = connect(dsn='myhost:mydb', user='guido', password='234$')
-
-
-Module constants
-----------------
-
-.. data:: apilevel
-
-    The string constant ``'2.0'``, stating that the module is DB-API 2.0 level
-    compliant.
-
-.. data:: threadsafety
-
-    The integer constant 1, stating that the module itself is thread-safe,
-    but the connections are not thread-safe, and therefore must be protected
-    with a lock if you want to use them from different threads.
-
-.. data:: paramstyle
-
-   The string constant ``pyformat``, stating that parameters should be passed
-   using Python extended format codes, e.g. ``" ... WHERE name=%(name)s"``.
-
-Errors raised by this module
-----------------------------
-
-The errors that can be raised by the :mod:`pgdb` module are the following:
-
-.. exception:: Warning
-
-    Exception raised for important warnings like data truncations while
-    inserting.
-
-.. exception:: Error
-
-    Exception that is the base class of all other error exceptions. You can
-    use this to catch all errors with one single except statement.
-    Warnings are not considered errors and thus do not use this class as base.
-
-.. exception:: InterfaceError
-
-    Exception raised for errors that are related to the database interface
-    rather than the database itself.
-
-.. exception:: DatabaseError
-
-    Exception raised for errors that are related to the database.
-
-.. exception:: DataError
-
-    Exception raised for errors that are due to problems with the processed
-    data like division by zero or numeric value out of range.
-
-.. exception:: OperationalError
-
-    Exception raised for errors that are related to the database's operation
-    and not necessarily under the control of the programmer, e.g. an unexpected
-    disconnect occurs, the data source name is not found, a transaction could
-    not be processed, or a memory allocation error occurred during processing.
-
-.. exception:: IntegrityError
-
-    Exception raised when the relational integrity of the database is affected,
-    e.g. a foreign key check fails.
-
-.. exception:: ProgrammingError
-
-    Exception raised for programming errors, e.g. table not found or already
-    exists, syntax error in the SQL statement or wrong number of parameters
-    specified.
-
-.. exception:: NotSupportedError
-
-    Exception raised in case a method or database API was used which is not
-    supported by the database.
-
-
-Connection -- The connection object
-===================================
-
-.. class:: Connection
-
-These connection objects respond to the following methods.
-
-Note that ``pgdb.Connection`` objects also implement the context manager protocol,
-i.e. you can use them in a ``with`` statement.
-
-close -- close the connection
------------------------------
-
-.. method:: Connection.close()
-
-    Close the connection now (rather than whenever it is deleted)
-
-    :rtype: None
-
-The connection will be unusable from this point forward; an :exc:`Error`
-(or subclass) exception will be raised if any operation is attempted with
-the connection. The same applies to all cursor objects trying to use the
-connection. Note that closing a connection without committing the changes
-first will cause an implicit rollback to be performed.
-
-commit -- commit the connection
--------------------------------
-
-.. method:: Connection.commit()
-
-    Commit any pending transaction to the database
-
-    :rtype: None
-
-Note that connections always use a transaction, there is no auto-commit.
-
-rollback -- roll back the connection
-------------------------------------
-
-.. method:: Connection.rollback()
-
-    Roll back any pending transaction to the database
-
-    :rtype: None
-
-This method causes the database to roll back to the start of any pending
-transaction. Closing a connection without committing the changes first will
-cause an implicit rollback to be performed.
-
-cursor -- return a new cursor object
-------------------------------------
-
-.. method:: Connection.cursor()
-
-    Return a new cursor object using the connection
-
-    :returns: a connection object
-    :rtype: :class:`Cursor`
-
-This method returns a new :class:`Cursor` object that can be used to
-operate on the database in the way described in the next section.
-
-Attributes that are not part of the standard
---------------------------------------------
-
-.. note::
-
-   The following attributes are not part of the DB-API 2 standard.
-
-.. attribute:: cursor_type
-
-    The default cursor type used by the connection
-
-If you want to use your own custom subclass of the :class:`Cursor` class
-with he connection, set this attribute to you custom cursor class. You will
-then get your custom cursor whenever you call :meth:`Connection.cursor`.
-
-
 Cursor -- The cursor object
 ===========================
+
+.. py:currentmodule:: pgdb
 
 .. class:: Cursor
 
@@ -258,6 +42,9 @@ description -- details regarding the result columns
     This attribute will be ``None`` for operations that do not return rows
     or if the cursor has not had an operation invoked via the
     :meth:`Cursor.execute` or :meth:`Cursor.executemany` method yet.
+
+.. versionchanged:: 5.0
+    Before version 5.0, this attribute was an ordinary tuple.
 
 rowcount -- number of rows of the result
 ----------------------------------------
@@ -346,6 +133,8 @@ value is currently not supported.
 The function may also provide a result set as output. These can be requested
 through the standard fetch methods of the cursor.
 
+.. versionadded:: 5.0
+
 fetchone -- fetch next row of the query result
 ----------------------------------------------
 
@@ -364,6 +153,9 @@ they are valid Python identifiers.
 An :exc:`Error` (or subclass) exception is raised if the previous call to
 :meth:`Cursor.execute` or :meth:`Cursor.executemany` did not produce
 any result set or no call was issued yet.
+
+.. versionchanged:: 5.0
+    Before version 5.0, this method returned ordinary tuples.
 
 fetchmany -- fetch next set of rows of the query result
 -------------------------------------------------------
@@ -402,6 +194,9 @@ For optimal performance, it is usually best to use the :attr:`arraysize`
 attribute. If the *size* parameter is used, then it is best for it to retain
 the same value from one :meth:`Cursor.fetchmany` call to the next.
 
+.. versionchanged:: 5.0
+    Before version 5.0, this method returned ordinary tuples.
+
 fetchall -- fetch all rows of the query result
 ----------------------------------------------
 
@@ -418,6 +213,9 @@ names of the database query as long as they are valid Python identifiers.
 
 Note that the cursor's :attr:`arraysize` attribute can affect the performance
 of this operation.
+
+.. versionchanged:: 5.0
+    Before version 5.0, this method returned ordinary tuples.
 
 arraysize - the number of rows to fetch at a time
 -------------------------------------------------
@@ -439,7 +237,7 @@ Methods and attributes that are not part of the standard
 
 .. method:: Cursor.copy_from(stream, table, [format], [sep], [null], [size], [columns])
 
-	Copy data from an input stream to the specified table
+    Copy data from an input stream to the specified table
 
     :param stream: the input stream
         (must be a file-like object, a string or an iterable returning strings)
@@ -474,9 +272,11 @@ file-like objects.
 The copy operation can be restricted to a subset of columns. If no columns are
 specified, all of them will be copied.
 
+.. versionadded:: 5.0
+
 .. method:: Cursor.copy_to(stream, table, [format], [sep], [null], [decode], [columns])
 
-	Copy data from the specified table to an output stream
+    Copy data from the specified table to an output stream
 
     :param stream: the output stream (must be a file-like object or ``None``)
     :param str table: the name of a database table or a ``SELECT`` query
@@ -514,6 +314,8 @@ the textual representation of ``NULL`` in the output.
 The copy operation can be restricted to a subset of columns. If no columns are
 specified, all of them will be copied.
 
+.. versionadded:: 5.0
+
 .. method:: Cursor.row_factory(row)
 
     Process rows before they are returned
@@ -541,6 +343,7 @@ to return rows as dicts, you can create a custom cursor class like this::
     cur = DictCursor(con)  # get one DictCursor instance or
     con.cursor_type = DictCursor  # always use DictCursor instances
 
+.. versionadded:: 4.0
 
 .. method:: Cursor.build_row_factory()
 
@@ -561,6 +364,8 @@ looks like this::
     def build_row_factory(self):
         return namedtuple('Row', self.colnames, rename=True)._make
 
+.. versionadded:: 5.0
+
 .. attribute:: Cursor.colnames
 
     The list of columns names of the current result set
@@ -568,6 +373,8 @@ looks like this::
 The values in this list are the same values as the *name* elements
 in the :attr:`Cursor.description` attribute. Always use the latter
 if you want to remain standard compliant.
+
+.. versionadded:: 5.0
 
 .. attribute:: Cursor.coltypes
 
@@ -577,112 +384,4 @@ The values in this list are the same values as the *type_code* elements
 in the :attr:`Cursor.description` attribute. Always use the latter
 if you want to remain standard compliant.
 
-
-Type -- Type objects and constructors
-=====================================
-
-.. class:: Type
-
-The :attr:`Cursor.description` attribute returns information about each
-of the result columns of a query. The *type_code* must compare equal to one
-of the :class:`Type` objects defined below. Type objects can be equal to
-more than one type code (e.g. :class:`DATETIME` is equal to the type codes
-for date, time and timestamp columns).
-
-The :mod:`pgdb` module exports the following constructors and singletons:
-
-.. function:: Date(year, month, day)
-
-    Construct an object holding a date value
-
-.. function:: Time(hour, minute=0, second=0, microsecond=0)
-
-    Construct an object holding a time value
-
-.. function:: Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0)
-
-    Construct an object holding a time stamp value
-
-.. function:: DateFromTicks(ticks)
-
-    Construct an object holding a date value from the given *ticks* value
-
-.. function:: TimeFromTicks(ticks)
-
-    Construct an object holding a time value from the given *ticks* value
-
-.. function:: TimestampFromTicks(ticks)
-
-    Construct an object holding a time stamp from the given *ticks* value
-
-.. function:: Binary(bytes)
-
-    Construct an object capable of holding a (long) binary string value
-
-.. class:: STRING
-
-    Used to describe columns that are string-based (e.g. ``char``, ``varchar``, ``text``)
-
-.. class:: BINARY type
-
-    Used to describe (long) binary columns (``bytea``)
-
-.. class:: NUMBER
-
-    Used to describe numeric columns (e.g. ``int``, ``float``, ``numeric``, ``money``)
-
-.. class:: DATETIME
-
-    Used to describe date/time columns (e.g. ``date``, ``time``, ``timestamp``, ``interval``)
-
-.. class:: ROWID
-
-    Used to describe the ``oid`` column of PostgreSQL database tables
-
-.. note::
-
-  The following more specific types are not part of the DB-API 2 standard.
-
-.. class:: BOOL
-
-    Used to describe ``boolean`` columns
-
-.. class:: SMALLINT
-
-    Used to describe ``smallint`` columns
-
-.. class:: INTEGER
-
-    Used to describe ``integer`` columns
-
-.. class:: LONG
-
-    Used to describe ``bigint`` columns
-
-.. class:: FLOAT
-
-    Used to describe ``float`` columns
-
-.. class:: NUMERIC
-
-    Used to describe ``numeric`` columns
-
-.. class:: MONEY
-
-    Used to describe ``money`` columns
-
-.. class:: DATE
-
-    Used to describe ``date`` columns
-
-.. class:: TIME
-
-    Used to describe ``time`` columns
-
-.. class:: TIMESTAMP
-
-    Used to describe ``timestamp`` columns
-
-.. class:: INTERVAL
-
-    Used to describe date and time ``interval`` columns
+.. versionadded:: 5.0

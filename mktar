@@ -1,11 +1,17 @@
 #! /bin/sh
 
 VERSION=5.0
+DISTDIR=/u/pyg/files
 
-# small safety test
+# small safety tests
 if [ ! -f module/pgmodule.c ]
 then
 	echo "Hmmm.  Are you sure you are in the right directory?"
+	exit 1
+fi
+if [ ! -d $DISTDIR ]
+then
+	echo "Hmmm.  Are you sure you are on the right server?"
 	exit 1
 fi
 
@@ -23,7 +29,6 @@ fi
 # Note that this does essentially the same as "python setup.py sdist",
 # except this also makes the docs and bundles them as source and html.
 
-DISTDIR=/u/pyg/files
 TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
 
@@ -31,10 +36,10 @@ MODFILES="module/pg.py module/pgdb.py module/pgmodule.c
           module/pgfs.h module/pgtypes.h module/py3c.h
           module/setup.py module/setup.cfg"
 DOCFILES="docs/Makefile docs/make.bat docs/*.rst
-          docs/_build/html/*.html docs/_build/html/*.js
-          docs/_build/html/_static"
+          docs/contents docs/download docs/community
+          docs/_static docs/_templates"
+HTMLFILES="docs/_build/html"
 TESTFILES="module/tests/*.py"
-TUTFILES="tutorial/*.py"
 
 echo "Making source tarball..."
 
@@ -42,13 +47,12 @@ echo "Making source tarball..."
 
 rm -rf $TD
 mkdir $TD
-mkdir -p $TD/docs/_static
+mkdir -p $TD/docs/_build/html
 mkdir $TD/tests
-mkdir $TD/tutorial
 cp $MODFILES $TD
 cp -r $DOCFILES $TD/docs
+cp -r $HTMLFILES $TD/docs/_build
 cp $TESTFILES $TD/tests
-cp $TUTFILES $TD/tutorial
 tar -cvzf $TF $TD
 chmod 644 $TF
 rm -rf $TD
@@ -56,4 +60,3 @@ rm -f $DISTDIR/$SYMLINK
 ln -s $TD.tgz $DISTDIR/$SYMLINK
 
 echo "$TF has been built"
-

@@ -5,7 +5,7 @@ Version 5.0
 -----------
 - This version runs on both Python 2 and Python 3.
 - The supported versions are Python 2.6 to 2.7, and 3.3 to 3.5.
-- PostgreSQL is supported in all versions from 9.0 to 9.4.
+- PostgreSQL is supported in all versions from 9.0 to 9.5.
 - The DB-API 2 module now always returns result rows as named tuples
   instead of simply lists as before. The documentation explains how
   you can restore the old behavior or use custom row objects instead.
@@ -23,6 +23,8 @@ Version 5.0
   from the client to the database.
 - The 7-tuples returned by the description attribute of a pgdb cursor
   are now named tuples, i.e. their elements can be also accessed by name.
+  The column names and types can now also be requested through the
+  colnames and coltypes attributes, which are not part of DB-API 2 though.
 - The tty parameter and attribute of database connections has been
   removed since it is not supported any more since PostgreSQL 7.4.
 
@@ -30,13 +32,15 @@ Version 4.2
 -----------
 - Set a better default for the user option "escaping-funcs".
 - The supported Python versions are 2.4 to 2.7.
-- PostgreSQL is supported in all versions from 8.3 to 9.4.
+- PostgreSQL is supported in all versions from 8.3 to 9.5.
 - Force build to compile with no errors.
 - Fix decimal point handling.
 - Add option to return boolean values as bool objects.
 - Add option to return money values as string.
+- get_tables() does not list information schema tables any more.
 - Fix notification handler (Thanks Patrick TJ McPhee).
 - Fix a small issue with large objects.
+- The tutorial files have become a chapter in the documentation.
 - Greatly improve unit testing, tests run with Python 2.4 to 2.7 again.
 
 Version 4.1.1 (2013-01-08)
