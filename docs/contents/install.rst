@@ -20,10 +20,31 @@ All three files will be installed directly into the Python site-packages
 directory. To uninstall PyGreSQL, simply remove these three files again.
 
 
+Installing with Pip
+-------------------
+
+This is the most easy way to install PyGreSQL if you have "pip" installed
+on your computer. Just run the following command in your terminal::
+
+  pip install PyGreSQL
+
+This will automatically try to find and download a distribution on the
+`Python Package Index <https://pypi.python.org/>`_ that matches your operating
+system and Python version and install it on your computer.
+
+
 Installing from a Binary Distribution
 -------------------------------------
 
-This is the easiest way to install PyGreSQL.
+If you don't want to use "pip", or "pip" doesn't find an appropriate
+distribution for your computer, you can also try to manually download
+and install a distribution.
+
+When you download the source distribution, you will need to compile the
+C extensions, for which you need a C compiler installed on your computer.
+If you don't want to install a C compiler or avoid possible problems
+with the compilation, you can search for a pre-compiled binary distribution
+of PyGreSQL on the Python Package Index or the PyGreSQL homepage.
 
 You can currently download PyGreSQL as Linux RPM, NetBSD package and Windows
 installer. Make sure the required Python version of the binary package matches
@@ -49,7 +70,7 @@ tool. This is usually also part of the "devel" package on Unix, and will be
 installed as part of the database server feature on Windows systems.
 
 Building and installing with Distutils
---------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You can build and install PyGreSQL using
 `Distutils <http://docs.python.org/install/>`_.
@@ -61,27 +82,17 @@ Type the following commands to build and install PyGreSQL::
     python setup.py build
     python setup.py install
 
-If you are using `MinGW <http://www.mingw.org>`_ to build PyGreSQL under
-Microsoft Windows, please note that Python newer version 2.3 is using msvcr71
-instead of msvcrt as its common runtime library. You can allow for that by
-editing the file ``%MinGWpath%/lib/gcc/%MinGWversion%/specs`` and changing
-the entry that reads ``-lmsvcrt`` to ``-lmsvcr71``. You may also need to copy
-``libpq.lib`` to ``libpq.a`` in the PostgreSQL ``lib`` directory. Then use
-the following command to build and install PyGreSQL::
-
-    python setup.py build -c mingw32 install
-
 Now you should be ready to use PyGreSQL.
 
 Compiling Manually
-------------------
+~~~~~~~~~~~~~~~~~~
 
 The source file for compiling the dynamic module is called pgmodule.c.
 You have two options. You can compile PyGreSQL as a stand-alone module
 or you can build it into the Python interpreter.
 
 Stand-Alone
------------
+^^^^^^^^^^^
 
 * In the directory containing ``pgmodule.c``, run the following command::
 
@@ -139,7 +150,7 @@ Stand-Alone
   if your Python modules are in ``/usr/lib/python``.
 
 Built-in to Python interpreter
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Find the directory where your ``Setup`` file lives (usually in the ``Modules``
   subdirectory) in the Python source hierarchy and copy or symlink the
