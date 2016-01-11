@@ -20,7 +20,7 @@ You can also pass the database name, host, port and login information
 as parameters when creating the :class:`DB` instance::
 
     >>> db = DB(dbname='testdb', host='pgserver', port=5432,
-    ...     user='fred', passwd='tiger')
+    ...     user='scott', passwd='tiger')
 
 The :class:`DB` class of which ``db`` is an object is a wrapper around
 the lower level :class:`Connection` class of the :mod:`pg` module.
