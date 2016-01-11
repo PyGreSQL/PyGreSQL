@@ -10,10 +10,10 @@ easy use of the powerful PostgreSQL features from a Python script.
 Authors and history:
 * PyGreSQL written 1997 by D'Arcy J.M. Cain <darcy@druid.net>
 * based on code written 1995 by Pascal Andre <andre@chimay.via.ecp.fr>
-* setup script created 2000/04 Mark Alexander <mwa@gate.net>
-* tweaked 2000/05 Jeremy Hylton <jeremy@cnri.reston.va.us>
-* win32 support 2001/01 by Gerhard Haering <gerhard@bigfoot.de>
-* tweaked 2006/02-2010/02 by Christoph Zwerschke <cito@online.de>
+* setup script created 2000 by Mark Alexander <mwa@gate.net>
+* improved 2000 by Jeremy Hylton <jeremy@cnri.reston.va.us>
+* improved 2001 by Gerhard Haering <gerhard@bigfoot.de>
+* improved 2006 and 2016 by Christoph Zwerschke <cito@online.de>
 
 Prerequisites to be installed:
 * Python including devel package (header files and distutils)
@@ -26,9 +26,6 @@ The supported versions are Python 2.4-2.7 and PostgreSQL 8.3-9.5.
 Use as follows:
 python setup.py build   # to build the module
 python setup.py install # to install it
-
-You can use MinGW or MinGW-w64 for building on Windows:
-python setup.py build -c mingw32 install
 
 See docs.python.org/doc/install/ for more information on
 using distutils to install Python programs.
@@ -58,6 +55,15 @@ from distutils.ccompiler import get_default_compiler
 from distutils.sysconfig import get_python_inc, get_python_lib
 
 
+# For historical reasons, PyGreSQL does not install itself as a single
+# "pygresql" package, but as two top-level modules "pg", providing the
+# classic interface, and "pgdb" for the modern DB-API 2.0 interface.
+# These two top-level Python modules share the same C extension "_pg".
+
+py_modules = ['pg', 'pgdb']
+c_sources = ['pgmodule.c']
+
+
 def pg_config(s):
     """Retrieve information about installed version of PostgreSQL."""
     f = os.popen('pg_config --%s' % s)
@@ -80,7 +86,6 @@ def pg_version():
 
 
 pg_version = pg_version()
-py_modules = ['pg', 'pgdb']
 libraries = ['pq']
 # Make sure that the Python header files are searched before
 # those of PostgreSQL, because PostgreSQL can have its own Python.h
@@ -176,7 +181,7 @@ setup(
     platforms=["any"],
     license="Python",
     py_modules=py_modules,
-    ext_modules=[Extension('_pg', ['pgmodule.c'],
+    ext_modules=[Extension('_pg', c_sources,
         include_dirs=include_dirs, library_dirs=library_dirs,
         define_macros=define_macros, undef_macros=undef_macros,
         libraries=libraries, extra_compile_args=extra_compile_args)],
