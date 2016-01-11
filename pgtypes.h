@@ -2,8 +2,8 @@
 	pgtypes - PostgreSQL type definitions
 
 	These are the standard PostgreSQL built-in types,
-	extracted from catalog/pg_type.h Revision 1.212,
-	because that header file is sometimes not availale
+	extracted from server/catalog/pg_type.h Revision 1.212,
+	because that header file is sometimes not available
 	or needs other header files to get properly included.
 	You can also query pg_type to get this information.
 */
