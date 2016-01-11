@@ -32,14 +32,14 @@ fi
 TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
 
-MODFILES="module/pg.py module/pgdb.py module/pgmodule.c
-          module/pgfs.h module/pgtypes.h module/py3c.h
-          module/setup.py module/setup.cfg"
+MODFILES="pg.py pgdb.py pgmodule.c
+          pgfs.h pgtypes.h py3c.h
+          setup.py setup.cfg"
 DOCFILES="docs/Makefile docs/make.bat docs/*.rst
           docs/contents docs/download docs/community
           docs/_static docs/_templates"
 HTMLFILES="docs/_build/html"
-TESTFILES="module/tests/*.py"
+TESTFILES="tests/*.py"
 
 echo "Making source tarball..."
 
