@@ -32,10 +32,9 @@
 #include <Python.h>
 
 #include <libpq-fe.h>
+#include <libpq/libpq-fs.h>
 
-/* some definitions from <libpq/libpq-fs.h> */
-#include "pgfs.h"
-/* the type definitions from <catalog/pg_type.h> */
+/* the type definitions from <server/catalog/pg_type.h> */
 #include "pgtypes.h"
 
 /* macros for single-source Python 2/3 compatibility */

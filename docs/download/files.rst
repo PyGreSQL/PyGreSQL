@@ -4,7 +4,6 @@ Distribution files
 ========== =
 
 pgmodule.c the C Python module (_pg)
-pgfs.h     PostgreSQL definitions for large objects
 pgtypes.h  PostgreSQL type definitions
 py3c.h     Python 2/3 compatibility layer for the C extension
 pg.py      the "classic" PyGreSQL module
