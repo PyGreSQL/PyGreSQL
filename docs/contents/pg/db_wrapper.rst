@@ -63,10 +63,12 @@ pkey -- return the primary key of a table
     :param str table: name of table
     :returns: Name of the field which is the primary key of the table
     :rtype: str
+    :rtype: str
+    :raises KeyError: the table does not have a primary key
 
 This method returns the primary key of a table. For composite primary
-keys, the return value will be a frozenset. Note that this raises an
-exception if the table does not have a primary key.
+keys, the return value will be a frozenset. Note that this raises a
+KeyError if the table does not have a primary key.
 
 get_databases -- get list of databases in the system
 ----------------------------------------------------

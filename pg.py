@@ -554,7 +554,7 @@ class DB(object):
         """This method gets or sets the primary key of a class.
 
         Composite primary keys are represented as frozensets. Note that
-        this raises an exception if the table does not have a primary key.
+        this raises a KeyError if the table does not have a primary key.
 
         If newpkey is set and is not a dictionary then set that
         value as the primary key of the class.  If it is a dictionary
@@ -743,7 +743,7 @@ class DB(object):
         # build qualified class name
         qcl = self._add_schema(cl)
         # To allow users to work with multiple tables,
-        # we munge the name of the "oid" the key
+        # we munge the name of the "oid" key
         qoid = _oid_key(qcl)
         if not keyname:
             # use the primary key by default
