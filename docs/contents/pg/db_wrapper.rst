@@ -138,7 +138,7 @@ has_table_privilege -- check whether current user has specified table privilege
 
 Returns True if the current user has the specified privilege for the table.
 
-.. versionadded:: 4.1
+.. versionadded:: 4.0
 
 get -- get a row from a database table or view
 ----------------------------------------------
