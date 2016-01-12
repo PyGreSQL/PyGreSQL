@@ -422,7 +422,7 @@ class DB(object):
 
         """
         s = _split_parts(cl)
-        if len(s) > 1:  # name already qualfied?
+        if len(s) > 1:  # name already qualified?
             # should be database.schema.table or schema.table
             if len(s) > 3:
                 raise _prg_error('Too many dots in class name %s' % cl)
@@ -663,11 +663,11 @@ class DB(object):
             " JOIN pg_namespace s ON r.relnamespace = s.oid"
             " JOIN pg_attribute a ON a.attrelid = r.oid"
             " JOIN pg_type t ON t.oid = a.atttypid"
-            " WHERE s.nspname = '%s' AND r.relname = '%s'"
+            " WHERE s.nspname = $1 AND r.relname = $2"
             " AND (a.attnum > 0 OR a.attname = 'oid')"
             " AND NOT a.attisdropped") % (
-                '::regtype' if self._regtypes else '', cl[0], cl[1])
-        q = self.db.query(q).getresult()
+                '::regtype' if self._regtypes else '',)
+        q = self.db.query(q, cl).getresult()
 
         if self._regtypes:
             t = dict(q)
@@ -721,8 +721,9 @@ class DB(object):
         try:
             return self._privileges[(qcl, privilege)]
         except KeyError:
-            q = "SELECT has_table_privilege('%s', '%s')" % (qcl, privilege)
-            ret = self.db.query(q).getresult()[0][0] == self._make_bool(True)
+            q = "SELECT has_table_privilege($1, $2)"
+            q = self.db.query(q, (qcl, privilege))
+            ret = q.getresult()[0][0] == self._make_bool(True)
             self._privileges[(qcl, privilege)] = ret
             return ret
 
