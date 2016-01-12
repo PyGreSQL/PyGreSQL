@@ -168,7 +168,7 @@ results as a list of tuples, by using the :meth:`Query.getresult` method::
 Here we used pprint to print out the returned list in a nicely formatted way.
 
 If you want to retrieve the results as a list of dictionaries instead of
-tuples, use the :meth:`pgqueryobject.dictresult` method instead::
+tuples, use the :meth:`Query.dictresult` method instead::
 
     >>> pprint(q.dictresult())
     [{'city': 'San Francisco',
@@ -183,8 +183,8 @@ tuples, use the :meth:`pgqueryobject.dictresult` method instead::
       'temp_lo': 37}]
 
 Finally, you can also retrieve the results as a list of named tuples, using
-the :meth:`pgqueryobject.namedresult` method. This can be a good compromise
-between simple tuples and the more memory intensive dictionaries:
+the :meth:`Query.namedresult` method. This can be a good compromise between
+simple tuples and the more memory intensive dictionaries:
 
     >>> for row in q.namedresult():
     ...     print(row.city, row.date)
