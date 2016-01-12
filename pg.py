@@ -46,7 +46,7 @@ except NameError:  # Python >= 3.0
 set_decimal(Decimal)
 
 
-# Auxiliary functions which are independent from a DB connection:
+# Auxiliary functions that are independent from a DB connection:
 
 def _is_quoted(s):
     """Check whether this string is a quoted identifier."""
@@ -621,13 +621,13 @@ class DB(object):
         """
         where = " AND r.relkind IN (%s)" % ','.join(
             ["'%s'" % k for k in kinds]) if kinds else ''
-        return [_join_parts(r) for r in self.db.query(
-            "SELECT s.nspname, r.relname"
+        q = ("SELECT s.nspname, r.relname"
             " FROM pg_class r"
             " JOIN pg_namespace s ON s.oid = r.relnamespace"
             " WHERE s.nspname NOT SIMILAR"
             " TO 'pg/_%%|information/_schema' ESCAPE '/' %s"
-            " ORDER BY 1, 2" % where).getresult()]
+            " ORDER BY 1, 2") % where
+        return [_join_parts(r) for r in self.db.query(q).getresult()]
 
     def get_tables(self):
         """Return list of tables in connected database."""
