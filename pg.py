@@ -590,7 +590,8 @@ class DB(object):
                     " pg_attribute.attname FROM pg_class"
                 " JOIN pg_namespace"
                     " ON pg_namespace.oid = pg_class.relnamespace"
-                    " AND pg_namespace.nspname NOT LIKE 'pg_%'"
+                    " AND pg_namespace.nspname"
+                    " NOT SIMILAR TO 'pg/_%|information/_schema' ESCAPE '/'"
                 " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
                     " AND pg_attribute.attisdropped = 'f'"
                 " JOIN pg_index ON pg_index.indrelid = pg_class.oid"
@@ -625,8 +626,8 @@ class DB(object):
             "SELECT pg_namespace.nspname, pg_class.relname"
             " FROM pg_class "
             " JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace "
-            " WHERE %s pg_namespace.nspname != 'information_schema'"
-                " AND pg_namespace.nspname !~ '^pg_' "
+            " WHERE %s pg_namespace.nspname"
+            " NOT SIMILAR TO 'pg/_%%|information/_schema' ESCAPE '/'"
             " ORDER BY 1, 2" % where).getresult()]
 
     def get_tables(self):
