@@ -75,7 +75,7 @@ class UtilityTest(unittest.TestCase):
             db.query("DELETE FROM _test_schema")
         try:
             db.query("CREATE VIEW _test_vschema AS "
-                "SELECT _test, 'abc'::text AS _test2  FROM _test_schema")
+                "SELECT _test, 'abc'::text AS _test2 FROM _test_schema")
         except Error:
             pass
 
@@ -110,12 +110,8 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(db.pkey('_test_schema'), '_test')
         self.assertEqual(db.pkey('public._test_schema'), '_test')
         self.assertEqual(db.pkey('_test1._test_schema'), '_test1')
-
-        self.assertEqual(db.pkey('_test_schema',
-                {'test1': 'a', 'test2.test3': 'b'}),
-                {'public.test1': 'a', 'test2.test3': 'b'})
-        self.assertEqual(db.pkey('test1'), 'a')
-        self.assertEqual(db.pkey('public.test1'), 'a')
+        self.assertEqual(db.pkey('_test2._test_schema'), '_test2')
+        self.assertRaises(KeyError, db.pkey, '_test_vschema')
 
     def test_get(self):
         db = opendb()

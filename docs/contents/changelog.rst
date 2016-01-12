@@ -27,6 +27,17 @@ Version 5.0
   colnames and coltypes attributes, which are not part of DB-API 2 though.
 - The tty parameter and attribute of database connections has been
   removed since it is not supported any more since PostgreSQL 7.4.
+- The table name that is affixed to the name of the OID column returned
+  by the get() method of the classic interface will not automatically
+  be fully qualified any more. This reduces overhead from the interface,
+  but it means you must always write the table name in the same way when
+  you call the methods using it and you are using tables with OIDs.
+  Note that OIDs are considered deprecated anyway, and they are not created
+  by default any more in PostgreSQL 8.1 and later.
+- Simplified the internal caching and mechanisms for automatic quoting
+  of class names in the classic interface, these things should now both
+  perform better and use less memory.
+
 
 Version 4.2
 -----------

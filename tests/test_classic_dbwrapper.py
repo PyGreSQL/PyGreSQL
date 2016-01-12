@@ -594,13 +594,15 @@ class TestDBClass(unittest.TestCase):
             self.assertIsInstance(r, frozenset)
             self.assertEqual(r, frozenset([
                 'a_very_long_column_name', 'with space', '42']))
-            self.assertEqual(pkey('%s0' % t, 'none'), 'none')
-            self.assertEqual(pkey('%s0' % t), 'none')
-            pkey(None, {'%s0' % t: 'a', 'public."%s1"' % t: 'b'})
+            # a newly added primary key will be detected
+            query('alter table "%s0" add primary key (a)' % t)
             self.assertEqual(pkey('%s0' % t), 'a')
+            # a changed primary key will not be detected,
+            # indicating that the internal cache is operating
+            query('alter table "%s1" rename column b to x' % t)
             self.assertEqual(pkey('%s1' % t), 'b')
-            pkey(None, {})
-            self.assertRaises(KeyError, pkey, '%s0' % t)
+            # we get the changed primary key when the cache is flushed
+            self.assertEqual(pkey('%s1' % t, flush=True), 'x')
             for n in range(7):
                 query('drop table "%s%d"' % (t, n))
 
@@ -716,10 +718,7 @@ class TestDBClass(unittest.TestCase):
                     % (table, n + 1, t))
             self.assertRaises(pg.ProgrammingError, get, table, 2)
             r = get(table, 2, 'n')
-            oid_table = table
-            if ' ' in table:
-                oid_table = '"%s"' % oid_table
-            oid_table = 'oid(public.%s)' % oid_table
+            oid_table = 'oid(%s)' % table
             self.assertIn(oid_table, r)
             oid = r[oid_table]
             self.assertIsInstance(oid, int)
@@ -797,10 +796,7 @@ class TestDBClass(unittest.TestCase):
                 " d numeric, f4 real, f8 double precision, m money,"
                 " v4 varchar(4), c4 char(4), t text,"
                 " b boolean, ts timestamp) with oids" % table)
-            oid_table = table
-            if ' ' in table:
-                oid_table = '"%s"' % oid_table
-            oid_table = 'oid(public.%s)' % oid_table
+            oid_table = 'oid(%s)' % table
             tests = [dict(i2=None, i4=None, i8=None),
                 (dict(i2='', i4='', i8=''), dict(i2=None, i4=None, i8=None)),
                 (dict(i2=0, i4=0, i8=0), dict(i2=0, i4=0, i8=0)),
@@ -1323,17 +1319,17 @@ class TestSchemas(unittest.TestCase):
         self.assertEqual(get("t", 1, 'n')['d'], 1)
         self.assertEqual(get("s4.t4", 1, 'n')['d'], 4)
 
-    def testMangling(self):
+    def testMunging(self):
         get = self.db.get
         query = self.db.query
         r = get("t", 1, 'n')
-        self.assertIn('oid(public.t)', r)
+        self.assertIn('oid(t)', r)
         query("set search_path to s2")
         r = get("t2", 1, 'n')
-        self.assertIn('oid(s2.t2)', r)
+        self.assertIn('oid(t2)', r)
         query("set search_path to s3")
         r = get("t", 1, 'n')
-        self.assertIn('oid(s3.t)', r)
+        self.assertIn('oid(t)', r)
 
 
 if __name__ == '__main__':

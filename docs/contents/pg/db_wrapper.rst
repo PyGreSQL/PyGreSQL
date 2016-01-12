@@ -63,10 +63,11 @@ pkey -- return the primary key of a table
     :param str table: name of table
     :returns: Name of the field which is the primary key of the table
     :rtype: str
+    :raises KeyError: the table does not have a primary key
 
 This method returns the primary key of a table. For composite primary
-keys, the return value will be a frozenset. Note that this raises an
-exception if the table does not have a primary key.
+keys, the return value will be a frozenset. Note that this raises a
+KeyError if the table does not have a primary key.
 
 get_databases -- get list of databases in the system
 ----------------------------------------------------
@@ -161,7 +162,7 @@ include the new values, replacing existing values where necessary.
 For a composite key, *keyname* can also be a sequence of key names.
 The OID is also put into the dictionary if the table has one, but in
 order to allow the caller to work with multiple tables, it is munged
-as ``oid(schema.table)``.
+as ``oid(table)``.
 
 insert -- insert a row into a database table
 --------------------------------------------
