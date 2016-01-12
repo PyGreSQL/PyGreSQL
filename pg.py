@@ -558,7 +558,7 @@ class DB(object):
 
         If newpkey is set and is not a dictionary then set that
         value as the primary key of the class.  If it is a dictionary
-        then replace the _pkeys dictionary with a copy of it.
+        then replace the internal cache of primary keys with a copy of it.
 
         """
         # First see if the caller is supplying a dictionary
