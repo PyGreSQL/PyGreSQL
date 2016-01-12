@@ -435,16 +435,16 @@ class DB(object):
             schemas = self.db.query(q).getresult()[0][0][1:-1].split(',')
             if schemas:  # non-empty path
                 # search schema for this object in the current search path
+                # (we could also use unnest with ordinality here to spare
+                # one query, but this is only possible since PostgreSQL 9.4)
                 q = ' UNION '.join(
                     ["SELECT %d::integer AS n, '%s'::name AS nspname"
                         % s for s in enumerate(schemas)])
-                q = ("SELECT nspname FROM pg_class"
-                    " JOIN pg_namespace"
-                    " ON pg_class.relnamespace = pg_namespace.oid"
+                q = ("SELECT nspname FROM pg_class r"
+                    " JOIN pg_namespace s ON r.relnamespace = s.oid"
                     " JOIN (%s) AS p USING (nspname)"
-                    " WHERE pg_class.relname = '%s'"
-                    " ORDER BY n LIMIT 1" % (q, cl))
-                schema = self.db.query(q).getresult()
+                    " WHERE r.relname = $1 ORDER BY n LIMIT 1" % q)
+                schema = self.db.query(q, (cl,)).getresult()
                 if schema:  # schema found
                     schema = schema[0][0]
                 else:  # object not found in current search path
