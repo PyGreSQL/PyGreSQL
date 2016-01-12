@@ -586,19 +586,16 @@ class DB(object):
         if qcl not in self._pkeys:
             # if not found, check again in case it was added after we started
             self._pkeys = {}
-            for r in self.db.query(
-                "SELECT pg_namespace.nspname, pg_class.relname,"
-                    " pg_attribute.attname FROM pg_class"
-                " JOIN pg_namespace"
-                    " ON pg_namespace.oid = pg_class.relnamespace"
-                    " AND pg_namespace.nspname"
-                    " NOT SIMILAR TO 'pg/_%|information/_schema' ESCAPE '/'"
-                " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
-                    " AND NOT pg_attribute.attisdropped"
-                " JOIN pg_index ON pg_index.indrelid = pg_class.oid"
-                    " AND pg_index.indisprimary"
-                    " AND pg_attribute.attnum"
-                        " = ANY (pg_index.indkey)").getresult():
+            q = ("SELECT s.nspname, r.relname, a.attname"
+                " FROM pg_class r"
+                " JOIN pg_namespace s ON s.oid = r.relnamespace"
+                " AND s.nspname NOT SIMILAR"
+                " TO 'pg/_%|information/_schema' ESCAPE '/'"
+                " JOIN pg_attribute a ON a.attrelid = r.oid"
+                " AND NOT a.attisdropped"
+                " JOIN pg_index i ON i.indrelid = r.oid"
+                " AND i.indisprimary AND a.attnum = ANY (i.indkey)")
+            for r in self.db.query(q).getresult():
                 cl, pkey = _join_parts(r[:2]), r[2]
                 self._pkeys.setdefault(cl, []).append(pkey)
             # (only) for composite primary keys, the values will be frozensets
@@ -622,14 +619,14 @@ class DB(object):
             specifying which kind of relations you want to list.
 
         """
-        where = "pg_class.relkind IN (%s) AND" % ','.join(
-            ["'%s'" % x for x in kinds]) if kinds else ''
-        return [_join_parts(x) for x in self.db.query(
-            "SELECT pg_namespace.nspname, pg_class.relname"
-            " FROM pg_class "
-            " JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace "
-            " WHERE %s pg_namespace.nspname"
-            " NOT SIMILAR TO 'pg/_%%|information/_schema' ESCAPE '/'"
+        where = " AND r.relkind IN (%s)" % ','.join(
+            ["'%s'" % k for k in kinds]) if kinds else ''
+        return [_join_parts(r) for r in self.db.query(
+            "SELECT s.nspname, r.relname"
+            " FROM pg_class r"
+            " JOIN pg_namespace s ON s.oid = r.relnamespace"
+            " WHERE s.nspname NOT SIMILAR"
+            " TO 'pg/_%%|information/_schema' ESCAPE '/' %s"
             " ORDER BY 1, 2" % where).getresult()]
 
     def get_tables(self):
@@ -661,16 +658,15 @@ class DB(object):
         if qcl not in self.get_relations('rv'):
             raise _prg_error('Class %s does not exist' % qcl)
 
-        q = "SELECT pg_attribute.attname, pg_type.typname"
-        if self._regtypes:
-            q += "::regtype"
-        q += (" FROM pg_class"
-            " JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid"
-            " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
-            " JOIN pg_type ON pg_type.oid = pg_attribute.atttypid"
-            " WHERE pg_namespace.nspname = '%s' AND pg_class.relname = '%s'"
-            " AND (pg_attribute.attnum > 0 OR pg_attribute.attname = 'oid')"
-            " AND NOT pg_attribute.attisdropped") % cl
+        q = ("SELECT a.attname, t.typname%s"
+            " FROM pg_class r"
+            " JOIN pg_namespace s ON r.relnamespace = s.oid"
+            " JOIN pg_attribute a ON a.attrelid = r.oid"
+            " JOIN pg_type t ON t.oid = a.atttypid"
+            " WHERE s.nspname = '%s' AND r.relname = '%s'"
+            " AND (a.attnum > 0 OR a.attname = 'oid')"
+            " AND NOT a.attisdropped") % (
+                '::regtype' if self._regtypes else '', cl[0], cl[1])
         q = self.db.query(q).getresult()
 
         if self._regtypes:
