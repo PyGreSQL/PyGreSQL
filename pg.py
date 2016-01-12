@@ -730,7 +730,7 @@ class DB(object):
             return ret
 
     def get(self, cl, arg, keyname=None):
-        """Get a tuple from a database table or view.
+        """Get a row from a database table or view.
 
         This method is the basic mechanism to get a single row.  The keyname
         that the key specifies a unique row.  If keyname is not specified
@@ -790,7 +790,7 @@ class DB(object):
         return arg
 
     def insert(self, cl, d=None, **kw):
-        """Insert a tuple into a database table.
+        """Insert a row into a database table.
 
         This method inserts a row into a table.  If a dictionary is
         supplied it starts with that.  Otherwise it uses a blank dictionary.
