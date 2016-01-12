@@ -37,6 +37,7 @@ import warnings
 
 from decimal import Decimal
 from collections import namedtuple
+from itertools import groupby
 
 try:
     basestring
@@ -565,18 +566,19 @@ class DB(object):
 
         If newpkey is set and is not a dictionary then set that
         value as the primary key of the class.  If it is a dictionary
-        then replace the _pkeys dictionary with a copy of it.
+        then replace the internal cache for primary keys with a copy of it.
 
         """
+        add_schema = self._add_schema
+
         # First see if the caller is supplying a dictionary
         if isinstance(newpkey, dict):
             # make sure that all classes have a namespace
-            self._pkeys = dict([
-                (cl if '.' in cl else 'public.' + cl, pkey)
-                for cl, pkey in newpkey.items()])
+            self._pkeys = dict((add_schema(cl), pkey)
+                for cl, pkey in newpkey.items())
             return self._pkeys
 
-        qcl = self._add_schema(cl)  # build fully qualified class name
+        qcl = add_schema(cl)  # build fully qualified class name
         # Check if the caller is supplying a new primary key for the class
         if newpkey:
             self._pkeys[qcl] = newpkey
@@ -585,7 +587,6 @@ class DB(object):
         # Get all the primary keys at once
         if qcl not in self._pkeys:
             # if not found, check again in case it was added after we started
-            self._pkeys = {}
             q = ("SELECT s.nspname, r.relname, a.attname"
                 " FROM pg_class r"
                 " JOIN pg_namespace s ON s.oid = r.relnamespace"
@@ -594,14 +595,16 @@ class DB(object):
                 " JOIN pg_attribute a ON a.attrelid = r.oid"
                 " AND NOT a.attisdropped"
                 " JOIN pg_index i ON i.indrelid = r.oid"
-                " AND i.indisprimary AND a.attnum = ANY (i.indkey)")
-            for r in self.db.query(q).getresult():
-                cl, pkey = _join_parts(r[:2]), r[2]
-                self._pkeys.setdefault(cl, []).append(pkey)
-            # (only) for composite primary keys, the values will be frozensets
-            for cl, pkey in self._pkeys.items():
-                self._pkeys[cl] = frozenset(pkey) if len(pkey) > 1 else pkey[0]
-            self._do_debug(self._pkeys)
+                " AND i.indisprimary AND a.attnum = ANY (i.indkey)"
+                " ORDER BY 1,2")
+            rows = self.db.query(q).getresult()
+            pkeys = {}
+            for cl, group in groupby(rows, lambda row: row[:2]):
+                cl = _join_parts(cl)
+                pkey = [row[2] for row in group]
+                pkeys[cl] = frozenset(pkey) if len(pkey) > 1 else pkey[0]
+            self._do_debug(pkeys)
+            self._pkeys = pkeys
 
         # will raise an exception if primary key doesn't exist
         return self._pkeys[qcl]

@@ -558,31 +558,51 @@ class TestDBClass(unittest.TestCase):
 
     def testPkey(self):
         query = self.db.query
-        for n in range(4):
-            query("drop table if exists pkeytest%d" % n)
-        query("create table pkeytest0 ("
-            "a smallint)")
-        query("create table pkeytest1 ("
-            "b smallint primary key)")
-        query("create table pkeytest2 ("
-            "c smallint, d smallint primary key)")
-        query("create table pkeytest3 ("
-            "e smallint, f smallint, g smallint, "
-            "h smallint, i smallint, "
-            "primary key (f,h))")
         pkey = self.db.pkey
-        self.assertRaises(KeyError, pkey, 'pkeytest0')
-        self.assertEqual(pkey('pkeytest1'), 'b')
-        self.assertEqual(pkey('pkeytest2'), 'd')
-        self.assertEqual(pkey('pkeytest3'), frozenset('fh'))
-        self.assertEqual(pkey('pkeytest0', 'none'), 'none')
-        self.assertEqual(pkey('pkeytest0'), 'none')
-        pkey(None, {'t': 'a', 'n.t': 'b'})
-        self.assertEqual(pkey('t'), 'a')
-        self.assertEqual(pkey('n.t'), 'b')
-        self.assertRaises(KeyError, pkey, 'pkeytest0')
-        for n in range(4):
-            query("drop table pkeytest%d" % n)
+        for t in ('pkeytest', 'primary key test'):
+            for n in range(7):
+                query('drop table if exists "%s%d"' % (t, n))
+            query('create table "%s0" ('
+                "a smallint)" % t)
+            query('create table "%s1" ('
+                "b smallint primary key)" % t)
+            query('create table "%s2" ('
+                "c smallint, d smallint primary key)" % t)
+            query('create table "%s3" ('
+                "e smallint, f smallint, g smallint, "
+                "h smallint, i smallint, "
+                "primary key (f, h))" % t)
+            query('create table "%s4" ('
+                "more_than_one_letter varchar primary key)" % t)
+            query('create table "%s5" ('
+                '"with space" date primary key)' % t)
+            query('create table "%s6" ('
+                'a_very_long_column_name varchar, '
+                '"with space" date, '
+                '"42" int, '
+                "primary key (a_very_long_column_name, "
+                '"with space", "42"))' % t)
+            self.assertRaises(KeyError, pkey, '%s0' % t)
+            self.assertEqual(pkey('%s1' % t), 'b')
+            self.assertEqual(pkey('%s2' % t), 'd')
+            r = pkey('%s3' % t)
+            self.assertIsInstance(r, frozenset)
+            self.assertEqual(r, frozenset('fh'))
+            self.assertEqual(pkey('%s4' % t), 'more_than_one_letter')
+            self.assertEqual(pkey('%s5' % t), 'with space')
+            r = pkey('%s6' % t)
+            self.assertIsInstance(r, frozenset)
+            self.assertEqual(r, frozenset([
+                'a_very_long_column_name', 'with space', '42']))
+            self.assertEqual(pkey('%s0' % t, 'none'), 'none')
+            self.assertEqual(pkey('%s0' % t), 'none')
+            pkey(None, {'%s0' % t: 'a', 'public."%s1"' % t: 'b'})
+            self.assertEqual(pkey('%s0' % t), 'a')
+            self.assertEqual(pkey('%s1' % t), 'b')
+            pkey(None, {})
+            self.assertRaises(KeyError, pkey, '%s0' % t)
+            for n in range(7):
+                query('drop table "%s%d"' % (t, n))
 
     def testGetDatabases(self):
         databases = self.db.get_databases()
