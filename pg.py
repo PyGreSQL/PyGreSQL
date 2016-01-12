@@ -613,9 +613,9 @@ class DB(object):
     def get_relations(self, kinds=None):
         """Get list of relations in connected database of specified kinds.
 
-            If kinds is None or empty, all kinds of relations are returned.
-            Otherwise kinds can be a string or sequence of type letters
-            specifying which kind of relations you want to list.
+        If kinds is None or empty, all kinds of relations are returned.
+        Otherwise kinds can be a string or sequence of type letters
+        specifying which kind of relations you want to list.
 
         """
         where = kinds and " AND r.relkind IN (%s)" % ','.join(
@@ -783,9 +783,12 @@ class DB(object):
     def insert(self, cl, d=None, **kw):
         """Insert a row into a database table.
 
-        This method inserts a row into a table.  If a dictionary is
-        supplied it starts with that.  Otherwise it uses a blank dictionary.
-        Either way the dictionary is updated from the keywords.
+        This method inserts a row into a table.  The name of the table must
+        be passed as the first parameter.  The other parameters are used for
+        providing the data of the row that shall be inserted into the table.
+        If a dictionary is supplied as the second parameter, it starts with
+        that.  Otherwise it uses a blank dictionary. Either way the dictionary
+        is updated from the keywords.
 
         The dictionary is then, if possible, reloaded with the values actually
         inserted in order to pick up values modified by rules, triggers, etc.
