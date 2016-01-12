@@ -47,7 +47,7 @@ except ImportError:  # Python < 2.6
     namedtuple = None
 
 
-# Auxiliary functions that are independent of a DB connection:
+# Auxiliary functions that are independent from a DB connection:
 
 def _is_quoted(s):
     """Check whether this string is a quoted identifier."""
@@ -304,7 +304,7 @@ class DB(object):
             # * to any other true value to just print debug statements
 
     def __getattr__(self, name):
-        # All undefined members are same as in underlying pg connection:
+        # All undefined members are same as in underlying connection:
         if self.db:
             return getattr(self.db, name)
         else:
@@ -411,7 +411,7 @@ class DB(object):
 
         """
         s = _split_parts(cl)
-        if len(s) > 1:  # name already qualfied?
+        if len(s) > 1:  # name already qualified?
             # should be database.schema.table or schema.table
             if len(s) > 3:
                 raise _prg_error('Too many dots in class name %s' % cl)
@@ -528,7 +528,7 @@ class DB(object):
         has OIDs, the return value is the OID of the newly inserted row.
         If the query is an update or delete statement, or an insert statement
         that did not insert exactly one row in a table with OIDs, then the
-        numer of rows affected is returned as a string. If it is a statement
+        number of rows affected is returned as a string. If it is a statement
         that returns rows as a result (usually a select statement, but maybe
         also an "insert/update ... returning" statement), this method returns
         a pgqueryobject that can be accessed via getresult() or dictresult()
@@ -581,22 +581,20 @@ class DB(object):
             self._pkeys = {}
             if self.server_version >= 80200:
                 # the ANY syntax works correctly only with PostgreSQL >= 8.2
-                any_indkey = "= ANY (pg_index.indkey)"
+                any_indkey = "= ANY (i.indkey)"
             else:
                 any_indkey = "IN (%s)" % ', '.join(
-                    ['pg_index.indkey[%d]' % i for i in range(16)])
-            for r in self.db.query(
-                "SELECT pg_namespace.nspname, pg_class.relname,"
-                    " pg_attribute.attname FROM pg_class"
-                " JOIN pg_namespace"
-                    " ON pg_namespace.oid = pg_class.relnamespace"
-                    " AND pg_namespace.nspname"
-                    " NOT SIMILAR TO 'pg/_%|information/_schema' ESCAPE '/'"
-                " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
-                    " AND pg_attribute.attisdropped = 'f'"
-                " JOIN pg_index ON pg_index.indrelid = pg_class.oid"
-                    " AND pg_index.indisprimary = 't'"
-                    " AND pg_attribute.attnum " + any_indkey).getresult():
+                    ['i.indkey[%d]' % i for i in range(16)])
+            q = ("SELECT s.nspname, r.relname, a.attname"
+                " FROM pg_class r"
+                " JOIN pg_namespace s ON s.oid = r.relnamespace"
+                " AND s.nspname NOT SIMILAR"
+                " TO 'pg/_%|information/_schema' ESCAPE '/'"
+                " JOIN pg_attribute a ON a.attrelid = r.oid"
+                " AND NOT a.attisdropped"
+                " JOIN pg_index i ON i.indrelid = r.oid"
+                " AND i.indisprimary AND a.attnum " + any_indkey)
+            for r in self.db.query(q).getresult():
                 cl, pkey = _join_parts(r[:2]), r[2]
                 self._pkeys.setdefault(cl, []).append(pkey)
             # (only) for composite primary keys, the values will be frozensets
@@ -620,15 +618,15 @@ class DB(object):
             specifying which kind of relations you want to list.
 
         """
-        where = kinds and "pg_class.relkind IN (%s) AND" % ','.join(
-            ["'%s'" % x for x in kinds]) or ''
-        return [_join_parts(x) for x in self.db.query(
-            "SELECT pg_namespace.nspname, pg_class.relname"
-            " FROM pg_class "
-            " JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace "
-            " WHERE %s pg_namespace.nspname"
-            " NOT SIMILAR TO 'pg/_%%|information/_schema' ESCAPE '/'"
-            " ORDER BY 1, 2" % where).getresult()]
+        where = kinds and " AND r.relkind IN (%s)" % ','.join(
+            ["'%s'" % k for k in kinds]) or ''
+        q = ("SELECT s.nspname, r.relname"
+            " FROM pg_class r"
+            " JOIN pg_namespace s ON s.oid = r.relnamespace"
+            " WHERE s.nspname NOT SIMILAR"
+            " TO 'pg/_%%|information/_schema' ESCAPE '/' %s"
+            " ORDER BY 1, 2") % where
+        return [_join_parts(r) for r in self.db.query(q).getresult()]
 
     def get_tables(self):
         """Return list of tables in connected database."""
@@ -659,17 +657,16 @@ class DB(object):
         if qcl not in self.get_relations('rv'):
             raise _prg_error('Class %s does not exist' % qcl)
 
-        q = "SELECT pg_attribute.attname, pg_type.typname"
-        if self._regtypes:
-            q += "::regtype"
-        q += (" FROM pg_class"
-            " JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid"
-            " JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid"
-            " JOIN pg_type ON pg_type.oid = pg_attribute.atttypid"
-            " WHERE pg_namespace.nspname = '%s' AND pg_class.relname = '%s'"
-            " AND (pg_attribute.attnum > 0 OR pg_attribute.attname = 'oid')"
-            " AND pg_attribute.attisdropped = 'f'") % cl
-        q = self.db.query(q).getresult()
+        q = ("SELECT a.attname, t.typname%s"
+            " FROM pg_class r"
+            " JOIN pg_namespace s ON r.relnamespace = s.oid"
+            " JOIN pg_attribute a ON a.attrelid = r.oid"
+            " JOIN pg_type t ON t.oid = a.atttypid"
+            " WHERE s.nspname = $1 AND r.relname = $2"
+            " AND (a.attnum > 0 OR a.attname = 'oid')"
+            " AND NOT a.attisdropped") % (
+                self._regtypes and '::regtype' or '',)
+        q = self.db.query(q, cl).getresult()
 
         if self._regtypes:
             t = dict(q)
@@ -721,8 +718,9 @@ class DB(object):
         try:
             return self._privileges[(qcl, privilege)]
         except KeyError:
-            q = "SELECT has_table_privilege('%s', '%s')" % (qcl, privilege)
-            ret = self.db.query(q).getresult()[0][0] == self._make_bool(True)
+            q = "SELECT has_table_privilege($1, $2)"
+            q = self.db.query(q, (qcl, privilege))
+            ret = q.getresult()[0][0] == self._make_bool(True)
             self._privileges[(qcl, privilege)] = ret
             return ret
 
