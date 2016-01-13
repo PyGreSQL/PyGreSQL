@@ -208,12 +208,12 @@ begin/commit/rollback/savepoint/release -- transaction handling
 get -- get a row from a database table or view
 ----------------------------------------------
 
-.. method:: DB.get(table, arg, [keyname])
+.. method:: DB.get(table, row, [keyname])
 
     Get a row from a database table or view
 
-    :param str table:  name of table or view
-    :param arg:  either a dictionary or the value to be looked up
+    :param str table: name of table or view
+    :param row: either a dictionary or the value to be looked up
     :param str keyname: name of field to use as key (optional)
     :returns: A dictionary - the keys are the attribute names,
       the values are the row values.
@@ -221,7 +221,7 @@ get -- get a row from a database table or view
 
 This method is the basic mechanism to get a single row. It assumes
 that the key specifies a unique row. If *keyname* is not specified,
-then the primary key for the table is used. If *arg* is a dictionary
+then the primary key for the table is used. If *row* is a dictionary
 then the value for the key is taken from it and it is modified to
 include the new values, replacing existing values where necessary.
 For a composite key, *keyname* can also be a sequence of key names.
@@ -232,12 +232,13 @@ as ``oid(table)``.
 insert -- insert a row into a database table
 --------------------------------------------
 
-.. method:: DB.insert(table, [d], [col=val, ...])
+.. method:: DB.insert(table, [row], [col=val, ...])
 
     Insert a row into a database table
 
     :param str table: name of table
-    :param dict d: optional dictionary of values
+    :param dict row: optional dictionary of values
+    :param col: optional keyword arguments for updating the dictionary
     :returns: the inserted values in the database
     :rtype: dict
     :raises ProgrammingError: missing privilege or conflict
@@ -256,12 +257,13 @@ although PostgreSQL does.
 update -- update a row in a database table
 ------------------------------------------
 
-.. method:: DB.update(table, [d], [col=val, ...])
+.. method:: DB.update(table, [row], [col=val, ...])
 
     Update a row in a database table
 
     :param str table: name of table
-    :param dict d: optional dictionary of values
+    :param dict row: optional dictionary of values
+    :param col: optional keyword arguments for updating the dictionary
     :returns: the new row in the database
     :rtype: dict
     :raises ProgrammingError: no primary key or missing privilege
@@ -279,12 +281,13 @@ where it can be simply the string 'oid'.
 upsert -- insert a row with conflict resolution
 -----------------------------------------------
 
-.. method:: DB.upsert(table, [d], [col=val, ...])
+.. method:: DB.upsert(table, [row], [col=val, ...])
 
     Insert a row into a database table with conflict resolution
 
     :param str table: name of table
-    :param dict d: optional dictionary of values
+    :param dict row: optional dictionary of values
+    :param col: optional keyword arguments for specifying the update
     :returns: the new row in the database
     :rtype: dict
     :raises ProgrammingError: no primary key or missing privilege
@@ -309,9 +312,9 @@ in the dictionary are also updated like in the case keywords had been passed
 with the value `True`.
 
 So if in the case of a conflict you want to update every column that has been
-passed in the dictionary `d` , you would call ``upsert(cl, d)``. If you don't
-want to do anything in case of a conflict, i.e. leave the existing row as it
-is, call ``upsert(cl, d, **dict.fromkeys(d))``.
+passed in the dictionary `d` , you would call ``upsert(table, d)``.  If you
+don't want to do anything in case of a conflict, i.e. leave the existing row
+as it is, call ``upsert(table, d, **dict.fromkeys(d))``.
 
 If you need more fine-grained control of what gets updated, you can also pass
 strings in the keyword parameters.  These strings will be used as SQL
@@ -365,32 +368,33 @@ Example::
 clear -- clear row values in memory
 -----------------------------------
 
-.. method:: DB.clear(table, [a])
+.. method:: DB.clear(table, [row])
 
     Clear row values in memory
 
     :param str table: name of table
-    :param dict a: optional dictionary of values
+    :param dict row: optional dictionary of values
     :returns: an empty row
     :rtype: dict
 
 This method clears all the attributes to values determined by the types.
-Numeric types are set to 0, Booleans are set to ``'f'``, dates are set
-to ``'now()'`` and everything else is set to the empty string.
-If the array argument is present, it is used as the array and any entries
-matching attribute names are cleared with everything else left unchanged.
+Numeric types are set to 0, Booleans are set to ``'f'``, and everything
+else is set to the empty string.  If the row argument is present, it is
+used as the row dictionary and any entries matching attribute names are
+cleared with everything else left unchanged.
 
 If the dictionary is not supplied a new one is created.
 
 delete -- delete a row from a database table
 --------------------------------------------
 
-.. method:: DB.delete(table, [d,] [key = val, ...])
+.. method:: DB.delete(table, [row], [col=val, ...])
 
     Delete a row from a database table
 
     :param str table: name of table
     :param dict d: optional dictionary of values
+    :param col: optional keyword arguments for updating the dictionary
     :rtype: None
 
 This method deletes the row from a table.  It deletes based on the OID value

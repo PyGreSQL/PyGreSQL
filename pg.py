@@ -49,9 +49,9 @@ set_decimal(Decimal)
 
 # Auxiliary functions that are independent from a DB connection:
 
-def _oid_key(cl):
-    """Build oid key from a class name."""
-    return 'oid(%s)' % cl
+def _oid_key(table):
+    """Build oid key from a table name."""
+    return 'oid(%s)' % table
 
 
 def _simpletype(typ):
@@ -372,7 +372,7 @@ class DB(object):
         return '$%d' % len(params)
 
     @staticmethod
-    def _prepare_qualified_param(cl, param):
+    def _prepare_qualified_param(name, param):
         """Quote parameter representing a qualified name.
 
         Escapes the name for use as an SQL parameter, unless the
@@ -383,7 +383,7 @@ class DB(object):
         """
         if isinstance(param, int):
             param = "$%d" % param
-        if '.' not in cl:
+        if '.' not in name:
             param = 'quote_ident(%s)' % (param,)
         return param
 
@@ -485,8 +485,8 @@ class DB(object):
         self._do_debug(qstr)
         return self.db.query(qstr, args)
 
-    def pkey(self, cl, flush=False):
-        """This method gets or sets the primary key of a class.
+    def pkey(self, table, flush=False):
+        """This method gets or sets the primary key of a table.
 
         Composite primary keys are represented as frozensets. Note that
         this raises a KeyError if the table does not have a primary key.
@@ -501,22 +501,23 @@ class DB(object):
             pkeys.clear()
             self._do_debug('pkey cache has been flushed')
         try:  # cache lookup
-            pkey = pkeys[cl]
+            pkey = pkeys[table]
         except KeyError:  # cache miss, check the database
             q = ("SELECT a.attname FROM pg_index i"
                 " JOIN pg_attribute a ON a.attrelid = i.indrelid"
                 " AND a.attnum = ANY(i.indkey)"
                 " AND NOT a.attisdropped"
                 " WHERE i.indrelid=%s::regclass"
-                " AND i.indisprimary" % self._prepare_qualified_param(cl, 1))
-            pkey = self.db.query(q, (cl,)).getresult()
+                " AND i.indisprimary") % (
+                    self._prepare_qualified_param(table, 1),)
+            pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
-                raise KeyError('Class %s has no primary key' % cl)
+                raise KeyError('Table %s has no primary key' % table)
             if len(pkey) > 1:
                 pkey = frozenset(k[0] for k in pkey)
             else:
                 pkey = pkey[0][0]
-            pkeys[cl] = pkey  # cache it
+            pkeys[table] = pkey  # cache it
         return pkey
 
     def get_databases(self):
@@ -546,7 +547,7 @@ class DB(object):
         """Return list of tables in connected database."""
         return self.get_relations('r')
 
-    def get_attnames(self, cl, flush=False):
+    def get_attnames(self, table, flush=False):
         """Given the name of a table, digs out the set of attribute names.
 
         Returns a dictionary of attribute names (the names are the keys,
@@ -564,7 +565,7 @@ class DB(object):
             attnames.clear()
             self._do_debug('pkey cache has been flushed')
         try:  # cache lookup
-            names = attnames[cl]
+            names = attnames[table]
         except KeyError:  # cache miss, check the database
             q = ("SELECT a.attname, t.typname%s"
                 " FROM pg_attribute a"
@@ -573,15 +574,15 @@ class DB(object):
                 " AND (a.attnum > 0 OR a.attname = 'oid')"
                 " AND NOT a.attisdropped") % (
                     '::regtype' if self._regtypes else '',
-                    self._prepare_qualified_param(cl, 1))
-            names = self.db.query(q, (cl,)).getresult()
+                    self._prepare_qualified_param(table, 1))
+            names = self.db.query(q, (table,)).getresult()
             if not names:
-                raise KeyError('Class %s does not exist' % cl)
+                raise KeyError('Table %s does not exist' % table)
             if self._regtypes:
                 names = dict(names)
             else:
                 names = dict((name, _simpletype(typ)) for name, typ in names)
-            attnames[cl] = names  # cache it
+            attnames[table] = names  # cache it
         return names
 
     def use_regtypes(self, regtypes=None):
@@ -595,83 +596,83 @@ class DB(object):
                 self._attnames.clear()
             return regtypes
 
-    def has_table_privilege(self, cl, privilege='select'):
+    def has_table_privilege(self, table, privilege='select'):
         """Check whether current user has specified table privilege."""
         privilege = privilege.lower()
         try:  # ask cache
-            return self._privileges[(cl, privilege)]
+            return self._privileges[(table, privilege)]
         except KeyError:  # cache miss, ask the database
             q = "SELECT has_table_privilege(%s, $2)" % (
-                self._prepare_qualified_param(cl, 1),)
-            q = self.db.query(q, (cl, privilege))
+                self._prepare_qualified_param(table, 1),)
+            q = self.db.query(q, (table, privilege))
             ret = q.getresult()[0][0] == self._make_bool(True)
-            self._privileges[(cl, privilege)] = ret  # cache it
+            self._privileges[(table, privilege)] = ret  # cache it
             return ret
 
-    def get(self, cl, arg, keyname=None):
+    def get(self, table, row, keyname=None):
         """Get a row from a database table or view.
 
         This method is the basic mechanism to get a single row.  The keyname
         that the key specifies a unique row.  If keyname is not specified
-        then the primary key for the table is used.  If arg is a dictionary
+        then the primary key for the table is used.  If row is a dictionary
         then the value for the key is taken from it and it is modified to
         include the new values, replacing existing values where necessary.
         For a composite key, keyname can also be a sequence of key names.
         The OID is also put into the dictionary if the table has one, but
         in order to allow the caller to work with multiple tables, it is
-        munged as "oid(cl)".
+        munged as "oid(table)".
 
         """
-        if cl.endswith('*'):  # scan descendant tables?
-            cl = cl[:-1].rstrip()  # need parent table name
+        if table.endswith('*'):  # scan descendant tables?
+            table = table[:-1].rstrip()  # need parent table name
         if not keyname:
             # use the primary key by default
             try:
-                keyname = self.pkey(cl)
+                keyname = self.pkey(table)
             except KeyError:
-                raise _prg_error('Class %s has no primary key' % cl)
-        attnames = self.get_attnames(cl)
+                raise _prg_error('Table %s has no primary key' % table)
+        attnames = self.get_attnames(table)
         params = []
         param = partial(self._prepare_param, params=params)
         col = self.escape_identifier
         # We want the oid for later updates if that isn't the key.
         # To allow users to work with multiple tables, we munge
-        # the name of the "oid" key by adding the name of the class.
-        qoid = _oid_key(cl)
+        # the name of the "oid" key by adding the name of the table.
+        qoid = _oid_key(table)
         if keyname == 'oid':
-            if isinstance(arg, dict):
-                if qoid not in arg:
-                    raise _db_error('%s not in arg' % qoid)
+            if isinstance(row, dict):
+                if qoid not in row:
+                    raise _db_error('%s not in row' % qoid)
             else:
-                arg = {qoid: arg}
+                row = {qoid: row}
             what = '*'
-            where = 'oid = %s' % param(arg[qoid], 'int')
+            where = 'oid = %s' % param(row[qoid], 'int')
         else:
             keyname = [keyname] if isinstance(
                 keyname, basestring) else sorted(keyname)
-            if not isinstance(arg, dict):
+            if not isinstance(row, dict):
                 if len(keyname) > 1:
-                    raise _prg_error('Composite key needs dict as arg')
-                arg = dict((k, arg) for k in keyname)
+                    raise _prg_error('Composite key needs dict as row')
+                row = dict((k, row) for k in keyname)
             what = ', '.join(col(k) for k in attnames)
             where = ' AND '.join('%s = %s' % (
-                col(k), param(arg[k], attnames[k])) for k in keyname)
+                col(k), param(row[k], attnames[k])) for k in keyname)
         q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (
-            what, self._escape_qualified_name(cl), where)
+            what, self._escape_qualified_name(table), where)
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
         if not res:
-            raise _db_error('No such record in %s where %s' % (cl, where))
+            raise _db_error('No such record in %s where %s' % (table, where))
         for n, value in res[0].items():
             if n == 'oid':
                 n = qoid
             elif attnames.get(n) == 'bytea':
                 value = self.unescape_bytea(value)
-            arg[n] = value
-        return arg
+            row[n] = value
+        return row
 
-    def insert(self, cl, d=None, **kw):
+    def insert(self, table, row=None, **kw):
         """Insert a row into a database table.
 
         This method inserts a row into a table.  The name of the table must
@@ -690,22 +691,22 @@ class DB(object):
         """
         if 'oid' in kw:
             del kw['oid']
-        if d is None:
-            d = {}
-        d.update(kw)
-        attnames = self.get_attnames(cl)
+        if row is None:
+            row = {}
+        row.update(kw)
+        attnames = self.get_attnames(table)
         params = []
         param = partial(self._prepare_param, params=params)
         col = self.escape_identifier
         names, values = [], []
         for n in attnames:
-            if n in d:
+            if n in row:
                 names.append(col(n))
-                values.append(param(d[n], attnames[n]))
+                values.append(param(row[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         ret = 'oid, *' if 'oid' in attnames else '*'
         q = 'INSERT INTO %s (%s) VALUES (%s) RETURNING %s' % (
-            self._escape_qualified_name(cl), names, values, ret)
+            self._escape_qualified_name(table), names, values, ret)
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -713,13 +714,13 @@ class DB(object):
             raise _int_error('insert did not return new values')
         for n, value in res[0].items():
             if n == 'oid':
-                n = _oid_key(cl)
+                n = _oid_key(table)
             elif attnames.get(n) == 'bytea' and value is not None:
                 value = self.unescape_bytea(value)
-            d[n] = value
-        return d
+            row[n] = value
+        return row
 
-    def update(self, cl, d=None, **kw):
+    def update(self, table, row=None, **kw):
         """Update an existing row in a database table.
 
         Similar to insert but updates an existing row.  The update is based
@@ -732,44 +733,44 @@ class DB(object):
         # Update always works on the oid which get() returns if available,
         # otherwise use the primary key.  Fail if neither.
         # Note that we only accept oid key from named args for safety.
-        qoid = _oid_key(cl)
+        qoid = _oid_key(table)
         if 'oid' in kw:
             kw[qoid] = kw['oid']
             del kw['oid']
-        if d is None:
-            d = {}
-        d.update(kw)
-        attnames = self.get_attnames(cl)
+        if row is None:
+            row = {}
+        row.update(kw)
+        attnames = self.get_attnames(table)
         params = []
         param = partial(self._prepare_param, params=params)
         col = self.escape_identifier
-        if qoid in d:
-            where = 'oid = %s' % param(d[qoid], 'int')
+        if qoid in row:
+            where = 'oid = %s' % param(row[qoid], 'int')
             keyname = []
         else:
             try:
-                keyname = self.pkey(cl)
+                keyname = self.pkey(table)
             except KeyError:
-                raise _prg_error('Class %s has no primary key' % cl)
+                raise _prg_error('Table %s has no primary key' % table)
             keyname = [keyname] if isinstance(
                 keyname, basestring) else sorted(keyname)
             try:
                 where = ' AND '.join('%s = %s' % (
-                    col(k), param(d[k], attnames[k])) for k in keyname)
+                    col(k), param(row[k], attnames[k])) for k in keyname)
             except KeyError:
                 raise _prg_error('update needs primary key or oid')
         keyname = set(keyname)
         keyname.add('oid')
         values = []
         for n in attnames:
-            if n in d and n not in keyname:
-                values.append('%s = %s' % (col(n), param(d[n], attnames[n])))
+            if n in row and n not in keyname:
+                values.append('%s = %s' % (col(n), param(row[n], attnames[n])))
         if not values:
-            return d
+            return row
         values = ', '.join(values)
         ret = 'oid, *' if 'oid' in attnames else '*'
         q = 'UPDATE %s SET %s WHERE %s RETURNING %s' % (
-            self._escape_qualified_name(cl), values, where, ret)
+            self._escape_qualified_name(table), values, where, ret)
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -779,10 +780,10 @@ class DB(object):
                     n = qoid
                 elif attnames.get(n) == 'bytea' and value is not None:
                     value = self.unescape_bytea(value)
-                d[n] = value
-        return d
+                row[n] = value
+        return row
 
-    def upsert(self, cl, d=None, **kw):
+    def upsert(self, table, row=None, **kw):
         """Insert a row into a database table with conflict resolution.
 
         This method inserts a row into a table, but instead of raising a
@@ -807,9 +808,9 @@ class DB(object):
         keywords had been passed with the value True.
 
         So if in the case of a conflict you want to update every column that
-        has been passed in the dictionary d , you would call upsert(cl, d).
+        has been passed in the dictionary row , you would call upsert(table, row).
         If you don't want to do anything in case of a conflict, i.e. leave
-        the existing row as it is, call upsert(cl, d, **dict.fromkeys(d)).
+        the existing row as it is, call upsert(table, row, **dict.fromkeys(row)).
 
         If you need more fine-grained control of what gets updated, you can
         also pass strings in the keyword parameters.  These strings will
@@ -828,22 +829,22 @@ class DB(object):
         """
         if 'oid' in kw:
             del kw['oid']
-        if d is None:
-            d = {}
-        attnames = self.get_attnames(cl)
+        if row is None:
+            row = {}
+        attnames = self.get_attnames(table)
         params = []
         param = partial(self._prepare_param,params=params)
         col = self.escape_identifier
         names, values, updates = [], [], []
         for n in attnames:
-            if n in d:
+            if n in row:
                 names.append(col(n))
-                values.append(param(d[n], attnames[n]))
+                values.append(param(row[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         try:
-            keyname = self.pkey(cl)
+            keyname = self.pkey(table)
         except KeyError:
-            raise _prg_error('Class %s has no primary key' % cl)
+            raise _prg_error('Table %s has no primary key' % table)
         keyname = [keyname] if isinstance(
             keyname, basestring) else sorted(keyname)
         try:
@@ -861,12 +862,12 @@ class DB(object):
                         value = 'excluded.%s' % col(n)
                     update.append('%s = %s' % (col(n), value))
         if not values and not update:
-            return d
+            return row
         do = 'update set %s' % ', '.join(update) if update else 'nothing'
         ret = 'oid, *' if 'oid' in attnames else '*'
         q = ('INSERT INTO %s AS included (%s) VALUES (%s)'
             ' ON CONFLICT (%s) DO %s RETURNING %s') % (
-                self._escape_qualified_name(cl), names, values,
+                self._escape_qualified_name(table), names, values,
                 target, do, ret)
         self._do_debug(q, params)
         try:
@@ -879,43 +880,43 @@ class DB(object):
         if res:  # may be empty with "do nothing"
             for n, value in res[0].items():
                 if n == 'oid':
-                    n = _oid_key(cl)
+                    n = _oid_key(table)
                 elif attnames.get(n) == 'bytea':
                     value = self.unescape_bytea(value)
-                d[n] = value
+                row[n] = value
         elif update:
             raise _int_error('upsert did not return new values')
         else:
-            self.get(cl, d)
-        return d
+            self.get(table, row)
+        return row
 
-    def clear(self, cl, a=None):
+    def clear(self, table, row=None):
         """Clear all the attributes to values determined by the types.
 
         Numeric types are set to 0, Booleans are set to false, and everything
-        else is set to the empty string.  If the array argument is present,
-        it is used as the array and any entries matching attribute names are
-        cleared with everything else left unchanged.
+        else is set to the empty string.  If the row argument is present,
+        it is used as the row dictionary and any entries matching attribute
+        names are cleared with everything else left unchanged.
 
         """
         # At some point we will need a way to get defaults from a table.
-        if a is None:
-            a = {}  # empty if argument is not present
-        attnames = self.get_attnames(cl)
+        if row is None:
+            row = {}  # empty if argument is not present
+        attnames = self.get_attnames(table)
         for n, t in attnames.items():
             if n == 'oid':
                 continue
             if t in ('int', 'integer', 'smallint', 'bigint',
                     'float', 'real', 'double precision',
                     'num', 'numeric', 'money'):
-                a[n] = 0
+                row[n] = 0
             elif t in ('bool', 'boolean'):
-                a[n] = self._make_bool(False)
+                row[n] = self._make_bool(False)
             else:
-                a[n] = ''
-        return a
+                row[n] = ''
+        return row
 
-    def delete(self, cl, d=None, **kw):
+    def delete(self, table, row=None, **kw):
         """Delete an existing row in a database table.
 
         This method deletes the row from a table.  It deletes based on the
@@ -928,33 +929,33 @@ class DB(object):
         # One day we will be testing that the record to be deleted
         # isn't referenced somewhere (or else PostgreSQL will).
         # Note that we only accept oid key from named args for safety.
-        qoid = _oid_key(cl)
+        qoid = _oid_key(table)
         if 'oid' in kw:
             kw[qoid] = kw['oid']
             del kw['oid']
-        if d is None:
-            d = {}
-        d.update(kw)
+        if row is None:
+            row = {}
+        row.update(kw)
         params = []
         param = partial(self._prepare_param, params=params)
-        if qoid in d:
-            where = 'oid = %s' % param(d[qoid], 'int')
+        if qoid in row:
+            where = 'oid = %s' % param(row[qoid], 'int')
         else:
             try:
-                keyname = self.pkey(cl)
+                keyname = self.pkey(table)
             except KeyError:
-                raise _prg_error('Class %s has no primary key' % cl)
+                raise _prg_error('Table %s has no primary key' % table)
             keyname = [keyname] if isinstance(
                 keyname, basestring) else sorted(keyname)
-            attnames = self.get_attnames(cl)
+            attnames = self.get_attnames(table)
             col = self.escape_identifier
             try:
-                where = ' AND '.join('%s = %s'
-                    % (col(k), param(d[k], attnames[k])) for k in keyname)
+                where = ' AND '.join('%s = %s' % (
+                    col(k), param(row[k], attnames[k])) for k in keyname)
             except KeyError:
                 raise _prg_error('delete needs primary key or oid')
         q = 'DELETE FROM %s WHERE %s' % (
-            self._escape_qualified_name(cl), where)
+            self._escape_qualified_name(table), where)
         self._do_debug(q, params)
         res = self.db.query(q, params)
         return int(res)
