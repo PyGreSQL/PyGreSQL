@@ -15,7 +15,7 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 
 """
 
-# Copyright (c) 1997-2013 by D'Arcy J.M. Cain.
+# Copyright (c) 1997-2016 by D'Arcy J.M. Cain.
 #
 # Contributions made by Ch. Zwerschke and others.
 #

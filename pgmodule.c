@@ -22,7 +22,7 @@
  * AUTHOR HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
  * ENHANCEMENTS, OR MODIFICATIONS.
  *
- * Further modifications copyright 1997 to 2015 by D'Arcy J.M. Cain
+ * Further modifications copyright 1997 to 2016 by D'Arcy J.M. Cain
  * (darcy@PyGreSQL.org) subject to the same terms and conditions as above.
  *
  */
