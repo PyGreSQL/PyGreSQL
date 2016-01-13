@@ -513,7 +513,7 @@ class DB(object):
             if not pkey:
                 raise KeyError('Class %s has no primary key' % cl)
             if len(pkey) > 1:
-                pkey = frozenset([k[0] for k in pkey])
+                pkey = frozenset(k[0] for k in pkey)
             else:
                 pkey = pkey[0][0]
             pkeys[cl] = pkey  # cache it
@@ -624,10 +624,6 @@ class DB(object):
         """
         if cl.endswith('*'):  # scan descendant tables?
             cl = cl[:-1].rstrip()  # need parent table name
-        # build qualified class name
-        # To allow users to work with multiple tables,
-        # we munge the name of the "oid" key
-        qoid = _oid_key(cl)
         if not keyname:
             # use the primary key by default
             try:
@@ -638,7 +634,10 @@ class DB(object):
         params = []
         param = partial(self._prepare_param, params=params)
         col = self.escape_identifier
-        # We want the oid for later updates if that isn't the key
+        # We want the oid for later updates if that isn't the key.
+        # To allow users to work with multiple tables, we munge
+        # the name of the "oid" key by adding the name of the class.
+        qoid = _oid_key(cl)
         if keyname == 'oid':
             if isinstance(arg, dict):
                 if qoid not in arg:
@@ -648,19 +647,20 @@ class DB(object):
             what = '*'
             where = 'oid = %s' % param(arg[qoid], 'int')
         else:
-            if isinstance(keyname, basestring):
-                keyname = (keyname,)
+            keyname = [keyname] if isinstance(
+                keyname, basestring) else sorted(keyname)
             if not isinstance(arg, dict):
                 if len(keyname) > 1:
                     raise _prg_error('Composite key needs dict as arg')
                 arg = dict((k, arg) for k in keyname)
             what = ', '.join(col(k) for k in attnames)
-            where = ' AND '.join(['%s = %s'
-                % (col(k), param(arg[k], attnames[k])) for k in keyname])
+            where = ' AND '.join('%s = %s' % (
+                col(k), param(arg[k], attnames[k])) for k in keyname)
         q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (
             what, self._escape_qualified_name(cl), where)
         self._do_debug(q, params)
-        res = self.db.query(q, params).dictresult()
+        q = self.db.query(q, params)
+        res = q.dictresult()
         if not res:
             raise _db_error('No such record in %s where %s' % (cl, where))
         for n, value in res[0].items():
@@ -688,7 +688,8 @@ class DB(object):
         although PostgreSQL does.
 
         """
-        qoid = _oid_key(cl)
+        if 'oid' in kw:
+            del kw['oid']
         if d is None:
             d = {}
         d.update(kw)
@@ -698,7 +699,7 @@ class DB(object):
         col = self.escape_identifier
         names, values = [], []
         for n in attnames:
-            if n != 'oid' and n in d:
+            if n in d:
                 names.append(col(n))
                 values.append(param(d[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
@@ -706,11 +707,13 @@ class DB(object):
         q = 'INSERT INTO %s (%s) VALUES (%s) RETURNING %s' % (
             self._escape_qualified_name(cl), names, values, ret)
         self._do_debug(q, params)
-        res = self.db.query(q, params)
-        res = res.dictresult()[0]
-        for n, value in res.items():
+        q = self.db.query(q, params)
+        res = q.dictresult()
+        if not res:
+            raise _int_error('insert did not return new values')
+        for n, value in res[0].items():
             if n == 'oid':
-                n = qoid
+                n = _oid_key(cl)
             elif attnames.get(n) == 'bytea' and value is not None:
                 value = self.unescape_bytea(value)
             d[n] = value
@@ -726,9 +729,9 @@ class DB(object):
         values, etc.
 
         """
-        # Update always works on the oid which get returns if available,
+        # Update always works on the oid which get() returns if available,
         # otherwise use the primary key.  Fail if neither.
-        # Note that we only accept oid key from named args for safety
+        # Note that we only accept oid key from named args for safety.
         qoid = _oid_key(cl)
         if 'oid' in kw:
             kw[qoid] = kw['oid']
@@ -742,19 +745,21 @@ class DB(object):
         col = self.escape_identifier
         if qoid in d:
             where = 'oid = %s' % param(d[qoid], 'int')
-            keyname = ()
+            keyname = []
         else:
             try:
                 keyname = self.pkey(cl)
             except KeyError:
                 raise _prg_error('Class %s has no primary key' % cl)
-            if isinstance(keyname, basestring):
-                keyname = (keyname,)
+            keyname = [keyname] if isinstance(
+                keyname, basestring) else sorted(keyname)
             try:
-                where = ' AND '.join(['%s = %s'
-                    % (col(k), param(d[k], attnames[k])) for k in keyname])
+                where = ' AND '.join('%s = %s' % (
+                    col(k), param(d[k], attnames[k])) for k in keyname)
             except KeyError:
-                raise _prg_error('Update needs primary key or oid.')
+                raise _prg_error('update needs primary key or oid')
+        keyname = set(keyname)
+        keyname.add('oid')
         values = []
         for n in attnames:
             if n in d and n not in keyname:
@@ -766,14 +771,122 @@ class DB(object):
         q = 'UPDATE %s SET %s WHERE %s RETURNING %s' % (
             self._escape_qualified_name(cl), values, where, ret)
         self._do_debug(q, params)
-        res = self.db.query(q, params)
-        res = res.dictresult()[0]
-        for n, value in res.items():
-            if n == 'oid':
-                n = qoid
-            elif attnames.get(n) == 'bytea' and value is not None:
-                value = self.unescape_bytea(value)
-            d[n] = value
+        q = self.db.query(q, params)
+        res = q.dictresult()
+        if res:  # may be empty when row does not exist
+            for n, value in res[0].items():
+                if n == 'oid':
+                    n = qoid
+                elif attnames.get(n) == 'bytea' and value is not None:
+                    value = self.unescape_bytea(value)
+                d[n] = value
+        return d
+
+    def upsert(self, cl, d=None, **kw):
+        """Insert a row into a database table with conflict resolution.
+
+        This method inserts a row into a table, but instead of raising a
+        ProgrammingError exception in case a row with the same primary key
+        already exists, an update will be executed instead.  This will be
+        performed as a single atomic operation on the database, so race
+        conditions can be avoided.
+
+        Like the insert method, the first parameter is the name of the
+        table and the second parameter can be used to pass the values to
+        be inserted as a dictionary.
+
+        Unlike the insert und update statement, keyword parameters are not
+        used to modify the dictionary, but to specify which columns shall
+        be updated in case of a conflict, and in which way:
+
+        A value of False or None means the column shall not be updated,
+        a value of True means the column shall be updated with the value
+        that has been proposed for insertion, i.e. has been passed as value
+        in the dictionary.  Columns that are not specified by keywords but
+        appear as keys in the dictionary are also updated like in the case
+        keywords had been passed with the value True.
+
+        So if in the case of a conflict you want to update every column that
+        has been passed in the dictionary d , you would call upsert(cl, d).
+        If you don't want to do anything in case of a conflict, i.e. leave
+        the existing row as it is, call upsert(cl, d, **dict.fromkeys(d)).
+
+        If you need more fine-grained control of what gets updated, you can
+        also pass strings in the keyword parameters.  These strings will
+        be used as SQL expressions for the update columns.  In these
+        expressions you can refer to the value that already exists in
+        the table by prefixing the column name with "included.", and to
+        the value that has been proposed for insertion by prefixing the
+        column name with the "excluded."
+
+        The dictionary is modified in any case to reflect the values in
+        the database after the operation has completed.
+
+        Note: The method uses the PostgreSQL "upsert" feature which is
+        only available since PostgreSQL 9.5.
+
+        """
+        if 'oid' in kw:
+            del kw['oid']
+        if d is None:
+            d = {}
+        attnames = self.get_attnames(cl)
+        params = []
+        param = partial(self._prepare_param,params=params)
+        col = self.escape_identifier
+        names, values, updates = [], [], []
+        for n in attnames:
+            if n in d:
+                names.append(col(n))
+                values.append(param(d[n], attnames[n]))
+        names, values = ', '.join(names), ', '.join(values)
+        try:
+            keyname = self.pkey(cl)
+        except KeyError:
+            raise _prg_error('Class %s has no primary key' % cl)
+        keyname = [keyname] if isinstance(
+            keyname, basestring) else sorted(keyname)
+        try:
+            target = ', '.join(col(k) for k in keyname)
+        except KeyError:
+            raise _prg_error('upsert needs primary key or oid')
+        update = []
+        keyname = set(keyname)
+        keyname.add('oid')
+        for n in attnames:
+            if n not in keyname:
+                value = kw.get(n, True)
+                if value:
+                    if not isinstance(value, basestring):
+                        value = 'excluded.%s' % col(n)
+                    update.append('%s = %s' % (col(n), value))
+        if not values and not update:
+            return d
+        do = 'update set %s' % ', '.join(update) if update else 'nothing'
+        ret = 'oid, *' if 'oid' in attnames else '*'
+        q = ('INSERT INTO %s AS included (%s) VALUES (%s)'
+            ' ON CONFLICT (%s) DO %s RETURNING %s') % (
+                self._escape_qualified_name(cl), names, values,
+                target, do, ret)
+        self._do_debug(q, params)
+        try:
+            q = self.db.query(q, params)
+        except ProgrammingError:
+            if self.server_version < 90500:
+                raise _prg_error('upsert not supported by PostgreSQL version')
+            raise  # re-raise original error
+        res = q.dictresult()
+        if res:  # may be empty with "do nothing"
+            for n, value in res[0].items():
+                if n == 'oid':
+                    n = _oid_key(cl)
+                elif attnames.get(n) == 'bytea':
+                    value = self.unescape_bytea(value)
+                d[n] = value
+        elif update:
+            raise _int_error('upsert did not return new values')
+        else:
+            self.get(cl, d)
         return d
 
     def clear(self, cl, a=None):
@@ -814,7 +927,7 @@ class DB(object):
         # Like update, delete works on the oid.
         # One day we will be testing that the record to be deleted
         # isn't referenced somewhere (or else PostgreSQL will).
-        # Note that we only accept oid key from named args for safety
+        # Note that we only accept oid key from named args for safety.
         qoid = _oid_key(cl)
         if 'oid' in kw:
             kw[qoid] = kw['oid']
@@ -831,19 +944,20 @@ class DB(object):
                 keyname = self.pkey(cl)
             except KeyError:
                 raise _prg_error('Class %s has no primary key' % cl)
-            if isinstance(keyname, basestring):
-                keyname = (keyname,)
+            keyname = [keyname] if isinstance(
+                keyname, basestring) else sorted(keyname)
             attnames = self.get_attnames(cl)
             col = self.escape_identifier
             try:
-                where = ' AND '.join(['%s = %s'
-                    % (col(k), param(d[k], attnames[k])) for k in keyname])
+                where = ' AND '.join('%s = %s'
+                    % (col(k), param(d[k], attnames[k])) for k in keyname)
             except KeyError:
-                raise _prg_error('Delete needs primary key or oid.')
+                raise _prg_error('delete needs primary key or oid')
         q = 'DELETE FROM %s WHERE %s' % (
             self._escape_qualified_name(cl), where)
         self._do_debug(q, params)
-        return int(self.db.query(q, params))
+        res = self.db.query(q, params)
+        return int(res)
 
     def notification_handler(self, event, callback, arg_dict={}, timeout=None):
         """Get notification handler that will run the given callback."""

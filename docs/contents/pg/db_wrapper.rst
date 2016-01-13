@@ -217,6 +217,7 @@ get -- get a row from a database table or view
     :param str keyname: name of field to use as key (optional)
     :returns: A dictionary - the keys are the attribute names,
       the values are the row values.
+    :raises ProgrammingError: no primary key or missing privilege
 
 This method is the basic mechanism to get a single row. It assumes
 that the key specifies a unique row. If *keyname* is not specified,
@@ -231,14 +232,15 @@ as ``oid(table)``.
 insert -- insert a row into a database table
 --------------------------------------------
 
-.. method:: DB.insert(table, [d,] [key = val, ...])
+.. method:: DB.insert(table, [d], [col=val, ...])
 
     Insert a row into a database table
 
     :param str table: name of table
     :param dict d: optional dictionary of values
-    :returns: the inserted values
+    :returns: the inserted values in the database
     :rtype: dict
+    :raises ProgrammingError: missing privilege or conflict
 
 This method inserts a row into a table.  If the optional dictionary is
 not supplied then the required values must be included as keyword/value
@@ -254,14 +256,15 @@ although PostgreSQL does.
 update -- update a row in a database table
 ------------------------------------------
 
-.. method:: DB.update(table, [d,] [key = val, ...])
+.. method:: DB.update(table, [d], [col=val, ...])
 
     Update a row in a database table
 
     :param str table: name of table
     :param dict d: optional dictionary of values
-    :returns: the new row
+    :returns: the new row in the database
     :rtype: dict
+    :raises ProgrammingError: no primary key or missing privilege
 
 Similar to insert but updates an existing row.  The update is based on the
 OID value as munged by get or passed as keyword, or on the primary key of
@@ -272,6 +275,61 @@ Like insert, the dictionary is optional and updates will be performed
 on the fields in the keywords.  There must be an OID or primary key
 either in the dictionary where the OID must be munged, or in the keywords
 where it can be simply the string 'oid'.
+
+upsert -- insert a row with conflict resolution
+-----------------------------------------------
+
+.. method:: DB.upsert(table, [d], [col=val, ...])
+
+    Insert a row into a database table with conflict resolution
+
+    :param str table: name of table
+    :param dict d: optional dictionary of values
+    :returns: the new row in the database
+    :rtype: dict
+    :raises ProgrammingError: no primary key or missing privilege
+
+This method inserts a row into a table, but instead of raising a
+ProgrammingError exception in case a row with the same primary key already
+exists, an update will be executed instead.  This will be performed as a
+single atomic operation on the database, so race conditions can be avoided.
+
+Like the insert method, the first parameter is the name of the table and the
+second parameter can be used to pass the values to be inserted as a dictionary.
+
+Unlike the insert und update statement, keyword parameters are not used to
+modify the dictionary, but to specify which columns shall be updated in case
+of a conflict, and in which way:
+
+A value of `False` or `None` means the column shall not be updated,
+a value of `True` means the column shall be updated with the value that
+has been proposed for insertion, i.e. has been passed as value in the
+dictionary.  Columns that are not specified by keywords but appear as keys
+in the dictionary are also updated like in the case keywords had been passed
+with the value `True`.
+
+So if in the case of a conflict you want to update every column that has been
+passed in the dictionary `d` , you would call ``upsert(cl, d)``. If you don't
+want to do anything in case of a conflict, i.e. leave the existing row as it
+is, call ``upsert(cl, d, **dict.fromkeys(d))``.
+
+If you need more fine-grained control of what gets updated, you can also pass
+strings in the keyword parameters.  These strings will be used as SQL
+expressions for the update columns.  In these expressions you can refer
+to the value that already exists in the table by writing the table prefix
+``included.`` before the column name, and you can refer to the value that
+has been proposed for insertion by writing ``excluded.`` as table prefix.
+
+The dictionary is modified in any case to reflect the values in the database
+after the operation has completed.
+
+.. note::
+
+    The method uses the PostgreSQL "upsert" feature which is only available
+    since PostgreSQL 9.5. With older PostgreSQL versions, you will get a
+    ProgrammingError if you use this method.
+
+.. versionadded:: 5.0
 
 query -- execute a SQL command string
 -------------------------------------

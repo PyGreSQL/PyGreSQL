@@ -132,6 +132,7 @@ class TestDBClassBasic(unittest.TestCase):
             'transaction',
             'unescape_bytea',
             'update',
+            'upsert',
             'use_regtypes',
             'user',
         ]
@@ -867,8 +868,8 @@ class TestDBClass(unittest.TestCase):
         r['t'] = 'u'
         s = update(table, r)
         self.assertEqual(s, r)
-        r = query('select t from "%s" where n=2' % table
-                  ).getresult()[0][0]
+        q = 'select t from "%s" where n=2' % table
+        r = query(q).getresult()[0][0]
         self.assertEqual(r, 'u')
         query('drop table "%s"' % table)
 
@@ -884,10 +885,24 @@ class TestDBClass(unittest.TestCase):
                 "%d, '%s')" % (table, n + 1, t))
         self.assertRaises(pg.ProgrammingError, update,
                           table, dict(t='b'))
-        self.assertEqual(update(table, dict(n=2, t='d'))['t'], 'd')
-        r = query('select t from "%s" where n=2' % table
-                  ).getresult()[0][0]
+        s = dict(n=2, t='d')
+        r = update(table, s)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['t'], 'd')
+        q = 'select t from "%s" where n=2' % table
+        r = query(q).getresult()[0][0]
         self.assertEqual(r, 'd')
+        s.update(dict(n=4, t='e'))
+        r = update(table, s)
+        self.assertEqual(r['n'], 4)
+        self.assertEqual(r['t'], 'e')
+        q = 'select t from "%s" where n=2' % table
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 'd')
+        q = 'select t from "%s" where n=4' % table
+        r = query(q).getresult()
+        self.assertEqual(len(r), 0)
         query('drop table "%s"' % table)
         table = 'update_test_table_2'
         query('drop table if exists "%s"' % table)
@@ -902,8 +917,8 @@ class TestDBClass(unittest.TestCase):
                           table, dict(n=2, t='b'))
         self.assertEqual(update(table,
                                 dict(n=2, m=2, t='x'))['t'], 'x')
-        r = [r[0] for r in query('select t from "%s" where n=2'
-            ' order by m' % table).getresult()]
+        q = 'select t from "%s" where n=2 order by m' % table
+        r = [r[0] for r in query(q).getresult()]
         self.assertEqual(r, ['c', 'x'])
         query('drop table "%s"' % table)
 
@@ -930,6 +945,175 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['much space'], 7007)
         self.assertEqual(r['Questions?'], 'When?')
         query('drop table "%s"' % table)
+
+    def testUpsert(self):
+        upsert = self.db.upsert
+        query = self.db.query
+        table = 'upsert_test_table'
+        query('drop table if exists "%s"' % table)
+        query('create table "%s" ('
+            "n integer primary key, t text) with oids" % table)
+        s = dict(n=1, t='x')
+        try:
+            r = upsert(table, s)
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90500:
+                self.skipTest('database does not support upsert')
+            self.fail(str(error))
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['t'], 'x')
+        s.update(n=2, t='y')
+        r = upsert(table, s, **dict.fromkeys(s))
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['t'], 'y')
+        q = 'select n, t from "%s" order by n limit 3' % table
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x'), (2, 'y')])
+        s.update(t='z')
+        r = upsert(table, s)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['t'], 'z')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x'), (2, 'z')])
+        s.update(t='n')
+        r = upsert(table, s, t=False)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['t'], 'z')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x'), (2, 'z')])
+        s.update(t='y')
+        r = upsert(table, s, t=True)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['t'], 'y')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x'), (2, 'y')])
+        s.update(t='n')
+        r = upsert(table, s, t="included.t || '2'")
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['t'], 'y2')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x'), (2, 'y2')])
+        s.update(t='y')
+        r = upsert(table, s, t="excluded.t || '3'")
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['t'], 'y3')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x'), (2, 'y3')])
+        s.update(n=1, t='2')
+        r = upsert(table, s, t="included.t || excluded.t")
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['t'], 'x2')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x2'), (2, 'y3')])
+        query('drop table "%s"' % table)
+
+    def testUpsertWithCompositeKey(self):
+        upsert = self.db.upsert
+        query = self.db.query
+        table = 'upsert_test_table_2'
+        query('drop table if exists "%s"' % table)
+        query('create table "%s" ('
+            "n integer, m integer, t text, primary key (n, m))" % table)
+        s = dict(n=1, m=2, t='x')
+        try:
+            r = upsert(table, s)
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90500:
+                self.skipTest('database does not support upsert')
+            self.fail(str(error))
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 2)
+        self.assertEqual(r['t'], 'x')
+        s.update(m=3, t='y')
+        r = upsert(table, s, **dict.fromkeys(s))
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        self.assertEqual(r['t'], 'y')
+        q = 'select n, m, t from "%s" order by n, m limit 3' % table
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 2, 'x'), (1, 3, 'y')])
+        s.update(t='z')
+        r = upsert(table, s)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        self.assertEqual(r['t'], 'z')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 2, 'x'), (1, 3, 'z')])
+        s.update(t='n')
+        r = upsert(table, s, t=False)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        self.assertEqual(r['t'], 'z')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 2, 'x'), (1, 3, 'z')])
+        s.update(t='n')
+        r = upsert(table, s, t=True)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        self.assertEqual(r['t'], 'n')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 2, 'x'), (1, 3, 'n')])
+        s.update(n=2, t='y')
+        r = upsert(table, s, t="'z'")
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['m'], 3)
+        self.assertEqual(r['t'], 'y')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 2, 'x'), (1, 3, 'n'), (2, 3, 'y')])
+        s.update(n=1, t='m')
+        r = upsert(table, s, t='included.t || excluded.t')
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        self.assertEqual(r['t'], 'nm')
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 2, 'x'), (1, 3, 'nm'), (2, 3, 'y')])
+        query('drop table "%s"' % table)
+
+    def testUpsertWithQuotedNames(self):
+        upsert = self.db.upsert
+        query = self.db.query
+        table = 'test table for upsert()'
+        query('drop table if exists "%s"' % table)
+        query('create table "%s" ('
+            '"Prime!" smallint primary key,'
+            '"much space" integer, "Questions?" text)' % table)
+        s = {'Prime!': 31, 'much space': 9009, 'Questions?': 'Yes.'}
+        try:
+            r = upsert(table, s)
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90500:
+                self.skipTest('database does not support upsert')
+            self.fail(str(error))
+        self.assertIs(r, s)
+        self.assertEqual(r['Prime!'], 31)
+        self.assertEqual(r['much space'], 9009)
+        self.assertEqual(r['Questions?'], 'Yes.')
+        q = 'select * from "%s" limit 2' % table
+        r = query(q).getresult()
+        self.assertEqual(r, [(31, 9009, 'Yes.')])
+        s.update({'Questions?': 'No.'})
+        r = upsert(table, s)
+        self.assertIs(r, s)
+        self.assertEqual(r['Prime!'], 31)
+        self.assertEqual(r['much space'], 9009)
+        self.assertEqual(r['Questions?'], 'No.')
+        r = query(q).getresult()
+        self.assertEqual(r, [(31, 9009, 'No.')])
 
     def testClear(self):
         clear = self.db.clear

@@ -168,9 +168,8 @@ uses the COPY command of the PostgreSQL database. The list is a list
 of tuples/lists that define the values for each inserted row. The rows
 values may contain string, integer, long or double (real) values.
 
-.. note::
+.. warning::
 
-    **Be very careful**:
     This method doesn't type check the fields according to the table definition;
     it just look whether or not it knows how to handle such types.
 
