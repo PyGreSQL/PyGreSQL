@@ -405,80 +405,6 @@ class TestDBClass(unittest.TestCase):
             b'\\x746861742773206be47365')
         self.assertEqual(f(r'\\x4f007073ff21'), b'\\x4f007073ff21')
 
-    def testQuote(self):
-        f = self.db._quote
-        self.assertEqual(f(None, None), 'NULL')
-        self.assertEqual(f(None, 'int'), 'NULL')
-        self.assertEqual(f(None, 'float'), 'NULL')
-        self.assertEqual(f(None, 'num'), 'NULL')
-        self.assertEqual(f(None, 'money'), 'NULL')
-        self.assertEqual(f(None, 'bool'), 'NULL')
-        self.assertEqual(f(None, 'date'), 'NULL')
-        self.assertEqual(f('', 'int'), 'NULL')
-        self.assertEqual(f('', 'float'), 'NULL')
-        self.assertEqual(f('', 'num'), 'NULL')
-        self.assertEqual(f('', 'money'), 'NULL')
-        self.assertEqual(f('', 'bool'), 'NULL')
-        self.assertEqual(f('', 'date'), 'NULL')
-        self.assertEqual(f('', 'text'), "''")
-        self.assertEqual(f(0, 'int'), '0')
-        self.assertEqual(f(0, 'num'), '0')
-        self.assertEqual(f(1, 'int'), '1')
-        self.assertEqual(f(1, 'num'), '1')
-        self.assertEqual(f(-1, 'int'), '-1')
-        self.assertEqual(f(-1, 'num'), '-1')
-        self.assertEqual(f(123456789, 'int'), '123456789')
-        self.assertEqual(f(123456987, 'num'), '123456987')
-        self.assertEqual(f(1.23654789, 'num'), '1.23654789')
-        self.assertEqual(f(12365478.9, 'num'), '12365478.9')
-        self.assertEqual(f('123456789', 'num'), '123456789')
-        self.assertEqual(f('1.23456789', 'num'), '1.23456789')
-        self.assertEqual(f('12345678.9', 'num'), '12345678.9')
-        self.assertEqual(f(123, 'money'), '123')
-        self.assertEqual(f('123', 'money'), '123')
-        self.assertEqual(f(123.45, 'money'), '123.45')
-        self.assertEqual(f('123.45', 'money'), '123.45')
-        self.assertEqual(f(123.454, 'money'), '123.454')
-        self.assertEqual(f('123.454', 'money'), '123.454')
-        self.assertEqual(f(123.456, 'money'), '123.456')
-        self.assertEqual(f('123.456', 'money'), '123.456')
-        self.assertEqual(f('f', 'bool'), "'f'")
-        self.assertEqual(f('F', 'bool'), "'f'")
-        self.assertEqual(f('false', 'bool'), "'f'")
-        self.assertEqual(f('False', 'bool'), "'f'")
-        self.assertEqual(f('FALSE', 'bool'), "'f'")
-        self.assertEqual(f(0, 'bool'), "'f'")
-        self.assertEqual(f('0', 'bool'), "'f'")
-        self.assertEqual(f('-', 'bool'), "'f'")
-        self.assertEqual(f('n', 'bool'), "'f'")
-        self.assertEqual(f('N', 'bool'), "'f'")
-        self.assertEqual(f('no', 'bool'), "'f'")
-        self.assertEqual(f('off', 'bool'), "'f'")
-        self.assertEqual(f('t', 'bool'), "'t'")
-        self.assertEqual(f('T', 'bool'), "'t'")
-        self.assertEqual(f('true', 'bool'), "'t'")
-        self.assertEqual(f('True', 'bool'), "'t'")
-        self.assertEqual(f('TRUE', 'bool'), "'t'")
-        self.assertEqual(f(1, 'bool'), "'t'")
-        self.assertEqual(f(2, 'bool'), "'t'")
-        self.assertEqual(f(-1, 'bool'), "'t'")
-        self.assertEqual(f(0.5, 'bool'), "'t'")
-        self.assertEqual(f('1', 'bool'), "'t'")
-        self.assertEqual(f('y', 'bool'), "'t'")
-        self.assertEqual(f('Y', 'bool'), "'t'")
-        self.assertEqual(f('yes', 'bool'), "'t'")
-        self.assertEqual(f('on', 'bool'), "'t'")
-        self.assertEqual(f('01.01.2000', 'date'), "'01.01.2000'")
-        self.assertEqual(f(123, 'text'), "'123'")
-        self.assertEqual(f(1.23, 'text'), "'1.23'")
-        self.assertEqual(f('abc', 'text'), "'abc'")
-        self.assertEqual(f("ab'c", 'text'), "'ab''c'")
-        self.assertEqual(f('ab\\c', 'text'), "'ab\\c'")
-        self.assertEqual(f("a\\b'c", 'text'), "'a\\b''c'")
-        self.db.query('set standard_conforming_strings=off')
-        self.assertEqual(f('ab\\c', 'text'), "'ab\\\\c'")
-        self.assertEqual(f("a\\b'c", 'text'), "'a\\\\b''c'")
-
     def testQuery(self):
         query = self.db.query
         query("drop table if exists test_table")
@@ -786,7 +712,6 @@ class TestDBClass(unittest.TestCase):
     def testInsert(self):
         insert = self.db.insert
         query = self.db.query
-        server_version = self.db.server_version
         bool_on = pg.get_bool()
         decimal = pg.get_decimal()
         for table in ('insert_test_table', 'test table for insert'):
@@ -859,9 +784,6 @@ class TestDBClass(unittest.TestCase):
                     m = expect.get('m')
                     if m is not None:
                         expect['m'] = decimal(m)
-                if data.get('m') and server_version < 910000:
-                    # PostgreSQL < 9.1 cannot directly convert numbers to money
-                    data['m'] = "'%s'::money" % data['m']
                 self.assertEqual(insert(table, data), data)
                 self.assertIn(oid_table, data)
                 oid = data[oid_table]
@@ -1129,6 +1051,24 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         query('drop table if exists bytea_test')
         query('create table bytea_test (n smallint primary key, data bytea)')
+        # insert null value
+        r = self.db.insert('bytea_test', n=0, data=None)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 0)
+        self.assertIn('data', r)
+        self.assertIsNone(r['data'])
+        s = b'None'
+        r = self.db.update('bytea_test', n=0, data=s)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 0)
+        self.assertIn('data', r)
+        r = r['data']
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, s)
+        r = self.db.update('bytea_test', n=0, data=None)
+        self.assertIsNone(r['data'])
         # insert as bytes
         s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
         r = self.db.insert('bytea_test', n=5, data=s)

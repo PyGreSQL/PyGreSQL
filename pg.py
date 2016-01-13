@@ -37,7 +37,7 @@ import warnings
 
 from decimal import Decimal
 from collections import namedtuple
-from itertools import groupby
+from functools import partial
 
 try:
     basestring
@@ -315,9 +315,10 @@ class DB(object):
 
     # Auxiliary methods
 
-    def _do_debug(self, s):
+    def _do_debug(self, *args):
         """Print a debug message."""
         if self.debug:
+            s = '\n'.join(args)
             if isinstance(self.debug, basestring):
                 print(self.debug % s)
             elif hasattr(self.debug, 'write'):
@@ -332,72 +333,55 @@ class DB(object):
         """Get boolean value corresponding to d."""
         return bool(d) if get_bool() else ('t' if d else 'f')
 
-    def _quote_text(self, d):
-        """Quote text value."""
-        if not isinstance(d, basestring):
-            d = str(d)
-        return "'%s'" % self.escape_string(d)
+    _bool_true_values = frozenset('t true 1 y yes on'.split())
 
-    _bool_true = frozenset('t true 1 y yes on'.split())
-
-    def _quote_bool(self, d):
-        """Quote boolean value."""
+    def _prepare_bool(self, d):
+        """Prepare a boolean parameter."""
         if isinstance(d, basestring):
             if not d:
-                return 'NULL'
-            d = d.lower() in self._bool_true
-        return "'t'" if d else "'f'"
+                return None
+            d = d.lower() in self._bool_true_values
+        return 't' if d else 'f'
 
     _date_literals = frozenset('current_date current_time'
         ' current_timestamp localtime localtimestamp'.split())
 
-    def _quote_date(self, d):
-        """Quote date value."""
+    def _prepare_date(self, d):
+        """Prepare a date parameter."""
         if not d:
-            return 'NULL'
+            return None
         if isinstance(d, basestring) and d.lower() in self._date_literals:
-            return d
-        return self._quote_text(d)
-
-    def _quote_num(self, d):
-        """Quote numeric value."""
-        if not d and d != 0:
-            return 'NULL'
-        return str(d)
-
-    def _quote_money(self, d):
-        """Quote money value."""
-        if d is None or d == '':
-            return 'NULL'
-        if not isinstance(d, basestring):
-            d = str(d)
+            raise ValueError
         return d
 
-    if bytes is str:  # Python < 3.0
-        """Quote bytes value."""
+    def _prepare_num(self, d):
+        """Prepare a numeric parameter."""
+        if not d and d != 0:
+            return None
+        return d
 
-        def _quote_bytea(self, d):
-            return "'%s'" % self.escape_bytea(d)
+    def _prepare_bytea(self, d):
+        return self.escape_bytea(d)
 
-    else:
+    _prepare_funcs = dict(  # quote methods for each type
+        bool=_prepare_bool, date=_prepare_date,
+        int=_prepare_num, num=_prepare_num, float=_prepare_num,
+        money=_prepare_num, bytea=_prepare_bytea)
 
-        def _quote_bytea(self, d):
-            return "'%s'" % self.escape_bytea(d).decode('ascii')
-
-    _quote_funcs = dict(  # quote methods for each type
-        text=_quote_text, bool=_quote_bool, date=_quote_date,
-        int=_quote_num, num=_quote_num, float=_quote_num,
-        money=_quote_money, bytea=_quote_bytea)
-
-    def _quote(self, d, t):
-        """Return quotes if needed."""
-        if d is None:
-            return 'NULL'
-        try:
-            quote_func = self._quote_funcs[t]
-        except KeyError:
-            quote_func = self._quote_funcs['text']
-        return quote_func(self, d)
+    def _prepare_param(self, value, typ, params):
+        """Prepare and add a parameter to the list."""
+        if value is not None and typ != 'text':
+            try:
+                prepare = self._prepare_funcs[typ]
+            except KeyError:
+                pass
+            else:
+                try:
+                    value = prepare(self, value)
+                except ValueError:
+                    return value
+        params.append(value)
+        return '$%d' % len(params)
 
     # Public methods
 
@@ -578,7 +562,6 @@ class DB(object):
         if flush:
             attnames.clear()
             self._do_debug('pkey cache has been flushed')
-
         try:  # cache lookup
             names = attnames[cl]
         except KeyError:  # cache miss, check the database
@@ -651,6 +634,8 @@ class DB(object):
             except KeyError:
                 raise _prg_error('Class %s has no primary key' % cl)
         attnames = self.get_attnames(cl)
+        params = []
+        param = partial(self._prepare_param, params=params)
         # We want the oid for later updates if that isn't the key
         if keyname == 'oid':
             if isinstance(arg, dict):
@@ -659,7 +644,7 @@ class DB(object):
             else:
                 arg = {qoid: arg}
             what = '*'
-            where = 'oid = %s' % arg[qoid]
+            where = 'oid = %s' % param(arg[qoid], 'int')
         else:
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
@@ -669,11 +654,11 @@ class DB(object):
                 arg = dict([(k, arg) for k in keyname])
             what = ', '.join(attnames)
             where = ' AND '.join(['%s = %s'
-                % (k, self._quote(arg[k], attnames[k])) for k in keyname])
+                % (k, param(arg[k], attnames[k])) for k in keyname])
         q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (
             what, _quote_class_name(cl), where)
-        self._do_debug(q)
-        res = self.db.query(q).dictresult()
+        self._do_debug(q, params)
+        res = self.db.query(q, params).dictresult()
         if not res:
             raise _db_error('No such record in %s where %s' % (cl, where))
         for n, value in res[0].items():
@@ -706,11 +691,13 @@ class DB(object):
             d = {}
         d.update(kw)
         attnames = self.get_attnames(cl)
+        params = []
+        param = partial(self._prepare_param, params=params)
         names, values = [], []
         for n in attnames:
             if n != 'oid' and n in d:
                 names.append('"%s"' % n)
-                values.append(self._quote(d[n], attnames[n]))
+                values.append(param(d[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         selectable = self.has_table_privilege(cl)
         if selectable:
@@ -719,14 +706,14 @@ class DB(object):
             ret = ''
         q = 'INSERT INTO %s (%s) VALUES (%s)%s' % (
             _quote_class_name(cl), names, values, ret)
-        self._do_debug(q)
-        res = self.db.query(q)
+        self._do_debug(q, params)
+        res = self.db.query(q, params)
         if ret:
             res = res.dictresult()[0]
             for n, value in res.items():
                 if n == 'oid':
                     n = qoid
-                elif attnames.get(n) == 'bytea':
+                elif attnames.get(n) == 'bytea' and value is not None:
                     value = self.unescape_bytea(value)
                 d[n] = value
         elif isinstance(res, int):
@@ -764,8 +751,10 @@ class DB(object):
             d = {}
         d.update(kw)
         attnames = self.get_attnames(cl)
+        params = []
+        param = partial(self._prepare_param, params=params)
         if qoid in d:
-            where = 'oid = %s' % d[qoid]
+            where = 'oid = %s' % param(d[qoid], 'int')
             keyname = ()
         else:
             try:
@@ -776,13 +765,13 @@ class DB(object):
                 keyname = (keyname,)
             try:
                 where = ' AND '.join(['%s = %s'
-                    % (k, self._quote(d[k], attnames[k])) for k in keyname])
+                    % (k, param(d[k], attnames[k])) for k in keyname])
             except KeyError:
                 raise _prg_error('Update needs primary key or oid.')
         values = []
         for n in attnames:
             if n in d and n not in keyname:
-                values.append('%s = %s' % (n, self._quote(d[n], attnames[n])))
+                values.append('%s = %s' % (n, param(d[n], attnames[n])))
         if not values:
             return d
         values = ', '.join(values)
@@ -793,14 +782,14 @@ class DB(object):
             ret = ''
         q = 'UPDATE %s SET %s WHERE %s%s' % (
             _quote_class_name(cl), values, where, ret)
-        self._do_debug(q)
-        res = self.db.query(q)
+        self._do_debug(q, params)
+        res = self.db.query(q, params)
         if ret:
             res = res.dictresult()[0]
             for n, value in res.items():
                 if n == 'oid':
                     n = qoid
-                elif attnames.get(n) == 'bytea':
+                elif attnames.get(n) == 'bytea' and value is not None:
                     value = self.unescape_bytea(value)
                 d[n] = value
         else:
@@ -857,8 +846,10 @@ class DB(object):
         if d is None:
             d = {}
         d.update(kw)
+        params = []
+        param = partial(self._prepare_param, params=params)
         if qoid in d:
-            where = 'oid = %s' % d[qoid]
+            where = 'oid = %s' % param(d[qoid], 'int')
         else:
             try:
                 keyname = self.pkey(cl)
@@ -869,12 +860,12 @@ class DB(object):
             attnames = self.get_attnames(cl)
             try:
                 where = ' AND '.join(['%s = %s'
-                    % (k, self._quote(d[k], attnames[k])) for k in keyname])
+                    % (k, param(d[k], attnames[k])) for k in keyname])
             except KeyError:
                 raise _prg_error('Delete needs primary key or oid.')
         q = 'DELETE FROM %s WHERE %s' % (_quote_class_name(cl), where)
-        self._do_debug(q)
-        return int(self.db.query(q))
+        self._do_debug(q, params)
+        return int(self.db.query(q, params))
 
     def notification_handler(self, event, callback, arg_dict={}, timeout=None):
         """Get notification handler that will run the given callback."""

@@ -34,10 +34,11 @@ Version 5.0
   you call the methods using it and you are using tables with OIDs.
   Note that OIDs are considered deprecated anyway, and they are not created
   by default any more in PostgreSQL 8.1 and later.
-- Simplified the internal caching and mechanisms for automatic quoting
-  of class names in the classic interface, these things should now both
-  perform better and use less memory.
-
+- The internal caching and automatic quoting of class names in the classic
+  interface has been simplified and improved, it should now perform better
+  and use less memory. Also, overhead for quoting and escaping values in the
+  DB wrapper methods has been reduced and security has been improved by
+  passing the values to libpq separately as parameters instead of inline.
 
 Version 4.2
 -----------
