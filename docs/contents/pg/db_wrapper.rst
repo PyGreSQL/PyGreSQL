@@ -218,6 +218,7 @@ get -- get a row from a database table or view
     :param str keyname: name of field to use as key (optional)
     :returns: A dictionary - the keys are the attribute names,
       the values are the row values.
+    :raises ProgrammingError: no primary key or missing privilege
 
 This method is the basic mechanism to get a single row. It assumes
 that the key specifies a unique row. If *keyname* is not specified,
@@ -232,14 +233,15 @@ as ``oid(schema.table)``.
 insert -- insert a row into a database table
 --------------------------------------------
 
-.. method:: DB.insert(table, [d,] [key = val, ...])
+.. method:: DB.insert(table, [d], [col=val, ...])
 
     Insert a row into a database table
 
     :param str table: name of table
     :param dict d: optional dictionary of values
-    :returns: the inserted values
+    :returns: the inserted values in the database
     :rtype: dict
+    :raises ProgrammingError: missing privilege or conflict
 
 This method inserts a row into a table.  If the optional dictionary is
 not supplied then the required values must be included as keyword/value
@@ -255,14 +257,15 @@ although PostgreSQL does.
 update -- update a row in a database table
 ------------------------------------------
 
-.. method:: DB.update(table, [d,] [key = val, ...])
+.. method:: DB.update(table, [d], [col=val, ...])
 
     Update a row in a database table
 
     :param str table: name of table
     :param dict d: optional dictionary of values
-    :returns: the new row
+    :returns: the new row in the database
     :rtype: dict
+    :raises ProgrammingError: no primary key or missing privilege
 
 Similar to insert but updates an existing row.  The update is based on the
 OID value as munged by get or passed as keyword, or on the primary key of

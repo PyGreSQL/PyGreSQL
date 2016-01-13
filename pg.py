@@ -842,9 +842,9 @@ class DB(object):
         default values, etc.
 
         """
-        # Update always works on the oid which get returns if available,
+        # Update always works on the oid which get() returns if available,
         # otherwise use the primary key.  Fail if neither.
-        # Note that we only accept oid key from named args for safety
+        # Note that we only accept oid key from named args for safety.
         qcl = self._add_schema(cl)
         qoid = _oid_key(qcl)
         if 'oid' in kw:
