@@ -790,7 +790,7 @@ class TestDBClass(unittest.TestCase):
                     data, change = test
                 expect = data.copy()
                 expect.update(change)
-                if data.get('m') and server_version < 910000:
+                if data.get('m') and server_version < 90100:
                     # PostgreSQL < 9.1 cannot directly convert numbers to money
                     data['m'] = "'%s'::money" % data['m']
                 self.assertEqual(insert(table, data), data)

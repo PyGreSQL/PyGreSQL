@@ -998,7 +998,7 @@ class TestConfigFunctions(unittest.TestCase):
         en_locales = 'en', 'en_US', 'en_US.utf8', 'en_US.UTF-8'
         en_money = '$34.25', '$ 34.25', '34.25$', '34.25 $', '34.25 Dollar'
         de_locales = 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8'
-        de_money = ('34,25€', '34,25 €', '€34,25' '€ 34,25',
+        de_money = ('34,25€', '34,25 €', '€34,25', '€ 34,25',
             'EUR34,25', 'EUR 34,25', '34,25 EUR', '34,25 Euro', '34,25 DM')
         # first try with English localization (using the point)
         for lc in en_locales:

@@ -181,6 +181,7 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(r['dvar'], 123)
 
         r = db.get('_test_schema', 1234)
+        self.assertIn('dvar', r)
         db.update('_test_schema', _test=1234, dvar=456)
         r = db.get('_test_schema', 1234)
         self.assertEqual(r['dvar'], 456)
