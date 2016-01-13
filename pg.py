@@ -896,19 +896,19 @@ class DB(object):
                     self.get(qcl, d)
         return d
 
-    def clear(self, cl, a=None):
+    def clear(self, cl, d=None):
         """Clear all the attributes to values determined by the types.
 
         Numeric types are set to 0, Booleans are set to false, and everything
-        else is set to the empty string.  If the array argument is present,
-        it is used as the array and any entries matching attribute names are
-        cleared with everything else left unchanged.
+        else is set to the empty string.  If the second argument is present,
+        it is used as the row dictionary and any entries matching attribute
+        names are cleared with everything else left unchanged.
 
         """
         # At some point we will need a way to get defaults from a table.
         qcl = self._add_schema(cl)
-        if a is None:
-            a = {}  # empty if argument is not present
+        if d is None:
+            d = {}  # empty if argument is not present
         attnames = self.get_attnames(qcl)
         for n, t in attnames.items():
             if n == 'oid':
@@ -916,12 +916,12 @@ class DB(object):
             if t in ('int', 'integer', 'smallint', 'bigint',
                     'float', 'real', 'double precision',
                     'num', 'numeric', 'money'):
-                a[n] = 0
+                d[n] = 0
             elif t in ('bool', 'boolean'):
-                a[n] = self._make_bool(False)
+                d[n] = self._make_bool(False)
             else:
-                a[n] = ''
-        return a
+                d[n] = ''
+        return d
 
     def delete(self, cl, d=None, **kw):
         """Delete an existing row in a database table.

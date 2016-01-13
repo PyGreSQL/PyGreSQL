@@ -233,7 +233,7 @@ as ``oid(schema.table)``.
 insert -- insert a row into a database table
 --------------------------------------------
 
-.. method:: DB.insert(table, [d], [col=val, ...])
+.. method:: DB.insert(table, [d], [key=val, ...])
 
     Insert a row into a database table
 
@@ -257,7 +257,7 @@ although PostgreSQL does.
 update -- update a row in a database table
 ------------------------------------------
 
-.. method:: DB.update(table, [d], [col=val, ...])
+.. method:: DB.update(table, [d], [key=val, ...])
 
     Update a row in a database table
 
@@ -311,27 +311,27 @@ Example::
 clear -- clear row values in memory
 -----------------------------------
 
-.. method:: DB.clear(table, [a])
+.. method:: DB.clear(table, [d])
 
     Clear row values in memory
 
     :param str table: name of table
-    :param dict a: optional dictionary of values
+    :param dict d: optional dictionary of values
     :returns: an empty row
     :rtype: dict
 
 This method clears all the attributes to values determined by the types.
-Numeric types are set to 0, Booleans are set to ``'f'``, dates are set
-to ``'now()'`` and everything else is set to the empty string.
-If the array argument is present, it is used as the array and any entries
-matching attribute names are cleared with everything else left unchanged.
+Numeric types are set to 0, Booleans are set to ``'f'``, and everything
+else is set to the empty string.  If the optional dictionary is present,
+it is used as the row and any entries matching attribute names are cleared
+with everything else left unchanged.
 
 If the dictionary is not supplied a new one is created.
 
 delete -- delete a row from a database table
 --------------------------------------------
 
-.. method:: DB.delete(table, [d,] [key = val, ...])
+.. method:: DB.delete(table, [d], [key=val, ...])
 
     Delete a row from a database table
 
