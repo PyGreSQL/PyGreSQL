@@ -49,34 +49,8 @@ set_decimal(Decimal)
 
 # Auxiliary functions that are independent from a DB connection:
 
-def _quote_class_name(cl):
-    """Quote a class name.
-
-    Class names are always quoted unless they contain a dot.
-    In this ambiguous case quotes must be added manually.
-
-    """
-    if '.' not in cl:
-        cl = '"%s"' % cl
-    return cl
-
-
-def _quote_class_param(cl, param):
-    """Quote parameter representing a class name.
-
-    The parameter is automatically quoted unless the class name contains a dot.
-    In this ambiguous case quotes must be added manually.
-
-    """
-    if isinstance(param, int):
-        param = "$%d" % param
-    if '.' not in cl:
-        param = 'quote_ident(%s)' % (param,)
-    return param
-
-
 def _oid_key(cl):
-    """Build oid key from qualified class name."""
+    """Build oid key from a class name."""
     return 'oid(%s)' % cl
 
 
@@ -328,6 +302,19 @@ class DB(object):
             else:
                 print(s)
 
+    def _escape_qualified_name(self, s):
+        """Escape a qualified name.
+
+        Escapes the name for use as an SQL identifier, unless the
+        name contains a dot, in which case the name is ambiguous
+        (could be a qualified name or just a name with a dot in it)
+        and must be quoted manually by the caller.
+
+        """
+        if '.' not in s:
+            s = self.escape_identifier(s)
+        return s
+
     @staticmethod
     def _make_bool(d):
         """Get boolean value corresponding to d."""
@@ -361,6 +348,7 @@ class DB(object):
         return d
 
     def _prepare_bytea(self, d):
+        """Prepare a bytea parameter."""
         return self.escape_bytea(d)
 
     _prepare_funcs = dict(  # quote methods for each type
@@ -382,6 +370,22 @@ class DB(object):
                     return value
         params.append(value)
         return '$%d' % len(params)
+
+    @staticmethod
+    def _prepare_qualified_param(cl, param):
+        """Quote parameter representing a qualified name.
+
+        Escapes the name for use as an SQL parameter, unless the
+        name contains a dot, in which case the name is ambiguous
+        (could be a qualified name or just a name with a dot in it)
+        and must be quoted manually by the caller.
+
+        """
+        if isinstance(param, int):
+            param = "$%d" % param
+        if '.' not in cl:
+            param = 'quote_ident(%s)' % (param,)
+        return param
 
     # Public methods
 
@@ -507,7 +511,7 @@ class DB(object):
                 " AND a.attnum = ANY(i.indkey)"
                 " AND NOT a.attisdropped"
                 " WHERE i.indrelid=%s::regclass"
-                " AND i.indisprimary" % _quote_class_param(cl, 1))
+                " AND i.indisprimary" % self._prepare_qualified_param(cl, 1))
             pkey = self.db.query(q, (cl,)).getresult()
             if not pkey:
                 raise KeyError('Class %s has no primary key' % cl)
@@ -572,7 +576,7 @@ class DB(object):
                 " AND (a.attnum > 0 OR a.attname = 'oid')"
                 " AND NOT a.attisdropped") % (
                     '::regtype' if self._regtypes else '',
-                    _quote_class_param(cl, 1))
+                    self._prepare_qualified_param(cl, 1))
             names = self.db.query(q, (cl,)).getresult()
             if not names:
                 raise KeyError('Class %s does not exist' % cl)
@@ -601,7 +605,7 @@ class DB(object):
             return self._privileges[(cl, privilege)]
         except KeyError:  # cache miss, ask the database
             q = "SELECT has_table_privilege(%s, $2)" % (
-                _quote_class_param(cl, 1),)
+                self._prepare_qualified_param(cl, 1),)
             q = self.db.query(q, (cl, privilege))
             ret = q.getresult()[0][0] == self._make_bool(True)
             self._privileges[(cl, privilege)] = ret  # cache it
@@ -636,6 +640,7 @@ class DB(object):
         attnames = self.get_attnames(cl)
         params = []
         param = partial(self._prepare_param, params=params)
+        col = self.escape_identifier
         # We want the oid for later updates if that isn't the key
         if keyname == 'oid':
             if isinstance(arg, dict):
@@ -651,12 +656,12 @@ class DB(object):
             if not isinstance(arg, dict):
                 if len(keyname) > 1:
                     raise _prg_error('Composite key needs dict as arg')
-                arg = dict([(k, arg) for k in keyname])
-            what = ', '.join(attnames)
+                arg = dict((k, arg) for k in keyname)
+            what = ', '.join(col(k) for k in attnames)
             where = ' AND '.join(['%s = %s'
-                % (k, param(arg[k], attnames[k])) for k in keyname])
+                % (col(k), param(arg[k], attnames[k])) for k in keyname])
         q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (
-            what, _quote_class_name(cl), where)
+            what, self._escape_qualified_name(cl), where)
         self._do_debug(q, params)
         res = self.db.query(q, params).dictresult()
         if not res:
@@ -693,10 +698,11 @@ class DB(object):
         attnames = self.get_attnames(cl)
         params = []
         param = partial(self._prepare_param, params=params)
+        col = self.escape_identifier
         names, values = [], []
         for n in attnames:
             if n != 'oid' and n in d:
-                names.append('"%s"' % n)
+                names.append(col(n))
                 values.append(param(d[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         selectable = self.has_table_privilege(cl)
@@ -705,7 +711,7 @@ class DB(object):
         else:
             ret = ''
         q = 'INSERT INTO %s (%s) VALUES (%s)%s' % (
-            _quote_class_name(cl), names, values, ret)
+            self._escape_qualified_name(cl), names, values, ret)
         self._do_debug(q, params)
         res = self.db.query(q, params)
         if ret:
@@ -753,6 +759,7 @@ class DB(object):
         attnames = self.get_attnames(cl)
         params = []
         param = partial(self._prepare_param, params=params)
+        col = self.escape_identifier
         if qoid in d:
             where = 'oid = %s' % param(d[qoid], 'int')
             keyname = ()
@@ -765,13 +772,13 @@ class DB(object):
                 keyname = (keyname,)
             try:
                 where = ' AND '.join(['%s = %s'
-                    % (k, param(d[k], attnames[k])) for k in keyname])
+                    % (col(k), param(d[k], attnames[k])) for k in keyname])
             except KeyError:
                 raise _prg_error('Update needs primary key or oid.')
         values = []
         for n in attnames:
             if n in d and n not in keyname:
-                values.append('%s = %s' % (n, param(d[n], attnames[n])))
+                values.append('%s = %s' % (col(n), param(d[n], attnames[n])))
         if not values:
             return d
         values = ', '.join(values)
@@ -781,7 +788,7 @@ class DB(object):
         else:
             ret = ''
         q = 'UPDATE %s SET %s WHERE %s%s' % (
-            _quote_class_name(cl), values, where, ret)
+            self._escape_qualified_name(cl), values, where, ret)
         self._do_debug(q, params)
         res = self.db.query(q, params)
         if ret:
@@ -858,12 +865,14 @@ class DB(object):
             if isinstance(keyname, basestring):
                 keyname = (keyname,)
             attnames = self.get_attnames(cl)
+            col = self.escape_identifier
             try:
                 where = ' AND '.join(['%s = %s'
-                    % (k, param(d[k], attnames[k])) for k in keyname])
+                    % (col(k), param(d[k], attnames[k])) for k in keyname])
             except KeyError:
                 raise _prg_error('Delete needs primary key or oid.')
-        q = 'DELETE FROM %s WHERE %s' % (_quote_class_name(cl), where)
+        q = 'DELETE FROM %s WHERE %s' % (
+            self._escape_qualified_name(cl), where)
         self._do_debug(q, params)
         return int(self.db.query(q, params))
 
