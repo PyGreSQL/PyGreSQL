@@ -684,8 +684,8 @@ class DB(object):
         that.  Otherwise it uses a blank dictionary. Either way the dictionary
         is updated from the keywords.
 
-        The dictionary is then, if possible, reloaded with the values actually
-        inserted in order to pick up values modified by rules, triggers, etc.
+        The dictionary is then reloaded with the values actually inserted in
+        order to pick up values modified by rules, triggers, etc.
 
         Note: The method currently doesn't support insert into views
         although PostgreSQL does.
@@ -705,35 +705,18 @@ class DB(object):
                 names.append(col(n))
                 values.append(param(d[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
-        selectable = self.has_table_privilege(cl)
-        if selectable:
-            ret = ' RETURNING %s*' % ('oid, ' if 'oid' in attnames else '')
-        else:
-            ret = ''
-        q = 'INSERT INTO %s (%s) VALUES (%s)%s' % (
+        ret = 'oid, *' if 'oid' in attnames else '*'
+        q = 'INSERT INTO %s (%s) VALUES (%s) RETURNING %s' % (
             self._escape_qualified_name(cl), names, values, ret)
         self._do_debug(q, params)
         res = self.db.query(q, params)
-        if ret:
-            res = res.dictresult()[0]
-            for n, value in res.items():
-                if n == 'oid':
-                    n = qoid
-                elif attnames.get(n) == 'bytea' and value is not None:
-                    value = self.unescape_bytea(value)
-                d[n] = value
-        elif isinstance(res, int):
-            d[qoid] = res
-            if selectable:
-                self.get(cl, d, 'oid')
-        elif selectable:
-            if qoid in d:
-                self.get(cl, d, 'oid')
-            else:
-                try:
-                    self.get(cl, d)
-                except ProgrammingError:
-                    pass  # table has no primary key
+        res = res.dictresult()[0]
+        for n, value in res.items():
+            if n == 'oid':
+                n = qoid
+            elif attnames.get(n) == 'bytea' and value is not None:
+                value = self.unescape_bytea(value)
+            d[n] = value
         return d
 
     def update(self, cl, d=None, **kw):
@@ -741,9 +724,9 @@ class DB(object):
 
         Similar to insert but updates an existing row.  The update is based
         on the OID value as munged by get or passed as keyword, or on the
-        primary key of the table.  The dictionary is modified, if possible,
-        to reflect any changes caused by the update due to triggers, rules,
-        default values, etc.
+        primary key of the table.  The dictionary is modified to reflect
+        any changes caused by the update due to triggers, rules, default
+        values, etc.
 
         """
         # Update always works on the oid which get returns if available,
@@ -782,29 +765,18 @@ class DB(object):
         if not values:
             return d
         values = ', '.join(values)
-        selectable = self.has_table_privilege(cl)
-        if selectable:
-            ret = ' RETURNING %s*' % ('oid, ' if 'oid' in attnames else '')
-        else:
-            ret = ''
-        q = 'UPDATE %s SET %s WHERE %s%s' % (
+        ret = 'oid, *' if 'oid' in attnames else '*'
+        q = 'UPDATE %s SET %s WHERE %s RETURNING %s' % (
             self._escape_qualified_name(cl), values, where, ret)
         self._do_debug(q, params)
         res = self.db.query(q, params)
-        if ret:
-            res = res.dictresult()[0]
-            for n, value in res.items():
-                if n == 'oid':
-                    n = qoid
-                elif attnames.get(n) == 'bytea' and value is not None:
-                    value = self.unescape_bytea(value)
-                d[n] = value
-        else:
-            if selectable:
-                if qoid in d:
-                    self.get(cl, d, 'oid')
-                else:
-                    self.get(cl, d)
+        res = res.dictresult()[0]
+        for n, value in res.items():
+            if n == 'oid':
+                n = qoid
+            elif attnames.get(n) == 'bytea' and value is not None:
+                value = self.unescape_bytea(value)
+            d[n] = value
         return d
 
     def clear(self, cl, a=None):

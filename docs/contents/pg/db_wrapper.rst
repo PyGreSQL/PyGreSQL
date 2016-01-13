@@ -181,8 +181,8 @@ not supplied then the required values must be included as keyword/value
 pairs.  If a dictionary is supplied then any keywords provided will be
 added to or replace the entry in the dictionary.
 
-The dictionary is then, if possible, reloaded with the values actually
-inserted in order to pick up values modified by rules, triggers, etc.
+The dictionary is then reloaded with the values actually inserted in order
+to pick up values modified by rules, triggers, etc.
 
 Note: The method currently doesn't support insert into views
 although PostgreSQL does.
@@ -201,8 +201,8 @@ update -- update a row in a database table
 
 Similar to insert but updates an existing row.  The update is based on the
 OID value as munged by get or passed as keyword, or on the primary key of
-the table.  The dictionary is modified, if possible, to reflect any changes
-caused by the update due to triggers, rules, default values, etc.
+the table.  The dictionary is modified to reflect any changes caused by the
+update due to triggers, rules, default values, etc.
 
 Like insert, the dictionary is optional and updates will be performed
 on the fields in the keywords.  There must be an OID or primary key
