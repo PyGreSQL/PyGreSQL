@@ -125,8 +125,8 @@ get_attnames -- get the attribute names of a table
 
 Given the name of a table, digs out the set of attribute names.
 
-has_table_privilege -- check whether current user has specified table privilege
--------------------------------------------------------------------------------
+has_table_privilege -- check table privilege
+--------------------------------------------
 
 .. method:: DB.has_table_privilege(table, privilege)
 
@@ -140,6 +140,70 @@ has_table_privilege -- check whether current user has specified table privilege
 Returns True if the current user has the specified privilege for the table.
 
 .. versionadded:: 4.0
+
+begin/commit/rollback/savepoint/release -- transaction handling
+---------------------------------------------------------------
+
+.. method:: DB.begin([mode])
+
+    Begin a transaction
+
+    :param str mode: an optional transaction mode such as 'READ ONLY'
+
+    This initiates a transaction block, that is, all following queries
+    will be executed in a single transaction until :meth:`DB.commit`
+    or :meth:`DB.rollback` is called.
+
+.. versionadded:: 4.1
+
+.. method:: DB.start()
+
+    This is the same as the :meth:`DB.begin` method.
+
+.. method:: DB.commit()
+
+    Commit a transaction
+
+    This commits the current transaction. All changes made by the
+    transaction become visible to others and are guaranteed to be
+    durable if a crash occurs.
+
+.. method:: DB.end()
+
+    This is the same as the :meth:`DB.commit` method.
+
+.. versionadded:: 4.1
+
+.. method:: DB.rollback([name])
+
+    Roll back a transaction
+
+    :param str name: optionally, roll back to the specified savepoint
+
+    This rolls back the current transaction and causes all the updates
+    made by the transaction to be discarded.
+
+.. versionadded:: 4.1
+
+.. method:: DB.savepoint(name)
+
+    Define a new savepoint
+
+    :param str name: the name to give to the new savepoint
+
+    This establishes a new savepoint within the current transaction.
+
+.. versionadded:: 4.1
+
+.. method:: DB.release(name)
+
+    Destroy a savepoint
+
+    :param str name: the name of the savepoint to destroy
+
+    This destroys a savepoint previously defined in the current transaction.
+
+.. versionadded:: 4.1
 
 get -- get a row from a database table or view
 ----------------------------------------------

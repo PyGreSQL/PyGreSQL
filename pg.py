@@ -445,18 +445,15 @@ class DB(object):
     end = commit
 
     def rollback(self, name=None):
-        """Rollback the current transaction."""
+        """Roll back the current transaction."""
         qstr = 'ROLLBACK'
         if name:
             qstr += ' TO ' + name
         return self.query(qstr)
 
-    def savepoint(self, name=None):
+    def savepoint(self, name):
         """Define a new savepoint within the current transaction."""
-        qstr = 'SAVEPOINT'
-        if name:
-            qstr += ' ' + name
-        return self.query(qstr)
+        return self.query('SAVEPOINT ' + name)
 
     def release(self, name):
         """Destroy a previously defined savepoint."""
