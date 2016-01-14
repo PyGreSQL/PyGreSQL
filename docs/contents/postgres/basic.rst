@@ -60,7 +60,7 @@ Now we want to fill our tables with data. An **INSERT** statement is used
 to insert a new row into a table. There are several ways you can specify
 what columns the data should go to.
 
-Let us insert a row into each of these tables. Tthe simplest case is when
+Let us insert a row into each of these tables. The simplest case is when
 the list of values corresponds to the order of the columns specified in the
 CREATE TABLE command::
 
