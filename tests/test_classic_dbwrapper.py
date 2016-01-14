@@ -48,6 +48,11 @@ try:
 except NameError:  # Python >= 3.0
     unicode = str
 
+try:
+    from collections import OrderedDict
+except ImportError:  # Python 2.6 or 3.0
+    OrderedDict = dict
+
 windows = os.name == 'nt'
 
 # There is a known a bug in libpq under Windows which can cause
@@ -406,6 +411,90 @@ class TestDBClass(unittest.TestCase):
             b'\\x746861742773206be47365')
         self.assertEqual(f(r'\\x4f007073ff21'), b'\\x4f007073ff21')
 
+    def testGetAttnames(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        query("drop table if exists test_table")
+        query("create table test_table("
+            " n int, alpha smallint, beta bool,"
+            " gamma char(5), tau text, v varchar(3))")
+        r = get_attnames("test_table")
+        self.assertIsInstance(r, dict)
+        self.assertEquals(r, dict(
+            n='int', alpha='int', beta='bool',
+            gamma='text', tau='text', v='text'))
+        query("drop table test_table")
+
+    def testGetAttnamesWithQuotes(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        table = 'test table for get_attnames()'
+        query('drop table if exists "%s"' % table)
+        query('create table "%s"('
+            '"Prime!" smallint,'
+            '"much space" integer, "Questions?" text)' % table)
+        r = get_attnames(table)
+        self.assertIsInstance(r, dict)
+        self.assertEquals(r, {
+            'Prime!': 'int', 'much space': 'int', 'Questions?': 'text'})
+        query('drop table "%s"' % table)
+
+    def testGetAttnamesWithRegtypes(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        query("drop table if exists test_table")
+        query("create table test_table("
+            " n int, alpha smallint, beta bool,"
+            " gamma char(5), tau text, v varchar(3))")
+        self.db.use_regtypes(True)
+        try:
+            r = get_attnames("test_table")
+            self.assertIsInstance(r, dict)
+        finally:
+            self.db.use_regtypes(False)
+        self.assertEquals(r, dict(
+            n='integer', alpha='smallint', beta='boolean',
+            gamma='character', tau='text', v='character varying'))
+        query("drop table test_table")
+
+    def testGetAttnamesIsCached(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        query("drop table if exists test_table")
+        query("create table test_table(col int)")
+        r = get_attnames("test_table")
+        self.assertIsInstance(r, dict)
+        self.assertEquals(r, dict(col='int'))
+        query("drop table test_table")
+        query("create table test_table(col text)")
+        r = get_attnames("test_table")
+        self.assertEquals(r, dict(col='int'))
+        r = get_attnames("test_table", flush=True)
+        self.assertEquals(r, dict(col='text'))
+        query("drop table test_table")
+        r = get_attnames("test_table")
+        self.assertEquals(r, dict(col='text'))
+        self.assertRaises(pg.ProgrammingError,
+            get_attnames, "test_table", flush=True)
+
+    def testGetAttnamesIsOrdered(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        query("drop table if exists test_table")
+        query("create table test_table("
+            " n int, alpha smallint, v varchar(3),"
+            " gamma char(5), tau text, beta bool)")
+        r = get_attnames("test_table")
+        self.assertIsInstance(r, OrderedDict)
+        self.assertEquals(r, OrderedDict([
+            ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
+            ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
+        query("drop table test_table")
+        if OrderedDict is dict:
+            self.skipTest('OrderedDict is not supported')
+        r = ' '.join(list(r.keys()))
+        self.assertEquals(r, 'n alpha v gamma tau beta')
+
     def testQuery(self):
         query = self.db.query
         query("drop table if exists test_table")
@@ -696,10 +785,10 @@ class TestDBClass(unittest.TestCase):
                     "%d, %d, '%s')" % (table, n + 1, m + 1, t))
         self.assertRaises(pg.ProgrammingError, get, table, 2)
         self.assertEqual(get(table, dict(n=2, m=2))['t'], 'd')
-        self.assertEqual(get(table, dict(n=1, m=2),
-                             ('n', 'm'))['t'], 'b')
-        self.assertEqual(get(table, dict(n=3, m=2),
-                             frozenset(['n', 'm']))['t'], 'f')
+        r = get(table, dict(n=1, m=2), ('n', 'm'))
+        self.assertEqual(r['t'], 'b')
+        r = get(table, dict(n=3, m=2), frozenset(['n', 'm']))
+        self.assertEqual(r['t'], 'f')
         query('drop table "%s"' % table)
 
     def testGetWithQuotedNames(self):

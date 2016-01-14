@@ -40,6 +40,11 @@ from collections import namedtuple
 from functools import partial
 
 try:
+    from collections import OrderedDict
+except ImportError:  # Python 2.6 or 3.0
+    OrderedDict = dict
+
+try:
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
@@ -553,8 +558,12 @@ class DB(object):
         Returns a dictionary of attribute names (the names are the keys,
         the values are the names of the attributes' types).
 
-        If the optional newattnames exists, it must be a dictionary and
-        will become the new attribute names dictionary.
+        If your Python version supports this, the dictionary will be an
+        OrderedDictionary with the column names in the right order.
+
+        If flush is set then the internal cache for attribute names will
+        be flushed. This may be necessary after the database schema or
+        the search path has been changed.
 
         By default, only a limited number of simple types will be returned.
         You can get the regular types after calling use_regtypes(True).
@@ -572,16 +581,15 @@ class DB(object):
                 " JOIN pg_type t ON t.oid = a.atttypid"
                 " WHERE a.attrelid = %s::regclass"
                 " AND (a.attnum > 0 OR a.attname = 'oid')"
-                " AND NOT a.attisdropped") % (
+                " AND NOT a.attisdropped ORDER BY a.attnum") % (
                     '::regtype' if self._regtypes else '',
                     self._prepare_qualified_param(table, 1))
             names = self.db.query(q, (table,)).getresult()
             if not names:
                 raise KeyError('Table %s does not exist' % table)
-            if self._regtypes:
-                names = dict(names)
-            else:
-                names = dict((name, _simpletype(typ)) for name, typ in names)
+            if not self._regtypes:
+                names = ((name, _simpletype(typ)) for name, typ in names)
+            names = OrderedDict(names)
             attnames[table] = names  # cache it
         return names
 

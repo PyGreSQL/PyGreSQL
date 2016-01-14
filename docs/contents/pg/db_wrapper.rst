@@ -125,6 +125,17 @@ get_attnames -- get the attribute names of a table
 
 Given the name of a table, digs out the set of attribute names.
 
+Returns a dictionary of attribute names (the names are the keys,
+the values are the names of the attributes' types).
+
+If your Python version supports this, the dictionary will be an
+OrderedDictionary with the column names in the right order.
+
+By default, only a limited number of simple types will be returned.
+You can get the regular types after enabling this by calling the
+:meth:`DB.use_regtypes` method.
+
+
 has_table_privilege -- check table privilege
 --------------------------------------------
 
