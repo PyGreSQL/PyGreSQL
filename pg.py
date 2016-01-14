@@ -370,6 +370,10 @@ class DB(object):
         params.append(value)
         return '$%d' % len(params)
 
+    def _list_params(self, params):
+        """Create a human readable parameter list."""
+        return ', '.join('$%d=%r' % (n, v) for n, v in enumerate(params, 1))
+
     @staticmethod
     def _prepare_qualified_param(name, param):
         """Quote parameter representing a qualified name.
@@ -660,7 +664,8 @@ class DB(object):
         q = self.db.query(q, params)
         res = q.dictresult()
         if not res:
-            raise _db_error('No such record in %s where %s' % (table, where))
+            raise _db_error('No such record in %s\nwhere %s\nwith %s' % (
+                table, where, self._list_params(params)))
         for n, value in res[0].items():
             if n == 'oid':
                 n = qoid
