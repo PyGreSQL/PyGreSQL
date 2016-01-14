@@ -264,6 +264,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.c = connect()
 
     def tearDown(self):
+        self.doCleanups()
         self.c.close()
 
     def testClassName(self):
@@ -506,6 +507,7 @@ class TestSimpleQueries(unittest.TestCase):
     def testQuery(self):
         query = self.c.query
         query("drop table if exists test_table")
+        self.addCleanup(query, "drop table test_table")
         q = "create table test_table (n integer) with oids"
         r = query(q)
         self.assertIsNone(r)
@@ -536,7 +538,6 @@ class TestSimpleQueries(unittest.TestCase):
         r = query(q)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
-        query("drop table test_table")
 
 
 class TestUnicodeQueries(unittest.TestCase):
@@ -1204,6 +1205,7 @@ class TestNotificatons(unittest.TestCase):
         self.c = connect()
 
     def tearDown(self):
+        self.doCleanups()
         self.c.close()
 
     def testGetNotify(self):
@@ -1250,31 +1252,29 @@ class TestNotificatons(unittest.TestCase):
         self.assertIs(self.c.get_notice_receiver(), r)
 
     def testNoticeReceiver(self):
+        self.addCleanup(self.c.query, 'drop function bilbo_notice();')
         self.c.query('''create function bilbo_notice() returns void AS $$
             begin
                 raise warning 'Bilbo was here!';
             end;
             $$ language plpgsql''')
-        try:
-            received = {}
+        received = {}
 
-            def notice_receiver(notice):
-                for attr in dir(notice):
-                    if attr.startswith('__'):
-                        continue
-                    value = getattr(notice, attr)
-                    if isinstance(value, str):
-                        value = value.replace('WARNUNG', 'WARNING')
-                    received[attr] = value
+        def notice_receiver(notice):
+            for attr in dir(notice):
+                if attr.startswith('__'):
+                    continue
+                value = getattr(notice, attr)
+                if isinstance(value, str):
+                    value = value.replace('WARNUNG', 'WARNING')
+                received[attr] = value
 
-            self.c.set_notice_receiver(notice_receiver)
-            self.c.query('''select bilbo_notice()''')
-            self.assertEqual(received, dict(
-                pgcnx=self.c, message='WARNING:  Bilbo was here!\n',
-                severity='WARNING', primary='Bilbo was here!',
-                detail=None, hint=None))
-        finally:
-            self.c.query('''drop function bilbo_notice();''')
+        self.c.set_notice_receiver(notice_receiver)
+        self.c.query('select bilbo_notice()')
+        self.assertEqual(received, dict(
+            pgcnx=self.c, message='WARNING:  Bilbo was here!\n',
+            severity='WARNING', primary='Bilbo was here!',
+            detail=None, hint=None))
 
 
 class TestConfigFunctions(unittest.TestCase):
