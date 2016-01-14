@@ -724,6 +724,45 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('v4', r)
         self.assertEqual(r['v4'], 'abc4')
 
+    def testGetLittleBobbyTables(self):
+        get = self.db.get
+        query = self.db.query
+        query("drop table if exists test_students")
+        query("create table test_students (firstname varchar primary key,"
+            " nickname varchar, grade char(2))")
+        query("insert into test_students values ("
+              "'D''Arcy', 'Darcey', 'A+')")
+        query("insert into test_students values ("
+              "'Sheldon', 'Moonpie', 'A+')")
+        query("insert into test_students values ("
+              "'Robert', 'Little Bobby Tables', 'D-')")
+        r = get('test_students', 'Sheldon')
+        self.assertEqual(r, dict(
+            firstname="Sheldon", nickname='Moonpie', grade='A+'))
+        r = get('test_students', 'Robert')
+        self.assertEqual(r, dict(
+            firstname="Robert", nickname='Little Bobby Tables', grade='D-'))
+        r = get('test_students', "D'Arcy")
+        self.assertEqual(r, dict(
+            firstname="D'Arcy", nickname='Darcey', grade='A+'))
+        try:
+            get('test_students', "D' Arcy")
+        except pg.DatabaseError as error:
+            self.assertEqual(str(error),
+                'No such record in public.test_students where firstname = '
+                "'D'' Arcy'")
+        try:
+            get('test_students', "Robert'); TRUNCATE TABLE test_students;--")
+        except pg.DatabaseError as error:
+            self.assertEqual(str(error),
+                'No such record in public.test_students where firstname = '
+                "'Robert''); TRUNCATE TABLE test_students;--'")
+        q = "select * from test_students order by 1 limit 4"
+        r = query(q).getresult()
+        self.assertEqual(len(r), 3)
+        self.assertEqual(r[1][2], 'D-')
+        query('drop table test_students')
+
     def testInsert(self):
         insert = self.db.insert
         query = self.db.query
