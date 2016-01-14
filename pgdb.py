@@ -61,7 +61,6 @@ Basic usage:
     cursor.close() # close the cursor
 
     connection.close() # close the connection
-
 """
 
 from __future__ import print_function
@@ -165,14 +164,14 @@ _cast = {'bool': _cast_bool, 'bytea': _cast_bytea,
 
 
 def _db_error(msg, cls=DatabaseError):
-    """Returns DatabaseError with empty sqlstate attribute."""
+    """Return DatabaseError with empty sqlstate attribute."""
     error = cls(msg)
     error.sqlstate = None
     return error
 
 
 def _op_error(msg):
-    """Returns OperationalError."""
+    """Return OperationalError."""
     return _db_error(msg, OperationalError)
 
 
@@ -217,7 +216,6 @@ class _quotedict(dict):
     """Dictionary with auto quoting of its items.
 
     The quote attribute must be set to the desired quote function.
-
     """
 
     def __getitem__(self, key):
@@ -249,7 +247,7 @@ class Cursor(object):
         self.lastrowid = None
 
     def __iter__(self):
-        """Make cursors compatible to the iteration protocol."""
+        """Make cursor compatible to the iteration protocol."""
         return self
 
     def __enter__(self):
@@ -296,7 +294,6 @@ class Cursor(object):
         """Quote parameters.
 
         This function works for both mappings and sequences.
-
         """
         if isinstance(parameters, dict):
             parameters = _quotedict(parameters)
@@ -400,7 +397,6 @@ class Cursor(object):
         size parameter. If it is not given, the cursor's arraysize
         determines the number of rows to be fetched. If you set
         the keep parameter to true, this is kept as new arraysize.
-
         """
         if size is None:
             size = self.arraysize
@@ -426,7 +422,6 @@ class Cursor(object):
 
         The procedure may also provide a result set as output. These can be
         requested through the standard fetch methods of the cursor.
-
         """
         n = parameters and len(parameters) or 0
         query = 'select * from "%s"(%s)' % (procname, ','.join(n * ['%s']))
@@ -450,7 +445,6 @@ class Cursor(object):
 
         The copy operation can be restricted to a subset of columns. If no
         columns are specified, all of them will be copied.
-
         """
         binary_format = format == 'binary'
         try:
@@ -467,7 +461,7 @@ class Cursor(object):
 
             if isinstance(stream, basestring):
                 if not isinstance(stream, input_type):
-                    raise ValueError("the input must be %s" % type_name)
+                    raise ValueError("The input must be %s" % type_name)
                 if not binary_format:
                     if isinstance(stream, str):
                         if not stream.endswith('\n'):
@@ -485,7 +479,7 @@ class Cursor(object):
                     for chunk in stream:
                         if not isinstance(chunk, input_type):
                             raise ValueError(
-                                "input stream must consist of %s" % type_name)
+                                "Input stream must consist of %s" % type_name)
                         if isinstance(chunk, str):
                             if not chunk.endswith('\n'):
                                 chunk += '\n'
@@ -495,13 +489,13 @@ class Cursor(object):
                         yield chunk
 
             else:
-                raise TypeError("need an input stream to copy from")
+                raise TypeError("Need an input stream to copy from")
         else:
             if size is None:
                 size = 8192
             if size > 0:
                 if not isinstance(size, int):
-                    raise TypeError("the size option must be an integer")
+                    raise TypeError("The size option must be an integer")
 
                 def chunks():
                     while True:
@@ -516,9 +510,9 @@ class Cursor(object):
                     yield read()
 
         if not table or not isinstance(table, basestring):
-            raise TypeError("need a table to copy to")
+            raise TypeError("Need a table to copy to")
         if table.lower().startswith('select'):
-                raise ValueError("must specify a table, not a query")
+                raise ValueError("Must specify a table, not a query")
         else:
             table = '"%s"' % (table,)
         operation = ['copy %s' % (table,)]
@@ -526,13 +520,13 @@ class Cursor(object):
         params = []
         if format is not None:
             if not isinstance(format, basestring):
-                raise TypeError("the format options be a string")
+                raise TypeError("format option must be be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("invalid format")
             options.append('format %s' % (format,))
         if sep is not None:
             if not isinstance(sep, basestring):
-                raise TypeError("the sep option must be a string")
+                raise TypeError("sep option must be a string")
             if format == 'binary':
                 raise ValueError("sep is not allowed with binary format")
             if len(sep) != 1:
@@ -541,7 +535,7 @@ class Cursor(object):
             params.append(sep)
         if null is not None:
             if not isinstance(null, basestring):
-                raise TypeError("the null option must be a string")
+                raise TypeError("null option must be a string")
             options.append('null %s')
             params.append(null)
         if columns:
@@ -587,7 +581,6 @@ class Cursor(object):
 
         The copy operation can be restricted to a subset of columns. If no
         columns are specified, all of them will be copied.
-
         """
         binary_format = format == 'binary'
         if stream is not None:
@@ -608,13 +601,13 @@ class Cursor(object):
         params = []
         if format is not None:
             if not isinstance(format, basestring):
-                raise TypeError("the format options be a string")
+                raise TypeError("format option must be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("invalid format")
             options.append('format %s' % (format,))
         if sep is not None:
             if not isinstance(sep, basestring):
-                raise TypeError("the sep option must be a string")
+                raise TypeError("sep option must be a string")
             if binary_format:
                 raise ValueError("sep is not allowed with binary format")
             if len(sep) != 1:
@@ -623,7 +616,7 @@ class Cursor(object):
             params.append(sep)
         if null is not None:
             if not isinstance(null, basestring):
-                raise TypeError("the null option must be a string")
+                raise TypeError("null option must be a string")
             options.append('null %s')
             params.append(null)
         if decode is None:
@@ -633,7 +626,7 @@ class Cursor(object):
                 decode = str is unicode
         else:
             if not isinstance(decode, (int, bool)):
-                raise TypeError("the decode option must be a boolean")
+                raise TypeError("decode option must be a boolean")
             if decode and binary_format:
                 raise ValueError("decode is not allowed with binary format")
         if columns:
@@ -715,7 +708,6 @@ class Cursor(object):
 
             cur = DictCursor(con)  # get one DictCursor instance or
             con.cursor_type = DictCursor  # always use DictCursor instances
-
         """
         raise NotImplementedError
 
@@ -725,7 +717,6 @@ class Cursor(object):
         This implementation builds a row factory for creating named tuples.
         You can overwrite this method if you want to dynamically create
         different row factories whenever the column description changes.
-
         """
         colnames = self.colnames
         if colnames:
@@ -778,7 +769,6 @@ class Connection(object):
         """Enter the runtime context for the connection object.
 
         The runtime context can be used for running transactions.
-
         """
         return self
 
@@ -786,7 +776,6 @@ class Connection(object):
         """Exit the runtime context for the connection object.
 
         This does not close the connection, but it ends a transaction.
-
         """
         if et is None and ev is None and tb is None:
             self.commit()
@@ -866,7 +855,7 @@ _connect_ = connect
 def connect(dsn=None,
         user=None, password=None,
         host=None, database=None):
-    """Connects to a database."""
+    """Connect to a database."""
     # first get params from DSN
     dbport = -1
     dbhost = ""
@@ -917,7 +906,6 @@ class Type(frozenset):
 
     PostgreSQL is object-oriented: types are dynamic.
     We must thus use type names as internal type codes.
-
     """
 
     def __new__(cls, values):
@@ -976,7 +964,7 @@ def Time(hour, minute=0, second=0, microsecond=0):
 
 
 def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0):
-    """construct an object holding a time stamp value."""
+    """construct an object holding a time stamp valu."""
     return datetime(year, month, day, hour, minute, second, microsecond)
 
 

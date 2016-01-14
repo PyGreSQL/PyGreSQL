@@ -12,7 +12,6 @@ It includes the _pg module and builds on it, providing the higher
 level wrapper class named DB with additional functionality.
 This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
-
 """
 
 # Copyright (c) 1997-2016 by D'Arcy J.M. Cain.
@@ -87,19 +86,19 @@ set_namedresult(_namedresult)
 
 
 def _db_error(msg, cls=DatabaseError):
-    """Returns DatabaseError with empty sqlstate attribute."""
+    """Return DatabaseError with empty sqlstate attribute."""
     error = cls(msg)
     error.sqlstate = None
     return error
 
 
 def _int_error(msg):
-    """Returns InternalError."""
+    """Return InternalError."""
     return _db_error(msg, InternalError)
 
 
 def _prg_error(msg):
-    """Returns ProgrammingError."""
+    """Return ProgrammingError."""
     return _db_error(msg, ProgrammingError)
 
 
@@ -116,7 +115,6 @@ class NotificationHandler(object):
         timeout  - Timeout in seconds; a floating point number denotes
                    fractions of seconds. If it is absent or None, the
                    callers will never time out.
-
         """
         if isinstance(db, DB):
             db = db.db
@@ -159,7 +157,6 @@ class NotificationHandler(object):
 
         Note: If the main loop is running in another thread, you must pass
         a different database connection to avoid a collision.
-
         """
         if not db:
             db = self.db
@@ -183,7 +180,6 @@ class NotificationHandler(object):
 
         Note: If you run this loop in another thread, don't use the same
         database connection for database operations in the main thread.
-
         """
         self.listen()
         _ilist = [self.db.fileno()]
@@ -199,7 +195,7 @@ class NotificationHandler(object):
                     if event not in (self.event, self.stop_event):
                         self.unlisten()
                         raise _db_error(
-                            'listening for "%s" and "%s", but notified of "%s"'
+                            'Listening for "%s" and "%s", but notified of "%s"'
                             % (self.event, self.stop_event, event))
                     if event == self.stop_event:
                         self.unlisten()
@@ -214,7 +210,7 @@ class NotificationHandler(object):
 
 def pgnotify(*args, **kw):
     """Same as NotificationHandler, under the traditional name."""
-    warnings.warn("pgnotify is deprecated, use NotificationHandler instead.",
+    warnings.warn("pgnotify is deprecated, use NotificationHandler instead",
         DeprecationWarning, stacklevel=2)
     return NotificationHandler(*args, **kw)
 
@@ -225,12 +221,11 @@ class DB(object):
     """Wrapper class for the _pg connection type."""
 
     def __init__(self, *args, **kw):
-        """Create a new connection.
+        """Create a new connection
 
         You can pass either the connection parameters or an existing
         _pg or pgdb connection. This allows you to use the methods
         of the classic pg interface with a DB-API 2 pgdb connection.
-
         """
         if not args and len(kw) == 1:
             db = kw.get('db')
@@ -281,7 +276,7 @@ class DB(object):
     # Context manager methods
 
     def __enter__(self):
-        """Enter the runtime context. This will start a transaction."""
+        """Enter the runtime context. This will start a transactio."""
         self.begin()
         return self
 
@@ -295,7 +290,7 @@ class DB(object):
     # Auxiliary methods
 
     def _do_debug(self, *args):
-        """Print a debug message."""
+        """Print a debug message"""
         if self.debug:
             s = '\n'.join(args)
             if isinstance(self.debug, basestring):
@@ -314,7 +309,6 @@ class DB(object):
         name contains a dot, in which case the name is ambiguous
         (could be a qualified name or just a name with a dot in it)
         and must be quoted manually by the caller.
-
         """
         if '.' not in s:
             s = self.escape_identifier(s)
@@ -465,7 +459,7 @@ class DB(object):
         return self.query('RELEASE ' + name)
 
     def query(self, qstr, *args):
-        """Executes a SQL command string.
+        """Execute a SQL command string.
 
         This method simply sends a SQL query to the database. If the query is
         an insert statement that inserted exactly one row into a table that
@@ -482,7 +476,6 @@ class DB(object):
         of any data constant. Arguments given after the query string will
         be substituted for the corresponding numbered parameter. Parameter
         values can also be given as a single list or tuple argument.
-
         """
         # Wraps shared library function for debugging.
         if not self.db:
@@ -491,7 +484,7 @@ class DB(object):
         return self.db.query(qstr, args)
 
     def pkey(self, table, flush=False):
-        """This method gets or sets the primary key of a table.
+        """Get or set the primary key of a table.
 
         Composite primary keys are represented as frozensets. Note that
         this raises a KeyError if the table does not have a primary key.
@@ -499,12 +492,11 @@ class DB(object):
         If flush is set then the internal cache for primary keys will
         be flushed. This may be necessary after the database schema or
         the search path has been changed.
-
         """
         pkeys = self._pkeys
         if flush:
             pkeys.clear()
-            self._do_debug('pkey cache has been flushed')
+            self._do_debug('The pkey cache has been flushed')
         try:  # cache lookup
             pkey = pkeys[table]
         except KeyError:  # cache miss, check the database
@@ -536,7 +528,6 @@ class DB(object):
         If kinds is None or empty, all kinds of relations are returned.
         Otherwise kinds can be a string or sequence of type letters
         specifying which kind of relations you want to list.
-
         """
         where = " AND r.relkind IN (%s)" % ','.join(
             ["'%s'" % k for k in kinds]) if kinds else ''
@@ -553,7 +544,7 @@ class DB(object):
         return self.get_relations('r')
 
     def get_attnames(self, table, flush=False):
-        """Given the name of a table, digs out the set of attribute names.
+        """Given the name of a table, dig out the set of attribute names.
 
         Returns a dictionary of attribute names (the names are the keys,
         the values are the names of the attributes' types).
@@ -567,12 +558,11 @@ class DB(object):
 
         By default, only a limited number of simple types will be returned.
         You can get the regular types after calling use_regtypes(True).
-
         """
         attnames = self._attnames
         if flush:
             attnames.clear()
-            self._do_debug('pkey cache has been flushed')
+            self._do_debug('The attnames cache has been flushed')
         try:  # cache lookup
             names = attnames[table]
         except KeyError:  # cache miss, check the database
@@ -629,7 +619,6 @@ class DB(object):
         The OID is also put into the dictionary if the table has one, but
         in order to allow the caller to work with multiple tables, it is
         munged as "oid(table)".
-
         """
         if table.endswith('*'):  # scan descendant tables?
             table = table[:-1].rstrip()  # need parent table name
@@ -695,7 +684,6 @@ class DB(object):
 
         Note: The method currently doesn't support insert into views
         although PostgreSQL does.
-
         """
         if 'oid' in kw:
             del kw['oid']
@@ -719,7 +707,7 @@ class DB(object):
         q = self.db.query(q, params)
         res = q.dictresult()
         if not res:
-            raise _int_error('insert did not return new values')
+            raise _int_error('Insert operation did not return new values')
         for n, value in res[0].items():
             if n == 'oid':
                 n = _oid_key(table)
@@ -736,7 +724,6 @@ class DB(object):
         primary key of the table.  The dictionary is modified to reflect
         any changes caused by the update due to triggers, rules, default
         values, etc.
-
         """
         # Update always works on the oid which get() returns if available,
         # otherwise use the primary key.  Fail if neither.
@@ -766,7 +753,7 @@ class DB(object):
                 where = ' AND '.join('%s = %s' % (
                     col(k), param(row[k], attnames[k])) for k in keyname)
             except KeyError:
-                raise _prg_error('update needs primary key or oid')
+                raise _prg_error('Update operation needs primary key or oid')
         keyname = set(keyname)
         keyname.add('oid')
         values = []
@@ -792,7 +779,7 @@ class DB(object):
         return row
 
     def upsert(self, table, row=None, **kw):
-        """Insert a row into a database table with conflict resolution.
+        """Insert a row into a database table with conflict resolution
 
         This method inserts a row into a table, but instead of raising a
         ProgrammingError exception in case a row with the same primary key
@@ -833,7 +820,6 @@ class DB(object):
 
         Note: The method uses the PostgreSQL "upsert" feature which is
         only available since PostgreSQL 9.5.
-
         """
         if 'oid' in kw:
             del kw['oid']
@@ -858,7 +844,7 @@ class DB(object):
         try:
             target = ', '.join(col(k) for k in keyname)
         except KeyError:
-            raise _prg_error('upsert needs primary key or oid')
+            raise _prg_error('Upsert operation needs primary key or oid')
         update = []
         keyname = set(keyname)
         keyname.add('oid')
@@ -882,7 +868,8 @@ class DB(object):
             q = self.db.query(q, params)
         except ProgrammingError:
             if self.server_version < 90500:
-                raise _prg_error('upsert not supported by PostgreSQL version')
+                raise _prg_error(
+                    'Upsert operation is not supported by PostgreSQL version')
             raise  # re-raise original error
         res = q.dictresult()
         if res:  # may be empty with "do nothing"
@@ -893,7 +880,7 @@ class DB(object):
                     value = self.unescape_bytea(value)
                 row[n] = value
         elif update:
-            raise _int_error('upsert did not return new values')
+            raise _int_error('Upsert operation did not return new values')
         else:
             self.get(table, row)
         return row
@@ -905,7 +892,6 @@ class DB(object):
         else is set to the empty string.  If the row argument is present,
         it is used as the row dictionary and any entries matching attribute
         names are cleared with everything else left unchanged.
-
         """
         # At some point we will need a way to get defaults from a table.
         if row is None:
@@ -931,7 +917,6 @@ class DB(object):
         OID value as munged by get or passed as keyword, or on the primary
         key of the table.  The return value is the number of deleted rows
         (i.e. 0 if the row did not exist and 1 if the row was deleted).
-
         """
         # Like update, delete works on the oid.
         # One day we will be testing that the record to be deleted
@@ -961,7 +946,7 @@ class DB(object):
                 where = ' AND '.join('%s = %s' % (
                     col(k), param(row[k], attnames[k])) for k in keyname)
             except KeyError:
-                raise _prg_error('delete needs primary key or oid')
+                raise _prg_error('Delete operation needs primary key or oid')
         q = 'DELETE FROM %s WHERE %s' % (
             self._escape_qualified_name(table), where)
         self._do_debug(q, params)

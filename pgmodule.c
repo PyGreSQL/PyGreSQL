@@ -239,7 +239,7 @@ get_type_array(PGresult *result, int nfields)
 
 	if (!(typ = PyMem_Malloc(sizeof(int) * nfields)))
 	{
-		PyErr_SetString(PyExc_MemoryError, "memory error in getresult().");
+		PyErr_SetString(PyExc_MemoryError, "Memory error in getresult()");
 		return NULL;
 	}
 
@@ -354,7 +354,7 @@ check_cnx_obj(connObject *self)
 {
 	if (!self->valid)
 	{
-		set_dberror(OperationalError, "connection has been closed.", NULL);
+		set_dberror(OperationalError, "Connection has been closed", NULL);
 		return 0;
 	}
 	return 1;
@@ -511,14 +511,14 @@ format_result(const PGresult *res)
 			else
 			{
 				PyErr_SetString(PyExc_MemoryError,
-					"Not enough memory for formatting the query result.");
+					"Not enough memory for formatting the query result");
 				return NULL;
 			}
 		} else {
 			PyMem_Free(aligns);
 			PyMem_Free(sizes);
 			PyErr_SetString(PyExc_MemoryError,
-				"Not enough memory for formatting the query result.");
+				"Not enough memory for formatting the query result");
 			return NULL;
 		}
 	}
@@ -540,7 +540,7 @@ check_lo_obj(largeObject *self, int level)
 
 	if (!self->lo_oid)
 	{
-		set_dberror(IntegrityError, "object is not valid (null oid).", NULL);
+		set_dberror(IntegrityError, "Object is not valid (null oid)", NULL);
 		return 0;
 	}
 
@@ -548,7 +548,7 @@ check_lo_obj(largeObject *self, int level)
 	{
 		if (self->lo_fd < 0)
 		{
-			PyErr_SetString(PyExc_IOError, "object is not opened.");
+			PyErr_SetString(PyExc_IOError, "Object is not opened");
 			return 0;
 		}
 	}
@@ -557,7 +557,7 @@ check_lo_obj(largeObject *self, int level)
 	{
 		if (self->lo_fd >= 0)
 		{
-			PyErr_SetString(PyExc_IOError, "object is already opened.");
+			PyErr_SetString(PyExc_IOError, "Object is already opened");
 			return 0;
 		}
 	}
@@ -595,8 +595,8 @@ largeDealloc(largeObject *self)
 
 /* opens large object */
 static char largeOpen__doc__[] =
-"open(mode) -- open access to large object with specified mode "
-"(INV_READ, INV_WRITE constants defined by module).";
+"open(mode) -- open access to large object with specified mode\n\n"
+"The mode must be one of INV_READ, INV_WRITE (module level constants).\n";
 
 static PyObject *
 largeOpen(largeObject *self, PyObject *args)
@@ -607,7 +607,7 @@ largeOpen(largeObject *self, PyObject *args)
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &mode))
 	{
-		PyErr_SetString(PyExc_TypeError, "open(mode), with mode(integer).");
+		PyErr_SetString(PyExc_TypeError, "open(mode), with mode(integer)");
 		return NULL;
 	}
 
@@ -618,7 +618,7 @@ largeOpen(largeObject *self, PyObject *args)
 	/* opens large object */
 	if ((fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode)) < 0)
 	{
-		PyErr_SetString(PyExc_IOError, "can't open large object.");
+		PyErr_SetString(PyExc_IOError, "Can't open large object");
 		return NULL;
 	}
 	self->lo_fd = fd;
@@ -630,7 +630,7 @@ largeOpen(largeObject *self, PyObject *args)
 
 /* close large object */
 static char largeClose__doc__[] =
-"close() -- close access to large object data.";
+"close() -- close access to large object data";
 
 static PyObject *
 largeClose(largeObject *self, PyObject *args)
@@ -639,7 +639,7 @@ largeClose(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method close() takes no parameters.");
+			"Method close() takes no parameters");
 		return NULL;
 	}
 
@@ -650,7 +650,7 @@ largeClose(largeObject *self, PyObject *args)
 	/* closes large object */
 	if (lo_close(self->pgcnx->cnx, self->lo_fd))
 	{
-		PyErr_SetString(PyExc_IOError, "error while closing large object fd.");
+		PyErr_SetString(PyExc_IOError, "Error while closing large object fd");
 		return NULL;
 	}
 	self->lo_fd = -1;
@@ -662,8 +662,8 @@ largeClose(largeObject *self, PyObject *args)
 
 /* reads from large object */
 static char largeRead__doc__[] =
-"read(integer) -- read from large object to sized string. "
-"Object must be opened in read mode before calling this method.";
+"read(size) -- read from large object to sized string\n\n"
+"Object must be opened in read mode before calling this method.\n";
 
 static PyObject *
 largeRead(largeObject *self, PyObject *args)
@@ -674,13 +674,13 @@ largeRead(largeObject *self, PyObject *args)
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &size))
 	{
-		PyErr_SetString(PyExc_TypeError, "read(size), with size (integer).");
+		PyErr_SetString(PyExc_TypeError, "read(size), with size (integer)");
 		return NULL;
 	}
 
 	if (size <= 0)
 	{
-		PyErr_SetString(PyExc_ValueError, "size must be positive.");
+		PyErr_SetString(PyExc_ValueError, "Parameter size must be positive");
 		return NULL;
 	}
 
@@ -694,7 +694,7 @@ largeRead(largeObject *self, PyObject *args)
 	if ((size = lo_read(self->pgcnx->cnx, self->lo_fd,
 		PyBytes_AS_STRING((PyBytesObject *)(buffer)), size)) < 0)
 	{
-		PyErr_SetString(PyExc_IOError, "error while reading.");
+		PyErr_SetString(PyExc_IOError, "Error while reading");
 		Py_XDECREF(buffer);
 		return NULL;
 	}
@@ -706,8 +706,8 @@ largeRead(largeObject *self, PyObject *args)
 
 /* write to large object */
 static char largeWrite__doc__[] =
-"write(string) -- write sized string to large object. "
-"Object must be opened in read mode before calling this method.";
+"write(string) -- write sized string to large object\n\n"
+"Object must be opened in read mode before calling this method.\n";
 
 static PyObject *
 largeWrite(largeObject *self, PyObject *args)
@@ -720,7 +720,7 @@ largeWrite(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s#", &buffer, &bufsize))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"write(buffer), with buffer (sized string).");
+			"write(buffer), with buffer (sized string)");
 		return NULL;
 	}
 
@@ -732,7 +732,7 @@ largeWrite(largeObject *self, PyObject *args)
 	if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
 						 bufsize)) < bufsize)
 	{
-		PyErr_SetString(PyExc_IOError, "buffer truncated during write.");
+		PyErr_SetString(PyExc_IOError, "Buffer truncated during write");
 		return NULL;
 	}
 
@@ -743,9 +743,9 @@ largeWrite(largeObject *self, PyObject *args)
 
 /* go to position in large object */
 static char largeSeek__doc__[] =
-"seek(off, whence) -- move to specified position. Object must be opened "
-"before calling this method. whence can be SEEK_SET, SEEK_CUR or SEEK_END, "
-"constants defined by module.";
+"seek(offset, whence) -- move to specified position\n\n"
+"Object must be opened before calling this method. The whence option\n"
+"can be SEEK_SET, SEEK_CUR or SEEK_END (module level constants).\n";
 
 static PyObject *
 largeSeek(largeObject *self, PyObject *args)
@@ -759,7 +759,7 @@ largeSeek(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "ii", &offset, &whence))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"lseek(offset, whence), with offset and whence (integers).");
+			"lseek(offset, whence), with offset and whence (integers)");
 		return NULL;
 	}
 
@@ -770,7 +770,7 @@ largeSeek(largeObject *self, PyObject *args)
 	/* sends query */
 	if ((ret = lo_lseek(self->pgcnx->cnx, self->lo_fd, offset, whence)) == -1)
 	{
-		PyErr_SetString(PyExc_IOError, "error while moving cursor.");
+		PyErr_SetString(PyExc_IOError, "Error while moving cursor");
 		return NULL;
 	}
 
@@ -780,8 +780,8 @@ largeSeek(largeObject *self, PyObject *args)
 
 /* gets large object size */
 static char largeSize__doc__[] =
-"size() -- return large object size. "
-"Object must be opened before calling this method.";
+"size() -- return large object size\n\n"
+"The object must be opened before calling this method.\n";
 
 static PyObject *
 largeSize(largeObject *self, PyObject *args)
@@ -793,7 +793,7 @@ largeSize(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method size() takes no parameters.");
+			"Method size() takes no parameters");
 		return NULL;
 	}
 
@@ -804,22 +804,23 @@ largeSize(largeObject *self, PyObject *args)
 	/* gets current position */
 	if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1)
 	{
-		PyErr_SetString(PyExc_IOError, "error while getting current position.");
+		PyErr_SetString(PyExc_IOError, "Error while getting current position");
 		return NULL;
 	}
 
 	/* gets end position */
 	if ((end = lo_lseek(self->pgcnx->cnx, self->lo_fd, 0, SEEK_END)) == -1)
 	{
-		PyErr_SetString(PyExc_IOError, "error while getting end position.");
+		PyErr_SetString(PyExc_IOError, "Error while getting end position");
 		return NULL;
 	}
 
 	/* move back to start position */
-	if ((start = lo_lseek(self->pgcnx->cnx, self->lo_fd, start, SEEK_SET)) == -1)
+	if ((start = lo_lseek(
+		self->pgcnx->cnx, self->lo_fd, start, SEEK_SET)) == -1)
 	{
 		PyErr_SetString(PyExc_IOError,
-			"error while moving back to first position.");
+			"Error while moving back to first position");
 		return NULL;
 	}
 
@@ -829,8 +830,8 @@ largeSize(largeObject *self, PyObject *args)
 
 /* gets large object cursor position */
 static char largeTell__doc__[] =
-"tell() -- give current position in large object. "
-"Object must be opened before calling this method.";
+"tell() -- give current position in large object\n\n"
+"The object must be opened before calling this method.\n";
 
 static PyObject *
 largeTell(largeObject *self, PyObject *args)
@@ -841,7 +842,7 @@ largeTell(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method tell() takes no parameters.");
+			"Method tell() takes no parameters");
 		return NULL;
 	}
 
@@ -852,7 +853,7 @@ largeTell(largeObject *self, PyObject *args)
 	/* gets current position */
 	if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1)
 	{
-		PyErr_SetString(PyExc_IOError, "error while getting position.");
+		PyErr_SetString(PyExc_IOError, "Error while getting position");
 		return NULL;
 	}
 
@@ -862,8 +863,8 @@ largeTell(largeObject *self, PyObject *args)
 
 /* exports large object as unix file */
 static char largeExport__doc__[] =
-"export(string) -- export large object data to specified file. "
-"Object must be closed when calling this method.";
+"export(filename) -- export large object data to specified file\n\n"
+"The object must be closed when calling this method.\n";
 
 static PyObject *
 largeExport(largeObject *self, PyObject *args)
@@ -878,14 +879,14 @@ largeExport(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s", &name))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"export(filename), with filename (string).");
+			"export(filename), with filename (string)");
 		return NULL;
 	}
 
 	/* runs command */
 	if (!lo_export(self->pgcnx->cnx, self->lo_oid, name))
 	{
-		PyErr_SetString(PyExc_IOError, "error while exporting large object.");
+		PyErr_SetString(PyExc_IOError, "Error while exporting large object");
 		return NULL;
 	}
 
@@ -895,8 +896,8 @@ largeExport(largeObject *self, PyObject *args)
 
 /* deletes a large object */
 static char largeUnlink__doc__[] =
-"unlink() -- destroy large object. "
-"Object must be closed when calling this method.";
+"unlink() -- destroy large object\n\n"
+"The object must be closed when calling this method.\n";
 
 static PyObject *
 largeUnlink(largeObject *self, PyObject *args)
@@ -905,7 +906,7 @@ largeUnlink(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method unlink() takes no parameters.");
+			"Method unlink() takes no parameters");
 		return NULL;
 	}
 
@@ -916,7 +917,7 @@ largeUnlink(largeObject *self, PyObject *args)
 	/* deletes the object, invalidate it on success */
 	if (!lo_unlink(self->pgcnx->cnx, self->lo_oid))
 	{
-		PyErr_SetString(PyExc_IOError, "error while unlinking large object");
+		PyErr_SetString(PyExc_IOError, "Error while unlinking large object");
 		return NULL;
 	}
 	self->lo_oid = 0;
@@ -1061,7 +1062,7 @@ connDelete(connObject *self)
 
 /* source creation */
 static char connSource__doc__[] =
-"source() -- creates a new source object for this connection";
+"source() -- create a new source object for this connection";
 
 static PyObject *
 connSource(connObject *self, PyObject *args)
@@ -1075,7 +1076,8 @@ connSource(connObject *self, PyObject *args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_TypeError, "method source() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError,
+			"Method source() takes no parameter");
 		return NULL;
 	}
 
@@ -1095,8 +1097,9 @@ connSource(connObject *self, PyObject *args)
 
 /* database query */
 static char connQuery__doc__[] =
-"query(sql, [args]) -- creates a new query object for this connection, using"
-" sql (string) request and optionally a tuple with positional parameters.";
+"query(sql, [arg]) -- create a new query object for this connection\n\n"
+"You must pass the SQL (string) request and you can optionally pass\n"
+"a tuple with positional parameters.\n";
 
 static PyObject *
 connQuery(connObject *self, PyObject *args)
@@ -1112,7 +1115,7 @@ connQuery(connObject *self, PyObject *args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -1138,7 +1141,7 @@ connQuery(connObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"query command must be a string.");
+			"Query command must be a string");
 		return NULL;
 	}
 
@@ -1149,7 +1152,7 @@ connQuery(connObject *self, PyObject *args)
 	if (param_obj)
 	{
 		param_obj = PySequence_Fast(param_obj,
-			"query parameters must be a sequence.");
+			"Query parameters must be a sequence");
 		if (!param_obj)
 		{
 			Py_XDECREF(query_obj);
@@ -1186,7 +1189,7 @@ connQuery(connObject *self, PyObject *args)
 			PyMem_Free(str);
 			Py_XDECREF(query_obj);
 			Py_XDECREF(param_obj);
-			PyErr_SetString(PyExc_MemoryError, "memory error in query().");
+			PyErr_SetString(PyExc_MemoryError, "Memory error in query()");
 			return NULL;
 		}
 
@@ -1232,7 +1235,7 @@ connQuery(connObject *self, PyObject *args)
 					Py_XDECREF(query_obj);
 					Py_XDECREF(param_obj);
 					PyErr_SetString(PyExc_TypeError,
-						"query parameter has no string representation");
+						"Query parameter has no string representation");
 					return NULL;
 				}
 				*s++ = str_obj;
@@ -1273,7 +1276,7 @@ connQuery(connObject *self, PyObject *args)
 		switch (status)
 		{
 			case PGRES_EMPTY_QUERY:
-				PyErr_SetString(PyExc_ValueError, "empty query.");
+				PyErr_SetString(PyExc_ValueError, "Empty query");
 				break;
 			case PGRES_BAD_RESPONSE:
 			case PGRES_FATAL_ERROR:
@@ -1306,8 +1309,7 @@ connQuery(connObject *self, PyObject *args)
 				Py_INCREF(Py_None);
 				return Py_None;
 			default:
-				set_dberror(InternalError,
-					"internal error: unknown result status.", result);
+				set_dberror(InternalError, "Unknown result status", result);
 		}
 
 		PQclear(result);
@@ -1328,7 +1330,7 @@ connQuery(connObject *self, PyObject *args)
 
 #ifdef DIRECT_ACCESS
 static char connPutLine__doc__[] =
-"putline() -- sends a line directly to the backend";
+"putline(line) -- send a line directly to the backend";
 
 /* direct access function: putline */
 static PyObject *
@@ -1339,14 +1341,14 @@ connPutLine(connObject *self, PyObject *args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
 	/* reads args */
 	if (!PyArg_ParseTuple(args, "s#", &line, &line_length))
 	{
-		PyErr_SetString(PyExc_TypeError, "putline(line), with line (string).");
+		PyErr_SetString(PyExc_TypeError, "putline(line), with line (string)");
 		return NULL;
 	}
 
@@ -1362,7 +1364,7 @@ connPutLine(connObject *self, PyObject *args)
 
 /* direct access function: getline */
 static char connGetLine__doc__[] =
-"getline() -- gets a line directly from the backend.";
+"getline() -- get a line directly from the backend";
 
 static PyObject *
 connGetLine(connObject *self, PyObject *args)
@@ -1372,7 +1374,7 @@ connGetLine(connObject *self, PyObject *args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -1380,7 +1382,7 @@ connGetLine(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method getline() takes no parameters.");
+			"Method getline() takes no parameters");
 		return NULL;
 	}
 
@@ -1391,7 +1393,7 @@ connGetLine(connObject *self, PyObject *args)
 			str = PyStr_FromString(line);
 			break;
 		case 1:
-			PyErr_SetString(PyExc_MemoryError, "buffer overflow");
+			PyErr_SetString(PyExc_MemoryError, "Buffer overflow");
 			str = NULL;
 			break;
 		case EOF:
@@ -1405,14 +1407,14 @@ connGetLine(connObject *self, PyObject *args)
 
 /* direct access function: end copy */
 static char connEndCopy__doc__[] =
-"endcopy() -- synchronizes client and server";
+"endcopy() -- synchronize client and server";
 
 static PyObject *
 connEndCopy(connObject *self, PyObject *args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -1420,7 +1422,7 @@ connEndCopy(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method endcopy() takes no parameters.");
+			"Method endcopy() takes no parameters");
 		return NULL;
 	}
 
@@ -1444,8 +1446,8 @@ queryStr(queryObject *self)
 
 /* insert table */
 static char connInsertTable__doc__[] =
-"inserttable(string, list) -- insert list in table. The fields in the "
-"list must be in the same order as in the table.";
+"inserttable(table, data) -- insert list into table\n\n"
+"The fields in the list must be in the same order as in the table.\n";
 
 static PyObject *
 connInsertTable(connObject *self, PyObject *args)
@@ -1468,7 +1470,7 @@ connInsertTable(connObject *self, PyObject *args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -1477,7 +1479,7 @@ connInsertTable(connObject *self, PyObject *args)
 	{
 		PyErr_SetString(PyExc_TypeError,
 			"inserttable(table, content), with table (string) "
-			"and content (list).");
+			"and content (list)");
 		return NULL;
 	}
 
@@ -1495,7 +1497,7 @@ connInsertTable(connObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"second arg must be some kind of array.");
+			"Second arg must be some kind of array");
 		return NULL;
 	}
 
@@ -1503,7 +1505,7 @@ connInsertTable(connObject *self, PyObject *args)
 	if (!(buffer = PyMem_Malloc(MAX_BUFFER_SIZE)))
 	{
 		PyErr_SetString(PyExc_MemoryError,
-			"can't allocate insert buffer.");
+			"Can't allocate insert buffer");
 		return NULL;
 	}
 
@@ -1544,7 +1546,7 @@ connInsertTable(connObject *self, PyObject *args)
 		else
 		{
 			PyErr_SetString(PyExc_TypeError,
-				"second arg must contain some kind of arrays.");
+				"Second arg must contain some kind of arrays");
 			return NULL;
 		}
 		if (i)
@@ -1553,7 +1555,7 @@ connInsertTable(connObject *self, PyObject *args)
 			{
 				PyMem_Free(buffer);
 				PyErr_SetString(PyExc_TypeError,
-					"arrays contained in second arg must have same size.");
+					"Arrays contained in second arg must have same size");
 				return NULL;
 			}
 		}
@@ -1649,7 +1651,7 @@ connInsertTable(connObject *self, PyObject *args)
 			{
 				PyMem_Free(buffer);
 				PyErr_SetString(PyExc_MemoryError,
-					"insert buffer overflow.");
+					"Insert buffer overflow");
 				return NULL;
 			}
 
@@ -1692,14 +1694,14 @@ connInsertTable(connObject *self, PyObject *args)
 
 /* get transaction state */
 static char connTransaction__doc__[] =
-"Returns the current transaction status.";
+"transaction() -- return the current transaction status";
 
 static PyObject *
 connTransaction(connObject *self, PyObject *args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -1707,7 +1709,7 @@ connTransaction(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method transaction() takes no parameters.");
+			"Method transaction() takes no parameters");
 		return NULL;
 	}
 
@@ -1716,7 +1718,7 @@ connTransaction(connObject *self, PyObject *args)
 
 /* get parameter setting */
 static char connParameter__doc__[] =
-"Looks up a current parameter setting.";
+"parameter() -- look up a current parameter setting";
 
 static PyObject *
 connParameter(connObject *self, PyObject *args)
@@ -1725,7 +1727,7 @@ connParameter(connObject *self, PyObject *args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -1733,7 +1735,7 @@ connParameter(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s", &name))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"parameter(name), with name (string).");
+			"parameter(name), with name (string)");
 		return NULL;
 	}
 
@@ -1751,7 +1753,7 @@ connParameter(connObject *self, PyObject *args)
 
 /* escape literal */
 static char connEscapeLiteral__doc__[] =
-"escape_literal(str) -- escape a literal constant for use within SQL.";
+"escape_literal(str) -- escape a literal constant for use within SQL";
 
 static PyObject *
 connEscapeLiteral(connObject *self, PyObject *args)
@@ -1759,7 +1761,7 @@ connEscapeLiteral(connObject *self, PyObject *args)
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
 	char 	   *from, /* our string argument as encoded string */
-		 	   *to; /* the result as encoded string */
+			   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
 	int			encoding = -1; /* client encoding */
@@ -1781,7 +1783,7 @@ connEscapeLiteral(connObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_literal() expects a string.");
+		PyErr_SetString(PyExc_TypeError, "escape_literal() expects a string");
 		return NULL;
 	}
 
@@ -1801,7 +1803,7 @@ connEscapeLiteral(connObject *self, PyObject *args)
 
 /* escape identifier */
 static char connEscapeIdentifier__doc__[] =
-"escape_identifier(str) -- escape an identifier for use within SQL.";
+"escape_identifier(str) -- escape an identifier for use within SQL";
 
 static PyObject *
 connEscapeIdentifier(connObject *self, PyObject *args)
@@ -1809,7 +1811,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
 	char 	   *from, /* our string argument as encoded string */
-		 	   *to; /* the result as encoded string */
+			   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
 	int			encoding = -1; /* client encoding */
@@ -1832,7 +1834,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"escape_identifier() expects a string.");
+			"escape_identifier() expects a string");
 		return NULL;
 	}
 
@@ -1854,7 +1856,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 
 /* escape string */
 static char connEscapeString__doc__[] =
-"escape_string(str) -- escape a string for use within SQL.";
+"escape_string(str) -- escape a string for use within SQL";
 
 static PyObject *
 connEscapeString(connObject *self, PyObject *args)
@@ -1862,7 +1864,7 @@ connEscapeString(connObject *self, PyObject *args)
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
 	char 	   *from, /* our string argument as encoded string */
-		 	   *to; /* the result as encoded string */
+			   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
 	int			encoding = -1; /* client encoding */
@@ -1884,7 +1886,7 @@ connEscapeString(connObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string.");
+		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string");
 		return NULL;
 	}
 
@@ -1910,7 +1912,7 @@ connEscapeString(connObject *self, PyObject *args)
 
 /* escape bytea */
 static char connEscapeBytea__doc__[] =
-"escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
+"escape_bytea(data) -- escape binary data for use within SQL as type bytea";
 
 static PyObject *
 connEscapeBytea(connObject *self, PyObject *args)
@@ -1918,7 +1920,7 @@ connEscapeBytea(connObject *self, PyObject *args)
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
 	char 	   *from, /* our string argument as encoded string */
-		 	   *to; /* the result as encoded string */
+			   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
 	int			encoding = -1; /* client encoding */
@@ -1940,12 +1942,12 @@ connEscapeBytea(connObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string.");
+		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string");
 		return NULL;
 	}
 
 	to = (char *)PQescapeByteaConn(self->cnx,
-	 	(unsigned char *)from, (size_t)from_length, &to_length);
+		(unsigned char *)from, (size_t)from_length, &to_length);
 
 	Py_XDECREF(from_obj);
 
@@ -1961,7 +1963,7 @@ connEscapeBytea(connObject *self, PyObject *args)
 #ifdef LARGE_OBJECTS
 /* creates large object */
 static char connCreateLO__doc__[] =
-"locreate() -- creates a new large object in the database.";
+"locreate(mode) -- create a new large object in the database";
 
 static PyObject *
 connCreateLO(connObject *self, PyObject *args)
@@ -1977,7 +1979,7 @@ connCreateLO(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "i", &mode))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"locreate(mode), with mode (integer).");
+			"locreate(mode), with mode (integer)");
 		return NULL;
 	}
 
@@ -1985,7 +1987,7 @@ connCreateLO(connObject *self, PyObject *args)
 	lo_oid = lo_creat(self->cnx, mode);
 	if (lo_oid == 0)
 	{
-		set_dberror(OperationalError, "can't create large object.", NULL);
+		set_dberror(OperationalError, "Can't create large object", NULL);
 		return NULL;
 	}
 
@@ -1994,7 +1996,7 @@ connCreateLO(connObject *self, PyObject *args)
 
 /* init from already known oid */
 static char connGetLO__doc__[] =
-"getlo(long) -- create a large object instance for the specified oid.";
+"getlo(oid) -- create a large object instance for the specified oid";
 
 static PyObject *
 connGetLO(connObject *self, PyObject *args)
@@ -2008,13 +2010,13 @@ connGetLO(connObject *self, PyObject *args)
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &lo_oid))
 	{
-		PyErr_SetString(PyExc_TypeError, "getlo(oid), with oid (integer).");
+		PyErr_SetString(PyExc_TypeError, "getlo(oid), with oid (integer)");
 		return NULL;
 	}
 
 	if (!lo_oid)
 	{
-		PyErr_SetString(PyExc_ValueError, "the object oid can't be null.");
+		PyErr_SetString(PyExc_ValueError, "The object oid can't be null");
 		return NULL;
 	}
 
@@ -2024,7 +2026,7 @@ connGetLO(connObject *self, PyObject *args)
 
 /* import unix file */
 static char connImportLO__doc__[] =
-"loimport(string) -- create a new large object from specified file.";
+"loimport(name) -- create a new large object from specified file";
 
 static PyObject *
 connImportLO(connObject *self, PyObject *args)
@@ -2039,7 +2041,7 @@ connImportLO(connObject *self, PyObject *args)
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "s", &name))
 	{
-		PyErr_SetString(PyExc_TypeError, "loimport(name), with name (string).");
+		PyErr_SetString(PyExc_TypeError, "loimport(name), with name (string)");
 		return NULL;
 	}
 
@@ -2047,7 +2049,7 @@ connImportLO(connObject *self, PyObject *args)
 	lo_oid = lo_import(self->cnx, name);
 	if (lo_oid == 0)
 	{
-		set_dberror(OperationalError, "can't create large object.", NULL);
+		set_dberror(OperationalError, "Can't create large object", NULL);
 		return NULL;
 	}
 
@@ -2057,16 +2059,16 @@ connImportLO(connObject *self, PyObject *args)
 
 /* resets connection */
 static char connReset__doc__[] =
-"reset() -- reset connection with current parameters. All derived queries "
-"and large objects derived from this connection will not be usable after "
-"this call.";
+"reset() -- reset connection with current parameters\n\n"
+"All derived queries and large objects derived from this connection\n"
+"will not be usable after this call.\n";
 
 static PyObject *
 connReset(connObject *self, PyObject *args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -2074,7 +2076,7 @@ connReset(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method reset() takes no parameters.");
+			"Method reset() takes no parameters");
 		return NULL;
 	}
 
@@ -2086,14 +2088,14 @@ connReset(connObject *self, PyObject *args)
 
 /* cancels current command */
 static char connCancel__doc__[] =
-"cancel() -- abandon processing of the current command.";
+"cancel() -- abandon processing of the current command";
 
 static PyObject *
 connCancel(connObject *self, PyObject *args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -2101,7 +2103,7 @@ connCancel(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method cancel() takes no parameters.");
+			"Method cancel() takes no parameters");
 		return NULL;
 	}
 
@@ -2111,14 +2113,14 @@ connCancel(connObject *self, PyObject *args)
 
 /* get connection socket */
 static char connFileno__doc__[] =
-"fileno() -- return database connection socket file handle.";
+"fileno() -- return database connection socket file handle";
 
 static PyObject *
 connFileno(connObject *self, PyObject *args)
 {
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -2126,7 +2128,7 @@ connFileno(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method fileno() takes no parameters.");
+			"Method fileno() takes no parameters");
 		return NULL;
 	}
 
@@ -2139,7 +2141,7 @@ connFileno(connObject *self, PyObject *args)
 
 /* set notice receiver callback function */
 static char connSetNoticeReceiver__doc__[] =
-"set_notice_receiver() -- set the current notice receiver.";
+"set_notice_receiver() -- set the current notice receiver";
 
 static PyObject *
 connSetNoticeReceiver(connObject * self, PyObject * args)
@@ -2157,14 +2159,15 @@ connSetNoticeReceiver(connObject * self, PyObject * args)
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
-			PyErr_SetString(PyExc_TypeError, "notice receiver must be callable");
+			PyErr_SetString(PyExc_TypeError,
+				"Notice receiver must be callable");
 	}
 	return ret;
 }
 
 /* get notice receiver callback function */
 static char connGetNoticeReceiver__doc__[] =
-"get_notice_receiver() -- get the current notice receiver.";
+"get_notice_receiver() -- get the current notice receiver";
 
 static PyObject *
 connGetNoticeReceiver(connObject * self, PyObject * args)
@@ -2181,16 +2184,16 @@ connGetNoticeReceiver(connObject * self, PyObject * args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method get_notice_receiver() takes no parameters.");
+			"Method get_notice_receiver() takes no parameters");
 	}
 	return ret;
 }
 
 /* close without deleting */
 static char connClose__doc__[] =
-"close() -- close connection. All instances of the connection object and "
-"derived objects (queries and large objects) can no longer be used after "
-"this call.";
+"close() -- close connection\n\n"
+"All instances of the connection object and derived objects\n"
+"(queries and large objects) can no longer be used after this call.\n";
 
 static PyObject *
 connClose(connObject *self, PyObject *args)
@@ -2198,7 +2201,7 @@ connClose(connObject *self, PyObject *args)
 	/* gets args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_TypeError, "close().");
+		PyErr_SetString(PyExc_TypeError, "close()");
 		return NULL;
 	}
 
@@ -2220,7 +2223,7 @@ connClose(connObject *self, PyObject *args)
 
 /* gets asynchronous notify */
 static char connGetNotify__doc__[] =
-"getnotify() -- get database notify for this connection.";
+"getnotify() -- get database notify for this connection";
 
 static PyObject *
 connGetNotify(connObject *self, PyObject *args)
@@ -2229,7 +2232,7 @@ connGetNotify(connObject *self, PyObject *args)
 
 	if (!self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -2237,7 +2240,7 @@ connGetNotify(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method getnotify() takes no parameters.");
+			"Method getnotify() takes no parameters");
 		return NULL;
 	}
 
@@ -2363,7 +2366,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 	/* first exception - close which returns a different error */
 	if (strcmp(name, "close") && !self->cnx)
 	{
-		PyErr_SetString(PyExc_TypeError, "Connection is not valid.");
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
 		return NULL;
 	}
 
@@ -2454,20 +2457,20 @@ check_source_obj(sourceObject *self, int level)
 {
 	if (!self->valid)
 	{
-		set_dberror(OperationalError, "object has been closed", NULL);
+		set_dberror(OperationalError, "Object has been closed", NULL);
 		return 0;
 	}
 
 	if ((level & CHECK_RESULT) && !self->result)
 	{
-		set_dberror(DatabaseError, "no result.", NULL);
+		set_dberror(DatabaseError, "No result", NULL);
 		return 0;
 	}
 
 	if ((level & CHECK_DQL) && self->result_type != RESULT_DQL)
 	{
 		set_dberror(DatabaseError,
-			"last query did not return tuples.", self->result);
+			"Last query did not return tuples", self->result);
 		return 0;
 	}
 
@@ -2490,8 +2493,8 @@ sourceDealloc(sourceObject *self)
 
 /* closes object */
 static char sourceClose__doc__[] =
-"close() -- close query object without deleting it. "
-"All instances of the query object can no longer be used after this call.";
+"close() -- close query object without deleting it\n\n"
+"All instances of the query object can no longer be used after this call.\n";
 
 static PyObject *
 sourceClose(sourceObject *self, PyObject *args)
@@ -2499,7 +2502,7 @@ sourceClose(sourceObject *self, PyObject *args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_TypeError, "method close() takes no parameter.");
+		PyErr_SetString(PyExc_TypeError, "Method close() takes no parameter");
 		return NULL;
 	}
 
@@ -2520,11 +2523,10 @@ sourceClose(sourceObject *self, PyObject *args)
 
 /* database query */
 static char sourceExecute__doc__[] =
-"execute(sql) -- execute a SQL statement (string).\n "
-"On success, this call returns the number of affected rows, "
-"or None for DQL (SELECT, ...) statements.\n"
-"The fetch (fetch(), fetchone() and fetchall()) methods can be used "
-"to get result rows.";
+"execute(sql) -- execute a SQL statement (string)\n\n"
+"On success, this call returns the number of affected rows, or None\n"
+"for DQL (SELECT, ...) statements.  The fetch (fetch(), fetchone()\n"
+"and fetchall()) methods can be used to get result rows.\n";
 
 static PyObject *
 sourceExecute(sourceObject *self, PyObject *args)
@@ -2562,7 +2564,7 @@ sourceExecute(sourceObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "executed sql must be a string.");
+		PyErr_SetString(PyExc_TypeError, "Executed SQL must be a string");
 		return NULL;
 	}
 
@@ -2620,7 +2622,7 @@ sourceExecute(sourceObject *self, PyObject *args)
 
 		/* query failed */
 		case PGRES_EMPTY_QUERY:
-			PyErr_SetString(PyExc_ValueError, "empty query.");
+			PyErr_SetString(PyExc_ValueError, "Empty query");
 			break;
 		case PGRES_BAD_RESPONSE:
 		case PGRES_FATAL_ERROR:
@@ -2629,8 +2631,8 @@ sourceExecute(sourceObject *self, PyObject *args)
 				PQerrorMessage(self->pgcnx->cnx), self->result);
 			break;
 		default:
-			set_dberror(InternalError, "internal error: "
-				"unknown result status.", self->result);
+			set_dberror(InternalError, "Internal error: "
+				"unknown result status", self->result);
 	}
 
 	/* frees result and returns error */
@@ -2642,7 +2644,7 @@ sourceExecute(sourceObject *self, PyObject *args)
 
 /* gets oid status for last query (valid for INSERTs, 0 for other) */
 static char sourceStatusOID__doc__[] =
-"oidstatus() -- return oid of last inserted row (if available).";
+"oidstatus() -- return oid of last inserted row (if available)";
 
 static PyObject *
 sourceStatusOID(sourceObject *self, PyObject *args)
@@ -2657,7 +2659,7 @@ sourceStatusOID(sourceObject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method oidstatus() takes no parameters.");
+			"Method oidstatus() takes no parameters");
 		return NULL;
 	}
 
@@ -2673,9 +2675,9 @@ sourceStatusOID(sourceObject *self, PyObject *args)
 
 /* fetches rows from last result */
 static char sourceFetch__doc__[] =
-"fetch(num) -- return the next num rows from the last result in a list. "
-"If num parameter is omitted arraysize attribute value is used. "
-"If size equals -1, all rows are fetched.";
+"fetch(num) -- return the next num rows from the last result in a list\n\n"
+"If num parameter is omitted arraysize attribute value is used.\n"
+"If size equals -1, all rows are fetched.\n";
 
 static PyObject *
 sourceFetch(sourceObject *self, PyObject *args)
@@ -2697,7 +2699,7 @@ sourceFetch(sourceObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "|l", &size))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"fetch(num), with num (integer, optional).");
+			"fetch(num), with num (integer, optional)");
 		return NULL;
 	}
 
@@ -2773,7 +2775,7 @@ pgsource_move(sourceObject *self, PyObject *args, int move)
 	{
 		char		errbuf[256];
 		PyOS_snprintf(errbuf, sizeof(errbuf),
-			"method %s() takes no parameter.", __movename[move]);
+			"Method %s() takes no parameter", __movename[move]);
 		PyErr_SetString(PyExc_TypeError, errbuf);
 		return NULL;
 	}
@@ -2803,7 +2805,7 @@ pgsource_move(sourceObject *self, PyObject *args, int move)
 
 /* move to first result row */
 static char sourceMoveFirst__doc__[] =
-"movefirst() -- move to first result row.";
+"movefirst() -- move to first result row";
 
 static PyObject *
 sourceMoveFirst(sourceObject *self, PyObject *args)
@@ -2813,7 +2815,7 @@ sourceMoveFirst(sourceObject *self, PyObject *args)
 
 /* move to last result row */
 static char sourceMoveLast__doc__[] =
-"movelast() -- move to last valid result row.";
+"movelast() -- move to last valid result row";
 
 static PyObject *
 sourceMoveLast(sourceObject *self, PyObject *args)
@@ -2823,7 +2825,7 @@ sourceMoveLast(sourceObject *self, PyObject *args)
 
 /* move to next result row */
 static char sourceMoveNext__doc__[] =
-"movenext() -- move to next result row.";
+"movenext() -- move to next result row";
 
 static PyObject *
 sourceMoveNext(sourceObject *self, PyObject *args)
@@ -2833,7 +2835,7 @@ sourceMoveNext(sourceObject *self, PyObject *args)
 
 /* move to previous result row */
 static char sourceMovePrev__doc__[] =
-"moveprev() -- move to previous result row.";
+"moveprev() -- move to previous result row";
 
 static PyObject *
 sourceMovePrev(sourceObject *self, PyObject *args)
@@ -2843,7 +2845,7 @@ sourceMovePrev(sourceObject *self, PyObject *args)
 
 /* put copy data */
 static char sourcePutData__doc__[] =
-"getdata(buffer) -- send data to server during copy from stdin.";
+"getdata(buffer) -- send data to server during copy from stdin";
 
 static PyObject *
 sourcePutData(sourceObject *self, PyObject *args)
@@ -2903,17 +2905,17 @@ sourcePutData(sourceObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"putdata() expects a buffer, None or an exception.");
+			"putdata() expects a buffer, None or an exception");
 		return NULL;
 	}
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-	 		!self->pgcnx->cnx ||
-	 		PQresultStatus(self->result) != PGRES_COPY_IN)
+			!self->pgcnx->cnx ||
+			PQresultStatus(self->result) != PGRES_COPY_IN)
 	{
 		PyErr_SetString(PyExc_IOError,
-			"connection is invalid or not in copy_in state.");
+			"Connection is invalid or not in copy_in state");
 		Py_XDECREF(buffer_obj);
 		return NULL;
 	}
@@ -2974,7 +2976,7 @@ sourcePutData(sourceObject *self, PyObject *args)
 
 /* get copy data */
 static char sourceGetData__doc__[] =
-"getdata(decode) -- receive data to server during copy to stdout.";
+"getdata(decode) -- receive data to server during copy to stdout";
 
 static PyObject *
 sourceGetData(sourceObject *self, PyObject *args)
@@ -2997,11 +2999,11 @@ sourceGetData(sourceObject *self, PyObject *args)
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-	 		!self->pgcnx->cnx ||
-	 		PQresultStatus(self->result) != PGRES_COPY_OUT)
+			!self->pgcnx->cnx ||
+			PQresultStatus(self->result) != PGRES_COPY_OUT)
 	{
 		PyErr_SetString(PyExc_IOError,
-			"connection is invalid or not in copy_out state.");
+			"Connection is invalid or not in copy_out state");
 		return NULL;
 	}
 
@@ -3075,7 +3077,7 @@ sourceFieldindex(sourceObject *self, PyObject *param, const char *usage)
 	/* checks field validity */
 	if (num < 0 || num >= self->num_fields)
 	{
-		PyErr_SetString(PyExc_ValueError, "Unknown field.");
+		PyErr_SetString(PyExc_ValueError, "Unknown field");
 		return -1;
 	}
 
@@ -3105,8 +3107,7 @@ pgsource_buildinfo(sourceObject *self, int num)
 
 /* lists fields info */
 static char sourceListInfo__doc__[] =
-"listinfo() -- return information for all fields "
-"(position, name, type oid).";
+"listinfo() -- get information for all fields (position, name, type oid)";
 
 static PyObject *
 sourceListInfo(sourceObject *self, PyObject *args)
@@ -3123,7 +3124,7 @@ sourceListInfo(sourceObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method listinfo() takes no parameter.");
+			"Method listinfo() takes no parameter");
 		return NULL;
 	}
 
@@ -3148,14 +3149,13 @@ sourceListInfo(sourceObject *self, PyObject *args)
 
 /* list fields information for last result */
 static char sourceFieldInfo__doc__[] =
-"fieldinfo(string|integer) -- return specified field information "
-"(position, name, type oid).";
+"fieldinfo(desc) -- get specified field info (position, name, type oid)";
 
 static PyObject *
 sourceFieldInfo(sourceObject *self, PyObject *args)
 {
 	static const char short_usage[] =
-	"fieldinfo(desc), with desc (string|integer).";
+	"fieldinfo(desc), with desc (string|integer)";
 	int			num;
 	PyObject   *param;
 
@@ -3176,13 +3176,13 @@ sourceFieldInfo(sourceObject *self, PyObject *args)
 
 /* retrieve field value */
 static char sourceField__doc__[] =
-"field(string|integer) -- return specified field value.";
+"field(desc) -- return specified field value";
 
 static PyObject *
 sourceField(sourceObject *self, PyObject *args)
 {
 	static const char short_usage[] =
-	"field(desc), with desc (string|integer).";
+	"field(desc), with desc (string|integer)";
 	int			num;
 	PyObject   *param;
 
@@ -3293,7 +3293,7 @@ sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 	{
 		if (!PyInt_Check(v))
 		{
-			PyErr_SetString(PyExc_TypeError, "arraysize must be integer.");
+			PyErr_SetString(PyExc_TypeError, "arraysize must be integer");
 			return -1;
 		}
 
@@ -3302,7 +3302,7 @@ sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 	}
 
 	/* unknown attribute */
-	PyErr_SetString(PyExc_TypeError, "not a writable attribute.");
+	PyErr_SetString(PyExc_TypeError, "Not a writable attribute");
 	return -1;
 }
 
@@ -3360,8 +3360,8 @@ static PyTypeObject sourceType = {
 
 /* connects to a database */
 static char pgConnect__doc__[] =
-"connect(dbname, host, port, opt) -- connect to a PostgreSQL database "
-"using specified parameters (optionals, keywords aware).";
+"connect(dbname, host, port, opt) -- connect to a PostgreSQL database\n\n"
+"The connection uses the specified parameters (optional, keywords aware).\n";
 
 static PyObject *
 pgConnect(PyObject *self, PyObject *args, PyObject *dict)
@@ -3454,7 +3454,7 @@ queryDealloc(queryObject *self)
 
 /* get number of rows */
 static char queryNTuples__doc__[] =
-"ntuples() -- returns number of tuples returned by query.";
+"ntuples() -- return number of tuples returned by query";
 
 static PyObject *
 queryNTuples(queryObject *self, PyObject *args)
@@ -3463,7 +3463,7 @@ queryNTuples(queryObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method ntuples() takes no parameters.");
+			"Method ntuples() takes no parameters");
 		return NULL;
 	}
 
@@ -3472,7 +3472,7 @@ queryNTuples(queryObject *self, PyObject *args)
 
 /* list fields names from query result */
 static char queryListFields__doc__[] =
-"listfields() -- Lists field names from result.";
+"listfields() -- List field names from result";
 
 static PyObject *
 queryListFields(queryObject *self, PyObject *args)
@@ -3487,7 +3487,7 @@ queryListFields(queryObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method listfields() takes no parameters.");
+			"Method listfields() takes no parameters");
 		return NULL;
 	}
 
@@ -3507,7 +3507,7 @@ queryListFields(queryObject *self, PyObject *args)
 
 /* get field name from last result */
 static char queryFieldName__doc__[] =
-"fieldname() -- returns name of field from result from its position.";
+"fieldname(num) -- return name of field from result from its position";
 
 static PyObject *
 queryFieldName(queryObject *self, PyObject *args)
@@ -3519,14 +3519,14 @@ queryFieldName(queryObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "i", &i))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"fieldname(number), with number(integer).");
+			"fieldname(number), with number(integer)");
 		return NULL;
 	}
 
 	/* checks number validity */
 	if (i >= PQnfields(self->result))
 	{
-		PyErr_SetString(PyExc_ValueError, "invalid field number.");
+		PyErr_SetString(PyExc_ValueError, "Invalid field number");
 		return NULL;
 	}
 
@@ -3537,7 +3537,7 @@ queryFieldName(queryObject *self, PyObject *args)
 
 /* gets fields number from name in last result */
 static char queryFieldNumber__doc__[] =
-"fieldnum() -- returns position in query for field from its name.";
+"fieldnum(name) -- return position in query for field from its name";
 
 static PyObject *
 queryFieldNumber(queryObject *self, PyObject *args)
@@ -3548,14 +3548,14 @@ queryFieldNumber(queryObject *self, PyObject *args)
 	/* gets args */
 	if (!PyArg_ParseTuple(args, "s", &name))
 	{
-		PyErr_SetString(PyExc_TypeError, "fieldnum(name), with name (string).");
+		PyErr_SetString(PyExc_TypeError, "fieldnum(name), with name (string)");
 		return NULL;
 	}
 
 	/* gets field number */
 	if ((num = PQfnumber(self->result, name)) == -1)
 	{
-		PyErr_SetString(PyExc_ValueError, "Unknown field.");
+		PyErr_SetString(PyExc_ValueError, "Unknown field");
 		return NULL;
 	}
 
@@ -3564,9 +3564,9 @@ queryFieldNumber(queryObject *self, PyObject *args)
 
 /* retrieves last result */
 static char queryGetResult__doc__[] =
-"getresult() -- Gets the result of a query.  The result is returned "
-"as a list of rows, each one a tuple of fields in the order returned "
-"by the server.";
+"getresult() -- Get the result of a query\n\n"
+"The result is returned as a list of rows, each one a tuple of fields\n"
+"in the order returned by the server.\n";
 
 static PyObject *
 queryGetResult(queryObject *self, PyObject *args)
@@ -3584,7 +3584,7 @@ queryGetResult(queryObject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method getresult() takes no parameters.");
+			"Method getresult() takes no parameters");
 		return NULL;
 	}
 
@@ -3735,9 +3735,9 @@ exit:
 
 /* retrieves last result as a list of dictionaries*/
 static char queryDictResult__doc__[] =
-"dictresult() -- Gets the result of a query.  The result is returned "
-"as a list of rows, each one a dictionary with the field names used "
-"as the labels.";
+"dictresult() -- Get the result of a query\n\n"
+"The result is returned as a list of rows, each one a dictionary with\n"
+"the field names used as the labels.\n";
 
 static PyObject *
 queryDictResult(queryObject *self, PyObject *args)
@@ -3755,7 +3755,7 @@ queryDictResult(queryObject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method dictresult() takes no parameters.");
+			"Method dictresult() takes no parameters");
 		return NULL;
 	}
 
@@ -3907,9 +3907,9 @@ exit:
 
 /* retrieves last result as named tuples */
 static char queryNamedResult__doc__[] =
-"namedresult() -- Gets the result of a query.  The result is returned "
-"as a list of rows, each one a tuple of fields in the order returned "
-"by the server.";
+"namedresult() -- Get the result of a query\n\n"
+"The result is returned as a list of rows, each one a tuple of fields\n"
+"in the order returned by the server.\n";
 
 static PyObject *
 queryNamedResult(queryObject *self, PyObject *args)
@@ -3921,14 +3921,14 @@ queryNamedResult(queryObject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method namedresult() takes no parameters.");
+			"Method namedresult() takes no parameters");
 		return NULL;
 	}
 
 	if (!namedresult)
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"named tuples are not supported.");
+			"Named tuples are not supported");
 		return NULL;
 	}
 
@@ -3952,7 +3952,7 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
 
 	if (!res)
 	{
-		PyErr_SetString(PyExc_TypeError, "Cannot get current notice.");
+		PyErr_SetString(PyExc_TypeError, "Cannot get current notice");
 		return NULL;
 	}
 
@@ -4116,7 +4116,7 @@ static PyTypeObject queryType = {
 
 /* escape string */
 static char pgEscapeString__doc__[] =
-"escape_string(str) -- escape a string for use within SQL.";
+"escape_string(string) -- escape a string for use within SQL";
 
 static PyObject *
 pgEscapeString(PyObject *self, PyObject *args)
@@ -4124,7 +4124,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
 	char 	   *from, /* our string argument as encoded string */
-		 	   *to; /* the result as encoded string */
+			   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
 	int			encoding = -1; /* client encoding */
@@ -4146,7 +4146,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string.");
+		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string");
 		return NULL;
 	}
 
@@ -4171,7 +4171,7 @@ pgEscapeString(PyObject *self, PyObject *args)
 
 /* escape bytea */
 static char pgEscapeBytea__doc__[] =
-"escape_bytea(data) -- escape binary data for use within SQL as type bytea.";
+"escape_bytea(data) -- escape binary data for use within SQL as type bytea";
 
 static PyObject *
 pgEscapeBytea(PyObject *self, PyObject *args)
@@ -4179,7 +4179,7 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
 	char 	   *from, /* our string argument as encoded string */
-		 	   *to; /* the result as encoded string */
+			   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
 	int			encoding = -1; /* client encoding */
@@ -4201,7 +4201,7 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string.");
+		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string");
 		return NULL;
 	}
 
@@ -4221,7 +4221,7 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 
 /* unescape bytea */
 static char pgUnescapeBytea__doc__[] =
-"unescape_bytea(str) -- unescape bytea data that has been retrieved as text.";
+"unescape_bytea(string) -- unescape bytea data retrieved as text";
 
 static PyObject
 *pgUnescapeBytea(PyObject *self, PyObject *args)
@@ -4229,7 +4229,7 @@ static PyObject
 	PyObject   *from_obj, /* the object that was passed in */
 			   *to_obj; /* string object to return */
 	char 	   *from, /* our string argument as encoded string */
-		 	   *to; /* the result as encoded string */
+			   *to; /* the result as encoded string */
 	Py_ssize_t 	from_length; /* length of string */
 	size_t		to_length; /* length of result */
 
@@ -4249,7 +4249,7 @@ static PyObject
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "unescape_bytea() expects a string.");
+		PyErr_SetString(PyExc_TypeError, "unescape_bytea() expects a string");
 		return NULL;
 	}
 
@@ -4265,7 +4265,7 @@ static PyObject
 
 /* get decimal point */
 static char pgGetDecimalPoint__doc__[] =
-"get_decimal_point() -- get decimal point to be used for money values.";
+"get_decimal_point() -- get decimal point to be used for money values";
 
 static PyObject *
 pgGetDecimalPoint(PyObject *self, PyObject * args)
@@ -4294,7 +4294,7 @@ pgGetDecimalPoint(PyObject *self, PyObject * args)
 
 /* set decimal point */
 static char pgSetDecimalPoint__doc__[] =
-"set_decimal_point(char) -- set decimal point to be used for money values.";
+"set_decimal_point(char) -- set decimal point to be used for money values";
 
 static PyObject *
 pgSetDecimalPoint(PyObject *self, PyObject * args)
@@ -4308,7 +4308,7 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 		if (!s)
 			s = "\0";
 		else if (*s && (*(s+1) || !strchr(".,;: '*/_`|", *s)))
-		 	s = NULL;
+			s = NULL;
 	}
 
 	if (s)
@@ -4325,7 +4325,7 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 
 /* get decimal type */
 static char pgGetDecimal__doc__[] =
-"get_decimal() -- set a decimal type to be used for numeric values.";
+"get_decimal() -- set a decimal type to be used for numeric values";
 
 static PyObject *
 pgGetDecimal(PyObject *self, PyObject *args)
@@ -4343,7 +4343,7 @@ pgGetDecimal(PyObject *self, PyObject *args)
 
 /* set decimal type */
 static char pgSetDecimal__doc__[] =
-"set_decimal(cls) -- set a decimal type to be used for numeric values.";
+"set_decimal(cls) -- set a decimal type to be used for numeric values";
 
 static PyObject *
 pgSetDecimal(PyObject *self, PyObject *args)
@@ -4365,7 +4365,7 @@ pgSetDecimal(PyObject *self, PyObject *args)
 		}
 		else
 			PyErr_SetString(PyExc_TypeError,
-				"decimal type must be None or callable");
+				"Decimal type must be None or callable");
 	}
 
 	return ret;
@@ -4373,7 +4373,7 @@ pgSetDecimal(PyObject *self, PyObject *args)
 
 /* get usage of bool values */
 static char pgGetBool__doc__[] =
-"get_bool() -- check whether boolean values are converted to bool.";
+"get_bool() -- check whether boolean values are converted to bool";
 
 static PyObject *
 pgGetBool(PyObject *self, PyObject * args)
@@ -4391,7 +4391,7 @@ pgGetBool(PyObject *self, PyObject * args)
 
 /* set usage of bool values */
 static char pgSetBool__doc__[] =
-"set_bool(bool) -- set whether boolean values should be converted to bool.";
+"set_bool(on) -- set whether boolean values should be converted to bool";
 
 static PyObject *
 pgSetBool(PyObject *self, PyObject * args)
@@ -4411,7 +4411,7 @@ pgSetBool(PyObject *self, PyObject * args)
 
 /* get named result factory */
 static char pgGetNamedresult__doc__[] =
-"get_namedresult(cls) -- get the function used for getting named results.";
+"get_namedresult(cls) -- get the function used for getting named results";
 
 static PyObject *
 pgGetNamedresult(PyObject *self, PyObject *args)
@@ -4429,7 +4429,7 @@ pgGetNamedresult(PyObject *self, PyObject *args)
 
 /* set named result factory */
 static char pgSetNamedresult__doc__[] =
-"set_namedresult(cls) -- set a function to be used for getting named results.";
+"set_namedresult(cls) -- set a function to be used for getting named results";
 
 static PyObject *
 pgSetNamedresult(PyObject *self, PyObject *args)
@@ -4445,7 +4445,7 @@ pgSetNamedresult(PyObject *self, PyObject *args)
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
-			PyErr_SetString(PyExc_TypeError, "parameter must be callable");
+			PyErr_SetString(PyExc_TypeError, "Parameter must be callable");
 	}
 
 	return ret;
@@ -4455,7 +4455,7 @@ pgSetNamedresult(PyObject *self, PyObject *args)
 
 /* gets default host */
 static char pgGetDefHost__doc__[] =
-"get_defhost() -- return default database host.";
+"get_defhost() -- return default database host";
 
 static PyObject *
 pgGetDefHost(PyObject *self, PyObject *args)
@@ -4464,7 +4464,7 @@ pgGetDefHost(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method get_defhost() takes no parameter.");
+			"Method get_defhost() takes no parameter");
 		return NULL;
 	}
 
@@ -4474,7 +4474,7 @@ pgGetDefHost(PyObject *self, PyObject *args)
 
 /* sets default host */
 static char pgSetDefHost__doc__[] =
-"set_defhost(string) -- set default database host. Return previous value.";
+"set_defhost(string) -- set default database host and return previous value";
 
 static PyObject *
 pgSetDefHost(PyObject *self, PyObject *args)
@@ -4486,7 +4486,7 @@ pgSetDefHost(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defhost(name), with name (string/None).");
+			"set_defhost(name), with name (string/None)");
 		return NULL;
 	}
 
@@ -4506,7 +4506,7 @@ pgSetDefHost(PyObject *self, PyObject *args)
 
 /* gets default base */
 static char pgGetDefBase__doc__[] =
-"get_defbase() -- return default database name.";
+"get_defbase() -- return default database name";
 
 static PyObject *
 pgGetDefBase(PyObject *self, PyObject *args)
@@ -4515,7 +4515,7 @@ pgGetDefBase(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method get_defbase() takes no parameter.");
+			"Method get_defbase() takes no parameter");
 		return NULL;
 	}
 
@@ -4525,7 +4525,7 @@ pgGetDefBase(PyObject *self, PyObject *args)
 
 /* sets default base */
 static char pgSetDefBase__doc__[] =
-"set_defbase(string) -- set default database name. Return previous value";
+"set_defbase(string) -- set default database name and return previous value";
 
 static PyObject *
 pgSetDefBase(PyObject *self, PyObject *args)
@@ -4537,7 +4537,7 @@ pgSetDefBase(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defbase(name), with name (string/None).");
+			"set_defbase(name), with name (string/None)");
 		return NULL;
 	}
 
@@ -4557,7 +4557,7 @@ pgSetDefBase(PyObject *self, PyObject *args)
 
 /* gets default options */
 static char pgGetDefOpt__doc__[] =
-"get_defopt() -- return default database options.";
+"get_defopt() -- return default database options";
 
 static PyObject *
 pgGetDefOpt(PyObject *self, PyObject *args)
@@ -4566,7 +4566,7 @@ pgGetDefOpt(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method get_defopt() takes no parameter.");
+			"Method get_defopt() takes no parameter");
 		return NULL;
 	}
 
@@ -4576,7 +4576,7 @@ pgGetDefOpt(PyObject *self, PyObject *args)
 
 /* sets default opt */
 static char pgSetDefOpt__doc__[] =
-"set_defopt(string) -- set default database options. Return previous value.";
+"set_defopt(string) -- set default options and return previous value";
 
 static PyObject *
 pgSetDefOpt(PyObject *self, PyObject *args)
@@ -4588,7 +4588,7 @@ pgSetDefOpt(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defopt(name), with name (string/None).");
+			"set_defopt(name), with name (string/None)");
 		return NULL;
 	}
 
@@ -4608,7 +4608,7 @@ pgSetDefOpt(PyObject *self, PyObject *args)
 
 /* gets default username */
 static char pgGetDefUser__doc__[] =
-"get_defuser() -- return default database username.";
+"get_defuser() -- return default database username";
 
 static PyObject *
 pgGetDefUser(PyObject *self, PyObject *args)
@@ -4617,7 +4617,7 @@ pgGetDefUser(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method get_defuser() takes no parameter.");
+			"Method get_defuser() takes no parameter");
 
 		return NULL;
 	}
@@ -4629,7 +4629,7 @@ pgGetDefUser(PyObject *self, PyObject *args)
 /* sets default username */
 
 static char pgSetDefUser__doc__[] =
-"set_defuser() -- set default database username. Return previous value.";
+"set_defuser(name) -- set default username and return previous value";
 
 static PyObject *
 pgSetDefUser(PyObject *self, PyObject *args)
@@ -4641,7 +4641,7 @@ pgSetDefUser(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defuser(name), with name (string/None).");
+			"set_defuser(name), with name (string/None)");
 		return NULL;
 	}
 
@@ -4661,7 +4661,7 @@ pgSetDefUser(PyObject *self, PyObject *args)
 
 /* sets default password */
 static char pgSetDefPassword__doc__[] =
-"set_defpasswd() -- set default database password.";
+"set_defpasswd(password) -- set default database password";
 
 static PyObject *
 pgSetDefPassword(PyObject *self, PyObject *args)
@@ -4672,7 +4672,7 @@ pgSetDefPassword(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defpasswd(password), with password (string/None).");
+			"set_defpasswd(password), with password (string/None)");
 		return NULL;
 	}
 
@@ -4690,7 +4690,7 @@ pgSetDefPassword(PyObject *self, PyObject *args)
 
 /* gets default port */
 static char pgGetDefPort__doc__[] =
-"get_defport() -- return default database port.";
+"get_defport() -- return default database port";
 
 static PyObject *
 pgGetDefPort(PyObject *self, PyObject *args)
@@ -4699,7 +4699,7 @@ pgGetDefPort(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"method get_defport() takes no parameter.");
+			"Method get_defport() takes no parameter");
 		return NULL;
 	}
 
@@ -4709,7 +4709,7 @@ pgGetDefPort(PyObject *self, PyObject *args)
 
 /* sets default port */
 static char pgSetDefPort__doc__[] =
-"set_defport(integer) -- set default database port. Return previous value.";
+"set_defport(port) -- set default port and return previous value";
 
 static PyObject *
 pgSetDefPort(PyObject *self, PyObject *args)
@@ -4721,7 +4721,7 @@ pgSetDefPort(PyObject *self, PyObject *args)
 	if ((!PyArg_ParseTuple(args, "l", &port)) || (port < -1))
 	{
 		PyErr_SetString(PyExc_TypeError, "set_defport(port), with port "
-			"(positive integer/-1).");
+			"(positive integer/-1)");
 		return NULL;
 	}
 
