@@ -4,7 +4,7 @@ VERSION=4.2
 DISTDIR=/u/pyg/files
 
 # small safety tests
-if [ ! -f module/pgmodule.c ]
+if [ ! -f pgmodule.c ]
 then
 	echo "Hmmm.  Are you sure you are in the right directory?"
 	exit 1
