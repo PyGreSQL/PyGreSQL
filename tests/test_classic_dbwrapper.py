@@ -72,61 +72,31 @@ class TestDBClassBasic(unittest.TestCase):
     def testAllDBAttributes(self):
         attributes = [
             'begin',
-            'cancel',
-            'clear',
-            'close',
-            'commit',
-            'db',
-            'dbname',
-            'debug',
-            'delete',
-            'end',
-            'endcopy',
-            'error',
-            'escape_bytea',
-            'escape_identifier',
-            'escape_literal',
-            'escape_string',
+            'cancel', 'clear', 'close', 'commit',
+            'db', 'dbname', 'debug', 'delete',
+            'end', 'endcopy', 'error',
+            'escape_bytea', 'escape_identifier',
+            'escape_literal', 'escape_string',
             'fileno',
-            'get',
-            'get_attnames',
-            'get_databases',
-            'get_notice_receiver',
-            'get_relations',
-            'get_tables',
-            'getline',
-            'getlo',
-            'getnotify',
-            'has_table_privilege',
-            'host',
-            'insert',
-            'inserttable',
-            'locreate',
-            'loimport',
+            'get', 'get_attnames', 'get_databases',
+            'get_notice_receiver', 'get_parameter',
+            'get_relations', 'get_tables',
+            'getline', 'getlo', 'getnotify',
+            'has_table_privilege', 'host',
+            'insert', 'inserttable',
+            'locreate', 'loimport',
             'notification_handler',
             'options',
-            'parameter',
-            'pkey',
-            'port',
-            'protocol_version',
-            'putline',
+            'parameter', 'pkey', 'port',
+            'protocol_version', 'putline',
             'query',
-            'release',
-            'reopen',
-            'reset',
-            'rollback',
-            'savepoint',
-            'server_version',
-            'set_notice_receiver',
-            'source',
-            'start',
-            'status',
-            'transaction',
-            'tty',
-            'unescape_bytea',
-            'update',
-            'use_regtypes',
-            'user',
+            'release', 'reopen', 'reset', 'rollback',
+            'savepoint', 'server_version',
+            'set_notice_receiver', 'set_parameter',
+            'source', 'start', 'status',
+            'transaction', 'tty',
+            'unescape_bytea', 'update',
+            'use_regtypes', 'user',
         ]
         if self.db.server_version < 90000:  # PostgreSQL < 9.0
             attributes.remove('escape_identifier')
@@ -288,8 +258,8 @@ class TestDBClass(unittest.TestCase):
         db.query("drop table if exists test cascade")
         db.query("create table test ("
             "i2 smallint, i4 integer, i8 bigint,"
-            "d numeric, f4 real, f8 double precision, m money, "
-            "v4 varchar(4), c4 char(4), t text)")
+            " d numeric, f4 real, f8 double precision, m money,"
+            " v4 varchar(4), c4 char(4), t text)")
         db.query("create or replace view test_view as"
             " select i4, v4 from test")
         db.close()
@@ -441,6 +411,150 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(f('ab\\c', 'text'), "'ab\\\\c'")
         self.assertEqual(f("a\\b'c", 'text'), "'a\\\\b''c'")
 
+    def testGetParameter(self):
+        f = self.db.get_parameter
+        self.assertRaises(TypeError, f)
+        self.assertRaises(TypeError, f, None)
+        self.assertRaises(TypeError, f, 42)
+        self.assertRaises(pg.ProgrammingError, f, 'this_does_not_exist')
+        r = f('standard_conforming_strings')
+        self.assertEqual(r, 'on')
+        r = f('lc_monetary')
+        self.assertEqual(r, 'C')
+        r = f('datestyle')
+        self.assertEqual(r, 'ISO, YMD')
+        r = f('bytea_output')
+        self.assertEqual(r, 'hex')
+        r = f(('bytea_output', 'lc_monetary'))
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, ['hex', 'C'])
+        r = f(['standard_conforming_strings', 'datestyle', 'bytea_output'])
+        self.assertEqual(r, ['on', 'ISO, YMD', 'hex'])
+        s = dict.fromkeys(('bytea_output', 'lc_monetary'))
+        r = f(s)
+        self.assertIs(r, s)
+        self.assertEqual(r, {'bytea_output': 'hex', 'lc_monetary': 'C'})
+        s = dict.fromkeys(('Bytea_Output', 'LC_Monetary'))
+        r = f(s)
+        self.assertIs(r, s)
+        self.assertEqual(r, {'Bytea_Output': 'hex', 'LC_Monetary': 'C'})
+
+    def testGetParameterServerVersion(self):
+        r = self.db.get_parameter('server_version_num')
+        self.assertIsInstance(r, str)
+        s = self.db.server_version
+        self.assertIsInstance(s, int)
+        self.assertEqual(r, str(s))
+
+    def testGetParameterAll(self):
+        f = self.db.get_parameter
+        r = f('all')
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r['standard_conforming_strings'], 'on')
+        self.assertEqual(r['lc_monetary'], 'C')
+        self.assertEqual(r['DateStyle'], 'ISO, YMD')
+        self.assertEqual(r['bytea_output'], 'hex')
+
+    def testSetParameter(self):
+        f = self.db.set_parameter
+        g = self.db.get_parameter
+        self.assertRaises(TypeError, f)
+        self.assertRaises(TypeError, f, None)
+        self.assertRaises(TypeError, f, 42)
+        self.assertRaises(pg.ProgrammingError, f, 'this_does_not_exist')
+        f('standard_conforming_strings', 'off')
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        f('datestyle', 'ISO, DMY')
+        self.assertEqual(g('datestyle'), 'ISO, DMY')
+        f(('standard_conforming_strings', 'datestyle'), ('on', 'ISO, YMD'))
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.assertEqual(g('datestyle'), 'ISO, YMD')
+        f(['standard_conforming_strings', 'datestyle'], ['off', 'ISO, DMY'])
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        self.assertEqual(g('datestyle'), 'ISO, DMY')
+        f({'standard_conforming_strings': 'on', 'datestyle': 'ISO, YMD'})
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.assertEqual(g('datestyle'), 'ISO, YMD')
+        f(('default_with_oids', 'standard_conforming_strings'), 'off')
+        self.assertEqual(g('default_with_oids'), 'off')
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        f(['default_with_oids', 'standard_conforming_strings'], 'on')
+        self.assertEqual(g('default_with_oids'), 'on')
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+
+    def testResetParameter(self):
+        db = DB()
+        f = db.set_parameter
+        g = db.get_parameter
+        r = g('default_with_oids')
+        self.assertIn(r, ('on', 'off'))
+        dwi, not_dwi = r, r == 'on' and 'off' or 'on'
+        r = g('standard_conforming_strings')
+        self.assertIn(r, ('on', 'off'))
+        scs, not_scs = r, r == 'on' and 'off' or 'on'
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f('default_with_oids')
+        f('standard_conforming_strings', None)
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f(('default_with_oids', 'standard_conforming_strings'))
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f(['default_with_oids', 'standard_conforming_strings'], None)
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
+
+    def testResetParameterAll(self):
+        db = DB()
+        f = db.set_parameter
+        self.assertRaises(ValueError, f, 'all', 0)
+        self.assertRaises(ValueError, f, 'all', 'off')
+        g = db.get_parameter
+        r = g('default_with_oids')
+        self.assertIn(r, ('on', 'off'))
+        dwi, not_dwi = r, r == 'on' and 'off' or 'on'
+        r = g('standard_conforming_strings')
+        self.assertIn(r, ('on', 'off'))
+        scs, not_scs = r, r == 'on' and 'off' or 'on'
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f('all')
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
+
+    def testSetParameterLocal(self):
+        f = self.db.set_parameter
+        g = self.db.get_parameter
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.db.begin()
+        f('standard_conforming_strings', 'off', local=True)
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        self.db.end()
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+
+    def testSetParameterSession(self):
+        f = self.db.set_parameter
+        g = self.db.get_parameter
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.db.begin()
+        f('standard_conforming_strings', 'off', local=False)
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        self.db.end()
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+
     def testQuery(self):
         query = self.db.query
         query("drop table if exists test_table")
@@ -529,9 +643,9 @@ class TestDBClass(unittest.TestCase):
         query("create table pkeytest2 ("
             "c smallint, d smallint primary key)")
         query("create table pkeytest3 ("
-            "e smallint, f smallint, g smallint, "
-            "h smallint, i smallint, "
-            "primary key (f,h))")
+            "e smallint, f smallint, g smallint,"
+            " h smallint, i smallint,"
+            " primary key (f,h))")
         pkey = self.db.pkey
         self.assertRaises(KeyError, pkey, 'pkeytest0')
         self.assertEqual(pkey('pkeytest1'), 'b')
@@ -609,7 +723,7 @@ class TestDBClass(unittest.TestCase):
         self.assertNotIn('public.test', result)
         self.assertNotIn('public.test_view', result)
 
-    def testAttnames(self):
+    def testGetAttnames(self):
         self.assertRaises(pg.ProgrammingError,
             self.db.get_attnames, 'does_not_exist')
         self.assertRaises(pg.ProgrammingError,
@@ -617,12 +731,12 @@ class TestDBClass(unittest.TestCase):
         for table in ('attnames_test_table', 'test table for attnames'):
             self.db.query('drop table if exists "%s"' % table)
             self.db.query('create table "%s" ('
-                'a smallint, b integer, c bigint, '
-                'e numeric, f float, f2 double precision, m money, '
-                'x smallint, y smallint, z smallint, '
-                'Normal_NaMe smallint, "Special Name" smallint, '
-                't text, u char(2), v varchar(2), '
-                'primary key (y, u)) with oids' % table)
+                ' a smallint, b integer, c bigint,'
+                ' e numeric, f float, f2 double precision, m money,'
+                ' x smallint, y smallint, z smallint,'
+                ' Normal_NaMe smallint, "Special Name" smallint,'
+                ' t text, u char(2), v varchar(2),'
+                ' primary key (y, u)) with oids' % table)
             attributes = self.db.get_attnames(table)
             result = {'a': 'int', 'c': 'int', 'b': 'int',
                 'e': 'num', 'f': 'float', 'f2': 'float', 'm': 'money',
@@ -747,13 +861,13 @@ class TestDBClass(unittest.TestCase):
             firstname="D'Arcy", nickname='Darcey', grade='A+'))
         try:
             get('test_students', "D' Arcy")
-        except pg.DatabaseError as error:
+        except pg.DatabaseError, error:
             self.assertEqual(str(error),
                 'No such record in public.test_students where firstname = '
                 "'D'' Arcy'")
         try:
             get('test_students', "Robert'); TRUNCATE TABLE test_students;--")
-        except pg.DatabaseError as error:
+        except pg.DatabaseError, error:
             self.assertEqual(str(error),
                 'No such record in public.test_students where firstname = '
                 "'Robert''); TRUNCATE TABLE test_students;--'")

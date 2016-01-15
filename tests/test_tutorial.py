@@ -64,7 +64,7 @@ class TestClassicTutorial(unittest.TestCase):
         more_fruits = 'cherimaya durian eggfruit fig grapefruit'.split()
         if namedtuple:
             data = list(enumerate(more_fruits, start=3))
-        else:  # Pyton < 2.6
+        else:  # Python < 2.6
             data = [(n + 3, name) for n, name in enumerate(more_fruits)]
         db.inserttable('fruits', data)
         q = db.query('select * from fruits')
@@ -87,12 +87,11 @@ class TestClassicTutorial(unittest.TestCase):
         self.assertEqual(r[6], {'id': 7, 'name': 'grapefruit'})
         try:
             rows = r = q.namedresult()
-        except TypeError:  # Python < 2.6
-            self.assertIsNone(namedtuple)
-        else:
             self.assertIsInstance(r, list)
             self.assertIsInstance(r[0], tuple)
             self.assertEqual(rows[3].name, 'durian')
+        except (AttributeError, TypeError):  # Python < 2.6
+            self.assertIsNone(namedtuple)
         r = db.update('fruits', banana, name=banana['name'].capitalize())
         self.assertIsInstance(r, dict)
         self.assertEqual(r, {'id': 2, 'name': 'Banana'})

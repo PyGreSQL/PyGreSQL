@@ -3,10 +3,12 @@ ChangeLog
 
 Version 4.2
 -----------
-- Set a better default for the user option "escaping-funcs".
 - The supported Python versions are 2.4 to 2.7.
 - PostgreSQL is supported in all versions from 8.3 to 9.5.
+- Set a better default for the user option "escaping-funcs".
 - Force build to compile with no errors.
+- New methods get_parameters() and set_parameters() in the classic interface
+  which can be used to get or set run-time parameters.
 - Fix decimal point handling.
 - Add option to return boolean values as bool objects.
 - Add option to return money values as string.
