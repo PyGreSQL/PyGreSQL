@@ -523,10 +523,13 @@ class DB(object):
         If the parameter is a string, the return value will also be a string
         that is the current setting of the run-time parameter with that name.
 
-        You can get several parameters at once by passing a list or tuple of
-        parameter names.  The return value will then be a corresponding list
-        of parameter settings.  If you pass a dict as parameter instead, its
-        values will be set to the parameter settings corresponding to its keys.
+        You can get several parameters at once by passing a list, set or dict.
+        When passing a list of parameter names, the return value will be a
+        corresponding list of parameter settings.  When passing a set of
+        parameter names, a new dict will be returned, mapping these parameter
+        names to their settings.  Finally, if you pass a dict as parameter,
+        its values will be set to the current parameter settings corresponding
+        to its keys.
 
         By passing the special name 'all' as the parameter, you can get a dict
         of all existing configuration parameters.
@@ -536,10 +539,13 @@ class DB(object):
             values = None
         elif isinstance(parameter, (list, tuple)):
             values = []
+        elif isinstance(parameter, (set, frozenset)):
+            values = {}
         elif isinstance(parameter, dict):
             values = parameter
         else:
-            raise TypeError('The parameter must be a dict, list or string')
+            raise TypeError(
+                'The parameter must be a string, list, set or dict')
         if not parameter:
             raise TypeError('No parameter has been specified')
         if isinstance(values, dict):
@@ -581,12 +587,13 @@ class DB(object):
         will be set to that value.  If no value or None is passed as a value,
         then the run-time parameter will be restored to its default value.
 
-        You can set several parameters at once by passing a list or tuple
-        of parameter names, with a single value that all parameters should
-        be set to or with a corresponding list or tuple of values.
-
-        You can also pass a dict as parameters.  In this case, you should
-        not pass a value, since the values will be taken from the dict.
+        You can set several parameters at once by passing a list of parameter
+        names, together with a single value that all parameters should be
+        set to or with a corresponding list of values.  You can also pass
+        the parameters as a set if you only provide a single value.
+        Finally, you can pass a dict with parameter names as keys.  In this
+        case, you should not pass a value, since the values for the parameters
+        will be taken from the dict.
 
         By passing the special name 'all' as the parameter, you can reset
         all existing settable run-time parameters to their default values.
@@ -604,12 +611,22 @@ class DB(object):
                 parameter = dict(zip(parameter, value))
             else:
                 parameter = dict.fromkeys(parameter, value)
+        elif isinstance(parameter, (set, frozenset)):
+            if isinstance(value, (list, tuple, set, frozenset)):
+                value = set(value)
+                if len(value) == 1:
+                    value = value.pop()
+            if not(value is None or isinstance(value, basestring)):
+                raise ValueError('A single value must be specified'
+                    ' when parameter is a set')
+            parameter = dict.fromkeys(parameter, value)
         elif isinstance(parameter, dict):
             if value is not None:
                 raise ValueError(
                     'A value must not be set when parameter is a dictionary')
         else:
-            raise TypeError('The parameter must be a dict, list or string')
+            raise TypeError(
+                'The parameter must be a string, list, set or dict')
         if not parameter:
             raise TypeError('No parameter has been specified')
         params = {}
