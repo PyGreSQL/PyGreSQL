@@ -120,8 +120,7 @@ get_attnames -- get the attribute names of a table
     Get the attribute names of a table
 
     :param str table: name of table
-    :returns: A dictionary -- the keys are the attribute names,
-     the values are the type names of the attributes.
+    :returns: a dictionary mapping attribute names to type names
 
 Given the name of a table, digs out the set of attribute names.
 
@@ -134,7 +133,6 @@ OrderedDictionary with the column names in the right order.
 By default, only a limited number of simple types will be returned.
 You can get the regular types after enabling this by calling the
 :meth:`DB.use_regtypes` method.
-
 
 has_table_privilege -- check table privilege
 --------------------------------------------
@@ -151,6 +149,67 @@ has_table_privilege -- check table privilege
 Returns True if the current user has the specified privilege for the table.
 
 .. versionadded:: 4.0
+
+get/set_parameter -- get or set  run-time parameters
+----------------------------------------------------
+
+.. method:: DB.get_parameter(parameter)
+
+    Get the value of run-time parameters
+
+    :param parameter: the run-time parameter(s) to get
+    :type param: str, tuple, list or dict
+    :returns: the current value(s) of the run-time parameter(s)
+    :rtype: str, list or dict
+    :raises TypeError: Invalid parameter type(s)
+    :raises ProgrammingError: Invalid parameter name(s)
+
+If the parameter is a string, the return value will also be a string
+that is the current setting of the run-time parameter with that name.
+
+You can get several parameters at once by passing a list or tuple of
+parameter names.  The return value will then be a corresponding list
+of parameter settings.  If you pass a dict as parameter instead, its
+values will be set to the parameter settings corresponding to its keys.
+
+By passing the special name `'all'` as the parameter, you can get a dict
+of all existing configuration parameters.
+
+.. versionadded:: 4.2
+
+.. method:: DB.set_parameter(self, parameter, [value], [local])
+
+    Set the value of run-time parameters
+
+    :param parameter: the run-time parameter(s) to set
+    :type param: string, tuple, list or dict
+    :param value: the value to set
+    :type param: str or None
+    :raises TypeError: Invalid parameter type(s)
+    :raises ValueError: Invalid value argument(s)
+    :raises ProgrammingError: Invalid parameter name(s) or values
+
+If the parameter and the value are strings, the run-time parameter
+will be set to that value.  If no value or *None* is passed as a value,
+then the run-time parameter will be restored to its default value.
+
+You can set several parameters at once by passing a list or tuple
+of parameter names, with a single value that all parameters should
+be set to or with a corresponding list or tuple of values.
+
+You can also pass a dict as parameters.  In this case, you should
+not pass a value, since the values will be taken from the dict.
+
+By passing the special name `'all'` as the parameter, you can reset
+all existing settable run-time parameters to their default values.
+
+If you set *local* to `True`, then the command takes effect for only the
+current transaction.  After :meth:`DB.commit` or :meth:`DB.rollback`,
+the session-level setting takes effect again.  Setting *local* to `True`
+will appear to have no effect if it is executed outside a transaction,
+since the transaction will end immediately.
+
+.. versionadded:: 4.2
 
 begin/commit/rollback/savepoint/release -- transaction handling
 ---------------------------------------------------------------

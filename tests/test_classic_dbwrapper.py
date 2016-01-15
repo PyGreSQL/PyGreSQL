@@ -85,61 +85,31 @@ class TestDBClassBasic(unittest.TestCase):
     def testAllDBAttributes(self):
         attributes = [
             'begin',
-            'cancel',
-            'clear',
-            'close',
-            'commit',
-            'db',
-            'dbname',
-            'debug',
-            'delete',
-            'end',
-            'endcopy',
-            'error',
-            'escape_bytea',
-            'escape_identifier',
-            'escape_literal',
-            'escape_string',
+            'cancel', 'clear', 'close', 'commit',
+            'db', 'dbname', 'debug', 'delete',
+            'end', 'endcopy', 'error',
+            'escape_bytea', 'escape_identifier',
+            'escape_literal', 'escape_string',
             'fileno',
-            'get',
-            'get_attnames',
-            'get_databases',
-            'get_notice_receiver',
-            'get_relations',
-            'get_tables',
-            'getline',
-            'getlo',
-            'getnotify',
-            'has_table_privilege',
-            'host',
-            'insert',
-            'inserttable',
-            'locreate',
-            'loimport',
+            'get', 'get_attnames', 'get_databases',
+            'get_notice_receiver', 'get_parameter',
+            'get_relations', 'get_tables',
+            'getline', 'getlo', 'getnotify',
+            'has_table_privilege', 'host',
+            'insert', 'inserttable',
+            'locreate', 'loimport',
             'notification_handler',
             'options',
-            'parameter',
-            'pkey',
-            'port',
-            'protocol_version',
-            'putline',
+            'parameter', 'pkey', 'port',
+            'protocol_version', 'putline',
             'query',
-            'release',
-            'reopen',
-            'reset',
-            'rollback',
-            'savepoint',
-            'server_version',
-            'set_notice_receiver',
-            'source',
-            'start',
-            'status',
+            'release', 'reopen', 'reset', 'rollback',
+            'savepoint', 'server_version',
+            'set_notice_receiver', 'set_parameter',
+            'source', 'start', 'status',
             'transaction',
-            'unescape_bytea',
-            'update',
-            'upsert',
-            'use_regtypes',
-            'user',
+            'unescape_bytea', 'update', 'upsert',
+            'use_regtypes', 'user',
         ]
         db_attributes = [a for a in dir(self.db)
             if not a.startswith('_')]
@@ -287,8 +257,8 @@ class TestDBClass(unittest.TestCase):
         db.query("drop table if exists test cascade")
         db.query("create table test ("
             "i2 smallint, i4 integer, i8 bigint,"
-            "d numeric, f4 real, f8 double precision, m money, "
-            "v4 varchar(4), c4 char(4), t text)")
+            " d numeric, f4 real, f8 double precision, m money,"
+            " v4 varchar(4), c4 char(4), t text)")
         db.query("create or replace view test_view as"
             " select i4, v4 from test")
         db.close()
@@ -412,90 +382,149 @@ class TestDBClass(unittest.TestCase):
             b'\\x746861742773206be47365')
         self.assertEqual(f(r'\\x4f007073ff21'), b'\\x4f007073ff21')
 
-    def testGetAttnames(self):
-        get_attnames = self.db.get_attnames
-        query = self.db.query
-        query("drop table if exists test_table")
-        self.addCleanup(query, "drop table test_table")
-        query("create table test_table("
-            " n int, alpha smallint, beta bool,"
-            " gamma char(5), tau text, v varchar(3))")
-        r = get_attnames("test_table")
+    def testGetParameter(self):
+        f = self.db.get_parameter
+        self.assertRaises(TypeError, f)
+        self.assertRaises(TypeError, f, None)
+        self.assertRaises(TypeError, f, 42)
+        self.assertRaises(pg.ProgrammingError, f, 'this_does_not_exist')
+        r = f('standard_conforming_strings')
+        self.assertEqual(r, 'on')
+        r = f('lc_monetary')
+        self.assertEqual(r, 'C')
+        r = f('datestyle')
+        self.assertEqual(r, 'ISO, YMD')
+        r = f('bytea_output')
+        self.assertEqual(r, 'hex')
+        r = f(('bytea_output', 'lc_monetary'))
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, ['hex', 'C'])
+        r = f(['standard_conforming_strings', 'datestyle', 'bytea_output'])
+        self.assertEqual(r, ['on', 'ISO, YMD', 'hex'])
+        s = dict.fromkeys(('bytea_output', 'lc_monetary'))
+        r = f(s)
+        self.assertIs(r, s)
+        self.assertEqual(r, {'bytea_output': 'hex', 'lc_monetary': 'C'})
+        s = dict.fromkeys(('Bytea_Output', 'LC_Monetary'))
+        r = f(s)
+        self.assertIs(r, s)
+        self.assertEqual(r, {'Bytea_Output': 'hex', 'LC_Monetary': 'C'})
+
+    def testGetParameterServerVersion(self):
+        r = self.db.get_parameter('server_version_num')
+        self.assertIsInstance(r, str)
+        s = self.db.server_version
+        self.assertIsInstance(s, int)
+        self.assertEqual(r, str(s))
+
+    def testGetParameterAll(self):
+        f = self.db.get_parameter
+        r = f('all')
         self.assertIsInstance(r, dict)
-        self.assertEquals(r, dict(
-            n='int', alpha='int', beta='bool',
-            gamma='text', tau='text', v='text'))
+        self.assertEqual(r['standard_conforming_strings'], 'on')
+        self.assertEqual(r['lc_monetary'], 'C')
+        self.assertEqual(r['DateStyle'], 'ISO, YMD')
+        self.assertEqual(r['bytea_output'], 'hex')
 
-    def testGetAttnamesWithQuotes(self):
-        get_attnames = self.db.get_attnames
-        query = self.db.query
-        table = 'test table for get_attnames()'
-        query('drop table if exists "%s"' % table)
-        self.addCleanup(query, 'drop table "%s"' % table)
-        query('create table "%s"('
-            '"Prime!" smallint,'
-            '"much space" integer, "Questions?" text)' % table)
-        r = get_attnames(table)
-        self.assertIsInstance(r, dict)
-        self.assertEquals(r, {
-            'Prime!': 'int', 'much space': 'int', 'Questions?': 'text'})
+    def testSetParameter(self):
+        f = self.db.set_parameter
+        g = self.db.get_parameter
+        self.assertRaises(TypeError, f)
+        self.assertRaises(TypeError, f, None)
+        self.assertRaises(TypeError, f, 42)
+        self.assertRaises(pg.ProgrammingError, f, 'this_does_not_exist')
+        f('standard_conforming_strings', 'off')
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        f('datestyle', 'ISO, DMY')
+        self.assertEqual(g('datestyle'), 'ISO, DMY')
+        f(('standard_conforming_strings', 'datestyle'), ('on', 'ISO, YMD'))
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.assertEqual(g('datestyle'), 'ISO, YMD')
+        f(['standard_conforming_strings', 'datestyle'], ['off', 'ISO, DMY'])
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        self.assertEqual(g('datestyle'), 'ISO, DMY')
+        f({'standard_conforming_strings': 'on', 'datestyle': 'ISO, YMD'})
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.assertEqual(g('datestyle'), 'ISO, YMD')
+        f(('default_with_oids', 'standard_conforming_strings'), 'off')
+        self.assertEqual(g('default_with_oids'), 'off')
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        f(['default_with_oids', 'standard_conforming_strings'], 'on')
+        self.assertEqual(g('default_with_oids'), 'on')
+        self.assertEqual(g('standard_conforming_strings'), 'on')
 
-    def testGetAttnamesWithRegtypes(self):
-        get_attnames = self.db.get_attnames
-        query = self.db.query
-        query("drop table if exists test_table")
-        self.addCleanup(query, "drop table test_table")
-        query("create table test_table("
-            " n int, alpha smallint, beta bool,"
-            " gamma char(5), tau text, v varchar(3))")
-        self.db.use_regtypes(True)
-        try:
-            r = get_attnames("test_table")
-            self.assertIsInstance(r, dict)
-        finally:
-            self.db.use_regtypes(False)
-        self.assertEquals(r, dict(
-            n='integer', alpha='smallint', beta='boolean',
-            gamma='character', tau='text', v='character varying'))
+    def testResetParameter(self):
+        db = DB()
+        f = db.set_parameter
+        g = db.get_parameter
+        r = g('default_with_oids')
+        self.assertIn(r, ('on', 'off'))
+        dwi, not_dwi = r, 'off' if r == 'on' else 'on'
+        r = g('standard_conforming_strings')
+        self.assertIn(r, ('on', 'off'))
+        scs, not_scs = r, 'off' if r == 'on' else 'on'
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f('default_with_oids')
+        f('standard_conforming_strings', None)
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f(('default_with_oids', 'standard_conforming_strings'))
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f(['default_with_oids', 'standard_conforming_strings'], None)
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
 
-    def testGetAttnamesIsCached(self):
-        get_attnames = self.db.get_attnames
-        query = self.db.query
-        query("drop table if exists test_table")
-        self.addCleanup(query, "drop table if exists test_table")
-        query("create table test_table(col int)")
-        r = get_attnames("test_table")
-        self.assertIsInstance(r, dict)
-        self.assertEquals(r, dict(col='int'))
-        query("drop table test_table")
-        query("create table test_table(col text)")
-        r = get_attnames("test_table")
-        self.assertEquals(r, dict(col='int'))
-        r = get_attnames("test_table", flush=True)
-        self.assertEquals(r, dict(col='text'))
-        query("drop table test_table")
-        r = get_attnames("test_table")
-        self.assertEquals(r, dict(col='text'))
-        self.assertRaises(pg.ProgrammingError,
-            get_attnames, "test_table", flush=True)
+    def testResetParameterAll(self):
+        db = DB()
+        f = db.set_parameter
+        self.assertRaises(ValueError, f, 'all', 0)
+        self.assertRaises(ValueError, f, 'all', 'off')
+        g = db.get_parameter
+        r = g('default_with_oids')
+        self.assertIn(r, ('on', 'off'))
+        dwi, not_dwi = r, 'off' if r == 'on' else 'on'
+        r = g('standard_conforming_strings')
+        self.assertIn(r, ('on', 'off'))
+        scs, not_scs = r, 'off' if r == 'on' else 'on'
+        f('default_with_oids', not_dwi)
+        f('standard_conforming_strings', not_scs)
+        self.assertEqual(g('default_with_oids'), not_dwi)
+        self.assertEqual(g('standard_conforming_strings'), not_scs)
+        f('all')
+        self.assertEqual(g('default_with_oids'), dwi)
+        self.assertEqual(g('standard_conforming_strings'), scs)
 
-    def testGetAttnamesIsOrdered(self):
-        get_attnames = self.db.get_attnames
-        query = self.db.query
-        query("drop table if exists test_table")
-        self.addCleanup(query, "drop table test_table")
-        query("create table test_table("
-            " n int, alpha smallint, v varchar(3),"
-            " gamma char(5), tau text, beta bool)")
-        r = get_attnames("test_table")
-        self.assertIsInstance(r, OrderedDict)
-        self.assertEquals(r, OrderedDict([
-            ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
-            ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
-        if OrderedDict is dict:
-            self.skipTest('OrderedDict is not supported')
-        r = ' '.join(list(r.keys()))
-        self.assertEquals(r, 'n alpha v gamma tau beta')
+    def testSetParameterLocal(self):
+        f = self.db.set_parameter
+        g = self.db.get_parameter
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.db.begin()
+        f('standard_conforming_strings', 'off', local=True)
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        self.db.end()
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+
+    def testSetParameterSession(self):
+        f = self.db.set_parameter
+        g = self.db.get_parameter
+        self.assertEqual(g('standard_conforming_strings'), 'on')
+        self.db.begin()
+        f('standard_conforming_strings', 'off', local=False)
+        self.assertEqual(g('standard_conforming_strings'), 'off')
+        self.db.end()
+        self.assertEqual(g('standard_conforming_strings'), 'off')
 
     def testQuery(self):
         query = self.db.query
@@ -588,19 +617,19 @@ class TestDBClass(unittest.TestCase):
             query('create table "%s2" ('
                 "c smallint, d smallint primary key)" % t)
             query('create table "%s3" ('
-                "e smallint, f smallint, g smallint, "
-                "h smallint, i smallint, "
-                "primary key (f, h))" % t)
+                "e smallint, f smallint, g smallint,"
+                " h smallint, i smallint,"
+                " primary key (f, h))" % t)
             query('create table "%s4" ('
                 "more_than_one_letter varchar primary key)" % t)
             query('create table "%s5" ('
                 '"with space" date primary key)' % t)
             query('create table "%s6" ('
-                'a_very_long_column_name varchar, '
-                '"with space" date, '
-                '"42" int, '
-                "primary key (a_very_long_column_name, "
-                '"with space", "42"))' % t)
+                'a_very_long_column_name varchar,'
+                ' "with space" date,'
+                ' "42" int,'
+                " primary key (a_very_long_column_name,"
+                ' "with space", "42"))' % t)
             self.assertRaises(KeyError, pkey, '%s0' % t)
             self.assertEqual(pkey('%s1' % t), 'b')
             self.assertEqual(pkey('%s2' % t), 'd')
@@ -686,28 +715,111 @@ class TestDBClass(unittest.TestCase):
         self.assertNotIn('public.test', result)
         self.assertNotIn('public.test_view', result)
 
-    def testAttnames(self):
+    def testGetAttnames(self):
+        get_attnames = self.db.get_attnames
         self.assertRaises(pg.ProgrammingError,
             self.db.get_attnames, 'does_not_exist')
         self.assertRaises(pg.ProgrammingError,
             self.db.get_attnames, 'has.too.many.dots')
-        for table in ('attnames_test_table', 'test table for attnames'):
-            self.db.query('drop table if exists "%s"' % table)
-            self.addCleanup(self.db.query, 'drop table "%s"' % table)
-            self.db.query('create table "%s" ('
-                'a smallint, b integer, c bigint, '
-                'e numeric, f float, f2 double precision, m money, '
-                'x smallint, y smallint, z smallint, '
-                'Normal_NaMe smallint, "Special Name" smallint, '
-                't text, u char(2), v varchar(2), '
-                'primary key (y, u)) with oids' % table)
-            attributes = self.db.get_attnames(table)
-            result = {'a': 'int', 'c': 'int', 'b': 'int',
-                'e': 'num', 'f': 'float', 'f2': 'float', 'm': 'money',
-                'normal_name': 'int', 'Special Name': 'int',
-                'u': 'text', 't': 'text', 'v': 'text',
-                'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int'}
-            self.assertEqual(attributes, result)
+        query = self.db.query
+        query("drop table if exists test_table")
+        self.addCleanup(query, "drop table test_table")
+        query("create table test_table("
+            " n int, alpha smallint, beta bool,"
+            " gamma char(5), tau text, v varchar(3))")
+        r = get_attnames('test_table')
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(
+            n='int', alpha='int', beta='bool',
+            gamma='text', tau='text', v='text'))
+
+    def testGetAttnamesWithQuotes(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        table = 'test table for get_attnames()'
+        query('drop table if exists "%s"' % table)
+        self.addCleanup(query, 'drop table "%s"' % table)
+        query('create table "%s"('
+            '"Prime!" smallint,'
+            ' "much space" integer, "Questions?" text)' % table)
+        r = get_attnames(table)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, {
+            'Prime!': 'int', 'much space': 'int', 'Questions?': 'text'})
+        table = 'yet another test table for get_attnames()'
+        query('drop table if exists "%s"' % table)
+        self.addCleanup(query, 'drop table "%s"' % table)
+        self.db.query('create table "%s" ('
+            'a smallint, b integer, c bigint,'
+            ' e numeric, f float, f2 double precision, m money,'
+            ' x smallint, y smallint, z smallint,'
+            ' Normal_NaMe smallint, "Special Name" smallint,'
+            ' t text, u char(2), v varchar(2),'
+            ' primary key (y, u)) with oids' % table)
+        r = get_attnames(table)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, {'a': 'int', 'c': 'int', 'b': 'int',
+            'e': 'num', 'f': 'float', 'f2': 'float', 'm': 'money',
+            'normal_name': 'int', 'Special Name': 'int',
+            'u': 'text', 't': 'text', 'v': 'text',
+            'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int'})
+
+    def testGetAttnamesWithRegtypes(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        query("drop table if exists test_table")
+        self.addCleanup(query, "drop table test_table")
+        query("create table test_table("
+            " n int, alpha smallint, beta bool,"
+            " gamma char(5), tau text, v varchar(3))")
+        self.db.use_regtypes(True)
+        try:
+            r = get_attnames("test_table")
+            self.assertIsInstance(r, dict)
+        finally:
+            self.db.use_regtypes(False)
+        self.assertEqual(r, dict(
+            n='integer', alpha='smallint', beta='boolean',
+            gamma='character', tau='text', v='character varying'))
+
+    def testGetAttnamesIsCached(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        query("drop table if exists test_table")
+        self.addCleanup(query, "drop table if exists test_table")
+        query("create table test_table(col int)")
+        r = get_attnames("test_table")
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(col='int'))
+        query("drop table test_table")
+        query("create table test_table(col text)")
+        r = get_attnames("test_table")
+        self.assertEqual(r, dict(col='int'))
+        r = get_attnames("test_table", flush=True)
+        self.assertEqual(r, dict(col='text'))
+        query("drop table test_table")
+        r = get_attnames("test_table")
+        self.assertEqual(r, dict(col='text'))
+        self.assertRaises(pg.ProgrammingError,
+            get_attnames, "test_table", flush=True)
+
+    def testGetAttnamesIsOrdered(self):
+        get_attnames = self.db.get_attnames
+        query = self.db.query
+        query("drop table if exists test_table")
+        self.addCleanup(query, "drop table test_table")
+        query("create table test_table("
+            " n int, alpha smallint, v varchar(3),"
+            " gamma char(5), tau text, beta bool)")
+        r = get_attnames("test_table")
+        self.assertIsInstance(r, OrderedDict)
+        self.assertEqual(r, OrderedDict([
+            ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
+            ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
+        if OrderedDict is dict:
+            self.skipTest('OrderedDict is not supported')
+        r = ' '.join(list(r.keys()))
+        self.assertEqual(r, 'n alpha v gamma tau beta')
 
     def testHasTablePrivilege(self):
         can = self.db.has_table_privilege
@@ -800,7 +912,7 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, 'drop table "%s"' % table)
         query('create table "%s" ('
             '"Prime!" smallint primary key,'
-            '"much space" integer, "Questions?" text)' % table)
+            ' "much space" integer, "Questions?" text)' % table)
         query('insert into "%s"'
               " values(17, 1001, 'No!')" % table)
         r = get(table, 17)
@@ -968,7 +1080,7 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, 'drop table "%s"' % table)
         query('create table "%s" ('
             '"Prime!" smallint primary key,'
-            '"much space" integer, "Questions?" text)' % table)
+            ' "much space" integer, "Questions?" text)' % table)
         r = {'Prime!': 11, 'much space': 2002, 'Questions?': 'What?'}
         r = insert(table, r)
         self.assertIsInstance(r, dict)
@@ -1059,7 +1171,7 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, 'drop table "%s"' % table)
         query('create table "%s" ('
             '"Prime!" smallint primary key,'
-            '"much space" integer, "Questions?" text)' % table)
+            ' "much space" integer, "Questions?" text)' % table)
         query('insert into "%s"'
               " values(13, 3003, 'Why!')" % table)
         r = {'Prime!': 13, 'much space': 7007, 'Questions?': 'When?'}
@@ -1221,7 +1333,7 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, 'drop table "%s"' % table)
         query('create table "%s" ('
             '"Prime!" smallint primary key,'
-            '"much space" integer, "Questions?" text)' % table)
+            ' "much space" integer, "Questions?" text)' % table)
         s = {'Prime!': 31, 'much space': 9009, 'Questions?': 'Yes.'}
         try:
             r = upsert(table, s)
@@ -1274,7 +1386,7 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, 'drop table "%s"' % table)
         query('create table "%s" ('
             '"Prime!" smallint primary key,'
-            '"much space" integer, "Questions?" text)' % table)
+            ' "much space" integer, "Questions?" text)' % table)
         r = clear(table)
         self.assertIsInstance(r, dict)
         self.assertEqual(r['Prime!'], 0)
@@ -1366,7 +1478,7 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, 'drop table "%s"' % table)
         query('create table "%s" ('
             '"Prime!" smallint primary key,'
-            '"much space" integer, "Questions?" text)' % table)
+            ' "much space" integer, "Questions?" text)' % table)
         query('insert into "%s"'
               " values(19, 5005, 'Yes!')" % table)
         r = {'Prime!': 17}

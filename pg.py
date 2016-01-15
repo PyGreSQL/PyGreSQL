@@ -462,6 +462,118 @@ class DB(object):
         """Destroy a previously defined savepoint."""
         return self.query('RELEASE ' + name)
 
+    def get_parameter(self, parameter):
+        """Get the value of a run-time parameter.
+
+        If the parameter is a string, the return value will also be a string
+        that is the current setting of the run-time parameter with that name.
+
+        You can get several parameters at once by passing a list or tuple of
+        parameter names.  The return value will then be a corresponding list
+        of parameter settings.  If you pass a dict as parameter instead, its
+        values will be set to the parameter settings corresponding to its keys.
+
+        By passing the special name 'all' as the parameter, you can get a dict
+        of all existing configuration parameters.
+        """
+        if isinstance(parameter, basestring):
+            parameter = [parameter]
+            values = None
+        elif isinstance(parameter, (list, tuple)):
+            values = []
+        elif isinstance(parameter, dict):
+            values = parameter
+        else:
+            raise TypeError('The parameter must be a dict, list or string')
+        if not parameter:
+            raise TypeError('No parameter has been specified')
+        params = {} if isinstance(values, dict) else []
+        for key in parameter:
+            param = key.strip().lower() if isinstance(
+                key, basestring) else None
+            if not param:
+                raise TypeError('Invalid parameter')
+            if param == 'all':
+                q = 'SHOW ALL'
+                values = self.db.query(q).getresult()
+                values = dict(value[:2] for value in values)
+                break
+            if isinstance(values, dict):
+                params[param] = key
+            else:
+                params.append(param)
+        else:
+            for param in params:
+                q = 'SHOW %s' % (param,)
+                value = self.db.query(q).getresult()[0][0]
+                if values is None:
+                    values = value
+                elif isinstance(values, list):
+                    values.append(value)
+                else:
+                    values[params[param]] = value
+        return values
+
+    def set_parameter(self, parameter, value=None, local=False):
+        """Set the value of a run-time parameter.
+
+        If the parameter and the value are strings, the run-time parameter
+        will be set to that value.  If no value or None is passed as a value,
+        then the run-time parameter will be restored to its default value.
+
+        You can set several parameters at once by passing a list or tuple
+        of parameter names, with a single value that all parameters should
+        be set to or with a corresponding list or tuple of values.
+
+        You can also pass a dict as parameters.  In this case, you should
+        not pass a value, since the values will be taken from the dict.
+
+        By passing the special name 'all' as the parameter, you can reset
+        all existing settable run-time parameters to their default values.
+
+        If you set local to True, then the command takes effect for only the
+        current transaction.  After commit() or rollback(), the session-level
+        setting takes effect again.  Setting local to True will appear to
+        have no effect if it is executed outside a transaction, since the
+        transaction will end immediately.
+        """
+        if isinstance(parameter, basestring):
+            parameter = {parameter: value}
+        elif isinstance(parameter, (list, tuple)):
+            if isinstance(value, (list, tuple)):
+                parameter = dict(zip(parameter, value))
+            else:
+                parameter = dict.fromkeys(parameter, value)
+        elif isinstance(parameter, dict):
+            if value is not None:
+                raise ValueError(
+                    'A value must not be set when parameter is a dictionary')
+        else:
+            raise TypeError('The parameter must be a dict, list or string')
+        if not parameter:
+            raise TypeError('No parameter has been specified')
+        params = {}
+        for key, value in parameter.items():
+            param = key.strip().lower() if isinstance(
+                key, basestring) else None
+            if not param:
+                raise TypeError('Invalid parameter')
+            if param == 'all':
+                if value is not None:
+                    raise ValueError(
+                        "A value must ot be set when parameter is 'all'")
+                params = {'all': None}
+                break
+            params[param] = value
+        local = ' LOCAL' if local else ''
+        for param, value in params.items():
+            if value is None:
+                q = 'RESET%s %s' % (local, param)
+            else:
+                q = 'SET%s %s TO %s' % (local, param, value)
+            self._do_debug(q)
+            self.db.query(q)
+
     def query(self, qstr, *args):
         """Execute a SQL command string.
 
