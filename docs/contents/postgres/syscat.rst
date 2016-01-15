@@ -1,6 +1,8 @@
 Examples for using the system catalogs
 ======================================
 
+.. py:currentmodule:: pg
+
 The system catalogs are regular tables where PostgreSQL stores schema metadata,
 such as information about tables and columns, and internal bookkeeping
 information. You can drop and recreate the tables, add columns, insert and
