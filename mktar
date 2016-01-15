@@ -4,7 +4,7 @@ VERSION=5.0
 DISTDIR=/u/pyg/files
 
 # small safety tests
-if [ ! -f module/pgmodule.c ]
+if [ ! -f pgmodule.c ]
 then
 	echo "Hmmm.  Are you sure you are in the right directory?"
 	exit 1
@@ -39,7 +39,7 @@ TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
 
 MODFILES="pg.py pgdb.py pgmodule.c
-          pgfs.h pgtypes.h py3c.h
+          pgtypes.h py3c.h
           setup.py setup.cfg"
 DOCFILES="docs/Makefile docs/make.bat docs/*.rst
           docs/contents docs/download docs/community
