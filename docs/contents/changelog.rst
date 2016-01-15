@@ -9,6 +9,8 @@ Version 4.2
 - Force build to compile with no errors.
 - New methods get_parameters() and set_parameters() in the classic interface
   which can be used to get or set run-time parameters.
+- New method truncate() in the classic interface that can be used to quickly
+  empty a table or a set of tables.
 - Fix decimal point handling.
 - Add option to return boolean values as bool objects.
 - Add option to return money values as string.

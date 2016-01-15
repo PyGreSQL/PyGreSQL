@@ -94,7 +94,7 @@ class TestDBClassBasic(unittest.TestCase):
             'savepoint', 'server_version',
             'set_notice_receiver', 'set_parameter',
             'source', 'start', 'status',
-            'transaction', 'tty',
+            'transaction', 'truncate', 'tty',
             'unescape_bytea', 'update',
             'use_regtypes', 'user',
         ]
@@ -1147,6 +1147,208 @@ class TestDBClass(unittest.TestCase):
             ' order by m' % table).getresult()]
         self.assertEqual(r, ['f'])
         query("drop table %s" % table)
+
+    def testTruncate(self):
+        truncate = self.db.truncate
+        self.assertRaises(TypeError, truncate, None)
+        self.assertRaises(TypeError, truncate, 42)
+        self.assertRaises(TypeError, truncate, dict(test_table=None))
+        query = self.db.query
+        query("drop table if exists test_table")
+        query("create table test_table (n smallint)")
+        for i in range(3):
+            query("insert into test_table values (1)")
+        q = "select count(*) from test_table"
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 3)
+        truncate('test_table')
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 0)
+        for i in range(3):
+            query("insert into test_table values (1)")
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 3)
+        truncate('public.test_table')
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 0)
+        query("drop table if exists test_table_2")
+        query('create table test_table_2 (n smallint)')
+        for t in (list, tuple, set):
+            for i in range(3):
+                query("insert into test_table values (1)")
+                query("insert into test_table_2 values (2)")
+            q = ("select (select count(*) from test_table),"
+                " (select count(*) from test_table_2)")
+            r = query(q).getresult()[0]
+            self.assertEqual(r, (3, 3))
+            truncate(t(['test_table', 'test_table_2']))
+            r = query(q).getresult()[0]
+            self.assertEqual(r, (0, 0))
+        query("drop table test_table_2")
+        query("drop table test_table")
+
+    def testTruncateRestart(self):
+        truncate = self.db.truncate
+        self.assertRaises(TypeError, truncate, 'test_table', restart='invalid')
+        query = self.db.query
+        query("drop table if exists test_table")
+        query("create table test_table (n serial, t text)")
+        for n in range(3):
+            query("insert into test_table (t) values ('test')")
+        q = "select count(n), min(n), max(n) from test_table"
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 1, 3))
+        truncate('test_table')
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, None, None))
+        for n in range(3):
+            query("insert into test_table (t) values ('test')")
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 4, 6))
+        truncate('test_table', restart=True)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, None, None))
+        for n in range(3):
+            query("insert into test_table (t) values ('test')")
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 1, 3))
+        query("drop table test_table")
+
+    def testTruncateCascade(self):
+        truncate = self.db.truncate
+        self.assertRaises(TypeError, truncate, 'test_table', cascade='invalid')
+        query = self.db.query
+        query("drop table if exists test_child")
+        query("drop table if exists test_parent")
+        query("create table test_parent (n smallint primary key)")
+        query("create table test_child ("
+            " n smallint primary key references test_parent (n))")
+        for n in range(3):
+            query("insert into test_parent (n) values (%d)" % n)
+            query("insert into test_child (n) values (%d)" % n)
+        q = ("select (select count(*) from test_parent),"
+            " (select count(*) from test_child)")
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 3))
+        self.assertRaises(pg.ProgrammingError, truncate, 'test_parent')
+        truncate(['test_parent', 'test_child'])
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0))
+        for n in range(3):
+            query("insert into test_parent (n) values (%d)" % n)
+            query("insert into test_child (n) values (%d)" % n)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 3))
+        truncate('test_parent', cascade=True)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0))
+        for n in range(3):
+            query("insert into test_parent (n) values (%d)" % n)
+            query("insert into test_child (n) values (%d)" % n)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 3))
+        truncate('test_child')
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 0))
+        self.assertRaises(pg.ProgrammingError, truncate, 'test_parent')
+        truncate('test_parent', cascade=True)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0))
+        query("drop table test_child")
+        query("drop table test_parent")
+
+    def testTruncateOnly(self):
+        truncate = self.db.truncate
+        self.assertRaises(TypeError, truncate, 'test_table', only='invalid')
+        query = self.db.query
+        query("drop table if exists test_child")
+        query("drop table if exists test_parent")
+        query("create table test_parent (n smallint)")
+        query("create table test_child ("
+            " m smallint) inherits (test_parent)")
+        for n in range(3):
+            query("insert into test_parent (n) values (1)")
+            query("insert into test_child (n, m) values (2, 3)")
+        q = ("select (select count(*) from test_parent),"
+            " (select count(*) from test_child)")
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (6, 3))
+        truncate('test_parent')
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0))
+        for n in range(3):
+            query("insert into test_parent (n) values (1)")
+            query("insert into test_child (n, m) values (2, 3)")
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (6, 3))
+        truncate('test_parent*')
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0))
+        for n in range(3):
+            query("insert into test_parent (n) values (1)")
+            query("insert into test_child (n, m) values (2, 3)")
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (6, 3))
+        truncate('test_parent', only=True)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (3, 3))
+        truncate('test_parent', only=False)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0))
+        self.assertRaises(ValueError, truncate, 'test_parent*', only=True)
+        truncate('test_parent*', only=False)
+        query("drop table if exists test_parent_2")
+        query("create table test_parent_2 (n smallint)")
+        query("drop table if exists test_child_2")
+        query("create table test_child_2 ("
+            " m smallint) inherits (test_parent_2)")
+        for n in range(3):
+            query("insert into test_parent (n) values (1)")
+            query("insert into test_child (n, m) values (2, 3)")
+            query("insert into test_parent_2 (n) values (1)")
+            query("insert into test_child_2 (n, m) values (2, 3)")
+        q = ("select (select count(*) from test_parent),"
+            " (select count(*) from test_child),"
+            " (select count(*) from test_parent_2),"
+            " (select count(*) from test_child_2)")
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (6, 3, 6, 3))
+        truncate(['test_parent', 'test_parent_2'], only=[False, True])
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0, 3, 3))
+        truncate(['test_parent', 'test_parent_2'], only=False)
+        r = query(q).getresult()[0]
+        self.assertEqual(r, (0, 0, 0, 0))
+        self.assertRaises(ValueError, truncate,
+            ['test_parent*', 'test_child'], only=[True, False])
+        truncate(['test_parent*', 'test_child'], only=[False, True])
+        query("drop table test_child_2")
+        query("drop table test_parent_2")
+        query("drop table test_child")
+        query("drop table test_parent")
+
+    def testTruncateQuoted(self):
+        truncate = self.db.truncate
+        query = self.db.query
+        table = "test table for truncate()"
+        query('drop table if exists "%s"' % table)
+        query('create table "%s" (n smallint)' % table)
+        for i in range(3):
+            query('insert into "%s" values (1)' % table)
+        q = 'select count(*) from "%s"' % table
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 3)
+        truncate(table)
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 0)
+        for i in range(3):
+            query('insert into "%s" values (1)' % table)
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 3)
+        truncate('public."%s"' % table)
+        r = query(q).getresult()[0][0]
+        self.assertEqual(r, 0)
+        query('drop table "%s"' % table)
 
     def testTransaction(self):
         query = self.db.query

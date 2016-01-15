@@ -415,6 +415,35 @@ as munged by get or passed as keyword, or on the primary key of the table.
 The return value is the number of deleted rows (i.e. 0 if the row did not
 exist and 1 if the row was deleted).
 
+truncate -- Quickly empty database tables
+-----------------------------------------
+
+.. method:: DB.truncate(self, table, [restart], [cascade], [only]):
+
+    Empty a table or set of tables
+
+    :param table: the name of the table(s)
+    :type table: str, list or set
+    :param bool restart: whether table sequences should be restarted
+    :param bool cascade: whether referenced tables should also be truncated
+    :param only: whether only parent tables should be truncated
+    :type only: bool or list
+
+This method quickly removes all rows from the given table or set
+of tables.  It has the same effect as an unqualified DELETE on each
+table, but since it does not actually scan the tables it is faster.
+Furthermore, it reclaims disk space immediately, rather than requiring
+a subsequent VACUUM operation. This is most useful on large tables.
+
+If *restart* is set to `True`, sequences owned by columns of the truncated
+table(s) are automatically restarted.  If *cascade* is set to `True`, it
+also truncates all tables that have foreign-key references to any of
+the named tables.  If the parameter *only* is not set to `True`, all the
+descendant tables (if any) will also be truncated. Optionally, a ``*``
+can be specified after the table name to explicitly indicate that
+descendant tables are included.  If the parameter *table* is a list,
+the parameter *only* can also be a list of corresponding boolean values.
+
 escape_literal -- escape a literal string for use within SQL
 ------------------------------------------------------------
 
