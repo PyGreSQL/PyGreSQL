@@ -577,8 +577,8 @@ class DB(object):
                 raise TypeError('Invalid parameter')
             if param == 'all':
                 if value is not None:
-                    raise ValueError(
-                        "A value must ot be set when parameter is 'all'")
+                    raise ValueError('A value must ot be specified'
+                        " when parameter is 'all'")
                 params = {'all': None}
                 break
             params[param] = value
@@ -1086,6 +1086,62 @@ class DB(object):
         self._do_debug(q, params)
         res = self.db.query(q, params)
         return int(res)
+
+    def truncate(self, table, restart=False, cascade=False, only=False):
+        """Empty a table or set of tables.
+
+        This method quickly removes all rows from the given table or set
+        of tables.  It has the same effect as an unqualified DELETE on each
+        table, but since it does not actually scan the tables it is faster.
+        Furthermore, it reclaims disk space immediately, rather than requiring
+        a subsequent VACUUM operation. This is most useful on large tables.
+
+        If restart is set to True, sequences owned by columns of the truncated
+        table(s) are automatically restarted.  If cascade is set to True, it
+        also truncates all tables that have foreign-key references to any of
+        the named tables.  If the parameter only is not set to True, all the
+        descendant tables (if any) will also be truncated. Optionally, a '*'
+        can be specified after the table name to explicitly indicate that
+        descendant tables are included.
+        """
+        if isinstance(table, basestring):
+            only = {table: only}
+            table = [table]
+        elif isinstance(table, (list, tuple)):
+            if isinstance(only, (list, tuple)):
+                only = dict(zip(table, only))
+            else:
+                only = dict.fromkeys(table, only)
+        elif isinstance(table, (set, frozenset)):
+            only = dict.fromkeys(table, only)
+        else:
+            raise TypeError('The table must be a string, list or set')
+        if not (restart is None or isinstance(restart, (bool, int))):
+            raise TypeError('Invalid type for the restart option')
+        if not (cascade is None or isinstance(cascade, (bool, int))):
+            raise TypeError('Invalid type for the cascade option')
+        tables = []
+        for t in table:
+            u = only.get(t)
+            if not (u is None or isinstance(u, (bool, int))):
+                raise TypeError('Invalid type for the only option')
+            if t.endswith('*'):
+                if u:
+                    raise ValueError(
+                        'Contradictory table name and only options')
+                t = t[:-1].rstrip()
+            t = self._escape_qualified_name(t)
+            if u:
+                t = 'ONLY %s' % t
+            tables.append(t)
+        q = ['TRUNCATE', ', '.join(tables)]
+        if restart:
+            q.append('RESTART IDENTITY')
+        if cascade:
+            q.append('CASCADE')
+        q = ' '.join(q)
+        self._do_debug(q)
+        return self.query(q)
 
     def notification_handler(self, event, callback, arg_dict={}, timeout=None):
         """Get notification handler that will run the given callback."""
