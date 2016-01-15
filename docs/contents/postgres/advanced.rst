@@ -1,6 +1,8 @@
 Examples for advanced features
 ==============================
 
+.. py:currentmodule:: pg
+
 In this section, we show how to use some advanced features of PostgreSQL
 using the classic PyGreSQL interface.
 

@@ -1,6 +1,8 @@
 Basic examples
 ==============
 
+.. py:currentmodule:: pg
+
 In this section, we demonstrate how to use some of the very basic features
 of PostgreSQL using the classic PyGreSQL interface.
 
