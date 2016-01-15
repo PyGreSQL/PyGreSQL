@@ -26,8 +26,14 @@ else
 fi
 
 # Package up as a source tarball in the distribution directory.
-# Note that this does essentially the same as "python setup.py sdist",
-# except this also makes the docs and bundles them as source and html.
+
+echo "Making source tarball..."
+
+# Make sure that the documentation has been built.
+
+./mkdocs
+
+# The following does essentially the same as "python setup.py sdist".
 
 TD=PyGreSQL-$VERSION
 TF=$DISTDIR/$TD.tgz
@@ -40,10 +46,6 @@ DOCFILES="docs/Makefile docs/make.bat docs/*.rst
           docs/_static docs/_templates"
 HTMLFILES="docs/_build/html"
 TESTFILES="tests/*.py"
-
-echo "Making source tarball..."
-
-./mkdocs
 
 rm -rf $TD
 mkdir $TD
