@@ -33,33 +33,19 @@ echo "Making source tarball..."
 
 ./mkdocs
 
-# The following does essentially the same as "python setup.py sdist".
+# Package as source distribution.
 
-TD=PyGreSQL-$VERSION
-TF=$DISTDIR/$TD.tgz
+rm -rf build dist
 
-MODFILES="pg.py pgdb.py pgmodule.c
-          pgfs.h pgtypes.h
-          setup.py setup.cfg
-          LICENSE.txt README.rst MANIFEST.in"
-DOCFILES="docs/Makefile docs/make.bat docs/*.rst docs/*.py
-          docs/contents docs/download docs/community
-          docs/_static docs/_templates"
-HTMLFILES="docs/_build/html"
-TESTFILES="tests/*.py"
+python setup.py sdist
 
-rm -rf $TD
-mkdir $TD
-mkdir -p $TD/docs/_build/html
-mkdir $TD/tests
-cp $MODFILES $TD
-cp -r $DOCFILES $TD/docs
-cp -r $HTMLFILES $TD/docs/_build
-cp $TESTFILES $TD/tests
-tar -cvzf $TF $TD
+DF=`ls dist`
+TF=$DISTDIR/$DF
+
+cp dist/$DF $TF
 chmod 644 $TF
-rm -rf $TD
-rm -f $DISTDIR/$SYMLINK
-ln -s $TD.tgz $DISTDIR/$SYMLINK
 
-echo "$TF has been built"
+rm -f $DISTDIR/$SYMLINK
+ln -s $DF $DISTDIR/$SYMLINK
+
+echo "$TF has been built."
