@@ -444,6 +444,8 @@ can be specified after the table name to explicitly indicate that
 descendant tables are included.  If the parameter *table* is a list,
 the parameter *only* can also be a list of corresponding boolean values.
 
+.. versionadded:: 4.2
+
 escape_literal -- escape a literal string for use within SQL
 ------------------------------------------------------------
 
