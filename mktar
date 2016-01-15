@@ -41,7 +41,7 @@ TF=$DISTDIR/$TD.tgz
 MODFILES="pg.py pgdb.py pgmodule.c
           pgtypes.h py3c.h
           setup.py setup.cfg
-          LICENSE.txt README.rst MANIFEST.inq "
+          LICENSE.txt README.rst MANIFEST.in"
 DOCFILES="docs/Makefile docs/make.bat docs/*.rst docs/*.py
           docs/contents docs/download docs/community
           docs/_static docs/_templates"
