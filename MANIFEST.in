@@ -2,6 +2,8 @@ include *.c
 include *.h
 include *.py
 include *.cfg
+include *.rst
+include *.txt
 recursive-include tests *.py
 recursive-include docs *.html *.css *.txt *.js *.gif *.png *.ico *.py Makefile *.bat *.rst *.css_t
 

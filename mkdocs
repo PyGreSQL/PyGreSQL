@@ -15,3 +15,4 @@ echo "Making Sphinx docs..."
 cd docs
 ${MAKE} clean
 ${MAKE} html
+rm -f build/html/.buildinfo
