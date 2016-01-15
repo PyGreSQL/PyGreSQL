@@ -61,8 +61,8 @@ need to be escaped, making this an effective way to pass arbitrary or
 unknown data without worrying about SQL injection or syntax errors.
 
 When the database could not process the query, a :exc:`pg.ProgrammingError` or
-a :exc:`pg.InternalError` is raised. You can check the ``SQLSTATE`` code of
-this error by reading its :attr:`sqlstate` attribute.
+a :exc:`pg.InternalError` is raised. You can check the ``SQLSTATE`` error code
+of this error by reading its :attr:`sqlstate` attribute.
 
 Example::
 

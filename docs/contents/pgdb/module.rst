@@ -82,6 +82,9 @@ The errors that can be raised by the :mod:`pgdb` module are the following:
 
     Exception raised for errors that are related to the database.
 
+    In PyGreSQL, this also has a :attr:`DatabaseError.sqlstate` attribute
+    that contains the ``SQLSTATE`` error code of this error.
+
 .. exception:: DataError
 
     Exception raised for errors that are due to problems with the processed

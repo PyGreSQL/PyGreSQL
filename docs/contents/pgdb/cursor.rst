@@ -91,6 +91,13 @@ The parameters may also be specified as list of tuples to e.g. insert multiple
 rows in a single operation, but this kind of usage is deprecated:
 :meth:`pgdbCursor.executemany` should be used instead.
 
+Note that in case this method raises a :exception:`DatabaseError`, you can
+get information about the error condition that has occurred by introspecting
+its :attr:`DatabaseError.sqlstate` attribute, which will be the ``SQLSTATE``
+error code associated with the error.  Applications that need to know which
+error condition has occurred should usually test the error code, rather than
+looking at the textual error message.
+
 executemany -- execute many similar database operations
 -------------------------------------------------------
 
