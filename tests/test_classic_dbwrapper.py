@@ -15,7 +15,10 @@ try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
     import unittest
+
 import os
+import sys
+import tempfile
 
 import pg  # the module under test
 
@@ -52,6 +55,11 @@ try:
     from collections import OrderedDict
 except ImportError:  # Python 2.6 or 3.0
     OrderedDict = dict
+
+if str is bytes:
+    from StringIO import StringIO
+else:
+    from io import StringIO
 
 windows = os.name == 'nt'
 
@@ -1859,20 +1867,6 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
 
-    def testDebugWithCallable(self):
-        if debug:
-            self.assertEqual(self.db.debug, debug)
-        else:
-            self.assertIsNone(self.db.debug)
-        s = []
-        self.db.debug = s.append
-        try:
-            self.db.query("select 1")
-            self.db.query("select 2")
-            self.assertEqual(s, ["select 1", "select 2"])
-        finally:
-            self.db.debug = debug
-
 
 class TestDBClassNonStdOpts(TestDBClass):
     """Test the methods of the DB class with non-standard global options."""
@@ -2021,6 +2015,69 @@ class TestSchemas(unittest.TestCase):
         query("set search_path to s3")
         r = get("t", 1, 'n')
         self.assertIn('oid(t)', r)
+
+
+class TestDebug(unittest.TestCase):
+    """Test the debug attribute of the DB class."""
+
+    def setUp(self):
+        self.db = DB()
+        self.query = self.db.query
+        self.debug = self.db.debug
+        self.output = StringIO()
+        self.stdout, sys.stdout = sys.stdout, self.output
+
+    def tearDown(self):
+        sys.stdout = self.stdout
+        self.output.close()
+        self.db.debug = debug
+        self.db.close()
+
+    def get_output(self):
+        return self.output.getvalue()
+
+    def send_queries(self):
+        self.db.query("select 1")
+        self.db.query("select 2")
+
+    def testDebugDefault(self):
+        if debug:
+            self.assertEqual(self.db.debug, debug)
+        else:
+            self.assertIsNone(self.db.debug)
+
+    def testDebugIsFalse(self):
+        self.db.debug = False
+        self.send_queries()
+        self.assertEqual(self.get_output(), "")
+
+    def testDebugIsTrue(self):
+        self.db.debug = True
+        self.send_queries()
+        self.assertEqual(self.get_output(), "select 1\nselect 2\n")
+
+    def testDebugIsString(self):
+        self.db.debug = "Test with string: %s."
+        self.send_queries()
+        self.assertEqual(self.get_output(),
+            "Test with string: select 1.\nTest with string: select 2.\n")
+
+    def testDebugIsFileLike(self):
+        with tempfile.TemporaryFile('w+') as debug_file:
+            self.db.debug = debug_file
+            self.send_queries()
+            debug_file.seek(0)
+            output = debug_file.read()
+            self.assertEqual(output, "select 1\nselect 2\n")
+            self.assertEqual(self.get_output(), "")
+
+    def testDebugIsCallable(self):
+        output = []
+        self.db.debug = output.append
+        self.db.query("select 1")
+        self.db.query("select 2")
+        self.assertEqual(output, ["select 1", "select 2"])
+        self.assertEqual(self.get_output(), "")
 
 
 if __name__ == '__main__':
