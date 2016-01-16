@@ -232,6 +232,20 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertRaises(pg.InternalError, self.db.close)
         self.assertRaises(pg.InternalError, self.db.query, 'select 1')
 
+    def testMethodReset(self):
+        con = self.db.db
+        self.db.reset()
+        self.assertIs(self.db.db, con)
+        self.db.query("select 1+1")
+        self.db.close()
+
+    def testMethodReopen(self):
+        con = self.db.db
+        self.db.reopen()
+        self.assertIsNot(self.db.db, con)
+        self.db.query("select 1+1")
+        self.db.close()
+
     def testExistingConnection(self):
         db = pg.DB(self.db.db)
         self.assertEqual(self.db.db, db.db)
@@ -555,6 +569,44 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(g('standard_conforming_strings'), 'off')
         self.db.end()
         self.assertEqual(g('standard_conforming_strings'), 'off')
+
+    def testReset(self):
+        db = DB()
+        default_datestyle = db.get_parameter('datestyle')
+        changed_datestyle = 'ISO, DMY'
+        if changed_datestyle == default_datestyle:
+            changed_datestyle == 'ISO, YMD'
+        self.db.set_parameter('datestyle', changed_datestyle)
+        r = self.db.get_parameter('datestyle')
+        self.assertEqual(r, changed_datestyle)
+        con = self.db.db
+        q = con.query("show datestyle")
+        self.db.reset()
+        r = q.getresult()[0][0]
+        self.assertEqual(r, changed_datestyle)
+        q = con.query("show datestyle")
+        r = q.getresult()[0][0]
+        self.assertEqual(r, default_datestyle)
+        r = self.db.get_parameter('datestyle')
+        self.assertEqual(r, default_datestyle)
+
+    def testReopen(self):
+        db = DB()
+        default_datestyle = db.get_parameter('datestyle')
+        changed_datestyle = 'ISO, DMY'
+        if changed_datestyle == default_datestyle:
+            changed_datestyle == 'ISO, YMD'
+        self.db.set_parameter('datestyle', changed_datestyle)
+        r = self.db.get_parameter('datestyle')
+        self.assertEqual(r, changed_datestyle)
+        con = self.db.db
+        q = con.query("show datestyle")
+        self.db.reopen()
+        r = q.getresult()[0][0]
+        self.assertEqual(r, changed_datestyle)
+        self.assertRaises(TypeError, getattr, con, 'query')
+        r = self.db.get_parameter('datestyle')
+        self.assertEqual(r, default_datestyle)
 
     def testQuery(self):
         query = self.db.query
