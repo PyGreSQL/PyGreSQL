@@ -143,23 +143,28 @@ def _prg_error(msg):
 class NotificationHandler(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 
-    def __init__(self, db, event, callback, arg_dict=None, timeout=None):
+    def __init__(self, db, event, callback=None,
+            arg_dict=None, timeout=None, stop_event=None):
         """Initialize the notification handler.
 
-        db       - PostgreSQL connection object.
-        event    - Event (notification channel) to LISTEN for.
-        callback - Event callback function.
-        arg_dict - A dictionary passed as the argument to the callback.
-        timeout  - Timeout in seconds; a floating point number denotes
-                   fractions of seconds. If it is absent or None, the
-                   callers will never time out.
+        You must pass a PyGreSQL database connection, the name of an
+        event (notification channel) to listen for and a callback function.
 
+        You can also specify a dictionary arg_dict that will be passed as
+        the single argument to the callback function, and a timeout value
+        in seconds (a floating point number denotes fractions of seconds).
+        If it is absent or None, the callers will never time out.  If the
+        timeout is reached, the callback function will be called with a
+        single argument that is None.  If you set the timeout to zero,
+        the handler will poll notifications synchronously and return.
+
+        You can specify the name of the event that will be used to signal
+        the handler to stop listening as stop_event. By default, it will
+        be the event name prefixed with 'stop_'.
         """
-        if isinstance(db, DB):
-            db = db.db
         self.db = db
         self.event = event
-        self.stop_event = 'stop_%s' % event
+        self.stop_event = stop_event or 'stop_%s' % event
         self.listening = False
         self.callback = callback
         if arg_dict is None:
@@ -168,7 +173,7 @@ class NotificationHandler(object):
         self.timeout = timeout
 
     def __del__(self):
-        self.close()
+        self.unlisten()
 
     def close(self):
         """Stop listening and close the connection."""
@@ -194,42 +199,47 @@ class NotificationHandler(object):
     def notify(self, db=None, stop=False, payload=None):
         """Generate a notification.
 
-        Note: If the main loop is running in another thread, you must pass
-        a different database connection to avoid a collision.
+        Optionally, you can pass a payload with the notification.
 
-        The payload parameter is only supported in PostgreSQL >= 9.0.
+        If you set the stop flag, a stop notification will be sent that
+        will cause the handler to stop listening.
 
+        Note: If the notification handler is running in another thread, you
+        must pass a different database connection since PyGreSQL database
+        connections are not thread-safe.
         """
-        if not db:
-            db = self.db
         if self.listening:
+            if not db:
+                db = self.db
             q = 'notify "%s"' % (stop and self.stop_event or self.event)
             if payload:
                 q += ", '%s'" % payload
             return db.query(q)
 
-    def __call__(self, close=False):
+    def __call__(self):
         """Invoke the notification handler.
 
-        The handler is a loop that actually LISTENs for two NOTIFY messages:
+        The handler is a loop that listens for notifications on the event
+        and stop event channels.  When either of these notifications are
+        received, its associated 'pid', 'event' and 'extra' (the payload
+        passed with the notification) are inserted into its arg_dict
+        dictionary and the callback is invoked with this dictionary as
+        a single argument.  When the handler receives a stop event, it
+        stops listening to both events and return.
 
-        <event> and stop_<event>.
-
-        When either of these NOTIFY messages are received, its associated
-        'pid' and 'event' are inserted into <arg_dict>, and the callback is
-        invoked with <arg_dict>. If the NOTIFY message is stop_<event>, the
-        handler UNLISTENs both <event> and stop_<event> and exits.
+        In the special case that the timeout of the handler has been set
+        to zero, the handler will poll all events synchronously and return.
+        If will keep listening until it receives a stop event.
 
         Note: If you run this loop in another thread, don't use the same
         database connection for database operations in the main thread.
-
         """
         self.listen()
-        _ilist = [self.db.fileno()]
-
+        poll = self.timeout == 0
+        if not poll:
+            rlist = [self.db.fileno()]
         while self.listening:
-            ilist, _olist, _elist = select.select(_ilist, [], [], self.timeout)
-            if ilist:
+            if poll or select.select(rlist, [], [], self.timeout)[0]:
                 while self.listening:
                     notice = self.db.getnotify()
                     if not notice:  # no more messages
@@ -238,14 +248,14 @@ class NotificationHandler(object):
                     if event not in (self.event, self.stop_event):
                         self.unlisten()
                         raise _db_error(
-                            'listening for "%s" and "%s", but notified of "%s"'
+                            'Listening for "%s" and "%s", but notified of "%s"'
                             % (self.event, self.stop_event, event))
                     if event == self.stop_event:
                         self.unlisten()
-                    self.arg_dict['pid'] = pid
-                    self.arg_dict['event'] = event
-                    self.arg_dict['extra'] = extra
+                    self.arg_dict.update(pid=pid, event=event, extra=extra)
                     self.callback(self.arg_dict)
+                if poll:
+                    break
             else:   # we timed out
                 self.unlisten()
                 self.callback(None)
@@ -1155,9 +1165,11 @@ class DB(object):
         self._do_debug(q)
         return self.query(q)
 
-    def notification_handler(self, event, callback, arg_dict={}, timeout=None):
+    def notification_handler(self,
+            event, callback, arg_dict=None, timeout=None, stop_event=None):
         """Get notification handler that will run the given callback."""
-        return NotificationHandler(self.db, event, callback, arg_dict, timeout)
+        return NotificationHandler(self,
+            event, callback, arg_dict, timeout, stop_event)
 
 
 # if run as script, print some information
