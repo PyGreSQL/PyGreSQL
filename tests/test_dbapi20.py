@@ -297,6 +297,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 "datetimetest timestamp,"
                 "intervaltest interval,"
                 "rowidtest oid)" % table)
+            cur.execute("set standard_conforming_strings to on")
             for s in ('numeric', 'monetary', 'time'):
                 cur.execute("set lc_%s to 'C'" % s)
             for _i in range(2):
