@@ -238,9 +238,15 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertIs(self.db.db, con)
         self.db.query("select 1+1")
         self.db.close()
+        self.assertRaises(pg.InternalError, self.db.reset)
 
     def testMethodReopen(self):
         con = self.db.db
+        self.db.reopen()
+        self.assertIsNot(self.db.db, con)
+        con = self.db.db
+        self.db.query("select 1+1")
+        self.db.close()
         self.db.reopen()
         self.assertIsNot(self.db.db, con)
         self.db.query("select 1+1")
@@ -1919,6 +1925,83 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
 
+    def testNotificationHandler(self):
+        # the notification handler itself is tested separately
+        f = self.db.notification_handler
+        callback = lambda arg_dict: None
+        handler = f('test', callback)
+        self.assertIsInstance(handler, pg.NotificationHandler)
+        self.assertIs(handler.db, self.db)
+        self.assertEqual(handler.event, 'test')
+        self.assertEqual(handler.stop_event, 'stop_test')
+        self.assertIs(handler.callback, callback)
+        self.assertIsInstance(handler.arg_dict, dict)
+        self.assertEqual(handler.arg_dict, {})
+        self.assertIsNone(handler.timeout)
+        self.assertFalse(handler.listening)
+        handler.close()
+        self.assertIsNone(handler.db)
+        self.db.reopen()
+        self.assertIsNone(handler.db)
+        handler = f('test2', callback, timeout=2)
+        self.assertIsInstance(handler, pg.NotificationHandler)
+        self.assertIs(handler.db, self.db)
+        self.assertEqual(handler.event, 'test2')
+        self.assertEqual(handler.stop_event, 'stop_test2')
+        self.assertIs(handler.callback, callback)
+        self.assertIsInstance(handler.arg_dict, dict)
+        self.assertEqual(handler.arg_dict, {})
+        self.assertEqual(handler.timeout, 2)
+        self.assertFalse(handler.listening)
+        handler.close()
+        self.assertIsNone(handler.db)
+        self.db.reopen()
+        self.assertIsNone(handler.db)
+        arg_dict = {'testing': 3}
+        handler = f('test3', callback, arg_dict=arg_dict)
+        self.assertIsInstance(handler, pg.NotificationHandler)
+        self.assertIs(handler.db, self.db)
+        self.assertEqual(handler.event, 'test3')
+        self.assertEqual(handler.stop_event, 'stop_test3')
+        self.assertIs(handler.callback, callback)
+        self.assertIs(handler.arg_dict, arg_dict)
+        self.assertEqual(arg_dict['testing'], 3)
+        self.assertIsNone(handler.timeout)
+        self.assertFalse(handler.listening)
+        handler.close()
+        self.assertIsNone(handler.db)
+        self.db.reopen()
+        self.assertIsNone(handler.db)
+        handler = f('test4', callback, stop_event='stop4')
+        self.assertIsInstance(handler, pg.NotificationHandler)
+        self.assertIs(handler.db, self.db)
+        self.assertEqual(handler.event, 'test4')
+        self.assertEqual(handler.stop_event, 'stop4')
+        self.assertIs(handler.callback, callback)
+        self.assertIsInstance(handler.arg_dict, dict)
+        self.assertEqual(handler.arg_dict, {})
+        self.assertIsNone(handler.timeout)
+        self.assertFalse(handler.listening)
+        handler.close()
+        self.assertIsNone(handler.db)
+        self.db.reopen()
+        self.assertIsNone(handler.db)
+        arg_dict = {'testing': 5}
+        handler = f('test5', callback, arg_dict, 1.5, 'stop5')
+        self.assertIsInstance(handler, pg.NotificationHandler)
+        self.assertIs(handler.db, self.db)
+        self.assertEqual(handler.event, 'test5')
+        self.assertEqual(handler.stop_event, 'stop5')
+        self.assertIs(handler.callback, callback)
+        self.assertIs(handler.arg_dict, arg_dict)
+        self.assertEqual(arg_dict['testing'], 5)
+        self.assertEqual(handler.timeout, 1.5)
+        self.assertFalse(handler.listening)
+        handler.close()
+        self.assertIsNone(handler.db)
+        self.db.reopen()
+        self.assertIsNone(handler.db)
+
 
 class TestDBClassNonStdOpts(TestDBClass):
     """Test the methods of the DB class with non-standard global options."""
@@ -1957,7 +2040,6 @@ class TestSchemas(unittest.TestCase):
     def setUpClass(cls):
         db = DB()
         query = db.query
-        query("set client_min_messages=warning")
         for num_schema in range(5):
             if num_schema:
                 schema = "s%d" % num_schema
@@ -1982,7 +2064,6 @@ class TestSchemas(unittest.TestCase):
     def tearDownClass(cls):
         db = DB()
         query = db.query
-        query("set client_min_messages=warning")
         for num_schema in range(5):
             if num_schema:
                 schema = "s%d" % num_schema
@@ -1995,7 +2076,6 @@ class TestSchemas(unittest.TestCase):
 
     def setUp(self):
         self.db = DB()
-        self.db.query("set client_min_messages=warning")
 
     def tearDown(self):
         self.doCleanups()

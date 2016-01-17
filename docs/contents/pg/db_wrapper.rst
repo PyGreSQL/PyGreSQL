@@ -605,3 +605,22 @@ The method can also be used to check through its return value whether
 currently regular type names are used.
 
 .. versionadded:: 4.1
+
+notification_handler -- create a notification handler
+-----------------------------------------------------
+
+.. class:: DB.notification_handler(event, callback, [arg_dict], [timeout], [stop_event])
+
+    Create a notification handler instance
+
+    :param str event: the name of an event to listen for
+    :param callback: a callback function
+    :param dict arg_dict: an optional dictionary for passing arguments
+    :param timeout: the time-out when waiting for notifications
+    :type timeout: int, float or None
+    :param str stop_event: an optional different name to be used as stop event
+
+This method creates a :class:`pg.NotificationHandler` object using the
+:class:`DB` connection as explained under :doc:`notification`.
+
+.. versionadded:: 4.1.1

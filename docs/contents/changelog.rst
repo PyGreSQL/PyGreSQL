@@ -56,12 +56,14 @@ Version 4.2
 - get_tables() does not list information schema tables any more.
 - Fix notification handler (Thanks Patrick TJ McPhee).
 - Fix a small issue with large objects.
+- Minor improvements of the NotificationHandler.
+- Converted documentation to Sphinx and added many missing parts.
 - The tutorial files have become a chapter in the documentation.
-- Greatly improve unit testing, tests run with Python 2.4 to 2.7 again.
+- Greatly improved unit testing, tests run with Python 2.4 to 2.7 again.
 
 Version 4.1.1 (2013-01-08)
 --------------------------
-- Add WhenNotified class and method.  Replaces need for third party pgnotify.
+- Add NotificationHandler class and method.  Replaces need for pgnotify.
 - Sharpen test for inserting current_timestamp.
 - Add more quote tests.  False and 0 should evaluate to NULL.
 - More tests - Any number other than 0 is True.

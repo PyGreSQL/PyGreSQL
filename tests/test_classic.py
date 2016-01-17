@@ -231,7 +231,7 @@ class UtilityTest(unittest.TestCase):
                     break
                 sleep(0.01)
             self.assertTrue(target.listening)
-            self.assertTrue(thread.isAlive())
+            self.assertTrue(thread.is_alive())
             # Open another connection for sending notifications.
             db2 = opendb()
             # Generate notification from the other connection.
@@ -259,7 +259,7 @@ class UtilityTest(unittest.TestCase):
             self.assertTrue(isinstance(arg_dict['pid'], int))
             self.assertFalse(self.notify_timeout)
             arg_dict['called'] = False
-            self.assertTrue(thread.isAlive())
+            self.assertTrue(thread.is_alive())
             # Generate stop notification.
             if call_notify:
                 target.notify(db2, stop=True, payload='payload 2')
@@ -278,7 +278,7 @@ class UtilityTest(unittest.TestCase):
             self.assertTrue(isinstance(arg_dict['pid'], int))
             self.assertFalse(self.notify_timeout)
             thread.join(5)
-            self.assertFalse(thread.isAlive())
+            self.assertFalse(thread.is_alive())
             self.assertFalse(target.listening)
             target.close()
         except Exception:
@@ -314,7 +314,7 @@ class UtilityTest(unittest.TestCase):
             # Verify that we've indeed timed out.
             self.assertFalse(arg_dict.get('called'))
             self.assertTrue(self.notify_timeout)
-            self.assertFalse(thread.isAlive())
+            self.assertFalse(thread.is_alive())
             self.assertFalse(target.listening)
             target.close()
 
