@@ -519,6 +519,8 @@ class DB(object):
             qstr += ' TO ' + name
         return self.query(qstr)
 
+    abort = rollback
+
     def savepoint(self, name):
         """Define a new savepoint within the current transaction."""
         return self.query('SAVEPOINT ' + name)
@@ -898,7 +900,7 @@ class DB(object):
         if keyname == 'oid':
             if isinstance(arg, dict):
                 if qoid not in arg:
-                    raise _db_error('%s not in arg' % qoid)
+                    raise _prg_error('%s not in arg' % qoid)
             else:
                 arg = {qoid: arg}
             where = 'oid = %s' % arg[qoid]

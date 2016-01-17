@@ -71,6 +71,7 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testAllDBAttributes(self):
         attributes = [
+            'abort',
             'begin',
             'cancel', 'clear', 'close', 'commit',
             'db', 'dbname', 'debug', 'delete',
@@ -222,8 +223,12 @@ class TestDBClassBasic(unittest.TestCase):
             pass
         else:
             self.fail('Reset should give an error for a closed connection')
+        self.assertIsNone(self.db.db)
         self.assertRaises(pg.InternalError, self.db.close)
         self.assertRaises(pg.InternalError, self.db.query, 'select 1')
+        self.assertRaises(pg.InternalError, getattr, self.db, 'status')
+        self.assertRaises(pg.InternalError, getattr, self.db, 'error')
+        self.assertRaises(pg.InternalError, getattr, self.db, 'absent')
 
     def testMethodReset(self):
         con = self.db.db
@@ -436,6 +441,9 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(TypeError, f)
         self.assertRaises(TypeError, f, None)
         self.assertRaises(TypeError, f, 42)
+        self.assertRaises(TypeError, f, '')
+        self.assertRaises(TypeError, f, [])
+        self.assertRaises(TypeError, f, [''])
         self.assertRaises(pg.ProgrammingError, f, 'this_does_not_exist')
         r = f('standard_conforming_strings')
         self.assertEqual(r, 'on')
@@ -487,6 +495,12 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(TypeError, f)
         self.assertRaises(TypeError, f, None)
         self.assertRaises(TypeError, f, 42)
+        self.assertRaises(TypeError, f, '')
+        self.assertRaises(TypeError, f, [])
+        self.assertRaises(TypeError, f, [''])
+        self.assertRaises(ValueError, f, 'all', 'invalid')
+        self.assertRaises(ValueError, f, {
+            'invalid1': 'value1', 'invalid2': 'value2'}, 'value')
         self.assertRaises(pg.ProgrammingError, f, 'this_does_not_exist')
         f('standard_conforming_strings', 'off')
         self.assertEqual(g('standard_conforming_strings'), 'off')
@@ -770,6 +784,12 @@ class TestDBClass(unittest.TestCase):
             self.db.get_attnames, 'does_not_exist')
         self.assertRaises(pg.ProgrammingError,
             self.db.get_attnames, 'has.too.many.dots')
+        attributes = self.db.get_attnames('test')
+        self.assertIsInstance(attributes, dict)
+        self.assertEqual(attributes, dict(
+            i2='int', i4='int', i8='int', d='num',
+            f4='float', f8='float', m='money',
+            v4='text', c4='text', t='text'))
         for table in ('attnames_test_table', 'test table for attnames'):
             self.db.query('drop table if exists "%s"' % table)
             self.db.query('create table "%s" ('

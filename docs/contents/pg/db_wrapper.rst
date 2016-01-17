@@ -257,6 +257,12 @@ begin/commit/rollback/savepoint/release -- transaction handling
 
 .. versionadded:: 4.1
 
+.. method:: DB.abort()
+
+    This is the same as the :meth:`DB.rollback` method.
+
+.. versionadded:: 4.2
+
 .. method:: DB.savepoint(name)
 
     Define a new savepoint
