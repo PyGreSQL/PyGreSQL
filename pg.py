@@ -373,15 +373,11 @@ class DB(object):
     def _prepare_param(self, value, typ, params):
         """Prepare and add a parameter to the list."""
         if value is not None and typ != 'text':
+            prepare = self._prepare_funcs[typ]
             try:
-                prepare = self._prepare_funcs[typ]
-            except KeyError:
-                pass
-            else:
-                try:
-                    value = prepare(self, value)
-                except ValueError:
-                    return value
+                value = prepare(self, value)
+            except ValueError:
+                return value
         params.append(value)
         return '$%d' % len(params)
 
@@ -468,6 +464,8 @@ class DB(object):
         if name:
             qstr += ' TO ' + name
         return self.query(qstr)
+
+    abort = rollback
 
     def savepoint(self, name):
         """Define a new savepoint within the current transaction."""
@@ -723,8 +721,6 @@ class DB(object):
                     '::regtype' if self._regtypes else '',
                     self._prepare_qualified_param(table, 1))
             names = self.db.query(q, (table,)).getresult()
-            if not names:
-                raise KeyError('Table %s does not exist' % table)
             if not self._regtypes:
                 names = ((name, _simpletype(typ)) for name, typ in names)
             names = OrderedDict(names)
@@ -787,7 +783,7 @@ class DB(object):
         if keyname == 'oid':
             if isinstance(row, dict):
                 if qoid not in row:
-                    raise _db_error('%s not in row' % qoid)
+                    raise _prg_error('%s not in row' % qoid)
             else:
                 row = {qoid: row}
             what = '*'
@@ -854,9 +850,7 @@ class DB(object):
             self._escape_qualified_name(table), names, values, ret)
         self._do_debug(q, params)
         q = self.db.query(q, params)
-        res = q.dictresult()
-        if not res:
-            raise _int_error('Insert operation did not return new values')
+        res = q.dictresult()  # this will always return a row
         for n, value in res[0].items():
             if n == 'oid':
                 n = _oid_key(table)
@@ -879,8 +873,7 @@ class DB(object):
         # Note that we only accept oid key from named args for safety.
         qoid = _oid_key(table)
         if 'oid' in kw:
-            kw[qoid] = kw['oid']
-            del kw['oid']
+            kw[qoid] = kw.pop('oid')
         if row is None:
             row = {}
         row.update(kw)
@@ -990,10 +983,7 @@ class DB(object):
             raise _prg_error('Table %s has no primary key' % table)
         keyname = [keyname] if isinstance(
             keyname, basestring) else sorted(keyname)
-        try:
-            target = ', '.join(col(k) for k in keyname)
-        except KeyError:
-            raise _prg_error('Upsert operation needs primary key or oid')
+        target = ', '.join(col(k) for k in keyname)
         update = []
         keyname = set(keyname)
         keyname.add('oid')
@@ -1004,7 +994,7 @@ class DB(object):
                     if not isinstance(value, basestring):
                         value = 'excluded.%s' % col(n)
                     update.append('%s = %s' % (col(n), value))
-        if not values and not update:
+        if not values:
             return row
         do = 'update set %s' % ', '.join(update) if update else 'nothing'
         ret = 'oid, *' if 'oid' in attnames else '*'
@@ -1021,15 +1011,13 @@ class DB(object):
                     'Upsert operation is not supported by PostgreSQL version')
             raise  # re-raise original error
         res = q.dictresult()
-        if res:  # may be empty with "do nothing"
+        if update:  # may be empty with "do nothing"
             for n, value in res[0].items():
                 if n == 'oid':
                     n = _oid_key(table)
-                elif attnames.get(n) == 'bytea':
+                elif attnames.get(n) == 'bytea' and value is not None:
                     value = self.unescape_bytea(value)
                 row[n] = value
-        elif update:
-            raise _int_error('Upsert operation did not return new values')
         else:
             self.get(table, row)
         return row
@@ -1073,8 +1061,7 @@ class DB(object):
         # Note that we only accept oid key from named args for safety.
         qoid = _oid_key(table)
         if 'oid' in kw:
-            kw[qoid] = kw['oid']
-            del kw['oid']
+            kw[qoid] = kw.pop('oid')
         if row is None:
             row = {}
         row.update(kw)

@@ -257,7 +257,11 @@ begin/commit/rollback/savepoint/release -- transaction handling
     This rolls back the current transaction and causes all the updates
     made by the transaction to be discarded.
 
-.. versionadded:: 4.1
+.. method:: DB.abort()
+
+    This is the same as the :meth:`DB.rollback` method.
+
+.. versionadded:: 4.2
 
 .. method:: DB.savepoint(name)
 
