@@ -65,9 +65,10 @@ pkey -- return the primary key of a table
     :rtype: str
     :raises KeyError: the table does not have a primary key
 
-This method returns the primary key of a table. For composite primary
-keys, the return value will be a frozenset. Note that this raises a
-KeyError if the table does not have a primary key.
+This method returns the primary key of a table.  Single primary keys are
+returned as strings unless you set the composite flag.  Composite primary
+keys are always represented as tuples.  Note that this raises a KeyError
+if the table does not have a primary key.
 
 get_databases -- get list of databases in the system
 ----------------------------------------------------
@@ -295,17 +296,23 @@ get -- get a row from a database table or view
     :param str keyname: name of field to use as key (optional)
     :returns: A dictionary - the keys are the attribute names,
       the values are the row values.
-    :raises ProgrammingError: no primary key or missing privilege
+    :raises ProgrammingError: table has no primary key or missing privilege
+    :raises KeyError: missing key value for the row
 
-This method is the basic mechanism to get a single row. It assumes
-that the key specifies a unique row. If *keyname* is not specified,
-then the primary key for the table is used. If *row* is a dictionary
-then the value for the key is taken from it and it is modified to
-include the new values, replacing existing values where necessary.
-For a composite key, *keyname* can also be a sequence of key names.
-The OID is also put into the dictionary if the table has one, but in
-order to allow the caller to work with multiple tables, it is munged
-as ``oid(table)``.
+This method is the basic mechanism to get a single row.  It assumes
+that the *keyname* specifies a unique row.  It must be the name of a
+single column or a tuple of column names.  If *keyname* is not specified,
+then the primary key for the table is used.
+
+If *row* is a dictionary, then the value for the key is taken from it.
+Otherwise, the row must be a single value or a tuple of values
+corresponding to the passed *keyname* or primary key.  The fetched row
+from the table will be returned as a new dictionary or used to replace
+the existing values when row was passed as aa dictionary.
+
+The OID is also put into the dictionary if the table has one, but
+in order to allow the caller to work with multiple tables, it is
+munged as ``oid(table)`` using the actual name of the table.
 
 insert -- insert a row into a database table
 --------------------------------------------
@@ -344,17 +351,20 @@ update -- update a row in a database table
     :param col: optional keyword arguments for updating the dictionary
     :returns: the new row in the database
     :rtype: dict
-    :raises ProgrammingError: no primary key or missing privilege
+    :raises ProgrammingError: table has no primary key or missing privilege
+    :raises KeyError: missing key value for the row
 
-Similar to insert but updates an existing row.  The update is based on the
-OID value as munged by get or passed as keyword, or on the primary key of
-the table.  The dictionary is modified to reflect any changes caused by the
+Similar to insert but updates an existing row.  The update is based on
+the primary key of the table or the OID value as munged by :meth:`DB.get`
+or passed as keyword.
+
+The dictionary is then modified to reflect any changes caused by the
 update due to triggers, rules, default values, etc.
 
 Like insert, the dictionary is optional and updates will be performed
 on the fields in the keywords.  There must be an OID or primary key
 either in the dictionary where the OID must be munged, or in the keywords
-where it can be simply the string 'oid'.
+where it can be simply the string ``'oid'``.
 
 upsert -- insert a row with conflict resolution
 -----------------------------------------------
@@ -368,7 +378,7 @@ upsert -- insert a row with conflict resolution
     :param col: optional keyword arguments for specifying the update
     :returns: the new row in the database
     :rtype: dict
-    :raises ProgrammingError: no primary key or missing privilege
+    :raises ProgrammingError: table has no primary key or missing privilege
 
 This method inserts a row into a table, but instead of raising a
 ProgrammingError exception in case a row with the same primary key already
@@ -474,11 +484,19 @@ delete -- delete a row from a database table
     :param dict d: optional dictionary of values
     :param col: optional keyword arguments for updating the dictionary
     :rtype: None
+    :raises ProgrammingError: table has no primary key,
+        row is still referenced or missing privilege
+    :raises KeyError: missing key value for the row
 
-This method deletes the row from a table.  It deletes based on the OID value
-as munged by get or passed as keyword, or on the primary key of the table.
+This method deletes the row from a table.  It deletes based on the
+primary key of the table or the OID value as munged by :meth:`DB.get`
+or passed as keyword.
+
 The return value is the number of deleted rows (i.e. 0 if the row did not
 exist and 1 if the row was deleted).
+
+Note that if the row cannot be deleted because e.g. it is still referenced
+by another table, this method will raise a ProgrammingError.
 
 truncate -- Quickly empty database tables
 -----------------------------------------

@@ -708,8 +708,9 @@ class TestDBClass(unittest.TestCase):
     def testPkey(self):
         query = self.db.query
         pkey = self.db.pkey
+        self.assertRaises(KeyError, pkey, 'test')
         for t in ('pkeytest', 'primary key test'):
-            for n in range(7):
+            for n in range(8):
                 query('drop table if exists "%s%d"' % (t, n))
                 self.addCleanup(query, 'drop table "%s%d"' % (t, n))
             query('create table "%s0" ('
@@ -723,10 +724,14 @@ class TestDBClass(unittest.TestCase):
                 " h smallint, i smallint,"
                 " primary key (f, h))" % t)
             query('create table "%s4" ('
-                "more_than_one_letter varchar primary key)" % t)
+                "e smallint, f smallint, g smallint,"
+                " h smallint, i smallint,"
+                " primary key (h, f))" % t)
             query('create table "%s5" ('
-                '"with space" date primary key)' % t)
+                "more_than_one_letter varchar primary key)" % t)
             query('create table "%s6" ('
+                '"with space" date primary key)' % t)
+            query('create table "%s7" ('
                 'a_very_long_column_name varchar,'
                 ' "with space" date,'
                 ' "42" int,'
@@ -734,16 +739,26 @@ class TestDBClass(unittest.TestCase):
                 ' "with space", "42"))' % t)
             self.assertRaises(KeyError, pkey, '%s0' % t)
             self.assertEqual(pkey('%s1' % t), 'b')
+            self.assertEqual(pkey('%s1' % t, True), ('b',))
+            self.assertEqual(pkey('%s1' % t, composite=False), 'b')
+            self.assertEqual(pkey('%s1' % t, composite=True), ('b',))
             self.assertEqual(pkey('%s2' % t), 'd')
+            self.assertEqual(pkey('%s2' % t, composite=True), ('d',))
             r = pkey('%s3' % t)
-            self.assertIsInstance(r, frozenset)
-            self.assertEqual(r, frozenset('fh'))
-            self.assertEqual(pkey('%s4' % t), 'more_than_one_letter')
-            self.assertEqual(pkey('%s5' % t), 'with space')
-            r = pkey('%s6' % t)
-            self.assertIsInstance(r, frozenset)
-            self.assertEqual(r, frozenset([
-                'a_very_long_column_name', 'with space', '42']))
+            self.assertIsInstance(r, tuple)
+            self.assertEqual(r, ('f', 'h'))
+            r = pkey('%s3' % t, composite=False)
+            self.assertIsInstance(r, tuple)
+            self.assertEqual(r, ('f', 'h'))
+            r = pkey('%s4' % t)
+            self.assertIsInstance(r, tuple)
+            self.assertEqual(r, ('h', 'f'))
+            self.assertEqual(pkey('%s5' % t), 'more_than_one_letter')
+            self.assertEqual(pkey('%s6' % t), 'with space')
+            r = pkey('%s7' % t)
+            self.assertIsInstance(r, tuple)
+            self.assertEqual(r, (
+                'a_very_long_column_name', 'with space', '42'))
             # a newly added primary key will be detected
             query('alter table "%s0" add primary key (a)' % t)
             self.assertEqual(pkey('%s0' % t), 'a')
@@ -955,6 +970,66 @@ class TestDBClass(unittest.TestCase):
         get = self.db.get
         query = self.db.query
         table = 'get_test_table'
+        self.assertRaises(TypeError, get)
+        self.assertRaises(TypeError, get, table)
+        query('drop table if exists "%s"' % table)
+        self.addCleanup(query, 'drop table "%s"' % table)
+        query('create table "%s" ('
+            "n integer, t text) without oids" % table)
+        for n, t in enumerate('xyz'):
+            query('insert into "%s" values('"%d, '%s')"
+                % (table, n + 1, t))
+        self.assertRaises(pg.ProgrammingError, get, table, 2)
+        r = get(table, 2, 'n')
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(n=2, t='y'))
+        r = get(table, 1, 'n')
+        self.assertEqual(r, dict(n=1, t='x'))
+        r = get(table, (3,), ('n',))
+        self.assertEqual(r, dict(n=3, t='z'))
+        r = get(table, 'y', 't')
+        self.assertEqual(r, dict(n=2, t='y'))
+        self.assertRaises(pg.DatabaseError, get, table, 4)
+        self.assertRaises(pg.DatabaseError, get, table, 4, 'n')
+        self.assertRaises(pg.DatabaseError, get, table, 'y')
+        self.assertRaises(pg.DatabaseError, get, table, 2, 't')
+        s = dict(n=3)
+        self.assertRaises(pg.ProgrammingError, get, table, s)
+        r = get(table, s, 'n')
+        self.assertIs(r, s)
+        self.assertEqual(r, dict(n=3, t='z'))
+        s.update(t='x')
+        r = get(table, s, 't')
+        self.assertIs(r, s)
+        self.assertEqual(s, dict(n=1, t='x'))
+        r = get(table, s, ('n', 't'))
+        self.assertIs(r, s)
+        self.assertEqual(r, dict(n=1, t='x'))
+        query('alter table "%s" alter n set not null' % table)
+        query('alter table "%s" add primary key (n)' % table)
+        r = get(table, 2)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(n=2, t='y'))
+        self.assertEqual(get(table, 1)['t'], 'x')
+        self.assertEqual(get(table, 3)['t'], 'z')
+        self.assertEqual(get(table + '*', 2)['t'], 'y')
+        self.assertEqual(get(table + ' *', 2)['t'], 'y')
+        self.assertRaises(KeyError, get, table, (2, 2))
+        s = dict(n=3)
+        r = get(table, s)
+        self.assertIs(r, s)
+        self.assertEqual(r, dict(n=3, t='z'))
+        s.update(n=1)
+        self.assertEqual(get(table, s)['t'], 'x')
+        s.update(n=2)
+        self.assertEqual(get(table, r)['t'], 'y')
+        s.pop('n')
+        self.assertRaises(KeyError, get, table, s)
+
+    def testGetWithOid(self):
+        get = self.db.get
+        query = self.db.query
+        table = 'get_with_oid_test_table'
         query('drop table if exists "%s"' % table)
         self.addCleanup(query, 'drop table "%s"' % table)
         query('create table "%s" ('
@@ -963,14 +1038,25 @@ class TestDBClass(unittest.TestCase):
             query('insert into "%s" values('"%d, '%s')"
                 % (table, n + 1, t))
         self.assertRaises(pg.ProgrammingError, get, table, 2)
-        self.assertRaises(pg.ProgrammingError, get, table, {}, 'oid')
+        self.assertRaises(KeyError, get, table, {}, 'oid')
         r = get(table, 2, 'n')
-        oid_table = 'oid(%s)' % table
-        self.assertIn(oid_table, r)
-        oid = r[oid_table]
+        qoid = 'oid(%s)' % table
+        self.assertIn(qoid, r)
+        oid = r[qoid]
         self.assertIsInstance(oid, int)
-        result = {'t': 'y', 'n': 2, oid_table: oid}
+        result = {'t': 'y', 'n': 2, qoid: oid}
         self.assertEqual(r, result)
+        r = get(table, oid, 'oid')
+        self.assertEqual(r, result)
+        r = get(table, dict(oid=oid))
+        self.assertEqual(r, result)
+        r = get(table, dict(oid=oid), 'oid')
+        self.assertEqual(r, result)
+        r = get(table, {qoid: oid})
+        self.assertEqual(r, result)
+        r = get(table, {qoid: oid}, 'oid')
+        self.assertEqual(r, result)
+        self.assertEqual(get(table + '*', 2, 'n'), r)
         self.assertEqual(get(table + ' *', 2, 'n'), r)
         self.assertEqual(get(table, oid, 'oid')['t'], 'y')
         self.assertEqual(get(table, 1, 'n')['t'], 'x')
@@ -980,6 +1066,7 @@ class TestDBClass(unittest.TestCase):
         r['n'] = 3
         self.assertEqual(get(table, r, 'n')['t'], 'z')
         self.assertEqual(get(table, 1, 'n')['t'], 'x')
+        self.assertEqual(get(table, r, 'oid')['t'], 'z')
         query('alter table "%s" alter n set not null' % table)
         query('alter table "%s" add primary key (n)' % table)
         self.assertEqual(get(table, 3)['t'], 'z')
@@ -991,6 +1078,22 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(get(table, r)['t'], 'z')
         r['n'] = 2
         self.assertEqual(get(table, r)['t'], 'y')
+        r = get(table, oid, 'oid')
+        self.assertEqual(r, result)
+        r = get(table, dict(oid=oid))
+        self.assertEqual(r, result)
+        r = get(table, dict(oid=oid), 'oid')
+        self.assertEqual(r, result)
+        r = get(table, {qoid: oid})
+        self.assertEqual(r, result)
+        r = get(table, {qoid: oid}, 'oid')
+        self.assertEqual(r, result)
+        r = get(table, dict(oid=oid, n=1))
+        self.assertEqual(r['n'], 1)
+        self.assertNotEqual(r[qoid], oid)
+        r = get(table, dict(oid=oid, t='z'), 't')
+        self.assertEqual(r['n'], 3)
+        self.assertNotEqual(r[qoid], oid)
 
     def testGetWithCompositeKey(self):
         get = self.db.get
@@ -1004,6 +1107,13 @@ class TestDBClass(unittest.TestCase):
             query('insert into "%s" values('
                 "%d, '%s')" % (table, n + 1, t))
         self.assertEqual(get(table, 2)['t'], 'b')
+        self.assertEqual(get(table, 1, 'n')['t'], 'a')
+        self.assertEqual(get(table, 2, ('n',))['t'], 'b')
+        self.assertEqual(get(table, 3, ['n'])['t'], 'c')
+        self.assertEqual(get(table, (2,), ('n',))['t'], 'b')
+        self.assertEqual(get(table, 'b', 't')['n'], 2)
+        self.assertEqual(get(table, ('a',), ('t',))['n'], 1)
+        self.assertEqual(get(table, ['c'], ['t'])['n'], 3)
         table = 'get_test_table_2'
         query('drop table if exists "%s"' % table)
         self.addCleanup(query, 'drop table "%s"' % table)
@@ -1014,12 +1124,18 @@ class TestDBClass(unittest.TestCase):
                 t = chr(ord('a') + 2 * n + m)
                 query('insert into "%s" values('
                     "%d, %d, '%s')" % (table, n + 1, m + 1, t))
-        self.assertRaises(pg.ProgrammingError, get, table, 2)
+        self.assertRaises(KeyError, get, table, 2)
+        self.assertEqual(get(table, (1, 1))['t'], 'a')
+        self.assertEqual(get(table, (1, 2))['t'], 'b')
+        self.assertEqual(get(table, (2, 1))['t'], 'c')
+        self.assertEqual(get(table, (1, 2), ('n', 'm'))['t'], 'b')
+        self.assertEqual(get(table, (1, 2), ('m', 'n'))['t'], 'c')
+        self.assertEqual(get(table, (3, 1), ('n', 'm'))['t'], 'e')
+        self.assertEqual(get(table, (1, 3), ('m', 'n'))['t'], 'e')
         self.assertEqual(get(table, dict(n=2, m=2))['t'], 'd')
-        r = get(table, dict(n=1, m=2), ('n', 'm'))
-        self.assertEqual(r['t'], 'b')
-        r = get(table, dict(n=3, m=2), frozenset(['n', 'm']))
-        self.assertEqual(r['t'], 'f')
+        self.assertEqual(get(table, dict(n=1, m=2), ('n', 'm'))['t'], 'b')
+        self.assertEqual(get(table, dict(n=2, m=1), ['n', 'm'])['t'], 'c')
+        self.assertEqual(get(table, dict(n=3, m=2), ('m', 'n'))['t'], 'f')
 
     def testGetWithQuotedNames(self):
         get = self.db.get
@@ -1198,21 +1314,66 @@ class TestDBClass(unittest.TestCase):
         r = insert('test_table', n=1)
         self.assertIsInstance(r, dict)
         self.assertEqual(r['n'], 1)
+        self.assertNotIn('oid', r)
         qoid = 'oid(test_table)'
         self.assertIn(qoid, r)
-        r = insert('test_table', n=2, oid='invalid')
+        oid = r[qoid]
+        self.assertEqual(sorted(r.keys()), ['n', qoid])
+        r = insert('test_table', n=2, oid=oid)
         self.assertIsInstance(r, dict)
         self.assertEqual(r['n'], 2)
-        r['n'] = 3
-        r = insert('test_table', r)
+        self.assertIn(qoid, r)
+        self.assertNotEqual(r[qoid], oid)
+        self.assertNotIn('oid', r)
+        r = insert('test_table', None, n=3)
         self.assertIsInstance(r, dict)
         self.assertEqual(r['n'], 3)
+        s = r
+        r = insert('test_table', r)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 3)
+        r = insert('test_table *', r)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 3)
         r = insert('test_table', r, n=4)
-        self.assertIsInstance(r, dict)
+        self.assertIs(r, s)
         self.assertEqual(r['n'], 4)
-        q = 'select n from test_table order by 1 limit 5'
+        self.assertNotIn('oid', r)
+        self.assertIn(qoid, r)
+        oid = r[qoid]
+        r = insert('test_table', r, n=5, oid=oid)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 5)
+        self.assertIn(qoid, r)
+        self.assertNotEqual(r[qoid], oid)
+        self.assertNotIn('oid', r)
+        r['oid'] = oid = r[qoid]
+        r = insert('test_table', r, n=6)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 6)
+        self.assertIn(qoid, r)
+        self.assertNotEqual(r[qoid], oid)
+        self.assertNotIn('oid', r)
+        q = 'select n from test_table order by 1 limit 9'
+        r = ' '.join(str(row[0]) for row in query(q).getresult())
+        self.assertEqual(r, '1 2 3 3 3 4 5 6')
+        query("truncate test_table")
+        query("alter table test_table add unique (n)")
+        r = insert('test_table', dict(n=7))
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r['n'], 7)
+        self.assertRaises(pg.ProgrammingError, insert, 'test_table', r)
+        r['n'] = 6
+        self.assertRaises(pg.ProgrammingError, insert, 'test_table', r, n=7)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r['n'], 7)
+        r['n'] = 6
+        r = insert('test_table', r)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r['n'], 6)
         r = query(q).getresult()
-        self.assertEqual(r, [(1,), (2,), (3,), (4,)])
+        r = ' '.join(str(row[0]) for row in query(q).getresult())
+        self.assertEqual(r, '6 7')
 
     def testInsertWithQuotedNames(self):
         insert = self.db.insert
@@ -1266,31 +1427,71 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, "drop table test_table")
         query("create table test_table (n int) with oids")
         query("insert into test_table values (1)")
-        r = get('test_table', 1, 'n')
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 1)
-        r['n'] = 2
-        r = update('test_table', r)
-        self.assertIsInstance(r, dict)
+        s = get('test_table', 1, 'n')
+        self.assertIsInstance(s, dict)
+        self.assertEqual(s['n'], 1)
+        s['n'] = 2
+        r = update('test_table', s)
+        self.assertIs(r, s)
         self.assertEqual(r['n'], 2)
         qoid = 'oid(test_table)'
         self.assertIn(qoid, r)
+        self.assertNotIn('oid', r)
+        self.assertEqual(sorted(r.keys()), ['n', qoid])
         r['n'] = 3
-        r = update('test_table', r, oid=r.pop(qoid))
-        self.assertIsInstance(r, dict)
+        oid = r.pop(qoid)
+        r = update('test_table', r, oid=oid)
+        self.assertIs(r, s)
         self.assertEqual(r['n'], 3)
         r.pop(qoid)
         self.assertRaises(pg.ProgrammingError, update, 'test_table', r)
-        r = get('test_table', 3, 'n')
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 3)
-        r.pop('n')
-        r = update('test_table', r)
-        r.pop(qoid)
+        s = get('test_table', 3, 'n')
+        self.assertIsInstance(s, dict)
+        self.assertEqual(s['n'], 3)
+        s.pop('n')
+        r = update('test_table', s)
+        oid = r.pop(qoid)
         self.assertEqual(r, {})
-        q = 'select n from test_table limit 2'
+        q = "select n from test_table limit 2"
         r = query(q).getresult()
         self.assertEqual(r, [(3,)])
+        query("insert into test_table values (1)")
+        self.assertRaises(pg.ProgrammingError,
+            update, 'test_table', dict(oid=oid, n=4))
+        r = update('test_table', dict(n=4), oid=oid)
+        self.assertEqual(r['n'], 4)
+        r = update('test_table *', dict(n=5), oid=oid)
+        self.assertEqual(r['n'], 5)
+        query("alter table test_table add column m int")
+        query("alter table test_table add primary key (n)")
+        self.assertIn('m', self.db.get_attnames('test_table', flush=True))
+        self.assertEqual('n', self.db.pkey('test_table', flush=True))
+        s = dict(n=1, m=4)
+        r = update('test_table', s)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 4)
+        s = dict(m=7)
+        r = update('test_table', s, n=5)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 5)
+        self.assertEqual(r['m'], 7)
+        q = "select n, m from test_table order by 1 limit 3"
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 4), (5, 7)])
+        s = dict(m=9, oid=oid)
+        self.assertRaises(KeyError, update, 'test_table', s)
+        r = update('test_table', s, oid=oid)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 5)
+        self.assertEqual(r['m'], 9)
+        s = dict(n=1, m=3, oid=oid)
+        r = update('test_table', s)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 3), (5, 9)])
 
     def testUpdateWithCompositeKey(self):
         update = self.db.update
@@ -1303,8 +1504,7 @@ class TestDBClass(unittest.TestCase):
         for n, t in enumerate('abc'):
             query('insert into "%s" values('
                 "%d, '%s')" % (table, n + 1, t))
-        self.assertRaises(pg.ProgrammingError, update,
-                          table, dict(t='b'))
+        self.assertRaises(KeyError, update, table, dict(t='b'))
         s = dict(n=2, t='d')
         r = update(table, s)
         self.assertIs(r, s)
@@ -1333,10 +1533,9 @@ class TestDBClass(unittest.TestCase):
                 t = chr(ord('a') + 2 * n + m)
                 query('insert into "%s" values('
                     "%d, %d, '%s')" % (table, n + 1, m + 1, t))
-        self.assertRaises(pg.ProgrammingError, update,
-                          table, dict(n=2, t='b'))
+        self.assertRaises(KeyError, update, table, dict(n=2, t='b'))
         self.assertEqual(update(table,
-                                dict(n=2, m=2, t='x'))['t'], 'x')
+            dict(n=2, m=2, t='x'))['t'], 'x')
         q = 'select t from "%s" where n=2 order by m' % table
         r = [r[0] for r in query(q).getresult()]
         self.assertEqual(r, ['c', 'x'])
@@ -1439,6 +1638,88 @@ class TestDBClass(unittest.TestCase):
         s = dict(m=3, u='z')
         r = upsert(table, s, oid='invalid')
         self.assertIs(r, s)
+
+    def testUpsertWithOid(self):
+        upsert = self.db.upsert
+        get = self.db.get
+        query = self.db.query
+        query("drop table if exists test_table")
+        self.addCleanup(query, "drop table test_table")
+        query("create table test_table (n int) with oids")
+        query("insert into test_table values (1)")
+        self.assertRaises(pg.ProgrammingError,
+            upsert, 'test_table', dict(n=2))
+        r = get('test_table', 1, 'n')
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r['n'], 1)
+        qoid = 'oid(test_table)'
+        self.assertIn(qoid, r)
+        self.assertNotIn('oid', r)
+        oid = r[qoid]
+        self.assertRaises(pg.ProgrammingError,
+            upsert, 'test_table', dict(n=2, oid=oid))
+        query("alter table test_table add column m int")
+        query("alter table test_table add primary key (n)")
+        self.assertIn('m', self.db.get_attnames('test_table', flush=True))
+        self.assertEqual('n', self.db.pkey('test_table', flush=True))
+        s = dict(n=2)
+        r = upsert('test_table', s)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertIsNone(r['m'])
+        q = query("select n, m from test_table order by n limit 3")
+        self.assertEqual(q.getresult(), [(1, None), (2, None)])
+        r['oid'] = oid
+        r = upsert('test_table', r)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertIsNone(r['m'])
+        self.assertIn(qoid, r)
+        self.assertNotIn('oid', r)
+        self.assertNotEqual(r[qoid], oid)
+        r['m'] = 7
+        r = upsert('test_table', r)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['m'], 7)
+        r.update(n=1, m=3)
+        r = upsert('test_table', r)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        q = query("select n, m from test_table order by n limit 3")
+        self.assertEqual(q.getresult(), [(1, 3), (2, 7)])
+        r = upsert('test_table', r, oid='invalid')
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        r['m'] = 5
+        r = upsert('test_table', r, m=False)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 3)
+        r['m'] = 5
+        r = upsert('test_table', r, m=True)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 1)
+        self.assertEqual(r['m'], 5)
+        r.update(n=2, m=1)
+        r = upsert('test_table', r, m='included.m')
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['m'], 7)
+        r['m'] = 9
+        r = upsert('test_table', r, m='excluded.m')
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['m'], 9)
+        r['m'] = 8
+        r = upsert('test_table *', r, m='included.m + 1')
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 2)
+        self.assertEqual(r['m'], 10)
+        q = query("select n, m from test_table order by n limit 3")
+        self.assertEqual(q.getresult(), [(1, 5), (2, 10)])
 
     def testUpsertWithCompositeKey(self):
         upsert = self.db.upsert
@@ -1625,40 +1906,91 @@ class TestDBClass(unittest.TestCase):
         query("drop table if exists test_table")
         self.addCleanup(query, "drop table test_table")
         query("create table test_table (n int) with oids")
-        query("insert into test_table values (1)")
-        query("insert into test_table values (2)")
-        query("insert into test_table values (3)")
+        for i in range(6):
+            query("insert into test_table values (%d)" % (i + 1))
         r = dict(n=3)
         self.assertRaises(pg.ProgrammingError, delete, 'test_table', r)
-        r = get('test_table', 1, 'n')
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 1)
+        s = get('test_table', 1, 'n')
         qoid = 'oid(test_table)'
-        self.assertIn(qoid, r)
-        oid = r[qoid]
-        self.assertIsInstance(oid, int)
-        s = delete('test_table', r)
-        self.assertEqual(s, 1)
-        s = delete('test_table', r)
-        self.assertEqual(s, 0)
-        r = get('test_table', 2, 'n')
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 2)
-        qoid = 'oid(test_table)'
-        self.assertIn(qoid, r)
-        oid = r[qoid]
-        self.assertIsInstance(oid, int)
-        r['oid'] = r.pop(qoid)
-        self.assertRaises(pg.ProgrammingError, delete, 'test_table', r)
-        s = delete('test_table', r, oid=oid)
-        self.assertEqual(s, 1)
-        s = delete('test_table', r)
-        self.assertEqual(s, 0)
-        s = delete('test_table', r, n=3)
-        self.assertEqual(s, 0)
-        q = 'select n from test_table order by 1 limit 3'
-        r = query(q).getresult()
-        self.assertEqual(r, [(3,)])
+        self.assertIn(qoid, s)
+        r = delete('test_table', s)
+        self.assertEqual(r, 1)
+        r = delete('test_table', s)
+        self.assertEqual(r, 0)
+        q = "select min(n),count(n) from test_table"
+        self.assertEqual(query(q).getresult()[0], (2, 5))
+        oid = get('test_table', 2, 'n')[qoid]
+        s = dict(oid=oid, n=2)
+        self.assertRaises(pg.ProgrammingError, delete, 'test_table', s)
+        r = delete('test_table', None, oid=oid)
+        self.assertEqual(r, 1)
+        r = delete('test_table', None, oid=oid)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (3, 4))
+        s = dict(oid=oid, n=2)
+        oid = get('test_table', 3, 'n')[qoid]
+        self.assertRaises(pg.ProgrammingError, delete, 'test_table', s)
+        r = delete('test_table', s, oid=oid)
+        self.assertEqual(r, 1)
+        r = delete('test_table', s, oid=oid)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (4, 3))
+        s = get('test_table', 4, 'n')
+        r = delete('test_table *', s)
+        self.assertEqual(r, 1)
+        r = delete('test_table *', s)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (5, 2))
+        oid = get('test_table', 5, 'n')[qoid]
+        s = {qoid: oid, 'm': 4}
+        r = delete('test_table', s, m=6)
+        self.assertEqual(r, 1)
+        r = delete('test_table *', s)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (6, 1))
+        query("alter table test_table add column m int")
+        query("alter table test_table add primary key (n)")
+        self.assertIn('m', self.db.get_attnames('test_table', flush=True))
+        self.assertEqual('n', self.db.pkey('test_table', flush=True))
+        for i in range(5):
+            query("insert into test_table values (%d, %d)" % (i + 1, i + 2))
+        s = dict(m=2)
+        self.assertRaises(KeyError, delete, 'test_table', s)
+        s = dict(m=2, oid=oid)
+        self.assertRaises(KeyError, delete, 'test_table', s)
+        r = delete('test_table', dict(m=2), oid=oid)
+        self.assertEqual(r, 0)
+        oid = get('test_table', 1, 'n')[qoid]
+        s = dict(oid=oid)
+        self.assertRaises(KeyError, delete, 'test_table', s)
+        r = delete('test_table', s, oid=oid)
+        self.assertEqual(r, 1)
+        r = delete('test_table', s, oid=oid)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (2, 5))
+        s = get('test_table', 2, 'n')
+        del s['n']
+        r = delete('test_table', s)
+        self.assertEqual(r, 1)
+        r = delete('test_table', s)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (3, 4))
+        r = delete('test_table', n=3)
+        self.assertEqual(r, 1)
+        r = delete('test_table', n=3)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (4, 3))
+        r = delete('test_table', None, n=4)
+        self.assertEqual(r, 1)
+        r = delete('test_table', None, n=4)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (5, 2))
+        s = dict(n=6)
+        r = delete('test_table', s, n=5)
+        self.assertEqual(r, 1)
+        r = delete('test_table', s, n=5)
+        self.assertEqual(r, 0)
+        self.assertEqual(query(q).getresult()[0], (6, 1))
 
     def testDeleteWithCompositeKey(self):
         query = self.db.query
@@ -1670,15 +2002,12 @@ class TestDBClass(unittest.TestCase):
         for n, t in enumerate('abc'):
             query("insert into %s values("
                 "%d, '%s')" % (table, n + 1, t))
-        self.assertRaises(pg.ProgrammingError, self.db.delete,
-            table, dict(t='b'))
+        self.assertRaises(KeyError, self.db.delete, table, dict(t='b'))
         self.assertEqual(self.db.delete(table, dict(n=2)), 1)
-        r = query('select t from "%s" where n=2' % table
-                  ).getresult()
+        r = query('select t from "%s" where n=2' % table).getresult()
         self.assertEqual(r, [])
         self.assertEqual(self.db.delete(table, dict(n=2)), 0)
-        r = query('select t from "%s" where n=3' % table
-                  ).getresult()[0][0]
+        r = query('select t from "%s" where n=3' % table).getresult()[0][0]
         self.assertEqual(r, 'c')
         table = 'delete_test_table_2'
         query('drop table if exists "%s"' % table)
@@ -1690,8 +2019,7 @@ class TestDBClass(unittest.TestCase):
                 t = chr(ord('a') + 2 * n + m)
                 query('insert into "%s" values('
                     "%d, %d, '%s')" % (table, n + 1, m + 1, t))
-        self.assertRaises(pg.ProgrammingError, self.db.delete,
-            table, dict(n=2, t='b'))
+        self.assertRaises(KeyError, self.db.delete, table, dict(n=2, t='b'))
         self.assertEqual(self.db.delete(table, dict(n=2, m=2)), 1)
         r = [r[0] for r in query('select t from "%s" where n=2'
             ' order by m' % table).getresult()]
@@ -1726,6 +2054,49 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, 1)
         r = query('select count(*) from "%s"' % table).getresult()
         self.assertEqual(r[0][0], 0)
+
+    def testDeleteReferenced(self):
+        delete = self.db.delete
+        query = self.db.query
+        query("drop table if exists test_child")
+        query("drop table if exists test_parent")
+        self.addCleanup(query, "drop table test_parent")
+        query("create table test_parent (n smallint primary key)")
+        self.addCleanup(query, "drop table test_child")
+        query("create table test_child ("
+            " n smallint primary key references test_parent (n))")
+        for n in range(3):
+            query("insert into test_parent (n) values (%d)" % n)
+            query("insert into test_child (n) values (%d)" % n)
+        q = ("select (select count(*) from test_parent),"
+            " (select count(*) from test_child)")
+        self.assertEqual(query(q).getresult()[0], (3, 3))
+        self.assertRaises(pg.ProgrammingError,
+            delete, 'test_parent', None, n=2)
+        self.assertRaises(pg.ProgrammingError,
+            delete, 'test_parent *', None, n=2)
+        r = delete('test_child', None, n=2)
+        self.assertEqual(r, 1)
+        self.assertEqual(query(q).getresult()[0], (3, 2))
+        r = delete('test_parent', None, n=2)
+        self.assertEqual(r, 1)
+        self.assertEqual(query(q).getresult()[0], (2, 2))
+        self.assertRaises(pg.ProgrammingError,
+            delete, 'test_parent', dict(n=0))
+        self.assertRaises(pg.ProgrammingError,
+            delete, 'test_parent *', dict(n=0))
+        r = delete('test_child', dict(n=0))
+        self.assertEqual(r, 1)
+        self.assertEqual(query(q).getresult()[0], (2, 1))
+        r = delete('test_child', dict(n=0))
+        self.assertEqual(r, 0)
+        r = delete('test_parent', dict(n=0))
+        self.assertEqual(r, 1)
+        self.assertEqual(query(q).getresult()[0], (1, 1))
+        r = delete('test_parent', None, n=0)
+        self.assertEqual(r, 0)
+        q = "select n from test_parent natural join test_child limit 2"
+        self.assertEqual(query(q).getresult(), [(1,)])
 
     def testTruncate(self):
         truncate = self.db.truncate

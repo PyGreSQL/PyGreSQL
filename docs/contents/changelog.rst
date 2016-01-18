@@ -27,11 +27,14 @@ Version 5.0
   colnames and coltypes attributes, which are not part of DB-API 2 though.
 - The tty parameter and attribute of database connections has been
   removed since it is not supported any more since PostgreSQL 7.4.
+- The pkey() method of the classic interface now returns tuples instead
+  of frozenset. The order of the tuples is like in the primary key index.
 - The table name that is affixed to the name of the OID column returned
   by the get() method of the classic interface will not automatically
   be fully qualified any more. This reduces overhead from the interface,
   but it means you must always write the table name in the same way when
   you call the methods using it and you are using tables with OIDs.
+  Also, OIDs are now only used when access via primary key is not possible.
   Note that OIDs are considered deprecated anyway, and they are not created
   by default any more in PostgreSQL 8.1 and later.
 - The internal caching and automatic quoting of class names in the classic

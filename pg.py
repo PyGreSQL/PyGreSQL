@@ -355,6 +355,9 @@ class DB(object):
             raise ValueError
         return d
 
+    _num_types = frozenset('int float num money'
+        ' int2 int4 int8 float4 float8 numeric money'.split())
+
     def _prepare_num(self, d):
         """Prepare a numeric parameter."""
         if not d and d != 0:
@@ -607,20 +610,20 @@ class DB(object):
     def query(self, qstr, *args):
         """Execute a SQL command string.
 
-        This method simply sends a SQL query to the database. If the query is
+        This method simply sends a SQL query to the database.  If the query is
         an insert statement that inserted exactly one row into a table that
         has OIDs, the return value is the OID of the newly inserted row.
         If the query is an update or delete statement, or an insert statement
         that did not insert exactly one row in a table with OIDs, then the
-        number of rows affected is returned as a string. If it is a statement
+        number of rows affected is returned as a string.  If it is a statement
         that returns rows as a result (usually a select statement, but maybe
         also an "insert/update ... returning" statement), this method returns
         a Query object that can be accessed via getresult() or dictresult()
-        or simply printed. Otherwise, it returns `None`.
+        or simply printed.  Otherwise, it returns `None`.
 
         The query can contain numbered parameters of the form $1 in place
-        of any data constant. Arguments given after the query string will
-        be substituted for the corresponding numbered parameter. Parameter
+        of any data constant.  Arguments given after the query string will
+        be substituted for the corresponding numbered parameter.  Parameter
         values can also be given as a single list or tuple argument.
         """
         # Wraps shared library function for debugging.
@@ -629,14 +632,16 @@ class DB(object):
         self._do_debug(qstr)
         return self.db.query(qstr, args)
 
-    def pkey(self, table, flush=False):
+    def pkey(self, table, composite=False, flush=False):
         """Get or set the primary key of a table.
 
-        Composite primary keys are represented as frozensets. Note that
-        this raises a KeyError if the table does not have a primary key.
+        Single primary keys are returned as strings unless you
+        set the composite flag.  Composite primary keys are always
+        represented as tuples.  Note that this raises a KeyError
+        if the table does not have a primary key.
 
         If flush is set then the internal cache for primary keys will
-        be flushed. This may be necessary after the database schema or
+        be flushed.  This may be necessary after the database schema or
         the search path has been changed.
         """
         pkeys = self._pkeys
@@ -646,21 +651,27 @@ class DB(object):
         try:  # cache lookup
             pkey = pkeys[table]
         except KeyError:  # cache miss, check the database
-            q = ("SELECT a.attname FROM pg_index i"
+            q = ("SELECT a.attname, a.attnum, i.indkey FROM pg_index i"
                 " JOIN pg_attribute a ON a.attrelid = i.indrelid"
                 " AND a.attnum = ANY(i.indkey)"
                 " AND NOT a.attisdropped"
                 " WHERE i.indrelid=%s::regclass"
-                " AND i.indisprimary") % (
+                " AND i.indisprimary ORDER BY a.attnum") % (
                     self._prepare_qualified_param(table, 1),)
             pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
                 raise KeyError('Table %s has no primary key' % table)
+            # we want to use the order defined in the primary key index here,
+            # not the order as defined by the columns in the table
             if len(pkey) > 1:
-                pkey = frozenset(k[0] for k in pkey)
+                indkey = [int(k) for k in pkey[0][2].split()]
+                pkey = sorted(pkey, key=lambda row: indkey.index(row[1]))
+                pkey = tuple(row[0] for row in pkey)
             else:
                 pkey = pkey[0][0]
             pkeys[table] = pkey  # cache it
+        if composite and not isinstance(pkey, tuple):
+            pkey = (pkey,)
         return pkey
 
     def get_databases(self):
@@ -754,50 +765,64 @@ class DB(object):
     def get(self, table, row, keyname=None):
         """Get a row from a database table or view.
 
-        This method is the basic mechanism to get a single row.  The keyname
-        that the key specifies a unique row.  If keyname is not specified
-        then the primary key for the table is used.  If row is a dictionary
-        then the value for the key is taken from it and it is modified to
-        include the new values, replacing existing values where necessary.
-        For a composite key, keyname can also be a sequence of key names.
+        This method is the basic mechanism to get a single row.  It assumes
+        that the keyname specifies a unique row.  It must be the name of a
+        single column or a tuple of column names.  If the keyname is not
+        specified, then the primary key for the table is used.
+
+        If row is a dictionary, then the value for the key is taken from it.
+        Otherwise, the row must be a single value or a tuple of values
+        corresponding to the passed keyname or primary key.  The fetched row
+        from the table will be returned as a new dictionary or used to replace
+        the existing values when row was passed as aa dictionary.
+
         The OID is also put into the dictionary if the table has one, but
         in order to allow the caller to work with multiple tables, it is
-        munged as "oid(table)".
+        munged as "oid(table)" using the actual name of the table.
         """
-        if table.endswith('*'):  # scan descendant tables?
-            table = table[:-1].rstrip()  # need parent table name
-        if not keyname:
-            # use the primary key by default
-            try:
-                keyname = self.pkey(table)
-            except KeyError:
-                raise _prg_error('Table %s has no primary key' % table)
+        if table.endswith('*'):  # hint for descendant tables can be ignored
+            table = table[:-1].rstrip()
         attnames = self.get_attnames(table)
+        qoid = _oid_key(table) if 'oid' in attnames else None
+        if keyname and isinstance(keyname, basestring):
+            keyname = (keyname,)
+        if qoid and isinstance(row, dict) and qoid in row and 'oid' not in row:
+            row['oid'] = row[qoid]
+        if not keyname:
+            try:  # if keyname is not specified, try using the primary key
+                keyname = self.pkey(table, True)
+            except KeyError:  # the table has no primary key
+                # try using the oid instead
+                if qoid and isinstance(row, dict) and 'oid' in row:
+                    keyname = ('oid',)
+                else:
+                    raise _prg_error('Table %s has no primary key' % table)
+            else:  # the table has a primary key
+                # check whether all key columns have values
+                if isinstance(row, dict) and not set(keyname).issubset(row):
+                    # try using the oid instead
+                    if qoid and 'oid' in row:
+                        keyname = ('oid',)
+                    else:
+                        raise KeyError(
+                            'Missing value in row for specified keyname')
+        if not isinstance(row, dict):
+            if not isinstance(row, (tuple, list)):
+                row = [row]
+            if len(keyname) != len(row):
+                raise KeyError(
+                    'Differing number of items in keyname and row')
+            row = dict(zip(keyname, row))
         params = []
         param = partial(self._prepare_param, params=params)
         col = self.escape_identifier
-        # We want the oid for later updates if that isn't the key.
-        # To allow users to work with multiple tables, we munge
-        # the name of the "oid" key by adding the name of the table.
-        qoid = _oid_key(table)
-        if keyname == 'oid':
-            if isinstance(row, dict):
-                if qoid not in row:
-                    raise _prg_error('%s not in row' % qoid)
-            else:
-                row = {qoid: row}
-            what = '*'
-            where = 'oid = %s' % param(row[qoid], 'int')
-        else:
-            keyname = [keyname] if isinstance(
-                keyname, basestring) else sorted(keyname)
-            if not isinstance(row, dict):
-                if len(keyname) > 1:
-                    raise _prg_error('Composite key needs dict as row')
-                row = dict((k, row) for k in keyname)
-            what = ', '.join(col(k) for k in attnames)
-            where = ' AND '.join('%s = %s' % (
-                col(k), param(row[k], attnames[k])) for k in keyname)
+        what = 'oid, *' if qoid else '*'
+        where = ' AND '.join('%s = %s' % (
+            col(k), param(row[k], attnames[k])) for k in keyname)
+        if 'oid' in row:
+            if qoid:
+                row[qoid] = row['oid']
+            del row['oid']
         q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (
             what, self._escape_qualified_name(table), where)
         self._do_debug(q, params)
@@ -807,9 +832,9 @@ class DB(object):
             raise _db_error('No such record in %s\nwhere %s\nwith %s' % (
                 table, where, self._list_params(params)))
         for n, value in res[0].items():
-            if n == 'oid':
+            if qoid and n == 'oid':
                 n = qoid
-            elif attnames.get(n) == 'bytea':
+            elif value is not None and attnames.get(n) == 'bytea':
                 value = self.unescape_bytea(value)
             row[n] = value
         return row
@@ -830,12 +855,15 @@ class DB(object):
         Note: The method currently doesn't support insert into views
         although PostgreSQL does.
         """
-        if 'oid' in kw:
-            del kw['oid']
+        if table.endswith('*'):  # hint for descendant tables can be ignored
+            table = table[:-1].rstrip()
         if row is None:
             row = {}
         row.update(kw)
+        if 'oid' in row:
+            del row['oid']  # do not insert oid
         attnames = self.get_attnames(table)
+        qoid = _oid_key(table) if 'oid' in attnames else None
         params = []
         param = partial(self._prepare_param, params=params)
         col = self.escape_identifier
@@ -845,67 +873,76 @@ class DB(object):
                 names.append(col(n))
                 values.append(param(row[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
-        ret = 'oid, *' if 'oid' in attnames else '*'
+        ret = 'oid, *' if qoid else '*'
         q = 'INSERT INTO %s (%s) VALUES (%s) RETURNING %s' % (
             self._escape_qualified_name(table), names, values, ret)
         self._do_debug(q, params)
         q = self.db.query(q, params)
-        res = q.dictresult()  # this will always return a row
-        for n, value in res[0].items():
-            if n == 'oid':
-                n = _oid_key(table)
-            elif attnames.get(n) == 'bytea' and value is not None:
-                value = self.unescape_bytea(value)
-            row[n] = value
+        res = q.dictresult()
+        if res:  # this should always be true
+            for n, value in res[0].items():
+                if qoid and n == 'oid':
+                    n = qoid
+                elif value is not None and attnames.get(n) == 'bytea':
+                    value = self.unescape_bytea(value)
+                row[n] = value
         return row
 
     def update(self, table, row=None, **kw):
         """Update an existing row in a database table.
 
         Similar to insert but updates an existing row.  The update is based
-        on the OID value as munged by get or passed as keyword, or on the
-        primary key of the table.  The dictionary is modified to reflect
-        any changes caused by the update due to triggers, rules, default
-        values, etc.
+        on the primary key of the table or the OID value as munged by get
+        or passed as keyword.
+
+        The dictionary is then modified to reflect any changes caused by the
+        update due to triggers, rules, default values, etc.
         """
-        # Update always works on the oid which get() returns if available,
-        # otherwise use the primary key.  Fail if neither.
-        # Note that we only accept oid key from named args for safety.
-        qoid = _oid_key(table)
-        if 'oid' in kw:
-            kw[qoid] = kw.pop('oid')
+        if table.endswith('*'):
+            table = table[:-1].rstrip()  # need parent table name
+        attnames = self.get_attnames(table)
+        qoid = _oid_key(table) if 'oid' in attnames else None
         if row is None:
             row = {}
+        elif 'oid' in row:
+            del row['oid']  # only accept oid key from named args for safety
         row.update(kw)
-        attnames = self.get_attnames(table)
+        if qoid and qoid in row and 'oid' not in row:
+            row['oid'] = row[qoid]
+        try:  # try using the primary key
+            keyname = self.pkey(table, True)
+        except KeyError:  # the table has no primary key
+            # try using the oid instead
+            if qoid and 'oid' in row:
+                keyname = ('oid',)
+            else:
+                raise _prg_error('Table %s has no primary key' % table)
+        else:  # the table has a primary key
+            # check whether all key columns have values
+            if not set(keyname).issubset(row):
+                # try using the oid instead
+                if qoid and 'oid' in row:
+                    keyname = ('oid',)
+                else:
+                    raise KeyError('Missing primary key in row')
         params = []
         param = partial(self._prepare_param, params=params)
         col = self.escape_identifier
-        if qoid in row:
-            where = 'oid = %s' % param(row[qoid], 'int')
-            keyname = []
-        else:
-            try:
-                keyname = self.pkey(table)
-            except KeyError:
-                raise _prg_error('Table %s has no primary key' % table)
-            keyname = [keyname] if isinstance(
-                keyname, basestring) else sorted(keyname)
-            try:
-                where = ' AND '.join('%s = %s' % (
-                    col(k), param(row[k], attnames[k])) for k in keyname)
-            except KeyError:
-                raise _prg_error('Update operation needs primary key or oid')
-        keyname = set(keyname)
-        keyname.add('oid')
+        where = ' AND '.join('%s = %s' % (
+            col(k), param(row[k], attnames[k])) for k in keyname)
+        if 'oid' in row:
+            if qoid:
+                row[qoid] = row['oid']
+            del row['oid']
         values = []
+        keyname = set(keyname)
         for n in attnames:
             if n in row and n not in keyname:
                 values.append('%s = %s' % (col(n), param(row[n], attnames[n])))
         if not values:
             return row
         values = ', '.join(values)
-        ret = 'oid, *' if 'oid' in attnames else '*'
+        ret = 'oid, *' if qoid else '*'
         q = 'UPDATE %s SET %s WHERE %s RETURNING %s' % (
             self._escape_qualified_name(table), values, where, ret)
         self._do_debug(q, params)
@@ -913,9 +950,9 @@ class DB(object):
         res = q.dictresult()
         if res:  # may be empty when row does not exist
             for n, value in res[0].items():
-                if n == 'oid':
+                if qoid and n == 'oid':
                     n = qoid
-                elif attnames.get(n) == 'bytea' and value is not None:
+                elif value is not None and attnames.get(n) == 'bytea':
                     value = self.unescape_bytea(value)
                 row[n] = value
         return row
@@ -963,11 +1000,16 @@ class DB(object):
         Note: The method uses the PostgreSQL "upsert" feature which is
         only available since PostgreSQL 9.5.
         """
-        if 'oid' in kw:
-            del kw['oid']
+        if table.endswith('*'):  # hint for descendant tables can be ignored
+            table = table[:-1].rstrip()
         if row is None:
             row = {}
+        if 'oid' in row:
+            del row['oid']  # do not insert oid
+        if 'oid' in kw:
+            del kw['oid']  # do not update oid
         attnames = self.get_attnames(table)
+        qoid = _oid_key(table) if 'oid' in attnames else None
         params = []
         param = partial(self._prepare_param,params=params)
         col = self.escape_identifier
@@ -978,11 +1020,9 @@ class DB(object):
                 values.append(param(row[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         try:
-            keyname = self.pkey(table)
+            keyname = self.pkey(table, True)
         except KeyError:
             raise _prg_error('Table %s has no primary key' % table)
-        keyname = [keyname] if isinstance(
-            keyname, basestring) else sorted(keyname)
         target = ', '.join(col(k) for k in keyname)
         update = []
         keyname = set(keyname)
@@ -997,7 +1037,7 @@ class DB(object):
         if not values:
             return row
         do = 'update set %s' % ', '.join(update) if update else 'nothing'
-        ret = 'oid, *' if 'oid' in attnames else '*'
+        ret = 'oid, *' if qoid else '*'
         q = ('INSERT INTO %s AS included (%s) VALUES (%s)'
             ' ON CONFLICT (%s) DO %s RETURNING %s') % (
                 self._escape_qualified_name(table), names, values,
@@ -1011,11 +1051,11 @@ class DB(object):
                     'Upsert operation is not supported by PostgreSQL version')
             raise  # re-raise original error
         res = q.dictresult()
-        if update:  # may be empty with "do nothing"
+        if res:  # may be empty with "do nothing"
             for n, value in res[0].items():
-                if n == 'oid':
-                    n = _oid_key(table)
-                elif attnames.get(n) == 'bytea' and value is not None:
+                if qoid and n == 'oid':
+                    n = qoid
+                elif value is not None and attnames.get(n) == 'bytea':
                     value = self.unescape_bytea(value)
                 row[n] = value
         else:
@@ -1037,11 +1077,9 @@ class DB(object):
         for n, t in attnames.items():
             if n == 'oid':
                 continue
-            if t in ('int', 'integer', 'smallint', 'bigint',
-                    'float', 'real', 'double precision',
-                    'num', 'numeric', 'money'):
+            if t in self._num_types:
                 row[n] = 0
-            elif t in ('bool', 'boolean'):
+            elif t == 'bool':
                 row[n] = self._make_bool(False)
             else:
                 row[n] = ''
@@ -1051,38 +1089,51 @@ class DB(object):
         """Delete an existing row in a database table.
 
         This method deletes the row from a table.  It deletes based on the
-        OID value as munged by get or passed as keyword, or on the primary
-        key of the table.  The return value is the number of deleted rows
-        (i.e. 0 if the row did not exist and 1 if the row was deleted).
+        primary key of the table or the OID value as munged by get() or
+        passed as keyword.
+
+        The return value is the number of deleted rows (i.e. 0 if the row
+        did not exist and 1 if the row was deleted).
+
+        Note that if the row cannot be deleted because e.g. it is still
+        referenced by another table, this method raises a ProgrammingError.
         """
-        # Like update, delete works on the oid.
-        # One day we will be testing that the record to be deleted
-        # isn't referenced somewhere (or else PostgreSQL will).
-        # Note that we only accept oid key from named args for safety.
-        qoid = _oid_key(table)
-        if 'oid' in kw:
-            kw[qoid] = kw.pop('oid')
+        if table.endswith('*'):  # hint for descendant tables can be ignored
+            table = table[:-1].rstrip()
+        attnames = self.get_attnames(table)
+        qoid = _oid_key(table) if 'oid' in attnames else None
         if row is None:
             row = {}
+        elif 'oid' in row:
+            del row['oid']  # only accept oid key from named args for safety
         row.update(kw)
+        if qoid and qoid in row and 'oid' not in row:
+            row['oid'] = row[qoid]
+        try:  # try using the primary key
+            keyname = self.pkey(table, True)
+        except KeyError:  # the table has no primary key
+            # try using the oid instead
+            if qoid and 'oid' in row:
+                keyname = ('oid',)
+            else:
+                raise _prg_error('Table %s has no primary key' % table)
+        else:  # the table has a primary key
+            # check whether all key columns have values
+            if not set(keyname).issubset(row):
+                # try using the oid instead
+                if qoid and 'oid' in row:
+                    keyname = ('oid',)
+                else:
+                    raise KeyError('Missing primary key in row')
         params = []
         param = partial(self._prepare_param, params=params)
-        if qoid in row:
-            where = 'oid = %s' % param(row[qoid], 'int')
-        else:
-            try:
-                keyname = self.pkey(table)
-            except KeyError:
-                raise _prg_error('Table %s has no primary key' % table)
-            keyname = [keyname] if isinstance(
-                keyname, basestring) else sorted(keyname)
-            attnames = self.get_attnames(table)
-            col = self.escape_identifier
-            try:
-                where = ' AND '.join('%s = %s' % (
-                    col(k), param(row[k], attnames[k])) for k in keyname)
-            except KeyError:
-                raise _prg_error('Delete operation needs primary key or oid')
+        col = self.escape_identifier
+        where = ' AND '.join('%s = %s' % (
+            col(k), param(row[k], attnames[k])) for k in keyname)
+        if 'oid' in row:
+            if qoid:
+                row[qoid] = row['oid']
+            del row['oid']
         q = 'DELETE FROM %s WHERE %s' % (
             self._escape_qualified_name(table), where)
         self._do_debug(q, params)
