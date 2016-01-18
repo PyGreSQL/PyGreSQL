@@ -668,20 +668,20 @@ class DB(object):
     def query(self, qstr, *args):
         """Executes a SQL command string.
 
-        This method simply sends a SQL query to the database. If the query is
+        This method simply sends a SQL query to the database.  If the query is
         an insert statement that inserted exactly one row into a table that
         has OIDs, the return value is the OID of the newly inserted row.
         If the query is an update or delete statement, or an insert statement
         that did not insert exactly one row in a table with OIDs, then the
-        number of rows affected is returned as a string. If it is a statement
+        number of rows affected is returned as a string.  If it is a statement
         that returns rows as a result (usually a select statement, but maybe
         also an "insert/update ... returning" statement), this method returns
         a pgqueryobject that can be accessed via getresult() or dictresult()
-        or simply printed. Otherwise, it returns `None`.
+        or simply printed.  Otherwise, it returns `None`.
 
         The query can contain numbered parameters of the form $1 in place
-        of any data constant. Arguments given after the query string will
-        be substituted for the corresponding numbered parameter. Parameter
+        of any data constant.  Arguments given after the query string will
+        be substituted for the corresponding numbered parameter.  Parameter
         values can also be given as a single list or tuple argument.
 
         Note that the query string must not be passed as a unicode value,
@@ -872,7 +872,7 @@ class DB(object):
     def get(self, cl, arg, keyname=None):
         """Get a row from a database table or view.
 
-        This method is the basic mechanism to get a single row.  The keyname
+        This method is the basic mechanism to get a single row.  It assumes
         that the key specifies a unique row.  If keyname is not specified
         then the primary key for the table is used.  If arg is a dictionary
         then the value for the key is taken from it and it is modified to
@@ -984,7 +984,7 @@ class DB(object):
         """Update an existing row in a database table.
 
         Similar to insert but updates an existing row.  The update is based
-        on the OID value as munged by get or passed as keyword, or on the
+        on the OID value as munged by get() or passed as keyword, or on the
         primary key of the table.  The dictionary is modified, if possible,
         to reflect any changes caused by the update due to triggers, rules,
         default values, etc.
@@ -1075,7 +1075,7 @@ class DB(object):
         """Delete an existing row in a database table.
 
         This method deletes the row from a table.  It deletes based on the
-        OID value as munged by get or passed as keyword, or on the primary
+        OID value as munged by get() or passed as keyword, or on the primary
         key of the table.  The return value is the number of deleted rows
         (i.e. 0 if the row did not exist and 1 if the row was deleted).
 

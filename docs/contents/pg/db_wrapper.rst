@@ -66,8 +66,8 @@ pkey -- return the primary key of a table
     :rtype: str
     :raises KeyError: the table does not have a primary key
 
-This method returns the primary key of a table. For composite primary
-keys, the return value will be a frozenset. Note that this raises a
+This method returns the primary key of a table.  For composite primary
+keys, the return value will be a frozenset.  Note that this raises a
 KeyError if the table does not have a primary key.
 
 get_databases -- get list of databases in the system
@@ -297,9 +297,9 @@ get -- get a row from a database table or view
       the values are the row values.
     :raises ProgrammingError: no primary key or missing privilege
 
-This method is the basic mechanism to get a single row. It assumes
-that the key specifies a unique row. If *keyname* is not specified,
-then the primary key for the table is used. If *arg* is a dictionary
+This method is the basic mechanism to get a single row.  It assumes
+that the key specifies a unique row.  If *keyname* is not specified,
+then the primary key for the table is used.  If *arg* is a dictionary
 then the value for the key is taken from it and it is modified to
 include the new values, replacing existing values where necessary.
 For a composite key, *keyname* can also be a sequence of key names.
@@ -345,14 +345,14 @@ update -- update a row in a database table
     :raises ProgrammingError: no primary key or missing privilege
 
 Similar to insert but updates an existing row.  The update is based on the
-OID value as munged by get or passed as keyword, or on the primary key of
-the table.  The dictionary is modified, if possible, to reflect any changes
-caused by the update due to triggers, rules, default values, etc.
+OID value as munged by :meth:`DB.get` or passed as keyword, or on the primary
+key of the table.  The dictionary is modified, if possible, to reflect any
+changes caused by the update due to triggers, rules, default values, etc.
 
 Like insert, the dictionary is optional and updates will be performed
 on the fields in the keywords.  There must be an OID or primary key
 either in the dictionary where the OID must be munged, or in the keywords
-where it can be simply the string 'oid'.
+where it can be simply the string ``'oid'``.
 
 query -- execute a SQL command string
 -------------------------------------
@@ -415,11 +415,13 @@ delete -- delete a row from a database table
     :param str table: name of table
     :param dict d: optional dictionary of values
     :rtype: None
+    :raises ProgrammingError: table has no primary key,
+        row is still referenced or missing privilege
 
 This method deletes the row from a table.  It deletes based on the OID value
-as munged by get or passed as keyword, or on the primary key of the table.
-The return value is the number of deleted rows (i.e. 0 if the row did not
-exist and 1 if the row was deleted).
+as munged by :meth:`DB.get` or passed as keyword, or on the primary key of
+the table.  The return value is the number of deleted rows (i.e. 0 if the
+row did not exist and 1 if the row was deleted).
 
 truncate -- Quickly empty database tables
 -----------------------------------------
