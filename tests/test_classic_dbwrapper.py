@@ -1359,6 +1359,38 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['much space'], 2002)
         self.assertEqual(r['Questions?'], 'What?')
 
+    def testInsertIntoView(self):
+        insert = self.db.insert
+        query = self.db.query
+        query("truncate test")
+        q = 'select * from test_view order by i4 limit 3'
+        r = query(q).getresult()
+        self.assertEqual(r, [])
+        r = dict(i4=1234, v4='abcd')
+        insert('test', r)
+        self.assertIsNone(r['i2'])
+        self.assertEqual(r['i4'], 1234)
+        self.assertIsNone(r['i8'])
+        self.assertEqual(r['v4'], 'abcd')
+        self.assertIsNone(r['c4'])
+        r = query(q).getresult()
+        self.assertEqual(r, [(1234, 'abcd')])
+        r = dict(i4=5678, v4='efgh')
+        try:
+            insert('test_view', r)
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90300:
+                # must setup rules in older PostgreSQL versions
+                self.skipTest('database cannot insert into view')
+            self.fail(str(error))
+        self.assertNotIn('i2', r)
+        self.assertEqual(r['i4'], 5678)
+        self.assertNotIn('i8', r)
+        self.assertEqual(r['v4'], 'efgh')
+        self.assertNotIn('c4', r)
+        r = query(q).getresult()
+        self.assertEqual(r, [(1234, 'abcd'), (5678, 'efgh')])
+
     def testUpdate(self):
         update = self.db.update
         query = self.db.query
@@ -1614,7 +1646,12 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('m', self.db.get_attnames('test_table', flush=True))
         self.assertEqual('n', self.db.pkey('test_table', flush=True))
         s = dict(n=2)
-        r = upsert('test_table', s)
+        try:
+            r = upsert('test_table', s)
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90500:
+                self.skipTest('database does not support upsert')
+            self.fail(str(error))
         self.assertIs(r, s)
         self.assertEqual(r['n'], 2)
         self.assertIsNone(r['m'])

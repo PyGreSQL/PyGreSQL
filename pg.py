@@ -851,9 +851,6 @@ class DB(object):
 
         The dictionary is then reloaded with the values actually inserted in
         order to pick up values modified by rules, triggers, etc.
-
-        Note: The method currently doesn't support insert into views
-        although PostgreSQL does.
         """
         if table.endswith('*'):  # hint for descendant tables can be ignored
             table = table[:-1].rstrip()
