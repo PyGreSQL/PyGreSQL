@@ -938,9 +938,6 @@ class DB(object):
         The dictionary is then, if possible, reloaded with the values actually
         inserted in order to pick up values modified by rules, triggers, etc.
 
-        Note: The method currently doesn't support insert into views
-        although PostgreSQL does.
-
         """
         qcl = self._add_schema(cl)
         qoid = _oid_key(qcl)

@@ -328,9 +328,6 @@ added to or replace the entry in the dictionary.
 The dictionary is then, if possible, reloaded with the values actually
 inserted in order to pick up values modified by rules, triggers, etc.
 
-Note: The method currently doesn't support insert into views
-although PostgreSQL does.
-
 update -- update a row in a database table
 ------------------------------------------
 
