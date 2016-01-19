@@ -5,20 +5,18 @@ The DB wrapper class
 
 .. class:: DB
 
-The :class:`Connection` methods are wrapped in the class :class:`DB`.
+The :class:`Connection` methods are wrapped in the class :class:`DB`
+which also adds convenient higher level methods for working with the
+database.  It also serves as a context manager for the connection.
 The preferred way to use this module is as follows::
 
     import pg
 
-    db = pg.DB(...)  # see below
-
-    for r in db.query(  # just for example
-        """SELECT foo,bar
-         FROM foo_bar_table
-         WHERE foo !~ bar"""
-        ).dictresult():
-
-        print '%(foo)s %(bar)s' % r
+    with pg.DB(...) as db:  # for parameters, see below
+        for r in db.query(  # just for example
+                "SELECT foo, bar FROM foo_bar_table WHERE foo !~ bar"
+                ).dictresult():
+            print('%(foo)s %(bar)s' % r)
 
 This class can be subclassed as in this example::
 
