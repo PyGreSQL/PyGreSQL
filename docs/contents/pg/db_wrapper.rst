@@ -144,7 +144,7 @@ get/set_parameter -- get or set  run-time parameters
     :returns: the current value(s) of the run-time parameter(s)
     :rtype: str, list or dict
     :raises TypeError: Invalid parameter type(s)
-    :raises ProgrammingError: Invalid parameter name(s)
+    :raises pg.ProgrammingError: Invalid parameter name(s)
 
 If the parameter is a string, the return value will also be a string
 that is the current setting of the run-time parameter with that name.
@@ -162,7 +162,7 @@ of all existing configuration parameters.
 
 .. versionadded:: 4.2
 
-.. method:: DB.set_parameter(self, parameter, [value], [local])
+.. method:: DB.set_parameter(parameter, [value], [local])
 
     Set the value of run-time parameters
 
@@ -172,7 +172,7 @@ of all existing configuration parameters.
     :type param: str or None
     :raises TypeError: Invalid parameter type(s)
     :raises ValueError: Invalid value argument(s)
-    :raises ProgrammingError: Invalid parameter name(s) or values
+    :raises pg.ProgrammingError: Invalid parameter name(s) or values
 
 If the parameter and the value are strings, the run-time parameter
 will be set to that value.  If no value or *None* is passed as a value,
@@ -295,7 +295,7 @@ get -- get a row from a database table or view
     :param str keyname: name of field to use as key (optional)
     :returns: A dictionary - the keys are the attribute names,
       the values are the row values.
-    :raises ProgrammingError: no primary key or missing privilege
+    :raises pg.ProgrammingError: no primary key or missing privilege
 
 This method is the basic mechanism to get a single row.  It assumes
 that the key specifies a unique row.  If *keyname* is not specified,
@@ -318,7 +318,7 @@ insert -- insert a row into a database table
     :param dict d: optional dictionary of values
     :returns: the inserted values in the database
     :rtype: dict
-    :raises ProgrammingError: missing privilege or conflict
+    :raises pg.ProgrammingError: missing privilege or conflict
 
 This method inserts a row into a table.  If the optional dictionary is
 not supplied then the required values must be included as keyword/value
@@ -339,7 +339,7 @@ update -- update a row in a database table
     :param dict d: optional dictionary of values
     :returns: the new row in the database
     :rtype: dict
-    :raises ProgrammingError: no primary key or missing privilege
+    :raises pg.ProgrammingError: no primary key or missing privilege
 
 Similar to insert but updates an existing row.  The update is based on the
 OID value as munged by :meth:`DB.get` or passed as keyword, or on the primary
@@ -412,7 +412,7 @@ delete -- delete a row from a database table
     :param str table: name of table
     :param dict d: optional dictionary of values
     :rtype: None
-    :raises ProgrammingError: table has no primary key,
+    :raises pg.ProgrammingError: table has no primary key,
         row is still referenced or missing privilege
 
 This method deletes the row from a table.  It deletes based on the OID value
@@ -420,10 +420,10 @@ as munged by :meth:`DB.get` or passed as keyword, or on the primary key of
 the table.  The return value is the number of deleted rows (i.e. 0 if the
 row did not exist and 1 if the row was deleted).
 
-truncate -- Quickly empty database tables
+truncate -- quickly empty database tables
 -----------------------------------------
 
-.. method:: DB.truncate(self, table, [restart], [cascade], [only]):
+.. method:: DB.truncate(table, [restart], [cascade], [only])
 
     Empty a table or set of tables
 

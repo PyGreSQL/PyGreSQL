@@ -662,6 +662,8 @@ class TestParamQueries(unittest.TestCase):
 class TestInserttable(unittest.TestCase):
     """Test inserttable method."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         c = connect()
@@ -671,6 +673,7 @@ class TestInserttable(unittest.TestCase):
             "d numeric, f4 real, f8 double precision, m money,"
             "c char(1), v4 varchar(4), c4 char(4), t text)")
         c.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -679,6 +682,7 @@ class TestInserttable(unittest.TestCase):
         c.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.c = connect()
         self.c.query("set lc_monetary='C'")
         self.c.query("set datestyle='ISO,YMD'")
@@ -787,12 +791,15 @@ class TestInserttable(unittest.TestCase):
 class TestDirectSocketAccess(unittest.TestCase):
     """Test copy command with direct socket access."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         c = connect()
         c.query("drop table if exists test cascade")
         c.query("create table test (i int, v varchar(16))")
         c.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -801,6 +808,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         c.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.c = connect()
         self.c.query("set datestyle='ISO,YMD'")
 

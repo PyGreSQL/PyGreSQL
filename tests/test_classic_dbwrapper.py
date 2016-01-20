@@ -277,6 +277,8 @@ class TestDBClassBasic(unittest.TestCase):
 class TestDBClass(unittest.TestCase):
     """Test the methods of the DB class wrapped pg connection."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         db = DB()
@@ -288,6 +290,7 @@ class TestDBClass(unittest.TestCase):
         db.query("create or replace view test_view as"
             " select i4, v4 from test")
         db.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -296,6 +299,7 @@ class TestDBClass(unittest.TestCase):
         db.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.db = DB()
         query = self.db.query
         query('set client_encoding=utf8')
@@ -1568,6 +1572,8 @@ class TestDBClass(unittest.TestCase):
 class TestSchemas(unittest.TestCase):
     """Test correct handling of schemas (namespaces)."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         db = DB()
@@ -1591,6 +1597,7 @@ class TestSchemas(unittest.TestCase):
             query("create table %s.t%d with oids as select 1 as n, %d as d"
                   % (schema, num_schema, num_schema))
         db.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -1607,6 +1614,7 @@ class TestSchemas(unittest.TestCase):
         db.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.db = DB()
 
     def tearDown(self):

@@ -1162,7 +1162,7 @@ class DB(object):
             q.append('CASCADE')
         q = ' '.join(q)
         self._do_debug(q)
-        return self.query(q)
+        return self.db.query(q)
 
     def notification_handler(self,
             event, callback, arg_dict=None, timeout=None, stop_event=None):
