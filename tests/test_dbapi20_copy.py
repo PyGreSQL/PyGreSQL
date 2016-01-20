@@ -50,7 +50,7 @@ class InputStream:
 
     def __str__(self):
         data = self.data
-        if str is unicode:
+        if str is unicode:  # Python >= 3.0
             data = data.decode('utf-8')
         return data
 
@@ -75,7 +75,7 @@ class OutputStream:
 
     def __str__(self):
         data = self.data
-        if str is unicode:
+        if str is unicode:  # Python >= 3.0
             data = data.decode('utf-8')
         return data
 
@@ -220,7 +220,10 @@ class TestCopyFrom(TestCopy):
         call('1\t', 'copytest',
              format='text', sep='\t', null='', columns=['id', 'name'])
         self.assertRaises(TypeError, call)
+        self.assertRaises(TypeError, call, None)
+        self.assertRaises(TypeError, call, None, None)
         self.assertRaises(TypeError, call, '0\t')
+        self.assertRaises(TypeError, call, '0\t', None)
         self.assertRaises(TypeError, call, '0\t', 42)
         self.assertRaises(TypeError, call, '0\t', ['copytest'])
         self.assertRaises(TypeError, call, '0\t', 'copytest', format=42)
@@ -230,6 +233,8 @@ class TestCopyFrom(TestCopy):
         self.assertRaises(TypeError, call, '0\t', 'copytest', null=42)
         self.assertRaises(ValueError, call, '0\t', 'copytest', size='bad')
         self.assertRaises(TypeError, call, '0\t', 'copytest', columns=42)
+        self.assertRaises(ValueError, call, b'', 'copytest',
+            format='binary', sep=',')
 
     def test_input_string(self):
         ret = self.copy_from('42\tHello, world!')
@@ -248,7 +253,7 @@ class TestCopyFrom(TestCopy):
         self.check_table()
         self.check_rowcount()
 
-    if str is unicode:
+    if str is unicode:  # Python >= 3.0
 
         def test_input_bytes(self):
             self.copy_from(b'42\tHello, world!')
@@ -257,7 +262,7 @@ class TestCopyFrom(TestCopy):
             self.copy_from(self.data_text.encode('utf-8'))
             self.check_table()
 
-    if str is not unicode:
+    else:  # Python < 3.0
 
         def test_input_unicode(self):
             self.copy_from(u'43\tWürstel, Käse!')
@@ -271,9 +276,19 @@ class TestCopyFrom(TestCopy):
         self.check_table()
         self.check_rowcount()
 
+    def test_input_iterable_invalid(self):
+        self.assertRaises(IOError, self.copy_from, [None])
+
     def test_input_iterable_with_newlines(self):
         self.copy_from('%s\n' % row for row in self.data_text.splitlines())
         self.check_table()
+
+    if str is unicode:  # Python >= 3.0
+
+        def test_input_iterable_bytes(self):
+            self.copy_from(row.encode('utf-8')
+                for row in self.data_text.splitlines())
+            self.check_table()
 
     def test_sep(self):
         stream = ('%d-%s' % row for row in self.data)
@@ -366,6 +381,10 @@ class TestCopyFrom(TestCopy):
         self.assertEqual(stream.sizes, [None])
         self.check_rowcount()
 
+    def test_size_invalid(self):
+        self.assertRaises(TypeError,
+            self.copy_from, self.data_file, size='invalid')
+
 
 class TestCopyTo(TestCopy):
     """Test the copy_to method."""
@@ -415,7 +434,7 @@ class TestCopyTo(TestCopy):
         self.assertEqual(rows, self.data_text)
         self.check_rowcount()
 
-    if str is unicode:
+    if str is unicode:  # Python >= 3.0
 
         def test_generator_bytes(self):
             ret = self.copy_to(decode=False)
@@ -426,7 +445,7 @@ class TestCopyTo(TestCopy):
             self.assertIsInstance(rows, bytes)
             self.assertEqual(rows, self.data_text.encode('utf-8'))
 
-    if str is not unicode:
+    else:  # Python < 3.0
 
         def test_generator_unicode(self):
             ret = self.copy_to(decode=True)
@@ -516,6 +535,8 @@ class TestCopyTo(TestCopy):
             format='binary', decode=True)
 
     def test_query(self):
+        self.assertRaises(ValueError, self.cursor.copy_to, None,
+            "select name from copytest", columns='noname')
         ret = self.cursor.copy_to(None,
             "select name||'!' from copytest where id=1941")
         self.assertIsInstance(ret, Iterable)
@@ -531,7 +552,7 @@ class TestCopyTo(TestCopy):
         self.assertIs(ret, self.cursor)
         self.assertEqual(str(stream), self.data_text)
         data = self.data_text
-        if str is unicode:
+        if str is unicode:  # Python >= 3.0
             data = data.encode('utf-8')
         sizes = [len(row) + 1 for row in data.splitlines()]
         self.assertEqual(stream.sizes, sizes)

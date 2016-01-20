@@ -25,6 +25,9 @@ Version 5.0
   are now named tuples, i.e. their elements can be also accessed by name.
   The column names and types can now also be requested through the
   colnames and coltypes attributes, which are not part of DB-API 2 though.
+- Re-activated the shortcut methods of the DB-API connection since they
+  can be handy when doing experiments or writing quick scripts. We keep
+  them undocumented though and discourage using them in production.
 - The tty parameter and attribute of database connections has been
   removed since it is not supported any more since PostgreSQL 7.4.
 - The pkey() method of the classic interface now returns tuples instead

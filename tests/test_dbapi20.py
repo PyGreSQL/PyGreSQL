@@ -28,6 +28,8 @@ except (ImportError, ValueError):
     except ImportError:
         pass
 
+from datetime import datetime
+
 try:
     long
 except NameError:  # Python >= 3.0
@@ -37,6 +39,16 @@ try:
     from collections import OrderedDict
 except ImportError:  # Python 2.6 or 3.0
     OrderedDict = None
+
+
+class PgBitString:
+    """Test object with a PostgreSQL representation as Bit String."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def __pg_repr__(self):
+         return "B'{0:b}'".format(self.value)
 
 
 class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
@@ -340,7 +352,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         from math import isnan, isinf
         self.assertTrue(isnan(nan) and not isinf(nan))
         self.assertTrue(isinf(inf) and not isnan(inf))
-        values = [0, 1, 0.03125, -42.53125, nan, inf, -inf]
+        values = [0, 1, 0.03125, -42.53125, nan, inf, -inf,
+            'nan', 'inf', '-inf', 'NaN', 'Infinity', '-Infinity']
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
@@ -356,6 +369,12 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(len(rows), len(values))
         rows = [row[1] for row in rows]
         for inval, outval in zip(values, rows):
+            if inval in ('inf', 'Infinity'):
+                inval = inf
+            elif inval in ('-inf', '-Infinity'):
+                inval = -inf
+            elif inval in ('nan', 'NaN'):
+                inval = nan
             if isinf(inval):
                 self.assertTrue(isinf(outval))
                 if inval < 0:
@@ -366,6 +385,70 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 self.assertTrue(isnan(outval))
             else:
                 self.assertEqual(inval, outval)
+
+    def test_datetime(self):
+        values = ['2011-07-17 15:47:42', datetime(2016, 1, 20, 20, 15, 51)]
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("set datestyle to 'iso'")
+            cur.execute(
+                "create table %s (n smallint, ts timestamp)" % table)
+            params = enumerate(values)
+            cur.executemany("insert into %s values (%%s,%%s)" % table, params)
+            cur.execute("select * from %s order by 1" % table)
+            rows = cur.fetchall()
+        finally:
+            con.close()
+        self.assertEqual(len(rows), len(values))
+        rows = [row[1] for row in rows]
+        for inval, outval in zip(values, rows):
+            if isinstance(inval, datetime):
+                inval = inval.strftime('%Y-%m-%d %H:%M:%S')
+            self.assertEqual(inval, outval)
+
+    def test_array(self):
+        values = ([20000, 25000, 25000, 30000],
+            [['breakfast', 'consulting'], ['meeting', 'lunch']])
+        output = ('{20000,25000,25000,30000}',
+            '{{breakfast,consulting},{meeting,lunch}}')
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s (i int[], t text[][])" % table)
+            cur.execute("insert into %s values (%%s,%%s)" % table, values)
+            cur.execute("select * from %s" % table)
+            row = cur.fetchone()
+        finally:
+            con.close()
+        self.assertEqual(row, output)
+
+    def test_custom_type(self):
+        values = [3, 5, 65]
+        values = list(map(PgBitString, values))
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            params = enumerate(values)  # params have __pg_repr__ method
+            cur.execute(
+                'create table "%s" (n smallint, b bit varying(7))' % table)
+            cur.executemany("insert into %s values (%%s,%%s)" % table, params)
+            cur.execute("select * from %s order by 1" % table)
+            rows = cur.fetchall()
+        finally:
+            con.close()
+        self.assertEqual(len(rows), len(values))
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            params = (1, object())  # an object that cannot be handled
+            self.assertRaises(pgdb.InterfaceError, cur.execute,
+                "insert into %s values (%%s,%%s)" % table, params)
+        finally:
+            con.close()
 
     def test_set_decimal_type(self):
         decimal_type = pgdb.decimal_type()
@@ -472,6 +555,54 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         values[3] = values[5] = True
         values[4] = values[6] = False
         self.assertEqual(rows, values)
+
+    def test_execute_edge_cases(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            sql = 'invalid'  # should be ignored with empty parameter list
+            cur.executemany(sql, [])
+            sql = 'select %d + 1'
+            cur.execute(sql, [(1,)])  # deprecated use of execute()
+            self.assertEqual(cur.fetchone()[0], 2)
+            sql = 'select 1/0'  # cannot be executed
+            self.assertRaises(pgdb.ProgrammingError, cur.execute, sql)
+            cur.close()
+            con.rollback()
+            if pgdb.shortcutmethods:
+                res = con.execute('select %d', (1,)).fetchone()
+                self.assertEqual(res, (1,))
+                res = con.executemany('select %d', [(1,), (2,)]).fetchone()
+                self.assertEqual(res, (2,))
+        finally:
+            con.close()
+        sql = 'select 1'  # cannot be executed after connection is closed
+        self.assertRaises(pgdb.OperationalError, cur.execute, sql)
+
+    def test_fetchmany_with_keep(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            self.assertEqual(cur.arraysize, 1)
+            cur.execute('select * from generate_series(1, 25)')
+            self.assertEqual(len(cur.fetchmany()), 1)
+            self.assertEqual(len(cur.fetchmany()), 1)
+            self.assertEqual(cur.arraysize, 1)
+            cur.arraysize = 3
+            self.assertEqual(len(cur.fetchmany()), 3)
+            self.assertEqual(len(cur.fetchmany()), 3)
+            self.assertEqual(cur.arraysize, 3)
+            self.assertEqual(len(cur.fetchmany(size=2)), 2)
+            self.assertEqual(cur.arraysize, 3)
+            self.assertEqual(len(cur.fetchmany()), 3)
+            self.assertEqual(len(cur.fetchmany()), 3)
+            self.assertEqual(len(cur.fetchmany(size=2, keep=True)), 2)
+            self.assertEqual(cur.arraysize, 2)
+            self.assertEqual(len(cur.fetchmany()), 2)
+            self.assertEqual(len(cur.fetchmany()), 2)
+            self.assertEqual(len(cur.fetchmany(25)), 3)
+        finally:
+            con.close()
 
     def test_nextset(self):
         con = self._connect()

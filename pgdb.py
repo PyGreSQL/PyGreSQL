@@ -112,11 +112,9 @@ threadsafety = 1
 # this module use extended python format codes
 paramstyle = 'pyformat'
 
-# shortcut methods are not supported by default
-# since they have been excluded from DB API 2
-# and are not recommended by the DB SIG.
-
-shortcutmethods = 0
+# shortcut methods have been excluded from DB API 2 and
+# are not recommended by the DB SIG, but they can be handy
+shortcutmethods = 1
 
 
 ### Internal Types Handling
@@ -144,16 +142,7 @@ def _cast_bytea(value):
 
 
 def _cast_float(value):
-    try:
-        return float(value)
-    except ValueError:
-        if value == 'NaN':
-            return nan
-        elif value == 'Infinity':
-            return inf
-        elif value == '-Infinity':
-            return -inf
-        raise
+    return float(value)  # this also works with NaN and Infinity
 
 
 _cast = {'bool': _cast_bool, 'bytea': _cast_bytea,
@@ -280,7 +269,8 @@ class Cursor(object):
         elif val is None:
             val = 'NULL'
         elif isinstance(val, (list, tuple)):
-            val = '(%s)' % ','.join(map(lambda v: str(self._quote(v)), val))
+            q = self._quote
+            val = 'ARRAY[%s]' % ','.join(str(q(v)) for v in val)
         elif Decimal is not float and isinstance(val, Decimal):
             pass
         elif hasattr(val, '__pg_repr__'):
@@ -339,8 +329,8 @@ class Cursor(object):
                 try:
                     self._cnx.source().execute(sql)
                 except DatabaseError:
-                    raise
-                except Exception:
+                    raise  # database provides error message
+                except Exception as err:
                     raise _op_error("can't start transaction")
                 self._dbcnx._tnx = True
             for parameters in seq_of_parameters:
@@ -354,9 +344,10 @@ class Cursor(object):
                 else:
                     self.rowcount = -1
         except DatabaseError:
-            raise
+            raise  # database provides error message
         except Error as err:
-            raise _db_error("error in '%s': '%s' " % (sql, err))
+            raise _db_error(
+                "error in '%s': '%s' " % (sql, err), InterfaceError)
         except Exception as err:
             raise _op_error("internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
@@ -493,9 +484,9 @@ class Cursor(object):
         else:
             if size is None:
                 size = 8192
+            elif not isinstance(size, int):
+                raise TypeError("The size option must be an integer")
             if size > 0:
-                if not isinstance(size, int):
-                    raise TypeError("The size option must be an integer")
 
                 def chunks():
                     while True:
