@@ -8,7 +8,6 @@ Sub-tests for large object support.
 Contributed by Christoph Zwerschke.
 
 These tests need a database to test against.
-
 """
 
 try:

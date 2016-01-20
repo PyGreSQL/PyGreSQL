@@ -8,7 +8,6 @@ Sub-tests for the copy methods.
 Contributed by Christoph Zwerschke.
 
 These tests need a database to test against.
-
 """
 
 try:
@@ -123,6 +122,8 @@ class TestStreams(unittest.TestCase):
 
 class TestCopy(unittest.TestCase):
 
+    cls_set_up = False
+
     @staticmethod
     def connect():
         return pgdb.connect(database=dbname,
@@ -139,6 +140,7 @@ class TestCopy(unittest.TestCase):
         cur.close()
         con.commit()
         con.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -150,6 +152,7 @@ class TestCopy(unittest.TestCase):
         con.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.con = self.connect()
         self.cursor = self.con.cursor()
         self.cursor.execute("set client_encoding=utf8")

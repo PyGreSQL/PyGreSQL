@@ -37,11 +37,7 @@ import warnings
 from decimal import Decimal
 from collections import namedtuple
 from functools import partial
-
-try:
-    from collections import OrderedDict
-except ImportError:  # Python 2.6 or 3.0
-    OrderedDict = dict
+from operator import itemgetter
 
 try:
     basestring
@@ -49,6 +45,92 @@ except NameError:  # Python >= 3.0
     basestring = (str, bytes)
 
 set_decimal(Decimal)
+
+try:
+    from collections import OrderedDict
+except ImportError:  # Python 2.6 or 3.0
+    OrderedDict = dict
+
+
+    class AttrDict(dict):
+        """Simple read-only ordered dictionary for storing attribute names."""
+
+        def __init__(self, *args, **kw):
+            if len(args) > 1 or kw:
+                raise TypeError
+            items = args[0] if args else []
+            if isinstance(items, dict):
+                raise TypeError
+            items = list(items)
+            self._keys = [item[0] for item in items]
+            dict.__init__(self, items)
+            self._read_only = True
+            error = self._read_only_error
+            self.clear = self.update = error
+            self.pop = self.setdefault = self.popitem = error
+
+        def __setitem__(self, key, value):
+            if self._read_only:
+                self._read_only_error()
+            dict.__setitem__(self, key, value)
+
+        def __delitem__(self, key):
+            if self._read_only:
+                self._read_only_error()
+            dict.__delitem__(self, key)
+
+        def __iter__(self):
+            return iter(self._keys)
+
+        def keys(self):
+            return list(self._keys)
+
+        def values(self):
+            return [self[key] for key in self]
+
+        def items(self):
+            return [(key, self[key]) for key in self]
+
+        def iterkeys(self):
+            return self.__iter__()
+
+        def itervalues(self):
+            return iter(self.values())
+
+        def iteritems(self):
+            return iter(self.items())
+
+        @staticmethod
+        def _read_only_error(*args, **kw):
+            raise TypeError('This object is read-only')
+
+else:
+
+     class AttrDict(OrderedDict):
+        """Simple read-only ordered dictionary for storing attribute names."""
+
+        def __init__(self, *args, **kw):
+            self._read_only = False
+            OrderedDict.__init__(self, *args, **kw)
+            self._read_only = True
+            error = self._read_only_error
+            self.clear = self.update = error
+            self.pop = self.setdefault = self.popitem = error
+
+        def __setitem__(self, key, value):
+            if self._read_only:
+                self._read_only_error()
+            OrderedDict.__setitem__(self, key, value)
+
+        def __delitem__(self, key):
+            if self._read_only:
+                self._read_only_error()
+            OrderedDict.__delitem__(self, key)
+
+        @staticmethod
+        def _read_only_error(*args, **kw):
+            raise TypeError('This object is read-only')
+
 
 
 # Auxiliary functions that are independent from a DB connection:
@@ -83,6 +165,23 @@ def _namedresult(q):
     return [row(*r) for r in q.getresult()]
 
 set_namedresult(_namedresult)
+
+
+class _MemoryQuery:
+    """Class that embodies a given query result."""
+
+    def __init__(self, result, fields):
+        """Create query from given result rows and field names."""
+        self.result = result
+        self.fields = fields
+
+    def listfields(self):
+        """Return the stored field names of this query."""
+        return self.fields
+
+    def getresult(self):
+        """Return the stored result of this query."""
+        return self.result
 
 
 def _db_error(msg, cls=DatabaseError):
@@ -703,13 +802,11 @@ class DB(object):
     def get_attnames(self, table, flush=False):
         """Given the name of a table, dig out the set of attribute names.
 
-        Returns a dictionary of attribute names (the names are the keys,
-        the values are the names of the attributes' types).
+        Returns a read-only dictionary of attribute names (the names are
+        the keys, the values are the names of the attributes' types)
+        with the column names in the proper order if you iterate over it.
 
-        If your Python version supports this, the dictionary will be an
-        OrderedDictionary with the column names in the right order.
-
-        If flush is set then the internal cache for attribute names will
+        If flush is set, then the internal cache for attribute names will
         be flushed. This may be necessary after the database schema or
         the search path has been changed.
 
@@ -734,7 +831,7 @@ class DB(object):
             names = self.db.query(q, (table,)).getresult()
             if not self._regtypes:
                 names = ((name, _simpletype(typ)) for name, typ in names)
-            names = OrderedDict(names)
+            names = AttrDict(names)
             attnames[table] = names  # cache it
         return names
 
@@ -1191,7 +1288,165 @@ class DB(object):
             q.append('CASCADE')
         q = ' '.join(q)
         self._do_debug(q)
-        return self.query(q)
+        return self.db.query(q)
+
+    def get_as_list(self, table, what=None, where=None,
+            order=None, limit=None, offset=None, scalar=False):
+        """Get a table as a list.
+
+        This gets a convenient representation of the table as a list
+        of named tuples in Python.  You only need to pass the name of
+        the table (or any other SQL expression returning rows).  Note that
+        by default this will return the full content of the table which
+        can be huge and overflow your memory.  However, you can control
+        the amount of data returned using the other optional parameters.
+
+        The parameter 'what' can restrict the query to only return a
+        subset of the table columns.  It can be a string, list or a tuple.
+        The parameter 'where' can restrict the query to only return a
+        subset of the table rows.  It can be a string, list or a tuple
+        of SQL expressions that all need to be fulfilled.  The parameter
+        'order' specifies the ordering of the rows.  It can also be a
+        other string, list or a tuple.  If no ordering is specified,
+        the result will be ordered by the primary key(s) or all columns
+        if no primary key exists.  You can set 'order' to False if you
+        don't care about the ordering.  The parameters 'limit' and 'offset'
+        can be integers specifying the maximum number of rows returned
+        and a number of rows skipped over.
+
+        If you set the 'scalar' option to True, then instead of the
+        named tuples you will get the first items of these tuples.
+        This is useful if the result has only one column anyway.
+        """
+        if not table:
+            raise TypeError('The table name is missing')
+        if what:
+            if isinstance(what, (list, tuple)):
+                what = ', '.join(map(str, what))
+            if order is None:
+                order = what
+        else:
+            what = '*'
+        q = ['SELECT', what, 'FROM', table]
+        if where:
+            if isinstance(where, (list, tuple)):
+                where = ' AND '.join(map(str, where))
+            q.extend(['WHERE', where])
+        if order is None:
+            try:
+                order = self.pkey(table, True)
+            except (KeyError, ProgrammingError):
+                try:
+                    order = list(self.get_attnames(table))
+                except (KeyError, ProgrammingError):
+                    pass
+        if order:
+            if isinstance(order, (list, tuple)):
+                order = ', '.join(map(str, order))
+            q.extend(['ORDER BY', order])
+        if limit:
+            q.append('LIMIT %d' % limit)
+        if offset:
+            q.append('OFFSET %d' % offset)
+        q = ' '.join(q)
+        self._do_debug(q)
+        q = self.db.query(q)
+        res = q.namedresult()
+        if res and scalar:
+            res = [row[0] for row in res]
+        return res
+
+    def get_as_dict(self, table, keyname=None, what=None, where=None,
+            order=None, limit=None, offset=None, scalar=False):
+        """Get a table as a dictionary.
+
+        This method is similar to get_as_list(), but returns the table
+        as a Python dict instead of a Python list, which can be even
+        more convenient. The primary key column(s) of the table will
+        be used as the keys of the dictionary, while the other column(s)
+        will be the corresponding values.  The keys will be named tuples
+        if the table has a composite primary key.  The rows will be also
+        named tuples unless the 'scalar' option has been set to True.
+        With the optional parameter 'keyname' you can specify an alternative
+        set of columns to be used as the keys of the dictionary.  It must
+        be set as a string, list or a tuple.
+
+        If the Python version supports it, the dictionary will be an
+        OrderedDict using the order specified with the 'order' parameter
+        or the key column(s) if not specified.  You can set 'order' to False
+        if you don't care about the ordering.  In this case the returned
+        dictionary will be an ordinary one.
+        """
+        if not table:
+            raise TypeError('The table name is missing')
+        if not keyname:
+            try:
+                keyname = self.pkey(table, True)
+            except (KeyError, ProgrammingError):
+                raise _prg_error('Table %s has no primary key' % table)
+        if isinstance(keyname, basestring):
+            keyname = [keyname]
+        elif not isinstance(keyname, (list, tuple)):
+            raise KeyError('The keyname must be a string, list or tuple')
+        if what:
+            if isinstance(what, (list, tuple)):
+                what = ', '.join(map(str, what))
+            if order is None:
+                order = what
+        else:
+            what = '*'
+        q = ['SELECT', what, 'FROM', table]
+        if where:
+            if isinstance(where, (list, tuple)):
+                where = ' AND '.join(map(str, where))
+            q.extend(['WHERE', where])
+        if order is None:
+            order = keyname
+        if order:
+            if isinstance(order, (list, tuple)):
+                order = ', '.join(map(str, order))
+            q.extend(['ORDER BY', order])
+        if limit:
+            q.append('LIMIT %d' % limit)
+        if offset:
+            q.append('OFFSET %d' % offset)
+        q = ' '.join(q)
+        self._do_debug(q)
+        q = self.db.query(q)
+        res = q.getresult()
+        cls = OrderedDict if order else dict
+        if not res:
+            return cls()
+        keyset = set(keyname)
+        fields = q.listfields()
+        if not keyset.issubset(fields):
+            raise KeyError('Missing keyname in row')
+        keyind, rowind = [], []
+        for i, f in enumerate(fields):
+            (keyind if f in keyset else rowind).append(i)
+        keytuple = len(keyind) > 1
+        getkey = itemgetter(*keyind)
+        keys = map(getkey, res)
+        if scalar:
+            rowind = rowind[:1]
+            rowtuple = False
+        else:
+            rowtuple = len(rowind) > 1
+        if scalar or rowtuple:
+            getrow = itemgetter(*rowind)
+        else:
+            rowind = rowind[0]
+            getrow = lambda row: (row[rowind],)
+            rowtuple = True
+        rows = map(getrow, res)
+        if keytuple or rowtuple:
+            namedresult = get_namedresult()
+            if keytuple:
+                keys = namedresult(_MemoryQuery(keys, keyname))
+            if rowtuple:
+                fields = [f for f in fields if f not in keyset]
+                rows = namedresult(_MemoryQuery(rows, fields))
+        return cls(zip(keys, rows))
 
     def notification_handler(self,
             event, callback, arg_dict=None, timeout=None, stop_event=None):

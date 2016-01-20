@@ -8,7 +8,6 @@ Sub-tests for the low-level connection object.
 Contributed by Christoph Zwerschke.
 
 These tests need a database to test against.
-
 """
 
 try:
@@ -870,6 +869,8 @@ class TestParamQueries(unittest.TestCase):
 class TestInserttable(unittest.TestCase):
     """Test inserttable method."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         c = connect()
@@ -884,6 +885,7 @@ class TestInserttable(unittest.TestCase):
         cls.has_encoding = c.query(
             "select length('ä') - length('a')").getresult()[0][0] == 0
         c.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -892,6 +894,7 @@ class TestInserttable(unittest.TestCase):
         c.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.c = connect()
         self.c.query("set client_encoding=utf8")
         self.c.query("set datestyle='ISO,YMD'")
@@ -1101,12 +1104,15 @@ class TestInserttable(unittest.TestCase):
 class TestDirectSocketAccess(unittest.TestCase):
     """Test copy command with direct socket access."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         c = connect()
         c.query("drop table if exists test cascade")
         c.query("create table test (i int, v varchar(16))")
         c.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -1115,6 +1121,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         c.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.c = connect()
         self.c.query("set client_encoding=utf8")
 
@@ -1282,7 +1289,6 @@ class TestConfigFunctions(unittest.TestCase):
 
     To test the effect of most of these functions, we need a database
     connection.  That's why they are covered in this test module.
-
     """
 
     def setUp(self):
@@ -1605,8 +1611,9 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
     we need to open a connection with fixed parameters prior to testing
     in order to ensure that the tests always run under the same conditions.
     That's why these tests are included in this test module.
-
     """
+
+    cls_set_up = False
 
     @classmethod
     def setUpClass(cls):
@@ -1614,8 +1621,10 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         query('set client_encoding=sql_ascii')
         query('set standard_conforming_strings=off')
         query('set bytea_output=escape')
+        cls.cls_set_up = True
 
     def testEscapeString(self):
+        self.assertTrue(self.cls_set_up)
         f = pg.escape_string
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
@@ -1633,6 +1642,7 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         self.assertEqual(r, r"It''s bad to have a \\ inside.")
 
     def testEscapeBytea(self):
+        self.assertTrue(self.cls_set_up)
         f = pg.escape_bytea
         r = f(b'plain')
         self.assertIsInstance(r, bytes)

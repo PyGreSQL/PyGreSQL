@@ -119,15 +119,13 @@ get_attnames -- get the attribute names of a table
     Get the attribute names of a table
 
     :param str table: name of table
-    :returns: a dictionary mapping attribute names to type names
+    :returns: an ordered dictionary mapping attribute names to type names
 
 Given the name of a table, digs out the set of attribute names.
 
-Returns a dictionary of attribute names (the names are the keys,
-the values are the names of the attributes' types).
-
-If your Python version supports this, the dictionary will be an
-OrderedDictionary with the column names in the right order.
+Returns a read-only dictionary of attribute names (the names are the keys,
+the values are the names of the attributes' types) with the column names
+in the proper order if you iterate over it.
 
 By default, only a limited number of simple types will be returned.
 You can get the regular types after enabling this by calling the
@@ -161,7 +159,7 @@ get/set_parameter -- get or set  run-time parameters
     :returns: the current value(s) of the run-time parameter(s)
     :rtype: str, list or dict
     :raises TypeError: Invalid parameter type(s)
-    :raises ProgrammingError: Invalid parameter name(s)
+    :raises pg.ProgrammingError: Invalid parameter name(s)
 
 If the parameter is a string, the return value will also be a string
 that is the current setting of the run-time parameter with that name.
@@ -179,7 +177,7 @@ of all existing configuration parameters.
 
 .. versionadded:: 4.2
 
-.. method:: DB.set_parameter(self, parameter, [value], [local])
+.. method:: DB.set_parameter(parameter, [value], [local])
 
     Set the value of run-time parameters
 
@@ -189,7 +187,7 @@ of all existing configuration parameters.
     :type param: str or None
     :raises TypeError: Invalid parameter type(s)
     :raises ValueError: Invalid value argument(s)
-    :raises ProgrammingError: Invalid parameter name(s) or values
+    :raises pg.ProgrammingError: Invalid parameter name(s) or values
 
 If the parameter and the value are strings, the run-time parameter
 will be set to that value.  If no value or *None* is passed as a value,
@@ -294,7 +292,7 @@ get -- get a row from a database table or view
     :param str keyname: name of field to use as key (optional)
     :returns: A dictionary - the keys are the attribute names,
       the values are the row values.
-    :raises ProgrammingError: table has no primary key or missing privilege
+    :raises pg.ProgrammingError: table has no primary key or missing privilege
     :raises KeyError: missing key value for the row
 
 This method is the basic mechanism to get a single row.  It assumes
@@ -324,7 +322,7 @@ insert -- insert a row into a database table
     :param col: optional keyword arguments for updating the dictionary
     :returns: the inserted values in the database
     :rtype: dict
-    :raises ProgrammingError: missing privilege or conflict
+    :raises pg.ProgrammingError: missing privilege or conflict
 
 This method inserts a row into a table.  If the optional dictionary is
 not supplied then the required values must be included as keyword/value
@@ -346,7 +344,7 @@ update -- update a row in a database table
     :param col: optional keyword arguments for updating the dictionary
     :returns: the new row in the database
     :rtype: dict
-    :raises ProgrammingError: table has no primary key or missing privilege
+    :raises pg.ProgrammingError: table has no primary key or missing privilege
     :raises KeyError: missing key value for the row
 
 Similar to insert but updates an existing row.  The update is based on
@@ -373,7 +371,7 @@ upsert -- insert a row with conflict resolution
     :param col: optional keyword arguments for specifying the update
     :returns: the new row in the database
     :rtype: dict
-    :raises ProgrammingError: table has no primary key or missing privilege
+    :raises pg.ProgrammingError: table has no primary key or missing privilege
 
 This method inserts a row into a table, but instead of raising a
 ProgrammingError exception in case a row with the same primary key already
@@ -479,7 +477,7 @@ delete -- delete a row from a database table
     :param dict d: optional dictionary of values
     :param col: optional keyword arguments for updating the dictionary
     :rtype: None
-    :raises ProgrammingError: table has no primary key,
+    :raises pg.ProgrammingError: table has no primary key,
         row is still referenced or missing privilege
     :raises KeyError: missing key value for the row
 
@@ -493,10 +491,10 @@ exist and 1 if the row was deleted).
 Note that if the row cannot be deleted because e.g. it is still referenced
 by another table, this method will raise a ProgrammingError.
 
-truncate -- Quickly empty database tables
+truncate -- quickly empty database tables
 -----------------------------------------
 
-.. method:: DB.truncate(self, table, [restart], [cascade], [only]):
+.. method:: DB.truncate(table, [restart], [cascade], [only])
 
     Empty a table or set of tables
 
@@ -523,6 +521,83 @@ descendant tables are included.  If the parameter *table* is a list,
 the parameter *only* can also be a list of corresponding boolean values.
 
 .. versionadded:: 4.2
+
+get_as_list/dict -- read a table as a list or dictionary
+--------------------------------------------------------
+
+.. method:: DB.get_as_list(table, [what], [where], [order], [limit], [offset], [scalar])
+
+    Get a table as a list
+
+    :param str table: the name of the table (the FROM clause)
+    :param what: column(s) to be returned (the SELECT clause)
+    :type what: str, list, tuple or None
+    :param where: conditions(s) to be fulfilled (the WHERE clause)
+    :type where: str, list, tuple or None
+    :param order: column(s) to sort by (the ORDER BY clause)
+    :type order: str, list, tuple, False or None
+    :param int limit: maximum number of rows returned (the LIMIT clause)
+    :param int offset: number of rows to be skipped (the OFFSET clause)
+    :param bool scalar: whether only the first column shall be returned
+    :returns: the content of the table as a list
+    :rtype: list
+    :raises TypeError: the table name has not been specified
+
+This gets a convenient representation of the table as a list of named tuples
+in Python.  You only need to pass the name of the table (or any other SQL
+expression returning rows).  Note that by default this will return the full
+content of the table which can be huge and overflow your memory.  However, you
+can control the amount of data returned using the other optional parameters.
+
+The parameter *what* can restrict the query to only return a subset of the
+table columns.  The parameter *where* can restrict the query to only return a
+subset of the table rows.  The specified SQL expressions all need to be
+fulfilled for a row to get into the result.  The parameter *order* specifies
+the ordering of the rows.  If no ordering is specified, the result will be
+ordered by the primary key(s) or all columns if no primary key exists.
+You can set *order* to *False* if you don't care about the ordering.
+The parameters *limit* and *offset* specify the maximum number of rows
+returned and a number of rows skipped over.
+
+If you set the *scalar* option to *True*, then instead of the named tuples
+you will get the first items of these tuples.  This is useful if the result
+has only one column anyway.
+
+.. method:: DB.get_as_dict(table, [keyname], [what], [where], [order], [limit], [offset], [scalar])
+
+    Get a table as a dictionary
+
+    :param str table: the name of the table (the FROM clause)
+    :param keyname: column(s) to be used as key(s) of the dictionary
+    :type keyname: str, list, tuple or None
+    :param what: column(s) to be returned (the SELECT clause)
+    :type what: str, list, tuple or None
+    :param where: conditions(s) to be fulfilled (the WHERE clause)
+    :type where: str, list, tuple or None
+    :param order: column(s) to sort by (the ORDER BY clause)
+    :type order: str, list, tuple, False or None
+    :param int limit: maximum number of rows returned (the LIMIT clause)
+    :param int offset: number of rows to be skipped (the OFFSET clause)
+    :param bool scalar: whether only the first column shall be returned
+    :returns: the content of the table as a list
+    :rtype: dict or OrderedDict
+    :raises TypeError: the table name has not been specified
+    :raises KeyError: keyname(s) are invalid or not part of the result
+    :raises pg.ProgrammingError: no keyname(s) and table has no primary key
+
+This method is similar to :meth:`DB.get_as_list`, but returns the table as
+a Python dict instead of a Python list, which can be even more convenient.
+The primary key column(s) of the table will be used as the keys of the
+dictionary, while the other column(s) will be the corresponding values.
+The keys will be named tuples if the table has a composite primary key.
+The rows will be also named tuples unless the *scalar* option has been set
+to *True*.  With the optional parameter *keyname* you can specify a different
+set of columns to be used as the keys of the dictionary.
+
+If the Python version supports it, the dictionary will be an *OrderedDict*
+using the order specified with the *order* parameter or the key column(s)
+if not specified.  You can set *order* to *False* if you don't care about the
+ordering.  In this case the returned dictionary will be an ordinary one.
 
 escape_literal -- escape a literal string for use within SQL
 ------------------------------------------------------------

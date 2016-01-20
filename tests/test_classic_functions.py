@@ -8,9 +8,7 @@ Sub-tests for the module functions and constants.
 Contributed by Christoph Zwerschke.
 
 These tests do not need a database to test against.
-
 """
-
 
 try:
     import unittest2 as unittest  # for Python < 2.7

@@ -8,8 +8,8 @@ Sub-tests for the DB wrapper object.
 Contributed by Christoph Zwerschke.
 
 These tests need a database to test against.
-
 """
+
 try:
     import unittest2 as unittest  # for Python < 2.7
 except ImportError:
@@ -22,6 +22,7 @@ import tempfile
 import pg  # the module under test
 
 from decimal import Decimal
+from operator import itemgetter
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
@@ -77,6 +78,89 @@ def DB():
     return db
 
 
+class TestAttrDict(unittest.TestCase):
+    """Test the simple ordered dictionary for attribute names."""
+
+    cls = pg.AttrDict
+    base = OrderedDict
+
+    def testInit(self):
+        a = self.cls()
+        self.assertIsInstance(a, self.base)
+        self.assertEqual(a, self.base())
+        items = [('id', 'int'), ('name', 'text')]
+        a = self.cls(items)
+        self.assertIsInstance(a, self.base)
+        self.assertEqual(a, self.base(items))
+        iteritems = iter(items)
+        a = self.cls(iteritems)
+        self.assertIsInstance(a, self.base)
+        self.assertEqual(a, self.base(items))
+
+    def testIter(self):
+        a = self.cls()
+        self.assertEqual(list(a), [])
+        keys = ['id', 'name', 'age']
+        items = [(key, None) for key in keys]
+        a = self.cls(items)
+        self.assertEqual(list(a), keys)
+
+    def testKeys(self):
+        a = self.cls()
+        self.assertEqual(list(a.keys()), [])
+        keys = ['id', 'name', 'age']
+        items = [(key, None) for key in keys]
+        a = self.cls(items)
+        self.assertEqual(list(a.keys()), keys)
+
+    def testValues(self):
+        a = self.cls()
+        self.assertEqual(list(a.values()), [])
+        items = [('id', 'int'), ('name', 'text')]
+        values = [item[1] for item in items]
+        a = self.cls(items)
+        self.assertEqual(list(a.values()), values)
+
+    def testItems(self):
+        a = self.cls()
+        self.assertEqual(list(a.items()), [])
+        items = [('id', 'int'), ('name', 'text')]
+        a = self.cls(items)
+        self.assertEqual(list(a.items()), items)
+
+    def testGet(self):
+        a = self.cls([('id', 1)])
+        try:
+            self.assertEqual(a['id'], 1)
+        except KeyError:
+            self.fail('AttrDict should be readable')
+
+    def testSet(self):
+        a = self.cls()
+        try:
+            a['id'] = 1
+        except TypeError:
+            pass
+        else:
+            self.fail('AttrDict should be read-only')
+
+    def testDel(self):
+        a = self.cls([('id', 1)])
+        try:
+            del a['id']
+        except TypeError:
+            pass
+        else:
+            self.fail('AttrDict should be read-only')
+
+    def testWriteMethods(self):
+        a = self.cls([('id', 1)])
+        self.assertEqual(a['id'], 1)
+        for method in 'clear', 'update', 'pop', 'setdefault', 'popitem':
+            method = getattr(a, method)
+            self.assertRaises(TypeError, method, a)
+
+
 class TestDBClassBasic(unittest.TestCase):
     """Test existence of the DB class wrapped pg connection methods."""
 
@@ -99,7 +183,8 @@ class TestDBClassBasic(unittest.TestCase):
             'escape_bytea', 'escape_identifier',
             'escape_literal', 'escape_string',
             'fileno',
-            'get', 'get_attnames', 'get_databases',
+            'get', 'get_as_dict', 'get_as_list',
+            'get_attnames', 'get_databases',
             'get_notice_receiver', 'get_parameter',
             'get_relations', 'get_tables',
             'getline', 'getlo', 'getnotify',
@@ -283,6 +368,8 @@ class TestDBClassBasic(unittest.TestCase):
 class TestDBClass(unittest.TestCase):
     """Test the methods of the DB class wrapped pg connection."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         db = DB()
@@ -294,6 +381,7 @@ class TestDBClass(unittest.TestCase):
         db.query("create or replace view test_view as"
             " select i4, v4 from test")
         db.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -302,6 +390,7 @@ class TestDBClass(unittest.TestCase):
         db.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.db = DB()
         query = self.db.query
         query('set client_encoding=utf8')
@@ -937,17 +1026,50 @@ class TestDBClass(unittest.TestCase):
 
     def testGetAttnamesIsOrdered(self):
         get_attnames = self.db.get_attnames
-        query = self.db.query
-        self.createTable('test_table',
+        r = get_attnames('test', flush=True)
+        self.assertIsInstance(r, OrderedDict)
+        self.assertEqual(r, OrderedDict([
+            ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
+            ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
+            ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
+        if OrderedDict is not dict:
+            r = ' '.join(list(r.keys()))
+            self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
+        table = 'test table for get_attnames'
+        self.createTable(table,
             ' n int, alpha smallint, v varchar(3),'
             ' gamma char(5), tau text, beta bool')
-        r = get_attnames("test_table")
+        r = get_attnames(table)
         self.assertIsInstance(r, OrderedDict)
         self.assertEqual(r, OrderedDict([
             ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
             ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
-        if OrderedDict is dict:
+        if OrderedDict is not dict:
+            r = ' '.join(list(r.keys()))
+            self.assertEqual(r, 'n alpha v gamma tau beta')
+        else:
             self.skipTest('OrderedDict is not supported')
+
+    def testGetAttnamesIsAttrDict(self):
+        AttrDict = pg.AttrDict
+        get_attnames = self.db.get_attnames
+        r = get_attnames('test', flush=True)
+        self.assertIsInstance(r, AttrDict)
+        self.assertEqual(r, AttrDict([
+            ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
+            ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
+            ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
+        r = ' '.join(list(r.keys()))
+        self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
+        table = 'test table for get_attnames'
+        self.createTable(table,
+            ' n int, alpha smallint, v varchar(3),'
+            ' gamma char(5), tau text, beta bool')
+        r = get_attnames(table)
+        self.assertIsInstance(r, AttrDict)
+        self.assertEqual(r, AttrDict([
+            ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
+            ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'n alpha v gamma tau beta')
 
@@ -1828,7 +1950,6 @@ class TestDBClass(unittest.TestCase):
 
     def testClearWithQuotedNames(self):
         clear = self.db.clear
-        query = self.db.query
         table = 'test table for clear()'
         self.createTable(table, '"Prime!" smallint primary key,'
             ' "much space" integer, "Questions?" text')
@@ -2221,6 +2342,286 @@ class TestDBClass(unittest.TestCase):
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 0)
 
+    def testGetAsList(self):
+        get_as_list = self.db.get_as_list
+        self.assertRaises(TypeError, get_as_list)
+        self.assertRaises(TypeError, get_as_list, None)
+        query = self.db.query
+        table = 'test_aslist'
+        r = query('select 1 as colname').namedresult()[0]
+        self.assertIsInstance(r, tuple)
+        named = hasattr(r, 'colname')
+        names = [(1, 'Homer'), (2, 'Marge'),
+                (3, 'Bart'), (4, 'Lisa'), (5, 'Maggie')]
+        self.createTable(table,
+            'id smallint primary key, name varchar', values=names)
+        r = get_as_list(table)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, names)
+        for t, n in zip(r, names):
+            self.assertIsInstance(t, tuple)
+            self.assertEqual(t, n)
+            if named:
+                self.assertEqual(t.id, n[0])
+                self.assertEqual(t.name, n[1])
+                self.assertEqual(t._asdict(), dict(id=n[0], name=n[1]))
+        r = get_as_list(table, what='name')
+        self.assertIsInstance(r, list)
+        expected = sorted((row[1],) for row in names)
+        self.assertEqual(r, expected)
+        r = get_as_list(table, what='name, id')
+        self.assertIsInstance(r, list)
+        expected = sorted(tuple(reversed(row)) for row in names)
+        self.assertEqual(r, expected)
+        r = get_as_list(table, what=['name', 'id'])
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, expected)
+        r = get_as_list(table, where="name like 'Ba%'")
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, names[2:3])
+        r = get_as_list(table, what='name', where="name like 'Ma%'")
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, [('Maggie',), ('Marge',)])
+        r = get_as_list(table, what='name',
+                        where=["name like 'Ma%'", "name like '%r%'"])
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, [('Marge',)])
+        r = get_as_list(table, what='name', order='id')
+        self.assertIsInstance(r, list)
+        expected = [(row[1],) for row in names]
+        self.assertEqual(r, expected)
+        r = get_as_list(table, what=['name'], order=['id'])
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, expected)
+        r = get_as_list(table, what=['id', 'name'], order=['id', 'name'])
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, names)
+        r = get_as_list(table, what='id * 2 as num', order='id desc')
+        self.assertIsInstance(r, list)
+        expected = [(n,) for n in range(10, 0, -2)]
+        self.assertEqual(r, expected)
+        r = get_as_list(table, limit=2)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, names[:2])
+        r = get_as_list(table, offset=3)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, names[3:])
+        r = get_as_list(table, limit=1, offset=2)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, names[2:3])
+        r = get_as_list(table, scalar=True)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, list(range(1, 6)))
+        r = get_as_list(table, what='name', scalar=True)
+        self.assertIsInstance(r, list)
+        expected = sorted(row[1] for row in names)
+        self.assertEqual(r, expected)
+        r = get_as_list(table, what='name', limit=1, scalar=True)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, expected[:1])
+        query('alter table "%s" drop constraint "%s_pkey"' % (table, table))
+        self.assertRaises(KeyError, self.db.pkey, table, flush=True)
+        names.insert(1, (1, 'Snowball'))
+        query('insert into "%s" values ($1, $2)' % table, (1, 'Snowball'))
+        r = get_as_list(table)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, names)
+        r = get_as_list(table, what='name', where='id=1', scalar=True)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, ['Homer', 'Snowball'])
+        # test with unordered query
+        r = get_as_list(table, order=False)
+        self.assertIsInstance(r, list)
+        self.assertEqual(set(r), set(names))
+        # test with arbitrary from clause
+        from_table = '(select lower(name) as n2 from "%s") as t2' % table
+        r = get_as_list(from_table)
+        self.assertIsInstance(r, list)
+        r = set(row[0] for row in r)
+        expected = set(row[1].lower() for row in names)
+        self.assertEqual(r, expected)
+        r = get_as_list(from_table, order='n2', scalar=True)
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, sorted(expected))
+        r = get_as_list(from_table, order='n2', limit=1)
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 1)
+        t = r[0]
+        self.assertIsInstance(t, tuple)
+        if named:
+            self.assertEqual(t.n2, 'bart')
+            self.assertEqual(t._asdict(), dict(n2='bart'))
+        else:
+            self.assertEqual(t, ('bart',))
+
+    def testGetAsDict(self):
+        get_as_dict = self.db.get_as_dict
+        self.assertRaises(TypeError, get_as_dict)
+        self.assertRaises(TypeError, get_as_dict, None)
+        # the test table has no primary key
+        self.assertRaises(pg.ProgrammingError, get_as_dict, 'test')
+        query = self.db.query
+        table = 'test_asdict'
+        r = query('select 1 as colname').namedresult()[0]
+        self.assertIsInstance(r, tuple)
+        named = hasattr(r, 'colname')
+        colors = [(1, '#7cb9e8', 'Aero'), (2, '#b5a642', 'Brass'),
+                  (3, '#b2ffff', 'Celeste'), (4, '#c19a6b', 'Desert')]
+        self.createTable(table,
+            'id smallint primary key, rgb char(7), name varchar',
+            values=colors)
+        # keyname must be string, list or tuple
+        self.assertRaises(KeyError, get_as_dict, table, 3)
+        self.assertRaises(KeyError, get_as_dict, table, dict(id=None))
+        # missing keyname in row
+        self.assertRaises(KeyError, get_as_dict, table,
+                          keyname='rgb', what='name')
+        r = get_as_dict(table)
+        self.assertIsInstance(r, OrderedDict)
+        expected = OrderedDict((row[0], row[1:]) for row in colors)
+        self.assertEqual(r, expected)
+        for key in r:
+            self.assertIsInstance(key, int)
+            self.assertIn(key, expected)
+            row = r[key]
+            self.assertIsInstance(row, tuple)
+            t = expected[key]
+            self.assertEqual(row, t)
+            if named:
+                self.assertEqual(row.rgb, t[0])
+                self.assertEqual(row.name, t[1])
+                self.assertEqual(row._asdict(), dict(rgb=t[0], name=t[1]))
+        if OrderedDict is not dict:  # Python > 2.6
+            self.assertEqual(r.keys(), expected.keys())
+        r = get_as_dict(table, keyname='rgb')
+        self.assertIsInstance(r, OrderedDict)
+        expected = OrderedDict((row[1], (row[0], row[2]))
+            for row in sorted(colors, key=itemgetter(1)))
+        self.assertEqual(r, expected)
+        for key in r:
+            self.assertIsInstance(key, str)
+            self.assertIn(key, expected)
+            row = r[key]
+            self.assertIsInstance(row, tuple)
+            t = expected[key]
+            self.assertEqual(row, t)
+            if named:
+                self.assertEqual(row.id, t[0])
+                self.assertEqual(row.name, t[1])
+                self.assertEqual(row._asdict(), dict(id=t[0], name=t[1]))
+        if OrderedDict is not dict:  # Python > 2.6
+            self.assertEqual(r.keys(), expected.keys())
+        r = get_as_dict(table, keyname=['id', 'rgb'])
+        self.assertIsInstance(r, OrderedDict)
+        expected = OrderedDict((row[:2], row[2:]) for row in colors)
+        self.assertEqual(r, expected)
+        for key in r:
+            self.assertIsInstance(key, tuple)
+            self.assertIsInstance(key[0], int)
+            self.assertIsInstance(key[1], str)
+            if named:
+                self.assertEqual(key, (key.id, key.rgb))
+                self.assertEqual(key._fields, ('id', 'rgb'))
+            row = r[key]
+            self.assertIsInstance(row, tuple)
+            self.assertIsInstance(row[0], str)
+            t = expected[key]
+            self.assertEqual(row, t)
+            if named:
+                self.assertEqual(row.name, t[0])
+                self.assertEqual(row._asdict(), dict(name=t[0]))
+        if OrderedDict is not dict:  # Python > 2.6
+            self.assertEqual(r.keys(), expected.keys())
+        r = get_as_dict(table, keyname=['id', 'rgb'], scalar=True)
+        self.assertIsInstance(r, OrderedDict)
+        expected = OrderedDict((row[:2], row[2]) for row in colors)
+        self.assertEqual(r, expected)
+        for key in r:
+            self.assertIsInstance(key, tuple)
+            row = r[key]
+            self.assertIsInstance(row, str)
+            t = expected[key]
+            self.assertEqual(row, t)
+        if OrderedDict is not dict:  # Python > 2.6
+            self.assertEqual(r.keys(), expected.keys())
+        r = get_as_dict(table, keyname='rgb', what=['rgb', 'name'], scalar=True)
+        self.assertIsInstance(r, OrderedDict)
+        expected = OrderedDict((row[1], row[2])
+            for row in sorted(colors, key=itemgetter(1)))
+        self.assertEqual(r, expected)
+        for key in r:
+            self.assertIsInstance(key, str)
+            row = r[key]
+            self.assertIsInstance(row, str)
+            t = expected[key]
+            self.assertEqual(row, t)
+        if OrderedDict is not dict:  # Python > 2.6
+            self.assertEqual(r.keys(), expected.keys())
+        r = get_as_dict(table, what='id, name',
+                        where="rgb like '#b%'", scalar=True)
+        self.assertIsInstance(r, OrderedDict)
+        expected = OrderedDict((row[0], row[2]) for row in colors[1:3])
+        self.assertEqual(r, expected)
+        for key in r:
+            self.assertIsInstance(key, int)
+            row = r[key]
+            self.assertIsInstance(row, str)
+            t = expected[key]
+            self.assertEqual(row, t)
+        if OrderedDict is not dict:  # Python > 2.6
+            self.assertEqual(r.keys(), expected.keys())
+        expected = r
+        r = get_as_dict(table, what=['name', 'id'],
+                        where=['id > 1', 'id < 4', "rgb like '#b%'",
+                   "name not like 'A%'", "name not like '%t'"], scalar=True)
+        self.assertEqual(r, expected)
+        r = get_as_dict(table, what='name, id', limit=2, offset=1, scalar=True)
+        self.assertEqual(r, expected)
+        r = get_as_dict(table, keyname=('id',), what=('name', 'id'),
+                        where=('id > 1', 'id < 4'), order=('id',), scalar=True)
+        self.assertEqual(r, expected)
+        r = get_as_dict(table, limit=1)
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[1][1], 'Aero')
+        r = get_as_dict(table, offset=3)
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[4][1], 'Desert')
+        r = get_as_dict(table, order='id desc')
+        expected = OrderedDict((row[0], row[1:]) for row in reversed(colors))
+        self.assertEqual(r, expected)
+        r = get_as_dict(table, where='id > 5')
+        self.assertIsInstance(r, OrderedDict)
+        self.assertEqual(len(r), 0)
+        # test with unordered query
+        expected = dict((row[0], row[1:]) for row in colors)
+        r = get_as_dict(table, order=False)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, expected)
+        if dict is not OrderedDict:  # Python > 2.6
+            self.assertNotIsInstance(self, OrderedDict)
+        # test with arbitrary from clause
+        from_table = '(select id, lower(name) as n2 from "%s") as t2' % table
+        # primary key must be passed explicitly in this case
+        self.assertRaises(pg.ProgrammingError, get_as_dict, from_table)
+        r = get_as_dict(from_table, 'id')
+        self.assertIsInstance(r, OrderedDict)
+        expected = OrderedDict((row[0], (row[2].lower(),)) for row in colors)
+        self.assertEqual(r, expected)
+        # test without a primary key
+        query('alter table "%s" drop constraint "%s_pkey"' % (table, table))
+        self.assertRaises(KeyError, self.db.pkey, table, flush=True)
+        self.assertRaises(pg.ProgrammingError, get_as_dict, table)
+        r = get_as_dict(table, keyname='id')
+        expected = OrderedDict((row[0], row[1:]) for row in colors)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, expected)
+        r = (1, '#007fff', 'Azure')
+        query('insert into "%s" values ($1, $2, $3)' % table, r)
+        # the last entry will win
+        expected[1] = r[1:]
+        r = get_as_dict(table, keyname='id')
+        self.assertEqual(r, expected)
+
     def testTransaction(self):
         query = self.db.query
         self.createTable('test_table', 'n integer', temporary=False)
@@ -2505,6 +2906,8 @@ class TestDBClassNonStdOpts(TestDBClass):
 class TestSchemas(unittest.TestCase):
     """Test correct handling of schemas (namespaces)."""
 
+    cls_set_up = False
+
     @classmethod
     def setUpClass(cls):
         db = DB()
@@ -2528,6 +2931,7 @@ class TestSchemas(unittest.TestCase):
             query("create table %s.t%d with oids as select 1 as n, %d as d"
                   % (schema, num_schema, num_schema))
         db.close()
+        cls.cls_set_up = True
 
     @classmethod
     def tearDownClass(cls):
@@ -2544,6 +2948,7 @@ class TestSchemas(unittest.TestCase):
         db.close()
 
     def setUp(self):
+        self.assertTrue(self.cls_set_up)
         self.db = DB()
 
     def tearDown(self):

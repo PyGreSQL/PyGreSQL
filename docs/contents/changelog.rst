@@ -42,6 +42,9 @@ Version 5.0
   and use less memory. Also, overhead for quoting and escaping values in the
   DB wrapper methods has been reduced and security has been improved by
   passing the values to libpq separately as parameters instead of inline.
+- The classic interface got two new methods get_as_list() and get_as_dict()
+  returning a database table as a Python list or dict. The amount of data
+  returned can be controlled with various parameters.
 
 Version 4.2
 -----------
