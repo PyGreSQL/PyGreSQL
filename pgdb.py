@@ -72,7 +72,6 @@ from datetime import date, time, datetime, timedelta
 from time import localtime
 try:
     from decimal import Decimal
-    set_decimal(Decimal)
 except ImportError:  # Python < 2.4, unsupported
     Decimal = float  # use float instead of Decimal
 try:
@@ -113,7 +112,6 @@ def decimal_type(decimal_type=None):
     global Decimal
     if decimal_type is not None:
         _cast['numeric'] = Decimal = decimal_type
-        set_decimal(Decimal)
     return Decimal
 
 
