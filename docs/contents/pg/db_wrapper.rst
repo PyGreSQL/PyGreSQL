@@ -599,8 +599,14 @@ using the order specified with the *order* parameter or the key column(s)
 if not specified.  You can set *order* to *False* if you don't care about the
 ordering.  In this case the returned dictionary will be an ordinary one.
 
-escape_literal -- escape a literal string for use within SQL
-------------------------------------------------------------
+escape_literal/identifier/string/bytea -- escape for SQL
+--------------------------------------------------------
+
+The following methods escape text or binary strings so that they can be
+inserted directly into an SQL command.  Except for :meth:`DB.escape_byte`,
+you don't need to call these methods for the strings passed as parameters
+to :meth:`DB.query`.  You also don't need to call any of these methods
+when storing data using :meth:`DB.insert` and similar.
 
 .. method:: DB.escape_literal(string)
 
@@ -616,9 +622,6 @@ characters (such as quotes and backslashes) must be escaped to prevent them
 from being interpreted specially by the SQL parser.
 
 .. versionadded:: 4.1
-
-escape_identifier -- escape an identifier string for use within SQL
--------------------------------------------------------------------
 
 .. method:: DB.escape_identifier(string)
 
@@ -636,9 +639,6 @@ contain upper case characters whose case should be preserved.
 
 .. versionadded:: 4.1
 
-escape_string -- escape a string for use within SQL
----------------------------------------------------
-
 .. method:: DB.escape_string(string)
 
     Escape a string for use within SQL
@@ -647,12 +647,9 @@ escape_string -- escape a string for use within SQL
     :returns: the escaped string
     :rtype: str
 
-Similar to the module function with the same name, but the
-behavior of this method is adjusted depending on the connection properties
-(such as character encoding).
-
-escape_bytea -- escape binary data for use within SQL
------------------------------------------------------
+Similar to the module function :func:`pg.escape_string` with the same name,
+but the behavior of this method is adjusted depending on the connection
+properties (such as character encoding).
 
 .. method:: DB.escape_bytea(datastring)
 
@@ -662,12 +659,17 @@ escape_bytea -- escape binary data for use within SQL
     :returns: the escaped string
     :rtype: str
 
-Similar to the module function with the same name, but the
-behavior of this method is adjusted depending on the connection properties
-(in particular, whether standard-conforming strings are enabled).
+Similar to the module function :func:`pg.escape_bytea` with the same name,
+but the behavior of this method is adjusted depending on the connection
+properties (in particular, whether standard-conforming strings are enabled).
 
-unescape_bytea -- unescape data that has been retrieved as text
----------------------------------------------------------------
+unescape_bytea -- unescape data retrieved from the database
+-----------------------------------------------------------
+
+The following method unescapes binary ``bytea`` data strings that
+have been retrieved from the database.  You don't need to use this
+method on the data returned by :meth:`DB.get` and similar, only if
+you query the database directly with :meth:`DB.query`.
 
 .. method:: DB.unescape_bytea(string)
 
@@ -677,7 +679,49 @@ unescape_bytea -- unescape data that has been retrieved as text
     :returns: byte string containing the binary data
     :rtype: bytes
 
-See the module function with the same name.
+See the module function :func:`pg.unescape_bytea` with the same name.
+
+encode/decode_json -- encode and decode JSON data
+-------------------------------------------------
+
+The following methods can be used to encode end decode data in
+`JSON <http://www.json.org/>`_ format.
+
+.. method:: DB.encode_json(obj)
+
+    Encode a Python object for use within SQL as type ``json`` or ``jsonb``
+
+    :param obj: Python object that shall be encoded to JSON format
+    :type obj: dict, list or None
+    :returns: string representation of the Python object in JSON format
+    :rtype: str
+
+This method serializes a Python object into a JSON formatted string that can
+be used within SQL.  You don't need to use this method on the data stored
+with :meth:`DB.insert` and similar, only if you store the data directly as
+part of an SQL command or parameter with :meth:`DB.query`.  This is the same
+as the :func:`json.dumps` function from the standard library.
+
+.. versionadded:: 5.0
+
+.. method:: DB.decode_json(string)
+
+    Decode ``json`` or ``jsonb`` data that has been retrieved as text
+
+    :param string: JSON formatted string shall be decoded into a Python object
+    :type string: str
+    :returns: Python object representing the JSON formatted string
+    :rtype: dict, list or None
+
+This method deserializes a JSON formatted string retrieved as text from the
+database to a Python object.  You normally don't need to use this method as
+JSON data is automatically decoded by PyGreSQL.  If you don't want the data
+to be decoded, then you can cast ``json`` or ``jsonb`` columns to ``text``
+in PostgreSQL or you can set the decoding function to *None* or a different
+function using :func:`pg.set_jsondecode`.  By default this is the same as
+the :func:`json.dumps` function from the standard library.
+
+.. versionadded:: 5.0
 
 use_regtypes -- determine use of regular type names
 ---------------------------------------------------

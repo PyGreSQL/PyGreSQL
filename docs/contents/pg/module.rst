@@ -413,8 +413,10 @@ get/set_namedresult -- conversion to named tuples
 
     Get the function that converts to named tuples
 
-This function returns the function used by PyGreSQL to construct the
-result of the :meth:`Query.namedresult` method.
+This returns the function used by PyGreSQL to construct the result of the
+:meth:`Query.namedresult` method.
+
+.. versionadded:: 4.1
 
 .. function:: set_namedresult(func)
 
@@ -423,7 +425,34 @@ result of the :meth:`Query.namedresult` method.
     :param func: the function to be used to convert results to named tuples
 
 You can use this if you want to create different kinds of named tuples
-returned by the :meth:`Query.namedresult` method.
+returned by the :meth:`Query.namedresult` method.  If you set this function
+to *None*, then it will become equal to :meth:`Query.getresult`.
+
+.. versionadded:: 4.1
+
+get/set_jsondecode -- decoding JSON format
+------------------------------------------
+
+.. function:: get_jsondecode()
+
+    Get the function that deserializes JSON formatted strings
+
+This returns the function used by PyGreSQL to construct Python objects
+from JSON formatted strings.
+
+.. function:: set_jsondecode(func)
+
+    Set a function that will deserialize JSON formatted strings
+
+    :param func: the function to be used for deserializing JSON strings
+
+You can use this if you do not want to deserialize JSON strings coming
+in from the database, or if want to use a different function than the
+standard function :meth:`json.loads` or if you want to use it with parameters
+different from the default ones.  If you set this function to *None*, then
+the automatic deserialization of JSON strings will be deactivated.
+
+.. versionadded:: 5.0
 
 
 Module constants

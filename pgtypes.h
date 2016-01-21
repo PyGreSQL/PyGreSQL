@@ -1,8 +1,8 @@
 /*
 	pgtypes - PostgreSQL type definitions
 
-	These are the standard PostgreSQL built-in types,
-	extracted from server/catalog/pg_type.h Revision 1.212,
+	These are the standard PostgreSQL 9.5 built-in types,
+	extracted from src/include/catalog/pg_type.h,
 	because that header file is sometimes not available
 	or needs other header files to get properly included.
 	You can also query pg_type to get this information.
@@ -25,7 +25,10 @@
 #define XIDOID 28
 #define CIDOID 29
 #define OIDVECTOROID 30
+#define JSONOID 114
 #define XMLOID 142
+#define PGNODETREEOID 194
+#define PGDDLCOMMANDOID 32
 #define POINTOID 600
 #define LSEGOID 601
 #define PATHOID 602
@@ -43,8 +46,10 @@
 #define MACADDROID 829
 #define INETOID 869
 #define CIDROID 650
+#define INT2ARRAYOID 1005
 #define INT4ARRAYOID 1007
 #define TEXTARRAYOID 1009
+#define OIDARRAYOID 1028
 #define FLOAT4ARRAYOID 1021
 #define ACLITEMOID 1033
 #define CSTRINGARRAYOID 1263
@@ -65,12 +70,18 @@
 #define REGOPERATOROID 2204
 #define REGCLASSOID 2205
 #define REGTYPEOID 2206
+#define REGROLEOID 4096
+#define REGNAMESPACEOID 4089
 #define REGTYPEARRAYOID 2211
+#define UUIDOID 2950
+#define LSNOID 3220
 #define TSVECTOROID 3614
 #define GTSVECTOROID 3642
 #define TSQUERYOID 3615
 #define REGCONFIGOID 3734
 #define REGDICTIONARYOID 3769
+#define JSONBOID 3802
+#define INT4RANGEOID 3904
 #define RECORDOID 2249
 #define RECORDARRAYOID 2287
 #define CSTRINGOID 2275
@@ -78,11 +89,15 @@
 #define ANYARRAYOID 2277
 #define VOIDOID 2278
 #define TRIGGEROID 2279
+#define EVTTRIGGEROID 3838
 #define LANGUAGE_HANDLEROID 2280
 #define INTERNALOID 2281
 #define OPAQUEOID 2282
 #define ANYELEMENTOID 2283
 #define ANYNONARRAYOID 2776
 #define ANYENUMOID 3500
+#define FDW_HANDLEROID 3115
+#define TSM_HANDLEROID 3310
+#define ANYRANGEOID 3831
 
 #endif /* PG_TYPE_H */

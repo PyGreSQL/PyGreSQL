@@ -92,7 +92,8 @@ static PyObject *pg_default_passwd;	/* default password */
 #endif	/* DEFAULT_VARS */
 
 static PyObject *decimal = NULL, /* decimal type */
-				*namedresult = NULL; /* function for getting named results */
+				*namedresult = NULL, /* function for getting named results */
+				*jsondecode = NULL; /* function for decoding json strings */
 static char decimal_point = '.'; /* decimal point used in money values */
 static int use_bool = 0; /* whether or not bool objects shall be returned */
 
@@ -188,13 +189,14 @@ typedef struct
 
 /* define internal types */
 
+#define PYGRES_DEFAULT 0
 #define PYGRES_INT 1
 #define PYGRES_LONG 2
 #define PYGRES_FLOAT 3
 #define PYGRES_DECIMAL 4
 #define PYGRES_MONEY 5
 #define PYGRES_BOOL 6
-#define PYGRES_DEFAULT 7
+#define PYGRES_JSON 7
 
 /* --------------------------------------------------------------------- */
 /* Internal Functions													 */
@@ -234,52 +236,57 @@ get_encoded_string(PyObject *unicode_obj, int encoding)
 static int *
 get_type_array(PGresult *result, int nfields)
 {
-	int *typ;
+	int *array, *a;
 	int j;
 
-	if (!(typ = PyMem_Malloc(sizeof(int) * nfields)))
+	if (!(array = PyMem_Malloc(sizeof(int) * nfields)))
 	{
 		PyErr_SetString(PyExc_MemoryError, "Memory error in getresult()");
 		return NULL;
 	}
 
-	for (j = 0; j < nfields; j++)
+	for (j = 0, a=array; j < nfields; j++)
 	{
 		switch (PQftype(result, j))
 		{
 			case INT2OID:
 			case INT4OID:
 			case OIDOID:
-				typ[j] = PYGRES_INT;
+				*a++ = PYGRES_INT;
 				break;
 
 			case INT8OID:
-				typ[j] = PYGRES_LONG;
+				*a++ = PYGRES_LONG;
 				break;
 
 			case FLOAT4OID:
 			case FLOAT8OID:
-				typ[j] = PYGRES_FLOAT;
+				*a++ = PYGRES_FLOAT;
 				break;
 
 			case NUMERICOID:
-				typ[j] = PYGRES_DECIMAL;
+				*a++ = PYGRES_DECIMAL;
 				break;
 
 			case CASHOID:
-				typ[j] = PYGRES_MONEY;
+				*a++ = PYGRES_MONEY;
 				break;
 
 			case BOOLOID:
-				typ[j] = PYGRES_BOOL;
+				*a++ = PYGRES_BOOL;
+				break;
+
+			case JSONOID:
+			case JSONBOID:
+				*a++ = PYGRES_JSON;
 				break;
 
 			default:
-				typ[j] = PYGRES_DEFAULT;
+				*a++ = PYGRES_DEFAULT;
 		}
 	}
 
-	return typ;
+	return array;
 }
 
 /* internal wrapper for the notice receiver callback */
@@ -3631,6 +3638,24 @@ queryGetResult(queryObject *self, PyObject *args)
 
 				switch (coltypes[j])
 				{
+					case PYGRES_JSON:
+						if (!jsondecode || /* no JSON decoder available */
+							PQfformat(self->result, j) != 0) /* not text */
+							goto default_case;
+						size = PQgetlength(self->result, i, j);
+#if IS_PY3
+						val = get_decoded_string(s, size, encoding);
+#else
+						val = get_decoded_string(s, size, self->encoding);
+#endif
+						if (val) /* was able to decode */
+						{
+							tmp_obj = Py_BuildValue("(O)", val);
+							val = PyObject_CallObject(jsondecode, tmp_obj);
+							Py_DECREF(tmp_obj);
+						}
+						break;
+
 					case PYGRES_INT:
 						val = PyInt_FromString(s, NULL, 10);
 						break;
@@ -3802,6 +3827,24 @@ queryDictResult(queryObject *self, PyObject *args)
 
 				switch (coltypes[j])
 				{
+					case PYGRES_JSON:
+						if (!jsondecode || /* no JSON decoder available */
+							PQfformat(self->result, j) != 0) /* not text */
+							goto default_case;
+						size = PQgetlength(self->result, i, j);
+#if IS_PY3
+						val = get_decoded_string(s, size, encoding);
+#else
+						val = get_decoded_string(s, size, self->encoding);
+#endif
+						if (val) /* was able to decode */
+						{
+							tmp_obj = Py_BuildValue("(O)", val);
+							val = PyObject_CallObject(jsondecode, tmp_obj);
+							Py_DECREF(tmp_obj);
+						}
+						break;
+
 					case PYGRES_INT:
 						val = PyInt_FromString(s, NULL, 10);
 						break;
@@ -3917,27 +3960,27 @@ queryNamedResult(queryObject *self, PyObject *args)
 	PyObject   *arglist,
 			   *ret;
 
-	/* checks args (args == NULL for an internal call) */
-	if (args && !PyArg_ParseTuple(args, ""))
+	if (namedresult)
 	{
-		PyErr_SetString(PyExc_TypeError,
-			"Method namedresult() takes no parameters");
-		return NULL;
-	}
+		/* checks args (args == NULL for an internal call) */
+		if (args && !PyArg_ParseTuple(args, ""))
+		{
+			PyErr_SetString(PyExc_TypeError,
+				"Method namedresult() takes no parameters");
+			return NULL;
+		}
 
-	if (!namedresult)
+		arglist = Py_BuildValue("(O)", self);
+		ret = PyObject_CallObject(namedresult, arglist);
+		Py_DECREF(arglist);
+
+		if (ret == NULL)
+			return NULL;
+		}
+	else
 	{
-		PyErr_SetString(PyExc_TypeError,
-			"Named tuples are not supported");
-		return NULL;
+		ret = queryGetResult(self, args);
 	}
-
-	arglist = Py_BuildValue("(O)", self);
-	ret = PyObject_CallObject(namedresult, arglist);
-	Py_DECREF(arglist);
-
-	if (ret == NULL)
-		return NULL;
 
 	return ret;
 }
@@ -4439,9 +4482,61 @@ pgSetNamedresult(PyObject *self, PyObject *args)
 
 	if (PyArg_ParseTuple(args, "O", &func))
 	{
-		if (PyCallable_Check(func))
+		if (func == Py_None)
+		{
+			Py_XDECREF(namedresult); namedresult = NULL;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else if (PyCallable_Check(func))
 		{
 			Py_XINCREF(func); Py_XDECREF(namedresult); namedresult = func;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else
+			PyErr_SetString(PyExc_TypeError, "Parameter must be callable");
+	}
+
+	return ret;
+}
+
+/* get json decode function */
+static char pgGetJsondecode__doc__[] =
+"get_jsondecode(cls) -- get the function used for decoding json results";
+
+static PyObject *
+pgGetJsondecode(PyObject *self, PyObject *args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = jsondecode ? jsondecode : Py_None;
+		Py_INCREF(ret);
+	}
+
+	return ret;
+}
+
+/* set json decode function */
+static char pgSetJsondecode__doc__[] =
+"set_jsondecode(cls) -- set a function to be used for decoding json results";
+
+static PyObject *
+pgSetJsondecode(PyObject *self, PyObject *args)
+{
+	PyObject *ret = NULL;
+	PyObject *func;
+
+	if (PyArg_ParseTuple(args, "O", &func))
+	{
+		if (func == Py_None)
+		{
+			Py_XDECREF(jsondecode); jsondecode = NULL;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else if (PyCallable_Check(func))
+		{
+			Py_XINCREF(func); Py_XDECREF(jsondecode); jsondecode = func;
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
@@ -4765,6 +4860,10 @@ static struct PyMethodDef pgMethods[] = {
 			pgGetNamedresult__doc__},
 	{"set_namedresult", (PyCFunction) pgSetNamedresult, METH_VARARGS,
 			pgSetNamedresult__doc__},
+	{"get_jsondecode", (PyCFunction) pgGetJsondecode, METH_VARARGS,
+			pgGetJsondecode__doc__},
+	{"set_jsondecode", (PyCFunction) pgSetJsondecode, METH_VARARGS,
+			pgSetJsondecode__doc__},
 
 #ifdef DEFAULT_VARS
 	{"get_defhost", pgGetDefHost, METH_VARARGS, pgGetDefHost__doc__},

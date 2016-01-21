@@ -15,6 +15,7 @@ try:
 except ImportError:
     import unittest
 
+import json
 import re
 
 import pg  # the module under test
@@ -181,11 +182,13 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testSetDecimalPoint(self):
         point = pg.get_decimal_point()
-        pg.set_decimal_point('*')
-        r = pg.get_decimal_point()
-        pg.set_decimal_point(point)
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, '*')
+        try:
+            pg.set_decimal_point('*')
+            r = pg.get_decimal_point()
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, '*')
+        finally:
+            pg.set_decimal_point(point)
         r = pg.get_decimal_point()
         self.assertIsInstance(r, str)
         self.assertEqual(r, point)
@@ -196,10 +199,12 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testSetDecimal(self):
         decimal_class = pg.Decimal
-        pg.set_decimal(int)
-        r = pg.get_decimal()
-        pg.set_decimal(decimal_class)
-        self.assertIs(r, int)
+        try:
+            pg.set_decimal(int)
+            r = pg.get_decimal()
+            self.assertIs(r, int)
+        finally:
+            pg.set_decimal(decimal_class)
         r = pg.get_decimal()
         self.assertIs(r, decimal_class)
 
@@ -210,16 +215,18 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testSetBool(self):
         use_bool = pg.get_bool()
-        pg.set_bool(True)
-        r = pg.get_bool()
-        pg.set_bool(use_bool)
-        self.assertIsInstance(r, bool)
-        self.assertIs(r, True)
-        pg.set_bool(False)
-        r = pg.get_bool()
-        pg.set_bool(use_bool)
-        self.assertIsInstance(r, bool)
-        self.assertIs(r, False)
+        try:
+            pg.set_bool(True)
+            r = pg.get_bool()
+            pg.set_bool(use_bool)
+            self.assertIsInstance(r, bool)
+            self.assertIs(r, True)
+            pg.set_bool(False)
+            r = pg.get_bool()
+            self.assertIsInstance(r, bool)
+            self.assertIs(r, False)
+        finally:
+            pg.set_bool(use_bool)
         r = pg.get_bool()
         self.assertIsInstance(r, bool)
         self.assertIs(r, use_bool)
@@ -231,13 +238,39 @@ class TestConfigFunctions(unittest.TestCase):
 
     def testSetNamedresult(self):
         namedresult = pg.get_namedresult()
-        f = lambda q: q.getresult()
-        pg.set_namedresult(f)
-        r = pg.get_namedresult()
-        pg.set_namedresult(namedresult)
-        self.assertIs(r, f)
+        try:
+            pg.set_namedresult(None)
+            r = pg.get_namedresult()
+            self.assertIsNone(r)
+            f = lambda q: q.getresult()
+            pg.set_namedresult(f)
+            r = pg.get_namedresult()
+            self.assertIs(r, f)
+            self.assertRaises(TypeError, pg.set_namedresult, 'invalid')
+        finally:
+            pg.set_namedresult(namedresult)
         r = pg.get_namedresult()
         self.assertIs(r, namedresult)
+
+    def testGetJsondecode(self):
+        r = pg.get_jsondecode()
+        self.assertTrue(callable(r))
+        self.assertIs(r, json.loads)
+
+    def testSetJsondecode(self):
+        jsondecode = pg.get_jsondecode()
+        try:
+            pg.set_jsondecode(None)
+            r = pg.get_jsondecode()
+            self.assertIsNone(r)
+            pg.set_jsondecode(str)
+            r = pg.get_jsondecode()
+            self.assertIs(r, str)
+            self.assertRaises(TypeError, pg.set_jsondecode, 'invalid')
+        finally:
+            pg.set_jsondecode(jsondecode)
+        r = pg.get_jsondecode()
+        self.assertIs(r, jsondecode)
 
 
 class TestModuleConstants(unittest.TestCase):

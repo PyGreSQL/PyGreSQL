@@ -364,6 +364,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.executemany("insert into %s values (%%s,%%s)" % table, params)
             cur.execute("select * from %s order by 1" % table)
             rows = cur.fetchall()
+            self.assertEqual(cur.description[1].type_code, pgdb.FLOAT)
         finally:
             con.close()
         self.assertEqual(len(rows), len(values))
@@ -399,6 +400,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.executemany("insert into %s values (%%s,%%s)" % table, params)
             cur.execute("select * from %s order by 1" % table)
             rows = cur.fetchall()
+            self.assertEqual(cur.description[1].type_code, pgdb.DATETIME)
         finally:
             con.close()
         self.assertEqual(len(rows), len(values))
@@ -408,7 +410,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 inval = inval.strftime('%Y-%m-%d %H:%M:%S')
             self.assertEqual(inval, outval)
 
-    def test_array(self):
+    def test_list_binds_as_array(self):
         values = ([20000, 25000, 25000, 30000],
             [['breakfast', 'consulting'], ['meeting', 'lunch']])
         output = ('{20000,25000,25000,30000}',
@@ -424,6 +426,18 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
         self.assertEqual(row, output)
+
+    def test_tuple_binds_as_row(self):
+        values = (1, 2.5, 'this is a test')
+        output = '(1,2.5,"this is a test")'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select %s", [values])
+            outval = cur.fetchone()[0]
+        finally:
+            con.close()
+        self.assertEqual(outval, output)
 
     def test_custom_type(self):
         values = [3, 5, 65]
@@ -458,11 +472,13 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur = con.cursor()
             self.assertTrue(pgdb.decimal_type(int) is int)
             cur.execute('select 42')
+            self.assertEqual(cur.description[0].type_code, pgdb.INTEGER)
             value = cur.fetchone()[0]
             self.assertTrue(isinstance(value, int))
             self.assertEqual(value, 42)
             self.assertTrue(pgdb.decimal_type(float) is float)
             cur.execute('select 4.25')
+            self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
             self.assertTrue(isinstance(value, float))
             self.assertEqual(value, 4.25)
@@ -549,12 +565,53 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.executemany("insert into %s values (%%s,%%s)" % table, params)
             cur.execute("select * from %s order by 1" % table)
             rows = cur.fetchall()
+            self.assertEqual(cur.description[1].type_code, pgdb.BOOL)
         finally:
             con.close()
         rows = [row[1] for row in rows]
         values[3] = values[5] = True
         values[4] = values[6] = False
         self.assertEqual(rows, values)
+
+    def test_json(self):
+        inval = {"employees":
+            [{"firstName": "John", "lastName": "Doe", "age": 61}]}
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            try:
+                cur.execute("create table %s (jsontest json)" % table)
+            except pgdb.ProgrammingError:
+                self.skipTest('database does not support json')
+            params = (pgdb.Json(inval),)
+            cur.execute("insert into %s values (%%s)" % table, params)
+            cur.execute("select * from %s" % table)
+            outval = cur.fetchone()[0]
+            self.assertEqual(cur.description[0].type_code, pgdb.JSON)
+        finally:
+            con.close()
+        self.assertEqual(inval, outval)
+
+    def test_jsonb(self):
+        inval = {"employees":
+            [{"firstName": "John", "lastName": "Doe", "age": 61}]}
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            try:
+                cur.execute("create table %s (jsonbtest jsonb)" % table)
+            except pgdb.ProgrammingError:
+                self.skipTest('database does not support jsonb')
+            params = (pgdb.Json(inval),)
+            cur.execute("insert into %s values (%%s)" % table, params)
+            cur.execute("select * from %s" % table)
+            outval = cur.fetchone()[0]
+            self.assertEqual(cur.description[0].type_code, pgdb.JSON)
+        finally:
+            con.close()
+        self.assertEqual(inval, outval)
 
     def test_execute_edge_cases(self):
         con = self._connect()
@@ -563,8 +620,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             sql = 'invalid'  # should be ignored with empty parameter list
             cur.executemany(sql, [])
             sql = 'select %d + 1'
-            cur.execute(sql, [(1,)])  # deprecated use of execute()
-            self.assertEqual(cur.fetchone()[0], 2)
+            cur.execute(sql, [(1,), (2,)])  # deprecated use of execute()
+            self.assertEqual(cur.fetchone()[0], 3)
             sql = 'select 1/0'  # cannot be executed
             self.assertRaises(pgdb.ProgrammingError, cur.execute, sql)
             cur.close()

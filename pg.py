@@ -38,13 +38,12 @@ from decimal import Decimal
 from collections import namedtuple
 from functools import partial
 from operator import itemgetter
+from json import loads as jsondecode, dumps as jsonencode
 
 try:
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
-
-set_decimal(Decimal)
 
 try:
     from collections import OrderedDict
@@ -132,7 +131,6 @@ else:
             raise TypeError('This object is read-only')
 
 
-
 # Auxiliary functions that are independent from a DB connection:
 
 def _oid_key(table):
@@ -156,6 +154,8 @@ def _simpletype(typ):
         return 'money'
     if typ.startswith('bytea'):
         return 'bytea'
+    if typ.startswith('json'):
+        return 'json'
     return 'text'
 
 
@@ -163,8 +163,6 @@ def _namedresult(q):
     """Get query result as named tuples."""
     row = namedtuple('Row', q.listfields())
     return [row(*r) for r in q.getresult()]
-
-set_namedresult(_namedresult)
 
 
 class _MemoryQuery:
@@ -200,6 +198,15 @@ def _prg_error(msg):
     """Return ProgrammingError."""
     return _db_error(msg, ProgrammingError)
 
+
+# Initialize the C module
+
+set_namedresult(_namedresult)
+set_decimal(Decimal)
+set_jsondecode(jsondecode)
+
+
+# The notification handler
 
 class NotificationHandler(object):
     """A PostgreSQL client-side asynchronous notification handler."""
@@ -467,10 +474,14 @@ class DB(object):
         """Prepare a bytea parameter."""
         return self.escape_bytea(d)
 
+    def _prepare_json(self, d):
+        """Prepare a json parameter."""
+        return self.encode_json(d)
+
     _prepare_funcs = dict(  # quote methods for each type
         bool=_prepare_bool, date=_prepare_date,
         int=_prepare_num, num=_prepare_num, float=_prepare_num,
-        money=_prepare_num, bytea=_prepare_bytea)
+        money=_prepare_num, bytea=_prepare_bytea, json=_prepare_json)
 
     def _prepare_param(self, value, typ, params):
         """Prepare and add a parameter to the list."""
@@ -508,6 +519,14 @@ class DB(object):
     # escape_string and escape_bytea exist as methods,
     # so we define unescape_bytea as a method as well
     unescape_bytea = staticmethod(unescape_bytea)
+
+    def decode_json(self, s):
+        """Decode a JSON string coming from the database."""
+        return (get_jsondecode() or jsondecode)(s)
+
+    def encode_json(self, d):
+        """Encode a JSON string for use within SQL."""
+        return jsonencode(d)
 
     def close(self):
         """Close the database connection."""
@@ -1441,11 +1460,12 @@ class DB(object):
         rows = map(getrow, res)
         if keytuple or rowtuple:
             namedresult = get_namedresult()
-            if keytuple:
-                keys = namedresult(_MemoryQuery(keys, keyname))
-            if rowtuple:
-                fields = [f for f in fields if f not in keyset]
-                rows = namedresult(_MemoryQuery(rows, fields))
+            if namedresult:
+                if keytuple:
+                    keys = namedresult(_MemoryQuery(keys, keyname))
+                if rowtuple:
+                    fields = [f for f in fields if f not in keyset]
+                    rows = namedresult(_MemoryQuery(rows, fields))
         return cls(zip(keys, rows))
 
     def notification_handler(self,

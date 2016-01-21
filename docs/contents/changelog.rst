@@ -25,11 +25,24 @@ Version 5.0
   are now named tuples, i.e. their elements can be also accessed by name.
   The column names and types can now also be requested through the
   colnames and coltypes attributes, which are not part of DB-API 2 though.
+- If you pass a list as one of the parameters to a DB-API 2 cursor, it is
+  now automatically bound as PostgreSQL ARRAY. If you pass a tuple, then
+  it will be bound as a PostgreSQL ROW expression.
 - Re-activated the shortcut methods of the DB-API connection since they
   can be handy when doing experiments or writing quick scripts. We keep
   them undocumented though and discourage using them in production.
 - The tty parameter and attribute of database connections has been
   removed since it is not supported any more since PostgreSQL 7.4.
+- The classic interface got two new methods get_as_list() and get_as_dict()
+  returning a database table as a Python list or dict. The amount of data
+  returned can be controlled with various parameters.
+- A method upsert() has been added to the DB wrapper class that exploits the
+  "upsert" feature that is new in PostgreSQL 9.5. The new method nicely
+  complements the existing get/insert/update/delete() methods.
+- PyGreSQL now supports the JSON and JSONB data types, converting such
+  columns automatically to and from Python objects. If you want to insert
+  Python objects as JSON data using DB-API 2, you should wrap them in the
+  new Json() type constructor as a hint to PyGreSQL.
 - The pkey() method of the classic interface now returns tuples instead
   of frozenset. The order of the tuples is like in the primary key index.
 - The table name that is affixed to the name of the OID column returned
@@ -45,9 +58,6 @@ Version 5.0
   and use less memory. Also, overhead for quoting and escaping values in the
   DB wrapper methods has been reduced and security has been improved by
   passing the values to libpq separately as parameters instead of inline.
-- The classic interface got two new methods get_as_list() and get_as_dict()
-  returning a database table as a Python list or dict. The amount of data
-  returned can be controlled with various parameters.
 
 Version 4.2
 -----------

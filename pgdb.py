@@ -72,6 +72,7 @@ from time import localtime
 from decimal import Decimal
 from math import isnan, isinf
 from collections import namedtuple
+from json import loads as jsondecode, dumps as jsonencode
 
 try:
     long
@@ -134,18 +135,11 @@ def _cast_money(value):
         lambda v: v in '0123456789.-', value)))
 
 
-def _cast_bytea(value):
-    return unescape_bytea(value)
-
-
-def _cast_float(value):
-    return float(value)  # this also works with NaN and Infinity
-
-
-_cast = {'bool': _cast_bool, 'bytea': _cast_bytea,
+_cast = {'bool': _cast_bool, 'bytea': unescape_bytea,
     'int2': int, 'int4': int, 'serial': int,
-    'int8': long, 'oid': long, 'oid8': long,
-    'float4': _cast_float, 'float8': _cast_float,
+    'int8': long, 'json': jsondecode, 'jsonb': jsondecode,
+    'oid': long, 'oid8': long,
+    'float4': float, 'float8': float,
     'numeric': Decimal, 'money': _cast_money}
 
 
@@ -246,7 +240,7 @@ class Cursor(object):
 
     def _quote(self, val):
         """Quote value depending on its type."""
-        if isinstance(val, (datetime, date, time, timedelta)):
+        if isinstance(val, (datetime, date, time, timedelta, Json)):
             val = str(val)
         if isinstance(val, basestring):
             if isinstance(val, Binary):
@@ -265,9 +259,12 @@ class Cursor(object):
                 return "'NaN'"
         elif val is None:
             val = 'NULL'
-        elif isinstance(val, (list, tuple)):
+        elif isinstance(val, list):
             q = self._quote
             val = 'ARRAY[%s]' % ','.join(str(q(v)) for v in val)
+        elif isinstance(val, tuple):
+            q = self._quote
+            val = 'ROW(%s)' % ','.join(str(q(v)) for v in val)
         elif Decimal is not float and isinstance(val, Decimal):
             pass
         elif hasattr(val, '__pg_repr__'):
@@ -299,12 +296,14 @@ class Cursor(object):
 
     def execute(self, operation, parameters=None):
         """Prepare and execute a database operation (query or command)."""
-
-        # The parameters may also be specified as list of
-        # tuples to e.g. insert multiple rows in a single
-        # operation, but this kind of usage is deprecated:
-        if (parameters and isinstance(parameters, list) and
-                isinstance(parameters[0], tuple)):
+        # The parameters may also be specified as list of tuples to e.g.
+        # insert multiple rows in a single operation, but this kind of
+        # usage is deprecated.  We make several plausibility checks because
+        # tuples can also be passed with the meaning of ROW constructors.
+        if (parameters and isinstance(parameters, list)
+                and len(parameters) > 1
+                and all(isinstance(p, tuple) for p in parameters)
+                and all(len(p) == len(parameters[0]) for p in parameters[1:])):
             return self.executemany(operation, parameters)
         else:
             # not a list of tuples
@@ -331,10 +330,9 @@ class Cursor(object):
                     raise _op_error("can't start transaction")
                 self._dbcnx._tnx = True
             for parameters in seq_of_parameters:
+                sql = operation
                 if parameters:
-                    sql = self._quoteparams(operation, parameters)
-                else:
-                    sql = operation
+                    sql = self._quoteparams(sql, parameters)
                 rows = self._src.execute(sql)
                 if rows:  # true if not DML
                     rowcount += rows
@@ -937,6 +935,7 @@ DATE = Type('date')
 TIME = Type('time timetz')
 TIMESTAMP = Type('timestamp timestamptz datetime abstime')
 INTERVAL = Type('interval tinterval timespan reltime')
+JSON = Type('json jsonb')
 
 
 # Mandatory type helpers defined by DB-API 2 specs:
@@ -952,7 +951,7 @@ def Time(hour, minute=0, second=0, microsecond=0):
 
 
 def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0):
-    """construct an object holding a time stamp valu."""
+    """Construct an object holding a time stamp value."""
     return datetime(year, month, day, hour, minute, second, microsecond)
 
 
@@ -962,17 +961,35 @@ def DateFromTicks(ticks):
 
 
 def TimeFromTicks(ticks):
-    """construct an object holding a time value from the given ticks value."""
+    """Construct an object holding a time value from the given ticks value."""
     return Time(*localtime(ticks)[3:6])
 
 
 def TimestampFromTicks(ticks):
-    """construct an object holding a time stamp from the given ticks value."""
+    """Construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*localtime(ticks)[:6])
 
 
 class Binary(bytes):
-    """construct an object capable of holding a binary (long) string value."""
+    """Construct an object capable of holding a binary (long) string value."""
+
+
+# Additional type helpers for PyGreSQL:
+
+class Json:
+    """Construct a wrapper for holding an object serializable to JSON."""
+
+    def __init__(self, obj, encode=None):
+        self.obj = obj
+        self.encode = encode or jsonencode
+
+    def __str__(self):
+        obj = self.obj
+        if isinstance(obj, basestring):
+            return obj
+        return self.encode(obj)
+
+    __pg_repr__ = __str__
 
 
 # If run as script, print some information:

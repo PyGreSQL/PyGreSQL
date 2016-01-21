@@ -18,6 +18,7 @@ except ImportError:
 import os
 import sys
 import tempfile
+import json
 
 import pg  # the module under test
 
@@ -178,8 +179,8 @@ class TestDBClassBasic(unittest.TestCase):
             'abort',
             'begin',
             'cancel', 'clear', 'close', 'commit',
-            'db', 'dbname', 'debug', 'delete',
-            'end', 'endcopy', 'error',
+            'db', 'dbname', 'debug', 'decode_json', 'delete',
+            'encode_json', 'end', 'endcopy', 'error',
             'escape_bytea', 'escape_identifier',
             'escape_literal', 'escape_string',
             'fileno',
@@ -282,6 +283,12 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testMethodUnescapeBytea(self):
         self.assertEqual(self.db.unescape_bytea(''), b'')
+
+    def testMethodDecodeJson(self):
+        self.assertEqual(self.db.decode_json('{}'), {})
+
+    def testMethodEncodeJson(self):
+        self.assertEqual(self.db.encode_json({}), '{}')
 
     def testMethodQuery(self):
         query = self.db.query
@@ -531,6 +538,38 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(f(r'\\x746861742773206be47365'),
             b'\\x746861742773206be47365')
         self.assertEqual(f(r'\\x4f007073ff21'), b'\\x4f007073ff21')
+
+    def testDecodeJson(self):
+        f = self.db.decode_json
+        self.assertIsNone(f('null'))
+        data = {
+          "id": 1, "name": "Foo", "price": 1234.5,
+          "new": True, "note": None,
+          "tags": ["Bar", "Eek"],
+          "stock": {"warehouse": 300, "retail": 20}}
+        text = json.dumps(data)
+        r = f(text)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, data)
+        self.assertIsInstance(r['id'], int)
+        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['price'], float)
+        self.assertIsInstance(r['new'], bool)
+        self.assertIsInstance(r['tags'], list)
+        self.assertIsInstance(r['stock'], dict)
+
+    def testEncodeJson(self):
+        f = self.db.encode_json
+        self.assertEqual(f(None), 'null')
+        data = {
+          "id": 1, "name": "Foo", "price": 1234.5,
+          "new": True, "note": None,
+          "tags": ["Bar", "Eek"],
+          "stock": {"warehouse": 300, "retail": 20}}
+        text = json.dumps(data)
+        r = f(data)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, text)
 
     def testGetParameter(self):
         f = self.db.get_parameter
@@ -2771,7 +2810,6 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, s)
 
     def testUpsertBytea(self):
-        query = self.db.query
         self.createTable('bytea_test', 'n smallint primary key, data bytea')
         s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
         r = dict(n=7, data=s)
@@ -2794,6 +2832,131 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 7)
         self.assertIn('data', r)
         self.assertIsNone(r['data'], bytes)
+
+    def testInsertGetJson(self):
+        try:
+            self.createTable('json_test', 'n smallint primary key, data json')
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90200:
+                self.skipTest('database does not support json')
+            self.fail(str(error))
+        jsondecode = pg.get_jsondecode()
+        # insert null value
+        r = self.db.insert('json_test', n=0, data=None)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 0)
+        self.assertIn('data', r)
+        self.assertIsNone(r['data'])
+        r = self.db.get('json_test', 0)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 0)
+        self.assertIn('data', r)
+        self.assertIsNone(r['data'])
+        # insert JSON object
+        data = {
+          "id": 1, "name": "Foo", "price": 1234.5,
+          "new": True, "note": None,
+          "tags": ["Bar", "Eek"],
+          "stock": {"warehouse": 300, "retail": 20}}
+        r = self.db.insert('json_test', n=1, data=data)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 1)
+        self.assertIn('data', r)
+        r = r['data']
+        if jsondecode is None:
+            self.assertIsInstance(r, str)
+            r = json.loads(r)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, data)
+        self.assertIsInstance(r['id'], int)
+        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['price'], float)
+        self.assertIsInstance(r['new'], bool)
+        self.assertIsInstance(r['tags'], list)
+        self.assertIsInstance(r['stock'], dict)
+        r = self.db.get('json_test', 1)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 1)
+        self.assertIn('data', r)
+        r = r['data']
+        if jsondecode is None:
+            self.assertIsInstance(r, str)
+            r = json.loads(r)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, data)
+        self.assertIsInstance(r['id'], int)
+        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['price'], float)
+        self.assertIsInstance(r['new'], bool)
+        self.assertIsInstance(r['tags'], list)
+        self.assertIsInstance(r['stock'], dict)
+
+    def testInsertGetJsonb(self):
+        try:
+            self.createTable('jsonb_test',
+                'n smallint primary key, data jsonb')
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90400:
+                self.skipTest('database does not support jsonb')
+            self.fail(str(error))
+        jsondecode = pg.get_jsondecode()
+        # insert null value
+        r = self.db.insert('jsonb_test', n=0, data=None)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 0)
+        self.assertIn('data', r)
+        self.assertIsNone(r['data'])
+        r = self.db.get('jsonb_test', 0)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 0)
+        self.assertIn('data', r)
+        self.assertIsNone(r['data'])
+        # insert JSON object
+        data = {
+          "id": 1, "name": "Foo", "price": 1234.5,
+          "new": True, "note": None,
+          "tags": ["Bar", "Eek"],
+          "stock": {"warehouse": 300, "retail": 20}}
+        r = self.db.insert('jsonb_test', n=1, data=data)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 1)
+        self.assertIn('data', r)
+        r = r['data']
+        if jsondecode is None:
+            self.assertIsInstance(r, str)
+            r = json.loads(r)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, data)
+        self.assertIsInstance(r['id'], int)
+        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['price'], float)
+        self.assertIsInstance(r['new'], bool)
+        self.assertIsInstance(r['tags'], list)
+        self.assertIsInstance(r['stock'], dict)
+        r = self.db.get('jsonb_test', 1)
+        self.assertIsInstance(r, dict)
+        self.assertIn('n', r)
+        self.assertEqual(r['n'], 1)
+        self.assertIn('data', r)
+        r = r['data']
+        if jsondecode is None:
+            self.assertIsInstance(r, str)
+            r = json.loads(r)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, data)
+        self.assertIsInstance(r['id'], int)
+        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['price'], float)
+        self.assertIsInstance(r['new'], bool)
+        self.assertIsInstance(r['tags'], list)
+        self.assertIsInstance(r['stock'], dict)
 
     def testNotificationHandler(self):
         # the notification handler itself is tested separately
@@ -2882,13 +3045,14 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.set_option('decimal', float)
         not_bool = not pg.get_bool()
         cls.set_option('bool', not_bool)
-        unnamed_result = lambda q: q.getresult()
-        cls.set_option('namedresult', unnamed_result)
+        cls.set_option('namedresult', None)
+        cls.set_option('jsondecode', None)
         super(TestDBClassNonStdOpts, cls).setUpClass()
 
     @classmethod
     def tearDownClass(cls):
         super(TestDBClassNonStdOpts, cls).tearDownClass()
+        cls.reset_option('jsondecode')
         cls.reset_option('namedresult')
         cls.reset_option('bool')
         cls.reset_option('decimal')
