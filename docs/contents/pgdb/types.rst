@@ -18,7 +18,7 @@ constructors defined below to create such objects that can hold special values.
 When passed to the cursor methods, PyGreSQL can then detect the proper type
 of the input parameter and bind it accordingly.
 
-The :mod:`pgdb` module exports the following constructors that as part of
+The :mod:`pgdb` module exports the following type constructors as part of
 the DB-API 2 standard:
 
 .. function:: Date(year, month, day)
@@ -67,7 +67,7 @@ Example for using a type constructor::
 
 .. note::
 
-    SQL NULL values are always represented by the Python *None* singleton
+    SQL ``NULL`` values are always represented by the Python *None* singleton
     on input and output.
 
 Type objects
@@ -76,7 +76,7 @@ Type objects
 .. class:: Type
 
 The :attr:`Cursor.description` attribute returns information about each
-of the result columns of a query. The *type_code* must compare equal to one
+of the result columns of a query.  The *type_code* must compare equal to one
 of the :class:`Type` objects defined below.  Type objects can be equal to
 more than one type code (e.g. :class:`DATETIME` is equal to the type codes
 for ``date``, ``time`` and ``timestamp`` columns).
@@ -106,7 +106,7 @@ DB-API 2 standard:
 
 .. note::
 
-  The following more specific types are not part of the DB-API 2 standard.
+  The following more specific type objects are not part of the DB-API 2 standard.
 
 .. object:: BOOL
 
