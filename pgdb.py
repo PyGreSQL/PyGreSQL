@@ -98,8 +98,6 @@ except ImportError:  # Python 2.6 or 3.0
         def OrderedDict(*args):
             raise NotSupportedError('OrderedDict is not supported')
 
-set_decimal(Decimal)
-
 
 ### Module Constants
 
@@ -124,7 +122,6 @@ def decimal_type(decimal_type=None):
     global Decimal
     if decimal_type is not None:
         _cast['numeric'] = Decimal = decimal_type
-        set_decimal(Decimal)
     return Decimal
 
 
