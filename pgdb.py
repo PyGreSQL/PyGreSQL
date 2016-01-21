@@ -671,7 +671,7 @@ def Time(hour, minute=0, second=0, microsecond=0):
 
 
 def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0):
-    """construct an object holding a time stamp value."""
+    """Construct an object holding a time stamp value."""
     return datetime(year, month, day, hour, minute, second, microsecond)
 
 
@@ -681,17 +681,17 @@ def DateFromTicks(ticks):
 
 
 def TimeFromTicks(ticks):
-    """construct an object holding a time value from the given ticks value."""
+    """Construct an object holding a time value from the given ticks value."""
     return Time(*localtime(ticks)[3:6])
 
 
 def TimestampFromTicks(ticks):
-    """construct an object holding a time stamp from the given ticks value."""
+    """Construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*localtime(ticks)[:6])
 
 
 class Binary(str):
-    """construct an object capable of holding a binary (long) string value."""
+    """Construct an object capable of holding a binary (long) string value."""
 
 
 # If run as script, print some information:

@@ -140,6 +140,8 @@ def _prg_error(msg):
     return _db_error(msg, ProgrammingError)
 
 
+# The notification handler
+
 class NotificationHandler(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 

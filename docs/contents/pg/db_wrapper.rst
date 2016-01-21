@@ -451,8 +451,14 @@ the parameter *only* can also be a list of corresponding boolean values.
 
 .. versionadded:: 4.2
 
-escape_literal -- escape a literal string for use within SQL
-------------------------------------------------------------
+escape_literal/identifier/string/bytea -- escape for SQL
+--------------------------------------------------------
+
+The following methods escape text or binary strings so that they can be
+inserted directly into an SQL command.  Except for :meth:`DB.escape_byte`,
+you don't need to call these methods for the strings passed as parameters
+to :meth:`DB.query`.  You also don't need to call any of these methods
+when storing data using :meth:`DB.insert` and similar.
 
 .. method:: DB.escape_literal(string)
 
@@ -468,9 +474,6 @@ characters (such as quotes and backslashes) must be escaped to prevent them
 from being interpreted specially by the SQL parser.
 
 .. versionadded:: 4.1
-
-escape_identifier -- escape an identifier string for use within SQL
--------------------------------------------------------------------
 
 .. method:: DB.escape_identifier(string)
 
@@ -488,9 +491,6 @@ contain upper case characters whose case should be preserved.
 
 .. versionadded:: 4.1
 
-escape_bytea -- escape binary data for use within SQL
------------------------------------------------------
-
 .. method:: DB.escape_bytea(datastring)
 
     Escape binary data for use within SQL as type ``bytea``
@@ -499,12 +499,12 @@ escape_bytea -- escape binary data for use within SQL
     :returns: the escaped string
     :rtype: str
 
-Similar to the module function with the same name, but the
-behavior of this method is adjusted depending on the connection properties
-(in particular, whether standard-conforming strings are enabled).
+Similar to the module function :func:`pg.escape_string` with the same name,
+but the behavior of this method is adjusted depending on the connection
+properties (such as character encoding).
 
-unescape_bytea -- unescape data that has been retrieved as text
----------------------------------------------------------------
+unescape_bytea -- unescape data retrieved from the database
+-----------------------------------------------------------
 
 .. method:: DB.unescape_bytea(string)
 
@@ -514,7 +514,7 @@ unescape_bytea -- unescape data that has been retrieved as text
     :returns: byte string containing the binary data
     :rtype: str
 
-See the module function with the same name.
+See the module function :func:`pg.unescape_bytea` with the same name.
 
 use_regtypes -- determine use of regular type names
 ---------------------------------------------------

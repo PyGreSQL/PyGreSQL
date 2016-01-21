@@ -445,8 +445,10 @@ get/set_namedresult -- conversion to named tuples
 
     Get the function that converts to named tuples
 
-This function returns the function used by PyGreSQL to construct the
-result of the :meth:`pgqueryobject.namedresult` method.
+This returns the function used by PyGreSQL to construct the result of the
+:meth:`pgqueryobject.namedresult` method.
+
+.. versionadded:: 4.1
 
 .. function:: set_namedresult(func)
 
@@ -454,8 +456,11 @@ result of the :meth:`pgqueryobject.namedresult` method.
 
     :param func: the function to be used to convert results to named tuples
 
-You can use this if you want to create different kinds of named tuples
-returned by the :meth:`pgqueryobject.namedresult` method.
+You can use this if you want to create different kinds of named tuples returned
+by the :meth:`pgqueryobject.namedresult` method.  If you set this function to
+*None*, then it will become equal to :meth:`pgqueryobject.getresult`.
+
+.. versionadded:: 4.1
 
 
 Module constants
