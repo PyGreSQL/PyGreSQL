@@ -19,10 +19,10 @@ if [ -f BETA ]
 then
 	VERSION=$VERSION-pre`date +"%y%m%d"`
 	PACKAGE=pygresql.pkg-beta
-	SYMLINK=PyGreSQL-beta.tgz
+	SYMLINK=PyGreSQL-beta.tar.gz
 else
 	PACKAGE=pygresql.pkg
-	SYMLINK=PyGreSQL.tgz
+	SYMLINK=PyGreSQL.tar.gz
 fi
 
 # Package up as a source tarball in the distribution directory.
