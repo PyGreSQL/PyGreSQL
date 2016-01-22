@@ -1,7 +1,7 @@
 #! /usr/bin/python
 # $Id$
 
-"""Setup script for PyGreSQL version 4.2
+"""Setup script for PyGreSQL version 4.2.1
 
 PyGreSQL is an open-source Python module that interfaces to a
 PostgreSQL database. It embeds the PostgreSQL query library to allow
@@ -32,7 +32,7 @@ using distutils to install Python programs.
 
 """
 
-version = '4.2'
+version = '4.2.1'
 
 
 import sys
