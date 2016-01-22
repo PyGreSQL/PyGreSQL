@@ -9,7 +9,7 @@ PostgreSQL features from a Python script.
     | For licensing details, see the full :doc:`copyright`.
 
 **PostgreSQL** is a highly scalable, SQL compliant, open source
-object-relational database management system. With more than 15 years
+object-relational database management system. With more than 20 years
 of development history, it is quickly becoming the de facto database
 for enterprise level open source solutions.
 Best of all, PostgreSQL's source code is available under the most liberal
