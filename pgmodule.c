@@ -220,7 +220,7 @@ get_decoded_string(char *str, Py_ssize_t size, int encoding)
 
 PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding)
- {
+{
 	if (encoding == pg_encoding_utf8)
 		return PyUnicode_AsUTF8String(unicode_obj);
 	if (encoding == pg_encoding_latin1)
@@ -269,7 +269,7 @@ get_type_array(PGresult *result, int nfields)
 				break;
 
 			case CASHOID:
-				*a++ = PYGRES_MONEY;
+				*a++ = decimal_point ? PYGRES_MONEY : PYGRES_DEFAULT;
 				break;
 
 			case BOOLOID:
@@ -278,7 +278,7 @@ get_type_array(PGresult *result, int nfields)
 
 			case JSONOID:
 			case JSONBOID:
-				*a++ = PYGRES_JSON;
+				*a++ = jsondecode ? PYGRES_JSON : PYGRES_DEFAULT;
 				break;
 
 			default:
@@ -288,6 +288,109 @@ get_type_array(PGresult *result, int nfields)
 
 	return array;
 }
+
+/* cast string s with type, size and encoding to a Python object */
+PyObject *
+cast_value(char *s, int type, Py_ssize_t size, int encoding)
+{
+	PyObject   *obj, *tmp_obj;
+	char		cashbuf[64];
+	int			k;
+
+	switch (type)
+	{
+		case PYGRES_JSON:
+		 	/* this type should only be passed when jsondecode is set */
+			if (!jsondecode)
+			{
+				PyErr_SetString(PyExc_ValueError, "JSON decoder is not set");
+				return NULL;
+			}
+
+			obj = get_decoded_string(s, size, encoding);
+			if (obj) /* was able to decode */
+			{
+				tmp_obj = Py_BuildValue("(O)", obj);
+				obj = PyObject_CallObject(jsondecode, tmp_obj);
+				Py_DECREF(tmp_obj);
+			}
+			break;
+
+		case PYGRES_INT:
+			obj = PyInt_FromString(s, NULL, 10);
+			break;
+
+		case PYGRES_LONG:
+			obj = PyLong_FromString(s, NULL, 10);
+			break;
+
+		case PYGRES_FLOAT:
+			tmp_obj = PyStr_FromString(s);
+			obj = PyFloat_FromString(tmp_obj);
+			Py_DECREF(tmp_obj);
+			break;
+
+		case PYGRES_MONEY:
+			/* type should only be passed when decimal_point is set */
+			if (!decimal_point)
+			{
+				PyErr_SetString(PyExc_ValueError, "Decimal point is not set");
+				return NULL;
+			}
+
+			for (k = 0;
+				*s && k < sizeof(cashbuf)/sizeof(cashbuf[0]) - 1;
+				s++)
+			{
+				if (*s >= '0' && *s <= '9')
+					cashbuf[k++] = *s;
+				else if (*s == decimal_point)
+					cashbuf[k++] = '.';
+				else if (*s == '(' || *s == '-')
+					cashbuf[k++] = '-';
+			}
+			cashbuf[k] = '\0';
+			s = cashbuf;
+			/* FALLTHROUGH */ /* no break here */
+	
+		case PYGRES_DECIMAL:
+			if (decimal)
+			{
+				tmp_obj = Py_BuildValue("(s)", s);
+				obj = PyEval_CallObject(decimal, tmp_obj);
+			}
+			else
+			{
+				tmp_obj = PyStr_FromString(s);
+				obj = PyFloat_FromString(tmp_obj);
+			}
+			Py_DECREF(tmp_obj);
+			break;
+
+		case PYGRES_BOOL:
+			/* convert to bool only if use_bool is set */
+			if (use_bool)
+			{
+				obj = *s == 't' ? Py_True : Py_False;
+				Py_INCREF(obj);
+			}
+			else
+			{
+				obj = PyStr_FromString(*s == 't' ? "t" : "f");
+			}
+			break;
+
+		default:
+#if IS_PY3
+			obj = get_decoded_string(s, size, encoding);
+			if (!obj) /* cannot decode */
+#endif
+			obj = PyBytes_FromStringAndSize(s, size);
+	}
+
+	return obj;
+}
+
 
 /* internal wrapper for the notice receiver callback */
 static void notice_receiver(void *arg, const PGresult *res)
@@ -3583,9 +3686,7 @@ queryGetResult(queryObject *self, PyObject *args)
 				m,
 				n,
 			   *coltypes;
-#if IS_PY3
-	int			encoding;
-#endif
+	int			encoding = self->encoding;
 
 	/* checks args (args == NULL for an internal call) */
 	if (args && !PyArg_ParseTuple(args, ""))
@@ -3600,10 +3701,6 @@ queryGetResult(queryObject *self, PyObject *args)
 	n = PQnfields(self->result);
 	if (!(reslist = PyList_New(m)))
 		return NULL;
-
-#if IS_PY3
-	encoding = self->encoding;
-#endif
 
 	coltypes = get_type_array(self->result, n);
 
@@ -3628,112 +3725,18 @@ queryGetResult(queryObject *self, PyObject *args)
 				Py_INCREF(Py_None);
 				val = Py_None;
 			}
-			else
+			else /* not null */
 			{
 				char	   *s = PQgetvalue(self->result, i, j);
-				char		cashbuf[64];
-				int			k;
-				Py_ssize_t	size;
-				PyObject   *tmp_obj;
+				Py_ssize_t	size = PQgetlength(self->result, i, j);;
 
-				switch (coltypes[j])
+				if (PQfformat(self->result, j) == 0) /* text */
 				{
-					case PYGRES_JSON:
-						if (!jsondecode || /* no JSON decoder available */
-							PQfformat(self->result, j) != 0) /* not text */
-							goto default_case;
-						size = PQgetlength(self->result, i, j);
-#if IS_PY3
-						val = get_decoded_string(s, size, encoding);
-#else
-						val = get_decoded_string(s, size, self->encoding);
-#endif
-						if (val) /* was able to decode */
-						{
-							tmp_obj = Py_BuildValue("(O)", val);
-							val = PyObject_CallObject(jsondecode, tmp_obj);
-							Py_DECREF(tmp_obj);
-						}
-						break;
-
-					case PYGRES_INT:
-						val = PyInt_FromString(s, NULL, 10);
-						break;
-
-					case PYGRES_LONG:
-						val = PyLong_FromString(s, NULL, 10);
-						break;
-
-					case PYGRES_FLOAT:
-						tmp_obj = PyStr_FromString(s);
-#if IS_PY3
-						val = PyFloat_FromString(tmp_obj);
-#else
-						val = PyFloat_FromString(tmp_obj, NULL);
-#endif
-						Py_DECREF(tmp_obj);
-						break;
-
-					case PYGRES_MONEY:
-						/* convert to decimal only if decimal point is set */
-						if (!decimal_point) goto default_case;
-
-						for (k = 0;
-							*s && k < sizeof(cashbuf)/sizeof(cashbuf[0]) - 1;
-							s++)
-						{
-							if (*s >= '0' && *s <= '9')
-								cashbuf[k++] = *s;
-							else if (*s == decimal_point)
-								cashbuf[k++] = '.';
-							else if (*s == '(' || *s == '-')
-								cashbuf[k++] = '-';
-						}
-						cashbuf[k] = '\0';
-						s = cashbuf;
-						/* FALLTHROUGH */ /* no break here */
-
-					case PYGRES_DECIMAL:
-						if (decimal)
-						{
-							tmp_obj = Py_BuildValue("(s)", s);
-							val = PyEval_CallObject(decimal, tmp_obj);
-						}
-						else
-						{
-							tmp_obj = PyStr_FromString(s);
-#if IS_PY3
-							val = PyFloat_FromString(tmp_obj);
-#else
-							val = PyFloat_FromString(tmp_obj, NULL);
-#endif
-						}
-						Py_DECREF(tmp_obj);
-						break;
-
-					case PYGRES_BOOL:
-						/* convert to bool only if bool_type is set */
-						if (use_bool)
-						{
-							val = *s == 't' ? Py_True : Py_False;
-							Py_INCREF(val);
-							break;
-						}
-						/* FALLTHROUGH */ /* no break here */
-
-					default:
-					default_case:
-						size = PQgetlength(self->result, i, j);
-#if IS_PY3
-						if (PQfformat(self->result, j) == 0) /* text */
-						{
-							val = get_decoded_string(s, size, encoding);
-							if (!val) /* cannot decode */
-								val = PyBytes_FromStringAndSize(s, size);
-						}
-						else
-#endif
-						val = PyBytes_FromStringAndSize(s, size);
+					val = cast_value(s, coltypes[j], size, encoding);
+				}
+				else /* not text */
+				{
+					val = PyBytes_FromStringAndSize(s, size);
 				}
 			}
 
@@ -3772,9 +3775,7 @@ queryDictResult(queryObject *self, PyObject *args)
 				m,
 				n,
 			   *coltypes;
-#if IS_PY3
-	int			encoding;
-#endif
+	int			encoding = self->encoding;
 
 	/* checks args (args == NULL for an internal call) */
 	if (args && !PyArg_ParseTuple(args, ""))
@@ -3789,10 +3790,6 @@ queryDictResult(queryObject *self, PyObject *args)
 	n = PQnfields(self->result);
 	if (!(reslist = PyList_New(m)))
 		return NULL;
-
-#if IS_PY3
-	encoding = self->encoding;
-#endif
 
 	coltypes = get_type_array(self->result, n);
 
@@ -3817,112 +3814,18 @@ queryDictResult(queryObject *self, PyObject *args)
 				Py_INCREF(Py_None);
 				val = Py_None;
 			}
-			else
+			else /* not null */
 			{
 				char	   *s = PQgetvalue(self->result, i, j);
-				char		cashbuf[64];
-				int			k;
-				Py_ssize_t	size;
-				PyObject   *tmp_obj;
+				Py_ssize_t	size = PQgetlength(self->result, i, j);;
 
-				switch (coltypes[j])
+				if (PQfformat(self->result, j) == 0) /* text */
 				{
-					case PYGRES_JSON:
-						if (!jsondecode || /* no JSON decoder available */
-							PQfformat(self->result, j) != 0) /* not text */
-							goto default_case;
-						size = PQgetlength(self->result, i, j);
-#if IS_PY3
-						val = get_decoded_string(s, size, encoding);
-#else
-						val = get_decoded_string(s, size, self->encoding);
-#endif
-						if (val) /* was able to decode */
-						{
-							tmp_obj = Py_BuildValue("(O)", val);
-							val = PyObject_CallObject(jsondecode, tmp_obj);
-							Py_DECREF(tmp_obj);
-						}
-						break;
-
-					case PYGRES_INT:
-						val = PyInt_FromString(s, NULL, 10);
-						break;
-
-					case PYGRES_LONG:
-						val = PyLong_FromString(s, NULL, 10);
-						break;
-
-					case PYGRES_FLOAT:
-						tmp_obj = PyBytes_FromString(s);
-#if IS_PY3
-						val = PyFloat_FromString(tmp_obj);
-#else
-						val = PyFloat_FromString(tmp_obj, NULL);
-#endif
-						Py_DECREF(tmp_obj);
-						break;
-
-					case PYGRES_MONEY:
-						/* convert to decimal only if decimal point is set */
-						if (!decimal_point) goto default_case;
-
-						for (k = 0;
-							*s && k < sizeof(cashbuf)/sizeof(cashbuf[0]) - 1;
-							s++)
-						{
-							if (*s >= '0' && *s <= '9')
-								cashbuf[k++] = *s;
-							else if (*s == decimal_point)
-								cashbuf[k++] = '.';
-							else if (*s == '(' || *s == '-')
-								cashbuf[k++] = '-';
-						}
-						cashbuf[k] = '\0';
-						s = cashbuf;
-						/* FALLTHROUGH */ /* no break here */
-
-					case PYGRES_DECIMAL:
-						if (decimal)
-						{
-							tmp_obj = Py_BuildValue("(s)", s);
-							val = PyEval_CallObject(decimal, tmp_obj);
-						}
-						else
-						{
-							tmp_obj = PyBytes_FromString(s);
-#if IS_PY3
-							val = PyFloat_FromString(tmp_obj);
-#else
-							val = PyFloat_FromString(tmp_obj, NULL);
-#endif
-						}
-						Py_DECREF(tmp_obj);
-						break;
-
-					case PYGRES_BOOL:
-						/* convert to bool only if bool_type is set */
-						if (use_bool)
-						{
-							val = *s == 't' ? Py_True : Py_False;
-							Py_INCREF(val);
-							break;
-						}
-						/* FALLTHROUGH */ /* no break here */
-
-					default:
-					default_case:
-						size = PQgetlength(self->result, i, j);
-#if IS_PY3
-						if (PQfformat(self->result, j) == 0) /* text */
-						{
-							val = get_decoded_string(s, size, encoding);
-							if (!val) /* cannot decode */
-								val = PyBytes_FromStringAndSize(s, size);
-						}
-						else
-#endif
-						val = PyBytes_FromStringAndSize(s, size);
+					val = cast_value(s, coltypes[j], size, encoding);
+				}
+				else /* not text */
+				{
+					val = PyBytes_FromStringAndSize(s, size);
 				}
 			}
 
