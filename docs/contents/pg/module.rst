@@ -278,6 +278,7 @@ escape_bytea -- escape binary data for use within SQL
 Escapes binary data for use within an SQL command with the type ``bytea``.
 As with :func:`escape_string`, this is only used when inserting data directly
 into an SQL command string.
+
 Note that there is also a :class:`Connection` method with the same name
 which takes connection properties into account.
 
@@ -299,16 +300,13 @@ unescape_bytea -- unescape data that has been retrieved as text
     :rtype: bytes
     :raises TypeError: bad argument type, or too many arguments
 
-Converts an escaped string representation of binary data into binary
-data -- the reverse of :func:`escape_bytea`. This is needed when retrieving
-``bytea`` data with one of the :meth:`Query.getresult`,
-:meth:`Query.dictresult` or :meth:`Query.namedresult` methods.
+Converts an escaped string representation of binary data stored as ``bytea``
+into the raw byte string representing the binary data  -- this is the reverse
+of :func:`escape_bytea`.  Since the :class:`Query` results will already
+return unescaped byte strings, you normally don't have to use this method.
 
-Example::
-
-    picture = unescape_bytea(con.query(
-          "select img from pictures where name='Garfield'").getresult[0][0])
-    open('garfield.gif', 'wb').write(picture)
+Note that there is also a :class:`DB` method with the same name
+which does exactly the same.
 
 get/set_decimal -- decimal type to be used for numeric values
 -------------------------------------------------------------

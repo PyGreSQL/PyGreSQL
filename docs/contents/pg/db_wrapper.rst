@@ -310,6 +310,9 @@ The OID is also put into the dictionary if the table has one, but
 in order to allow the caller to work with multiple tables, it is
 munged as ``oid(table)`` using the actual name of the table.
 
+Note that since PyGreSQL 5.0 this will return the value of an array
+type column as a Python list.
+
 insert -- insert a row into a database table
 --------------------------------------------
 
@@ -331,6 +334,9 @@ added to or replace the entry in the dictionary.
 
 The dictionary is then reloaded with the values actually inserted in order
 to pick up values modified by rules, triggers, etc.
+
+Note that since PyGreSQL 5.0 it is possible to insert a value for an
+array type column by passing it as Python list.
 
 update -- update a row in a database table
 ------------------------------------------
@@ -666,11 +672,6 @@ properties (in particular, whether standard-conforming strings are enabled).
 unescape_bytea -- unescape data retrieved from the database
 -----------------------------------------------------------
 
-The following method unescapes binary ``bytea`` data strings that
-have been retrieved from the database.  You don't need to use this
-method on the data returned by :meth:`DB.get` and similar, only if
-you query the database directly with :meth:`DB.query`.
-
 .. method:: DB.unescape_bytea(string)
 
     Unescape ``bytea`` data that has been retrieved as text
@@ -679,7 +680,10 @@ you query the database directly with :meth:`DB.query`.
     :returns: byte string containing the binary data
     :rtype: bytes
 
-See the module function :func:`pg.unescape_bytea` with the same name.
+Converts an escaped string representation of binary data stored as ``bytea``
+into the raw byte string representing the binary data  -- this is the reverse
+of :meth:`DB.escape_bytea`.  Since the :class:`Query` results will already
+return unescaped byte strings, you normally don't have to use this method.
 
 encode/decode_json -- encode and decode JSON data
 -------------------------------------------------

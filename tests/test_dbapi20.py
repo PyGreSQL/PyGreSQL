@@ -361,14 +361,15 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute(
                 "create table %s (n smallint, floattest float)" % table)
             params = enumerate(values)
-            cur.executemany("insert into %s values (%%s,%%s)" % table, params)
-            cur.execute("select * from %s order by 1" % table)
+            cur.executemany("insert into %s values (%%d,%%s)" % table, params)
+            cur.execute("select floattest from %s order by n" % table)
             rows = cur.fetchall()
-            self.assertEqual(cur.description[1].type_code, pgdb.FLOAT)
+            self.assertEqual(cur.description[0].type_code, pgdb.FLOAT)
+            self.assertNotEqual(cur.description[0].type_code, pgdb.ARRAY)
         finally:
             con.close()
         self.assertEqual(len(rows), len(values))
-        rows = [row[1] for row in rows]
+        rows = [row[0] for row in rows]
         for inval, outval in zip(values, rows):
             if inval in ('inf', 'Infinity'):
                 inval = inf
@@ -397,43 +398,52 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute(
                 "create table %s (n smallint, ts timestamp)" % table)
             params = enumerate(values)
-            cur.executemany("insert into %s values (%%s,%%s)" % table, params)
-            cur.execute("select * from %s order by 1" % table)
+            cur.executemany("insert into %s values (%%d,%%s)" % table, params)
+            cur.execute("select ts from %s order by n" % table)
             rows = cur.fetchall()
-            self.assertEqual(cur.description[1].type_code, pgdb.DATETIME)
+            self.assertEqual(cur.description[0].type_code, pgdb.DATETIME)
+            self.assertNotEqual(cur.description[0].type_code, pgdb.ARRAY)
         finally:
             con.close()
         self.assertEqual(len(rows), len(values))
-        rows = [row[1] for row in rows]
+        rows = [row[0] for row in rows]
         for inval, outval in zip(values, rows):
             if isinstance(inval, datetime):
                 inval = inval.strftime('%Y-%m-%d %H:%M:%S')
             self.assertEqual(inval, outval)
 
-    def test_list_binds_as_array(self):
-        values = ([20000, 25000, 25000, 30000],
-            [['breakfast', 'consulting'], ['meeting', 'lunch']])
-        output = ('{20000,25000,25000,30000}',
-            '{{breakfast,consulting},{meeting,lunch}}')
+    def test_roundtrip_with_list(self):
+        values = [(None, None), ([], []), ([None], [[None], ['null']]),
+            ([1, 2, 3], [['a', 'b'], ['c', 'd']]),
+            ([20000, 25000, 25000, 30000],
+            [['breakfast', 'consulting'], ['meeting', 'lunch']]),
+            ([0, 1, -1], [['Hello, World!', '"Hi!"'], ['{x,y}', ' x y ']])]
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
-            cur.execute("create table %s (i int[], t text[][])" % table)
-            cur.execute("insert into %s values (%%s,%%s)" % table, values)
-            cur.execute("select * from %s" % table)
-            row = cur.fetchone()
+            cur.execute("create table %s"
+                " (n smallint, i int[], t text[][])" % table)
+            params = [(n, v[0], v[1]) for n, v in enumerate(values)]
+            cur.execute("insert into %s values (%%d,%%s,%%s)" % table, params)
+            cur.execute("select i, t from %s order by n" % table)
+            self.assertEqual(cur.description[0].type_code, pgdb.ARRAY)
+            self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
+            self.assertEqual(cur.description[0].type_code, pgdb.INTEGER)
+            self.assertEqual(cur.description[1].type_code, pgdb.ARRAY)
+            self.assertEqual(cur.description[1].type_code, pgdb.STRING)
+            rows = cur.fetchall()
         finally:
             con.close()
-        self.assertEqual(row, output)
+        self.assertEqual(rows, values)
 
     def test_tuple_binds_as_row(self):
-        values = (1, 2.5, 'this is a test')
+        values = [(1, 2.5, 'this is a test')]
         output = '(1,2.5,"this is a test")'
         con = self._connect()
         try:
             cur = con.cursor()
-            cur.execute("select %s", [values])
+            cur.execute("select %s", values)
             outval = cur.fetchone()[0]
         finally:
             con.close()
@@ -450,7 +460,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute(
                 'create table "%s" (n smallint, b bit varying(7))' % table)
             cur.executemany("insert into %s values (%%s,%%s)" % table, params)
-            cur.execute("select * from %s order by 1" % table)
+            cur.execute("select * from %s" % table)
             rows = cur.fetchall()
         finally:
             con.close()
@@ -563,12 +573,12 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 "create table %s (n smallint, booltest bool)" % table)
             params = enumerate(values)
             cur.executemany("insert into %s values (%%s,%%s)" % table, params)
-            cur.execute("select * from %s order by 1" % table)
+            cur.execute("select booltest from %s order by n" % table)
             rows = cur.fetchall()
-            self.assertEqual(cur.description[1].type_code, pgdb.BOOL)
+            self.assertEqual(cur.description[0].type_code, pgdb.BOOL)
         finally:
             con.close()
-        rows = [row[1] for row in rows]
+        rows = [row[0] for row in rows]
         values[3] = values[5] = True
         values[4] = values[6] = False
         self.assertEqual(rows, values)
@@ -586,7 +596,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 self.skipTest('database does not support json')
             params = (pgdb.Json(inval),)
             cur.execute("insert into %s values (%%s)" % table, params)
-            cur.execute("select * from %s" % table)
+            cur.execute("select jsontest from %s" % table)
             outval = cur.fetchone()[0]
             self.assertEqual(cur.description[0].type_code, pgdb.JSON)
         finally:
@@ -606,7 +616,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 self.skipTest('database does not support jsonb')
             params = (pgdb.Json(inval),)
             cur.execute("insert into %s values (%%s)" % table, params)
-            cur.execute("select * from %s" % table)
+            cur.execute("select jsonbtest from %s" % table)
             outval = cur.fetchone()[0]
             self.assertEqual(cur.description[0].type_code, pgdb.JSON)
         finally:
@@ -754,6 +764,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertTrue(pgdb.NUMBER >= pgdb.INTEGER)
         self.assertTrue(pgdb.TIME <= pgdb.DATETIME)
         self.assertTrue(pgdb.DATETIME >= pgdb.DATE)
+        self.assertEqual(pgdb.ARRAY, pgdb.ARRAY)
+        self.assertNotEqual(pgdb.ARRAY, pgdb.STRING)
+        self.assertEqual('_char', pgdb.ARRAY)
+        self.assertNotEqual('char', pgdb.ARRAY)
 
 
 if __name__ == '__main__':

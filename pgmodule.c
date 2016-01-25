@@ -53,7 +53,7 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #endif
 
 /* default values */
-#define PG_ARRAYSIZE			1
+#define PG_ARRAYSIZE		1
 
 /* flags for object validity checks */
 #define CHECK_OPEN			1
@@ -79,6 +79,7 @@ const char *__movename[5] =
 {"", "movefirst", "movelast", "movenext", "moveprev"};
 
 #define MAX_BUFFER_SIZE 8192	/* maximum transaction size */
+#define MAX_ARRAY_DEPTH 16		/* maximum allowed depth of an array */
 
 /* MODULE GLOBAL VARIABLES */
 
@@ -187,16 +188,22 @@ typedef struct
 #define is_largeObject(v) (PyType(v) == &largeType)
 #endif /* LARGE_OBJECTS */
 
-/* define internal types */
+/* PyGreSQL internal types */
 
-#define PYGRES_DEFAULT 0
+/* simple types */
 #define PYGRES_INT 1
 #define PYGRES_LONG 2
 #define PYGRES_FLOAT 3
 #define PYGRES_DECIMAL 4
 #define PYGRES_MONEY 5
 #define PYGRES_BOOL 6
-#define PYGRES_JSON 7
+/* text based types */
+#define PYGRES_TEXT 8
+#define PYGRES_BYTEA 9
+#define PYGRES_JSON 10
+#define PYGRES_EXTERNAL 11
+/* array types */
+#define PYGRES_ARRAY 16
 
 /* --------------------------------------------------------------------- */
 /* Internal Functions													 */
@@ -204,7 +211,7 @@ typedef struct
 
 /* shared function for encoding and decoding strings */
 
-PyObject *
+static PyObject *
 get_decoded_string(char *str, Py_ssize_t size, int encoding)
 {
 	if (encoding == pg_encoding_utf8)
@@ -218,7 +225,7 @@ get_decoded_string(char *str, Py_ssize_t size, int encoding)
 		pg_encoding_to_char(encoding), "strict");
 }
 
-PyObject *
+static PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding)
 {
 	if (encoding == pg_encoding_utf8)
@@ -232,83 +239,178 @@ get_encoded_string(PyObject *unicode_obj, int encoding)
 		pg_encoding_to_char(encoding), "strict");
 }
 
-/* shared functions for converting PG types to Python types */
-static int *
-get_type_array(PGresult *result, int nfields)
+/* helper functions */
+
+/* get PyGreSQL internal types for  a PostgreSQL type */
+static int
+get_type(Oid pgtype)
 {
-	int *array, *a;
-	int j;
+	int t;
 
-	if (!(array = PyMem_Malloc(sizeof(int) * nfields)))
+	switch (pgtype)
 	{
-		PyErr_SetString(PyExc_MemoryError, "Memory error in getresult()");
-		return NULL;
+		/* simple types */
+
+		case INT2OID:
+		case INT4OID:
+		case CIDOID:
+		case OIDOID:
+		case XIDOID:
+			t = PYGRES_INT;
+			break;
+
+		case INT8OID:
+			t = PYGRES_LONG;
+			break;
+
+		case FLOAT4OID:
+		case FLOAT8OID:
+			t = PYGRES_FLOAT;
+			break;
+
+		case NUMERICOID:
+			t = PYGRES_DECIMAL;
+			break;
+
+		case CASHOID:
+			t = decimal_point ? PYGRES_MONEY : PYGRES_TEXT;
+			break;
+
+		case BOOLOID:
+			t = PYGRES_BOOL;
+			break;
+
+		case BYTEAOID:
+			t = PYGRES_BYTEA;
+			break;
+
+		case JSONOID:
+		case JSONBOID:
+			t = jsondecode ? PYGRES_JSON : PYGRES_TEXT;
+			break;
+
+		/* array types */
+
+		case INT2ARRAYOID:
+		case INT4ARRAYOID:
+		case CIDARRAYOID:
+		case OIDARRAYOID:
+		case XIDARRAYOID:
+			t = PYGRES_INT | PYGRES_ARRAY;
+			break;
+
+		case INT8ARRAYOID:
+			t = PYGRES_LONG | PYGRES_ARRAY;
+			break;
+
+		case FLOAT4ARRAYOID:
+		case FLOAT8ARRAYOID:
+			t = PYGRES_FLOAT | PYGRES_ARRAY;
+			break;
+
+		case NUMERICARRAYOID:
+			t = PYGRES_DECIMAL | PYGRES_ARRAY;
+			break;
+
+		case CASHARRAYOID:
+			t = (decimal_point ?
+				PYGRES_MONEY : PYGRES_TEXT) | PYGRES_ARRAY;
+			break;
+
+		case BOOLARRAYOID:
+			t = PYGRES_BOOL | PYGRES_ARRAY;
+			break;
+
+		case BYTEAARRAYOID:
+			t = PYGRES_BYTEA | PYGRES_ARRAY;
+			break;
+
+		case JSONARRAYOID:
+		case JSONBARRAYOID:
+			t = (jsondecode ? PYGRES_JSON : PYGRES_TEXT) | PYGRES_ARRAY;
+			break;
+
+		case ANYARRAYOID:
+		case BPCHARARRAYOID:
+		case CHARARRAYOID:
+		case TEXTARRAYOID:
+		case VARCHARARRAYOID:
+		case DATEARRAYOID:
+		case INTERVALARRAYOID:
+		case TIMEARRAYOID:
+		case TIMETZARRAYOID:
+		case TIMESTAMPARRAYOID:
+		case TIMESTAMPTZARRAYOID:
+			t = PYGRES_TEXT | PYGRES_ARRAY;
+			break;
+
+		default:
+			t = PYGRES_TEXT;
 	}
 
-	for (j = 0, a=array; j < nfields; j++)
-	{
-		switch (PQftype(result, j))
-		{
-			case INT2OID:
-			case INT4OID:
-			case OIDOID:
-				*a++ = PYGRES_INT;
-				break;
-
-			case INT8OID:
-				*a++ = PYGRES_LONG;
-				break;
-
-			case FLOAT4OID:
-			case FLOAT8OID:
-				*a++ = PYGRES_FLOAT;
-				break;
-
-			case NUMERICOID:
-				*a++ = PYGRES_DECIMAL;
-				break;
-
-			case CASHOID:
-				*a++ = decimal_point ? PYGRES_MONEY : PYGRES_DEFAULT;
-				break;
-
-			case BOOLOID:
-				*a++ = PYGRES_BOOL;
-				break;
-
-			case JSONOID:
-			case JSONBOID:
-				*a++ = jsondecode ? PYGRES_JSON : PYGRES_DEFAULT;
-				break;
-
-			default:
-				*a++ = PYGRES_DEFAULT;
-		}
-	}
-
-	return array;
+	return t;
 }
 
-/* cast string s with type, size and encoding to a Python object */
-PyObject *
-cast_value(char *s, int type, Py_ssize_t size, int encoding)
+/* get PyGreSQL column types for all result columns */
+static int *
+get_col_types(PGresult *result, int nfields)
+{
+	int *types, *t, j;
+
+	if (!(types = PyMem_Malloc(sizeof(int) * nfields)))
+		return (int *)PyErr_NoMemory();
+
+	for (j = 0, t=types; j < nfields; ++j)
+		*t++ = get_type(PQftype(result, j));
+
+	return types;
+}
+
+/* Cast a bytea encoded text based type to a Python object.
+   This assumes the text is null-terminated character string. */
+static PyObject *
+cast_bytea_text(char *s)
+{
+	PyObject   *obj;
+	char	   *tmp_str;
+	size_t		str_len;
+
+	tmp_str = (char *)PQunescapeBytea((unsigned char*)s, &str_len);
+	obj = PyBytes_FromStringAndSize(tmp_str, str_len);
+	if (tmp_str)
+		PQfreemem(tmp_str);
+	return obj;
+}
+
+/* Cast a text based type to a Python object.
+   This needs the character string, size and encoding. */
+static PyObject *
+cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
 {
 	PyObject   *obj, *tmp_obj;
-	char		cashbuf[64];
-	int			k;
+	char	   *tmp_str;
+	size_t		str_len;
 
-	switch (type)
+	switch (type) /* this must be the PyGreSQL internal type */
 	{
+		case PYGRES_BYTEA:
+			/* we need to add a null byte */
+			tmp_str = (char *) PyMem_Malloc(size + 1);
+			if (!tmp_str) return PyErr_NoMemory();
+			memcpy(tmp_str, s, size);
+			s = tmp_str; *(s + size) = '\0';
+			tmp_str = (char *)PQunescapeBytea((unsigned char*)s, &str_len);
+			PyMem_Free(s);
+			if (!tmp_str) return PyErr_NoMemory();
+			obj = PyBytes_FromStringAndSize(tmp_str, str_len);
+			if (tmp_str)
+				PQfreemem(tmp_str);
+			break;
+
 		case PYGRES_JSON:
 		 	/* this type should only be passed when jsondecode is set */
-			if (!jsondecode)
-			{
-				PyErr_SetString(PyExc_ValueError, "JSON decoder is not set");
-				return NULL;
-			}
-
 			obj = get_decoded_string(s, size, encoding);
-			if (obj) /* was able to decode */
+			if (obj && jsondecode) /* was able to decode */
 			{
 				tmp_obj = Py_BuildValue("(O)", obj);
 				obj = PyObject_CallObject(jsondecode, tmp_obj);
@@ -316,54 +418,80 @@ cast_value(char *s, int type, Py_ssize_t size, int encoding)
 			}
 			break;
 
+		default:  /* PYGRES_TEXT */
+#if IS_PY3
+			obj = get_decoded_string(s, size, encoding);
+			if (!obj) /* cannot decode */
+#endif
+			obj = PyBytes_FromStringAndSize(s, size);
+	}
+
+	return obj;
+}
+
+/* Cast a simple type to a Python object.
+   This needs a character string representation with a given size. */
+static PyObject *
+cast_sized_simple(char *s, Py_ssize_t size, int type)
+{
+	PyObject   *obj, *tmp_obj;
+	char		buf[64], *t;
+	int			i, j, n;
+
+	switch (type) /* this must be the PyGreSQL internal type */
+	{
 		case PYGRES_INT:
-			obj = PyInt_FromString(s, NULL, 10);
+			n = sizeof(buf)/sizeof(buf[0]) - 1;
+			if (size < n) n = size;
+			for (i = 0, t = buf; i < n; ++i) *t++ = *s++;
+			*t = '\0';
+			obj = PyInt_FromString(buf, NULL, 10);
 			break;
 
 		case PYGRES_LONG:
-			obj = PyLong_FromString(s, NULL, 10);
+			n = sizeof(buf)/sizeof(buf[0]) - 1;
+			if (size < n) n = size;
+			for (i = 0, t = buf; i < n; ++i) *t++ = *s++;
+			*t = '\0';
+			obj = PyLong_FromString(buf, NULL, 10);
 			break;
 
 		case PYGRES_FLOAT:
-			tmp_obj = PyStr_FromString(s);
+			tmp_obj = PyStr_FromStringAndSize(s, size);
 			obj = PyFloat_FromString(tmp_obj);
 			Py_DECREF(tmp_obj);
 			break;
 
 		case PYGRES_MONEY:
-			/* type should only be passed when decimal_point is set */
-			if (!decimal_point)
-			{
-				PyErr_SetString(PyExc_ValueError, "Decimal point is not set");
-				return NULL;
-			}
-
-			for (k = 0;
-				*s && k < sizeof(cashbuf)/sizeof(cashbuf[0]) - 1;
-				s++)
+			/* this type should only be passed when decimal_point is set */
+			n = sizeof(buf)/sizeof(buf[0]) - 1;
+			for (i = 0, j = 0; i < size && j < n; ++i, ++s)
 			{
 				if (*s >= '0' && *s <= '9')
-					cashbuf[k++] = *s;
+					buf[j++] = *s;
 				else if (*s == decimal_point)
-					cashbuf[k++] = '.';
+					buf[j++] = '.';
 				else if (*s == '(' || *s == '-')
-					cashbuf[k++] = '-';
+					buf[j++] = '-';
 			}
-			cashbuf[k] = '\0';
-			s = cashbuf;
-			/* FALLTHROUGH */ /* no break here */
-	
-		case PYGRES_DECIMAL:
 			if (decimal)
 			{
-				tmp_obj = Py_BuildValue("(s)", s);
-				obj = PyEval_CallObject(decimal, tmp_obj);
+				buf[j] = '\0';
+				obj = PyObject_CallFunction(decimal, "(s)", buf);
 			}
 			else
 			{
-				tmp_obj = PyStr_FromString(s);
+				tmp_obj = PyStr_FromString(buf);
 				obj = PyFloat_FromString(tmp_obj);
+				Py_DECREF(tmp_obj);
+
 			}
+			break;
+
+		case PYGRES_DECIMAL:
+			tmp_obj = PyStr_FromStringAndSize(s, size);
+			obj = decimal ? PyObject_CallFunctionObjArgs(
+				decimal, tmp_obj, NULL) : PyFloat_FromString(tmp_obj);
 			Py_DECREF(tmp_obj);
 			break;
 
@@ -381,19 +509,334 @@ cast_value(char *s, int type, Py_ssize_t size, int encoding)
 			break;
 
 		default:
-#if IS_PY3
-			obj = get_decoded_string(s, size, encoding);
-			if (!obj) /* cannot decode */
-#endif
-			obj = PyBytes_FromStringAndSize(s, size);
+			/* other types should never be passed, use cast_sized_text */
+			obj = PyStr_FromStringAndSize(s, size);
 	}
 
 	return obj;
 }
 
+/* Cast a simple type to a Python object.
+   This needs a null-terminated character string representation. */
+static PyObject *
+cast_unsized_simple(char *s, int type)
+{
+	PyObject   *obj, *tmp_obj;
+	char		buf[64];
+	int			j, n;
+
+	switch (type) /* this must be the PyGreSQL internal type */
+	{
+		case PYGRES_INT:
+			obj = PyInt_FromString(s, NULL, 10);
+			break;
+
+		case PYGRES_LONG:
+			obj = PyLong_FromString(s, NULL, 10);
+			break;
+
+		case PYGRES_FLOAT:
+			tmp_obj = PyStr_FromString(s);
+			obj = PyFloat_FromString(tmp_obj);
+			Py_DECREF(tmp_obj);
+			break;
+
+		case PYGRES_MONEY:
+			/* this type should only be passed when decimal_point is set */
+			n = sizeof(buf)/sizeof(buf[0]) - 1;
+			for (j = 0; *s && j < n; ++s)
+			{
+				if (*s >= '0' && *s <= '9')
+					buf[j++] = *s;
+				else if (*s == decimal_point)
+					buf[j++] = '.';
+				else if (*s == '(' || *s == '-')
+					buf[j++] = '-';
+			}
+			buf[j] = '\0'; s = buf;
+			/* FALLTHROUGH */ /* no break here */
+	
+		case PYGRES_DECIMAL:
+			if (decimal)
+			{
+				obj = PyObject_CallFunction(decimal, "(s)", s);
+			}
+			else
+			{
+				tmp_obj = PyStr_FromString(s);
+				obj = PyFloat_FromString(tmp_obj);
+				Py_DECREF(tmp_obj);
+			}
+			break;
+
+		case PYGRES_BOOL:
+			/* convert to bool only if use_bool is set */
+			if (use_bool)
+			{
+				obj = *s == 't' ? Py_True : Py_False;
+				Py_INCREF(obj);
+			}
+			else
+			{
+				obj = PyStr_FromString(*s == 't' ? "t" : "f");
+			}
+			break;
+
+		default:
+			/* other types should never be passed, use cast_sized_text */
+			obj = PyStr_FromString(s);
+	}
+
+	return obj;
+}
+
+/* quick case insensitive check if given sized string is null */
+#define STR_IS_NULL(s, n) (n == 4 \
+	&& (s[0] == 'n' || s[0] == 'N') \
+	&& (s[1] == 'u' || s[1] == 'U') \
+	&& (s[2] == 'l' || s[2] == 'L') \
+	&& (s[3] == 'l' || s[3] == 'L'))
+
+/* Cast string s with size and encoding to a Python list.
+   Use cast function if specified or basetype to cast elements.
+   The parameter delim specifies the delimiter for the elements,
+   since some types do not use the default delimiter of a comma. */
+static PyObject *
+cast_array(char *s, Py_ssize_t size, int encoding,
+	 int type, PyObject *cast, char delim)
+{
+	PyObject   *result, *stack[MAX_ARRAY_DEPTH];
+	char	   *end = s + size, *t;
+	int			depth, ranges = 0, level = 0;
+
+	if (type)
+	{
+		type &= ~PYGRES_ARRAY; /* get the base type */
+		if (!type) type = PYGRES_TEXT;
+	}
+	if (!delim) delim = ',';
+
+	/* strip blanks at the beginning */
+	while (s != end && *s == ' ') ++s;
+	if (*s == '[') /* dimension ranges */
+	{
+		int valid;
+
+		for (valid = 0; !valid;)
+		{
+			if (s == end || *s++ != '[') break;
+			while (s != end && *s == ' ') ++s;
+			if (s != end && (*s == '+' || *s == '-')) ++s;
+			if (s == end || *s <= '0' || *s >= '9') break;
+			while (s != end && *s >= '0' && *s <= '9') ++s;
+			if (s == end || *s++ != ':') break;
+			if (s != end && (*s == '+' || *s == '-')) ++s;
+			if (s == end || *s <= '0' || *s >= '9') break;
+			while (s != end && *s >= '0' && *s <= '9') ++s;
+			if (s == end || *s++ != ']') break;
+			while (s != end && *s == ' ') ++s;
+			++ranges;
+			if (s != end && *s == '=')
+			{
+				do ++s; while (s != end && *s == ' ');
+				valid = 1;
+			}
+		}
+		if (!valid)
+		{
+			PyErr_SetString(PyExc_ValueError, "Invalid array dimensions");
+			return NULL;
+		}
+	}
+	for (t = s, depth = 0; t != end && (*t == '{' || *t == ' '); ++t)
+		if (*t == '{') ++depth;
+	if (!depth)
+	{
+		PyErr_SetString(PyExc_ValueError,
+			"Array must start with an opening brace");
+		return NULL;
+	}
+	if (ranges && depth != ranges)
+	{
+		PyErr_SetString(PyExc_ValueError,
+			"Array dimensions do not match content");
+		return NULL;
+	}
+	if (depth > MAX_ARRAY_DEPTH)
+	{
+		PyErr_SetString(PyExc_ValueError, "Array is too deeply nested");
+		return NULL;
+	}
+	depth--; /* next level of parsing */
+	result = PyList_New(0);
+	if (!result) return NULL;
+	do ++s; while (s != end && *s == ' ');
+	/* everything is set up, start parsing the array */
+	while (s != end)
+	{
+		if (*s == '}')
+		{
+			PyObject *subresult;
+
+			if (!level) break; /* top level array ended */
+			do ++s; while (s != end && *s == ' ');
+			if (s == end) break; /* error */
+			if (*s == delim)
+			{
+				do ++s; while (s != end && *s == ' ');
+				if (s == end) break; /* error */
+				if (*s != '{')
+				{
+					PyErr_SetString(PyExc_ValueError,
+						"Subarray expected but not found");
+					return NULL;
+				}
+			}
+			else if (*s != '}') break; /* error */
+			subresult = result;
+			result = stack[--level];
+			if (PyList_Append(result, subresult)) return NULL;
+		}
+		else if (level == depth) /* we expect elements at this level */
+		{
+			PyObject   *element;
+			char	   *estr;
+			Py_ssize_t	esize;
+			int escaped = 0;
+
+			if (*s == '{')
+			{
+				PyErr_SetString(PyExc_ValueError,
+					"Subarray found where not expected");
+				return NULL;
+			}
+			if (*s == '"') /* quoted element */
+			{
+				estr = ++s;
+				while (s != end && *s != '"')
+				{
+					if (*s == '\\')
+					{
+						++s; if (s == end) break;
+						escaped = 1;
+					}
+					++s;
+				}
+				esize = s - estr;
+				do ++s; while (s != end && *s == ' ');
+			}
+			else /* unquoted element */
+			{
+				estr = s;
+				/* can contain blanks inside */
+				while (s != end && *s != '"' &&
+					*s != '{' && *s != '}' && *s != delim)
+				{
+					if (*s == '\\')
+					{
+						++s; if (s == end) break;
+						escaped = 1;
+					}
+					++s;
+				}
+				t = s; while (t > estr && *(t - 1) == ' ') --t;
+				if (!(esize = t - estr))
+				{
+					s = end; break; /* error */
+				}
+				if (STR_IS_NULL(estr, esize)) /* NULL gives None */
+					estr = NULL;
+			}
+			if (s == end) break; /* error */
+			if (estr)
+			{
+				if (escaped)
+				{
+					char   *r;
+					int		i;
+
+					/* create unescaped string */
+					t = estr;
+					estr = (char *) PyMem_Malloc(esize);
+					if (!estr) return PyErr_NoMemory();
+					for (i = 0, r = estr; i < esize; ++i)
+					{
+						if (*t == '\\') ++t, ++i;
+						*r++ = *t++;
+					}
+					esize = r - estr;
+				}
+				if (type) /* internal casting of base type */
+				{
+					if (type & PYGRES_TEXT)
+						element = cast_sized_text(estr, esize, encoding, type);
+					else
+						element = cast_sized_simple(estr, esize, type);
+				}
+				else /* external casting of base type */
+				{
+#if IS_PY3
+					element = encoding == pg_encoding_ascii ? NULL :
+						get_decoded_string(estr, esize, encoding);
+					if (!element) /* no decoding necessary or possible */
+#else
+					element = PyBytes_FromStringAndSize(estr, esize);
+#endif
+					if (element && cast)
+					{
+						element = PyObject_CallFunctionObjArgs(
+							cast, element, NULL);
+					}
+				}
+				if (escaped) PyMem_Free(estr);
+				if (!element) return NULL;
+			}
+			else
+			{
+				Py_INCREF(Py_None);
+				element = Py_None;
+			}
+			if (PyList_Append(result, element)) return NULL;
+			if (*s == delim)
+			{
+				do ++s; while (s != end && *s == ' ');
+				if (s == end) break; /* error */
+			}
+			else if (*s != '}') break; /* error */
+		}
+		else /* we expect arrays at this level */
+		{
+			if (*s != '{')
+			{
+				PyErr_SetString(PyExc_ValueError,
+					"Subarray must start with an opening brace");
+				return NULL;
+			}
+			do ++s; while (s != end && *s == ' ');
+			if (s == end) break; /* error */
+			stack[level++] = result;
+			if (!(result = PyList_New(0))) return NULL;
+		}
+	}
+	if (s == end || *s != '}')
+	{
+		PyErr_SetString(PyExc_ValueError,
+			"Unexpected end of array");
+		return NULL;
+	}
+	do ++s; while (s != end && *s == ' ');
+	if (s != end)
+	{
+		PyErr_SetString(PyExc_ValueError,
+			"Unexpected characters after end of array");
+		return NULL;
+	}
+	return result;
+}
 
 /* internal wrapper for the notice receiver callback */
-static void notice_receiver(void *arg, const PGresult *res)
+static void
+notice_receiver(void *arg, const PGresult *res)
 {
 	PyGILState_STATE gstate = PyGILState_Ensure();
 	connObject *self = (connObject*) arg;
@@ -401,7 +844,7 @@ static void notice_receiver(void *arg, const PGresult *res)
 	if (proc && PyCallable_Check(proc))
 	{
 		noticeObject *notice = PyObject_NEW(noticeObject, &noticeType);
-		PyObject *args, *ret;
+		PyObject *ret;
 		if (notice)
 		{
 			notice->pgcnx = arg;
@@ -412,10 +855,8 @@ static void notice_receiver(void *arg, const PGresult *res)
 			Py_INCREF(Py_None);
 			notice = (noticeObject *)(void *)Py_None;
 		}
-		args = Py_BuildValue("(O)", notice);
-		ret = PyObject_CallObject(proc, args);
+		ret = PyObject_CallFunction(proc, "(O)", notice);
 		Py_XDECREF(ret);
-		Py_DECREF(args);
 	}
 	PyGILState_Release(gstate);
 }
@@ -481,159 +922,147 @@ format_result(const PGresult *res)
 {
 	const int n = PQnfields(res);
 
-	if (n > 0)
+	if (n <= 0)
+		return PyStr_FromString("(nothing selected)");
+
+	char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
+	int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
+
+	if (!aligns || !sizes)
 	{
-		char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
-		int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
+		PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
+	}
 
-		if (aligns && sizes)
+	const int m = PQntuples(res);
+	int i, j;
+	size_t size;
+	char *buffer;
+
+	/* calculate sizes and alignments */
+	for (j = 0; j < n; ++j)
+	{
+		const char * const s = PQfname(res, j);
+		const int format = PQfformat(res, j);
+
+		sizes[j] = s ? (int)strlen(s) : 0;
+		if (format)
 		{
-			const int m = PQntuples(res);
-			int i, j;
-			size_t size;
-			char *buffer;
+			aligns[j] = '\0';
+			if (m && sizes[j] < 8)
+				/* "<binary>" must fit */
+				sizes[j] = 8;
+		}
+		else
+		{
+			const Oid ftype = PQftype(res, j);
 
-			/* calculate sizes and alignments */
-			for (j = 0; j < n; j++)
+			switch (ftype)
 			{
-				const char * const s = PQfname(res, j);
-				const int format = PQfformat(res, j);
-
-				sizes[j] = s ? (int)strlen(s) : 0;
-				if (format)
-				{
-					aligns[j] = '\0';
-					if (m && sizes[j] < 8)
-						/* "<binary>" must fit */
-						sizes[j] = 8;
-				}
-				else
-				{
-					const Oid ftype = PQftype(res, j);
-
-					switch (ftype)
-					{
-						case INT2OID:
-						case INT4OID:
-						case INT8OID:
-						case FLOAT4OID:
-						case FLOAT8OID:
-						case NUMERICOID:
-						case OIDOID:
-						case XIDOID:
-						case CIDOID:
-						case CASHOID:
-							aligns[j] = 'r';
-							break;
-						default:
-							aligns[j] = 'l';
-					}
-				}
+				case INT2OID:
+				case INT4OID:
+				case INT8OID:
+				case FLOAT4OID:
+				case FLOAT8OID:
+				case NUMERICOID:
+				case OIDOID:
+				case XIDOID:
+				case CIDOID:
+				case CASHOID:
+					aligns[j] = 'r';
+					break;
+				default:
+					aligns[j] = 'l';
 			}
-			for (i = 0; i < m; i++)
+		}
+	}
+	for (i = 0; i < m; ++i)
+	{
+		for (j = 0; j < n; ++j)
+		{
+			if (aligns[j])
 			{
-				for (j = 0; j < n; j++)
-				{
-					if (aligns[j])
-					{
-						const int k = PQgetlength(res, i, j);
+				const int k = PQgetlength(res, i, j);
 
-						if (sizes[j] < k)
-							/* value must fit */
-							sizes[j] = k;
-					}
-				}
+				if (sizes[j] < k)
+					/* value must fit */
+					sizes[j] = k;
 			}
-			size = 0;
-			/* size of one row */
-			for (j = 0; j < n; j++) size += sizes[j] + 1;
-			/* times number of rows incl. heading */
-			size *= (m + 2);
-			/* plus size of footer */
-			size += 40;
-			/* is the buffer size that needs to be allocated */
-			buffer = (char *) PyMem_Malloc(size);
-			if (buffer)
+		}
+	}
+	size = 0;
+	/* size of one row */
+	for (j = 0; j < n; ++j) size += sizes[j] + 1;
+	/* times number of rows incl. heading */
+	size *= (m + 2);
+	/* plus size of footer */
+	size += 40;
+	/* is the buffer size that needs to be allocated */
+	buffer = (char *) PyMem_Malloc(size);
+	if (!buffer)
+	{
+		PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
+	}
+	char *p = buffer;
+	PyObject *result;
+
+	/* create the header */
+	for (j = 0; j < n; ++j)
+	{
+		const char * const s = PQfname(res, j);
+		const int k = sizes[j];
+		const int h = (k - (int)strlen(s)) / 2;
+
+		sprintf(p, "%*s", h, "");
+		sprintf(p + h, "%-*s", k - h, s);
+		p += k;
+		if (j + 1 < n)
+			*p++ = '|';
+	}
+	*p++ = '\n';
+	for (j = 0; j < n; ++j)
+	{
+		int k = sizes[j];
+
+		while (k--)
+			*p++ = '-';
+		if (j + 1 < n)
+			*p++ = '+';
+	}
+	*p++ = '\n';
+	/* create the body */
+	for (i = 0; i < m; ++i)
+	{
+		for (j = 0; j < n; ++j)
+		{
+			const char align = aligns[j];
+			const int k = sizes[j];
+
+			if (align)
 			{
-				char *p = buffer;
-				PyObject *result;
-
-				/* create the header */
-				for (j = 0; j < n; j++)
-				{
-					const char * const s = PQfname(res, j);
-					const int k = sizes[j];
-					const int h = (k - (int)strlen(s)) / 2;
-
-					sprintf(p, "%*s", h, "");
-					sprintf(p + h, "%-*s", k - h, s);
-					p += k;
-					if (j + 1 < n)
-						*p++ = '|';
-				}
-				*p++ = '\n';
-				for (j = 0; j < n; j++)
-				{
-					int k = sizes[j];
-
-					while (k--)
-						*p++ = '-';
-					if (j + 1 < n)
-						*p++ = '+';
-				}
-				*p++ = '\n';
-				/* create the body */
-				for (i = 0; i < m; i++)
-				{
-					for (j = 0; j < n; j++)
-					{
-						const char align = aligns[j];
-						const int k = sizes[j];
-
-						if (align)
-						{
-							sprintf(p, align == 'r' ?
-								"%*s" : "%-*s", k,
-								PQgetvalue(res, i, j));
-						}
-						else
-						{
-							sprintf(p, "%-*s", k,
-								PQgetisnull(res, i, j) ?
-								"" : "<binary>");
-						}
-						p += k;
-						if (j + 1 < n)
-							*p++ = '|';
-					}
-					*p++ = '\n';
-				}
-				/* free memory */
-				PyMem_Free(aligns);
-				PyMem_Free(sizes);
-				/* create the footer */
-				sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
-				/* return the result */
-				result = PyStr_FromString(buffer);
-				PyMem_Free(buffer);
-				return result;
+				sprintf(p, align == 'r' ?
+					"%*s" : "%-*s", k,
+					PQgetvalue(res, i, j));
 			}
 			else
 			{
-				PyErr_SetString(PyExc_MemoryError,
-					"Not enough memory for formatting the query result");
-				return NULL;
+				sprintf(p, "%-*s", k,
+					PQgetisnull(res, i, j) ?
+					"" : "<binary>");
 			}
-		} else {
-			PyMem_Free(aligns);
-			PyMem_Free(sizes);
-			PyErr_SetString(PyExc_MemoryError,
-				"Not enough memory for formatting the query result");
-			return NULL;
+			p += k;
+			if (j + 1 < n)
+				*p++ = '|';
 		}
+		*p++ = '\n';
 	}
-	else
-		return PyStr_FromString("(nothing selected)");
+	/* free memory */
+	PyMem_Free(aligns); PyMem_Free(sizes);
+	/* create the footer */
+	sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
+	/* return the result */
+	result = PyStr_FromString(buffer);
+	PyMem_Free(buffer);
+	return result;
 }
 
 /* --------------------------------------------------------------------- */
@@ -1294,19 +1723,17 @@ connQuery(connObject *self, PyObject *args)
 
 		str = (PyObject **)PyMem_Malloc(nparms * sizeof(*str));
 		parms = (char **)PyMem_Malloc(nparms * sizeof(*parms));
-		if (!str || !parms) {
-			PyMem_Free(parms);
-			PyMem_Free(str);
-			Py_XDECREF(query_obj);
-			Py_XDECREF(param_obj);
-			PyErr_SetString(PyExc_MemoryError, "Memory error in query()");
-			return NULL;
+		if (!str || !parms)
+		{
+			PyMem_Free(parms); PyMem_Free(str);
+			Py_XDECREF(query_obj); Py_XDECREF(param_obj);
+			return PyErr_NoMemory();
 		}
 
 		/* convert optional args to a list of strings -- this allows
 		 * the caller to pass whatever they like, and prevents us
 		 * from having to map types to OIDs */
-		for (i = 0, s=str, p=parms; i < nparms; i++, p++)
+		for (i = 0, s=str, p=parms; i < nparms; ++i, ++p)
 		{
 			PyObject *obj = PySequence_Fast_GET_ITEM(param_obj, i);
 
@@ -1427,10 +1854,7 @@ connQuery(connObject *self, PyObject *args)
 	}
 
 	if (!(npgobj = PyObject_NEW(queryObject, &queryType)))
-	{
-		PyErr_SetString(PyExc_MemoryError, "Can't create query object");
-		return NULL;
-	}
+		return PyErr_NoMemory();
 
 	/* stores result and returns object */
 	npgobj->result = result;
@@ -1613,11 +2037,7 @@ connInsertTable(connObject *self, PyObject *args)
 
 	/* allocate buffer */
 	if (!(buffer = PyMem_Malloc(MAX_BUFFER_SIZE)))
-	{
-		PyErr_SetString(PyExc_MemoryError,
-			"Can't allocate insert buffer");
-		return NULL;
-	}
+		return PyErr_NoMemory();
 
 	/* starts query */
 	sprintf(buffer, "copy %s from stdin", table);
@@ -1640,7 +2060,7 @@ connInsertTable(connObject *self, PyObject *args)
 	n = 0; /* not strictly necessary but avoids warning */
 
 	/* feed table */
-	for (i = 0; i < m; i++)
+	for (i = 0; i < m; ++i)
 	{
 		sublist = getitem(list, i);
 		if (PyTuple_Check(sublist))
@@ -1678,7 +2098,7 @@ connInsertTable(connObject *self, PyObject *args)
 		bufpt = buffer;
 		bufsiz = MAX_BUFFER_SIZE - 1;
 
-		for (j = 0; j < n; j++)
+		for (j = 0; j < n; ++j)
 		{
 			if (j)
 			{
@@ -1759,10 +2179,7 @@ connInsertTable(connObject *self, PyObject *args)
 
 			if (bufsiz <= 0)
 			{
-				PyMem_Free(buffer);
-				PyErr_SetString(PyExc_MemoryError,
-					"Insert buffer overflow");
-				return NULL;
+				PyMem_Free(buffer); return PyErr_NoMemory();
 			}
 
 		}
@@ -2819,26 +3236,24 @@ sourceFetch(sourceObject *self, PyObject *args)
 		size = self->max_row - self->current_row;
 
 	/* allocate list for result */
-	if (!(reslist = PyList_New(0)))
-		return NULL;
+	if (!(reslist = PyList_New(0))) return NULL;
 
 #if IS_PY3
 	encoding = self->encoding;
 #endif
 
 	/* builds result */
-	for (i = 0, k = self->current_row; i < size; i++, k++)
+	for (i = 0, k = self->current_row; i < size; ++i, ++k)
 	{
 		PyObject   *rowtuple;
 		int			j;
 
 		if (!(rowtuple = PyTuple_New(self->num_fields)))
 		{
-			Py_DECREF(reslist);
-			return NULL;
+			Py_DECREF(reslist); return NULL;
 		}
 
-		for (j = 0; j < self->num_fields; j++)
+		for (j = 0; j < self->num_fields; ++j)
 		{
 			PyObject   *str;
 
@@ -2847,7 +3262,8 @@ sourceFetch(sourceObject *self, PyObject *args)
 				Py_INCREF(Py_None);
 				str = Py_None;
 			}
-			else {
+			else
+			{
 				char *s = PQgetvalue(self->result, k, j);
 				Py_ssize_t size = PQgetlength(self->result, k, j);
 #if IS_PY3
@@ -2864,7 +3280,10 @@ sourceFetch(sourceObject *self, PyObject *args)
 			PyTuple_SET_ITEM(rowtuple, j, str);
 		}
 
-		PyList_Append(reslist, rowtuple);
+		if (PyList_Append(reslist, rowtuple))
+		{
+			Py_DECREF(rowtuple); Py_DECREF(reslist); return NULL;
+		}
 		Py_DECREF(rowtuple);
 	}
 
@@ -2901,7 +3320,7 @@ pgsource_move(sourceObject *self, PyObject *args, int move)
 			break;
 		case QUERY_MOVENEXT:
 			if (self->current_row != self->max_row)
-				self->current_row++;
+				++self->current_row;
 			break;
 		case QUERY_MOVEPREV:
 			if (self->current_row > 0)
@@ -2978,7 +3397,8 @@ sourcePutData(sourceObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "O", &buffer_obj))
 		return NULL;
 
-	if (buffer_obj == Py_None) {
+	if (buffer_obj == Py_None)
+	{
 		/* pass None for terminating the operation */
 		buffer = errormsg = NULL;
 		buffer_obj = NULL;
@@ -3242,7 +3662,7 @@ sourceListInfo(sourceObject *self, PyObject *args)
 	if (!(result = PyTuple_New(self->num_fields)))
 		return NULL;
 
-	for (i = 0; i < self->num_fields; i++)
+	for (i = 0; i < self->num_fields; ++i)
 	{
 		info = pgsource_buildinfo(self, i);
 		if (!info)
@@ -3605,7 +4025,7 @@ queryListFields(queryObject *self, PyObject *args)
 	n = PQnfields(self->result);
 	fieldstuple = PyTuple_New(n);
 
-	for (i = 0; i < n; i++)
+	for (i = 0; i < n; ++i)
 	{
 		name = PQfname(self->result, i);
 		str = PyStr_FromString(name);
@@ -3682,10 +4102,7 @@ static PyObject *
 queryGetResult(queryObject *self, PyObject *args)
 {
 	PyObject   *reslist;
-	int			i,
-				m,
-				n,
-			   *coltypes;
+	int			i, m, n, *col_types;
 	int			encoding = self->encoding;
 
 	/* checks args (args == NULL for an internal call) */
@@ -3699,12 +4116,11 @@ queryGetResult(queryObject *self, PyObject *args)
 	/* stores result in tuple */
 	m = PQntuples(self->result);
 	n = PQnfields(self->result);
-	if (!(reslist = PyList_New(m)))
-		return NULL;
+	if (!(reslist = PyList_New(m))) return NULL;
 
-	coltypes = get_type_array(self->result, n);
+	if (!(col_types = get_col_types(self->result, n))) return NULL;
 
-	for (i = 0; i < m; i++)
+	for (i = 0; i < m; ++i)
 	{
 		PyObject   *rowtuple;
 		int			j;
@@ -3716,7 +4132,7 @@ queryGetResult(queryObject *self, PyObject *args)
 			goto exit;
 		}
 
-		for (j = 0; j < n; j++)
+		for (j = 0; j < n; ++j)
 		{
 			PyObject * val;
 
@@ -3727,17 +4143,22 @@ queryGetResult(queryObject *self, PyObject *args)
 			}
 			else /* not null */
 			{
-				char	   *s = PQgetvalue(self->result, i, j);
-				Py_ssize_t	size = PQgetlength(self->result, i, j);;
+				/* get the string representation of the value */
+				/* note: this is always null-terminated text format */
+				char   *s = PQgetvalue(self->result, i, j);
+				/* get the PyGreSQL type of the column */
+				int		type = col_types[j];
 
-				if (PQfformat(self->result, j) == 0) /* text */
-				{
-					val = cast_value(s, coltypes[j], size, encoding);
-				}
-				else /* not text */
-				{
-					val = PyBytes_FromStringAndSize(s, size);
-				}
+				if (type & PYGRES_ARRAY)
+					val = cast_array(s, PQgetlength(self->result, i, j),
+						encoding, type, NULL, 0);
+				else if (type == PYGRES_BYTEA)
+					val = cast_bytea_text(s);
+				else if (type & PYGRES_TEXT)
+					val = cast_sized_text(s, PQgetlength(self->result, i, j),
+						encoding, type);
+				else
+					val = cast_unsized_simple(s, type);
 			}
 
 			if (!val)
@@ -3755,7 +4176,7 @@ queryGetResult(queryObject *self, PyObject *args)
 	}
 
 exit:
-	PyMem_Free(coltypes);
+	PyMem_Free(col_types);
 
 	/* returns list */
 	return reslist;
@@ -3774,7 +4195,7 @@ queryDictResult(queryObject *self, PyObject *args)
 	int			i,
 				m,
 				n,
-			   *coltypes;
+			   *col_types;
 	int			encoding = self->encoding;
 
 	/* checks args (args == NULL for an internal call) */
@@ -3788,12 +4209,11 @@ queryDictResult(queryObject *self, PyObject *args)
 	/* stores result in list */
 	m = PQntuples(self->result);
 	n = PQnfields(self->result);
-	if (!(reslist = PyList_New(m)))
-		return NULL;
+	if (!(reslist = PyList_New(m))) return NULL;
 
-	coltypes = get_type_array(self->result, n);
+	if (!(col_types = get_col_types(self->result, n))) return NULL;
 
-	for (i = 0; i < m; i++)
+	for (i = 0; i < m; ++i)
 	{
 		PyObject   *dict;
 		int			j;
@@ -3805,7 +4225,7 @@ queryDictResult(queryObject *self, PyObject *args)
 			goto exit;
 		}
 
-		for (j = 0; j < n; j++)
+		for (j = 0; j < n; ++j)
 		{
 			PyObject * val;
 
@@ -3816,17 +4236,22 @@ queryDictResult(queryObject *self, PyObject *args)
 			}
 			else /* not null */
 			{
-				char	   *s = PQgetvalue(self->result, i, j);
-				Py_ssize_t	size = PQgetlength(self->result, i, j);;
+				/* get the string representation of the value */
+				/* note: this is always null-terminated text format */
+				char   *s = PQgetvalue(self->result, i, j);
+				/* get the PyGreSQL type of the column */
+				int		type = col_types[j];
 
-				if (PQfformat(self->result, j) == 0) /* text */
-				{
-					val = cast_value(s, coltypes[j], size, encoding);
-				}
-				else /* not text */
-				{
-					val = PyBytes_FromStringAndSize(s, size);
-				}
+				if (type & PYGRES_ARRAY)
+					val = cast_array(s, PQgetlength(self->result, i, j),
+						encoding, type, NULL, 0);
+				else if (type == PYGRES_BYTEA)
+					val = cast_bytea_text(s);
+				else if (type & PYGRES_TEXT)
+					val = cast_sized_text(s, PQgetlength(self->result, i, j),
+						encoding, type);
+				else
+					val = cast_unsized_simple(s, type);
 			}
 
 			if (!val)
@@ -3845,7 +4270,7 @@ queryDictResult(queryObject *self, PyObject *args)
 	}
 
 exit:
-	PyMem_Free(coltypes);
+	PyMem_Free(col_types);
 
 	/* returns list */
 	return reslist;
@@ -3860,8 +4285,7 @@ static char queryNamedResult__doc__[] =
 static PyObject *
 queryNamedResult(queryObject *self, PyObject *args)
 {
-	PyObject   *arglist,
-			   *ret;
+	PyObject   *ret;
 
 	if (namedresult)
 	{
@@ -3873,9 +4297,7 @@ queryNamedResult(queryObject *self, PyObject *args)
 			return NULL;
 		}
 
-		arglist = Py_BuildValue("(O)", self);
-		ret = PyObject_CallObject(namedresult, arglist);
-		Py_DECREF(arglist);
+		ret = PyObject_CallFunction(namedresult, "(O)", self);
 
 		if (ret == NULL)
 			return NULL;
@@ -4203,9 +4625,11 @@ static PyObject
 
 	Py_XDECREF(from_obj);
 
+	if (!to) return PyErr_NoMemory();
+
 	to_obj = PyBytes_FromStringAndSize(to, to_length);
-	if (to)
-		PQfreemem(to);
+	PQfreemem(to);
+
 	return to_obj;
 }
 
@@ -4225,7 +4649,9 @@ pgGetDecimalPoint(PyObject *self, PyObject * args)
 		{
 			s[0] = decimal_point; s[1] = '\0';
 			ret = PyStr_FromString(s);
-		} else {
+		}
+		else
+		{
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 	}
@@ -4261,7 +4687,9 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 	{
 		decimal_point = *s;
 		Py_INCREF(Py_None); ret = Py_None;
-	} else {
+	}
+	else
+	{
 		PyErr_SetString(PyExc_TypeError,
 			"set_decimal_point() expects a decimal mark character");
 	}
@@ -4738,6 +5166,55 @@ pgSetDefPort(PyObject *self, PyObject *args)
 }
 #endif /* DEFAULT_VARS */
 
+/* cast a string with a text representation of an array to a list */
+static char pgCastArray__doc__[] =
+"cast_array(string, cast=None, delim=',') -- cast a string as an array";
+
+PyObject *
+pgCastArray(PyObject *self, PyObject *args, PyObject *dict)
+{
+	static const char *kwlist[] = {"string", "cast", "delim", NULL};
+	PyObject   *string_obj, *cast_obj = NULL;
+	char  	   *string;
+	Py_ssize_t	size;
+	int			encoding;
+	char		delim = ',';
+
+	if (!PyArg_ParseTupleAndKeywords(args, dict, "O|Oc",
+			(char **) kwlist, &string_obj, &cast_obj, &delim))
+		return NULL;
+
+	if (PyBytes_Check(string_obj))
+	{
+		encoding = pg_encoding_ascii;
+		PyBytes_AsStringAndSize(string_obj, &string, &size);
+		string_obj = NULL;
+	}
+	else if (PyUnicode_Check(string_obj))
+	{
+		encoding = pg_encoding_utf8;
+		string_obj = get_encoded_string(string_obj, encoding);
+		if (!string_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(string_obj, &string, &size);
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError, "cast_array() expects a string");
+		return NULL;
+	}
+
+	if (!cast_obj || cast_obj == Py_None)
+		cast_obj = NULL;
+	else if (!PyCallable_Check(cast_obj))
+	{
+		PyErr_SetString(PyExc_TypeError, "The cast argument must be callable");
+		return NULL;
+	}
+
+	return cast_array(string, size, encoding, 0, cast_obj, delim);
+}
+
+
 /* List of functions defined in the module */
 
 static struct PyMethodDef pgMethods[] = {
@@ -4767,6 +5244,8 @@ static struct PyMethodDef pgMethods[] = {
 			pgGetJsondecode__doc__},
 	{"set_jsondecode", (PyCFunction) pgSetJsondecode, METH_VARARGS,
 			pgSetJsondecode__doc__},
+	{"cast_array", (PyCFunction) pgCastArray, METH_VARARGS|METH_KEYWORDS,
+			pgCastArray__doc__},
 
 #ifdef DEFAULT_VARS
 	{"get_defhost", pgGetDefHost, METH_VARARGS, pgGetDefHost__doc__},

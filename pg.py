@@ -38,6 +38,7 @@ from decimal import Decimal
 from collections import namedtuple
 from functools import partial
 from operator import itemgetter
+from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
 try:
@@ -131,32 +132,42 @@ else:
             raise TypeError('This object is read-only')
 
 
-# Auxiliary functions that are independent from a DB connection:
+# Auxiliary classes and functions that are independent from a DB connection:
 
 def _oid_key(table):
     """Build oid key from a table name."""
     return 'oid(%s)' % table
 
 
-def _simpletype(typ):
-    """Determine a simplified name a pg_type name."""
-    if typ.startswith('bool'):
-        return 'bool'
-    if typ.startswith(('abstime', 'date', 'interval', 'timestamp')):
-        return 'date'
-    if typ.startswith(('cid', 'oid', 'int', 'xid')):
-        return 'int'
-    if typ.startswith('float'):
-        return 'float'
-    if typ.startswith('numeric'):
-        return 'num'
-    if typ.startswith('money'):
-        return 'money'
-    if typ.startswith('bytea'):
-        return 'bytea'
-    if typ.startswith('json'):
-        return 'json'
-    return 'text'
+class _SimpleType(dict):
+    """Dictionary mapping pg_type names to simple type names."""
+
+    _types = {'bool': 'bool',
+        'bytea': 'bytea',
+        'date': 'date interval time timetz timestamp timestamptz'
+            ' abstime reltime',  # these are very old
+        'float': 'float4 float8',
+        'int': 'cid int2 int4 int8 oid xid',
+        'json': 'json jsonb',
+        'num': 'numeric',
+        'money': 'money',
+        'text': 'bpchar char name text varchar'}
+
+    def __init__(self):
+        for typ, keys in self._types.items():
+            for key in keys.split():
+                self[key] = typ
+                self['_%s' % key] = '%s[]' % typ
+
+    @staticmethod
+    def __missing__(key):
+        return 'text'
+
+_simpletype = _SimpleType()
+
+
+class _Literal(str):
+    """Wrapper class for literal SQL."""
 
 
 def _namedresult(q):
@@ -413,7 +424,7 @@ class DB(object):
     def _do_debug(self, *args):
         """Print a debug message"""
         if self.debug:
-            s = '\n'.join(args)
+            s = '\n'.join(str(arg) for arg in args)
             if isinstance(self.debug, basestring):
                 print(self.debug % s)
             elif hasattr(self.debug, 'write'):
@@ -458,17 +469,20 @@ class DB(object):
         if not d:
             return None
         if isinstance(d, basestring) and d.lower() in self._date_literals:
-            raise ValueError
+            return _Literal(d)
         return d
 
     _num_types = frozenset('int float num money'
         ' int2 int4 int8 float4 float8 numeric money'.split())
 
-    def _prepare_num(self, d):
+    @staticmethod
+    def _prepare_num(d):
         """Prepare a numeric parameter."""
         if not d and d != 0:
             return None
         return d
+
+    _prepare_int = _prepare_float = _prepare_money = _prepare_num
 
     def _prepare_bytea(self, d):
         """Prepare a bytea parameter."""
@@ -476,20 +490,96 @@ class DB(object):
 
     def _prepare_json(self, d):
         """Prepare a json parameter."""
+        if not d:
+            return None
+        if isinstance(d, basestring):
+            return d
         return self.encode_json(d)
 
-    _prepare_funcs = dict(  # quote methods for each type
-        bool=_prepare_bool, date=_prepare_date,
-        int=_prepare_num, num=_prepare_num, float=_prepare_num,
-        money=_prepare_num, bytea=_prepare_bytea, json=_prepare_json)
+    _re_array_escape = regex(r'(["\\])')
+    _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
+
+    def _prepare_bool_array(self, d):
+        """Prepare a bool array parameter."""
+        if isinstance(d, list):
+            return '{%s}' % ','.join(self._prepare_bool_array(v) for v in d)
+        if d is None:
+            return 'null'
+        if isinstance(d, basestring):
+            if not d:
+                return 'null'
+            d = d.lower() in self._bool_true_values
+        return 't' if d else 'f'
+
+    def _prepare_num_array(self, d):
+        """Prepare a numeric array parameter."""
+        if isinstance(d, list):
+            return '{%s}' % ','.join(self._prepare_num_array(v) for v in d)
+        if not d and d != 0:
+            return 'null'
+        return str(d)
+
+    _prepare_int_array = _prepare_float_array = _prepare_money_array = \
+            _prepare_num_array
+
+    def _prepare_text_array(self, d):
+        """Prepare a text array parameter."""
+        if isinstance(d, list):
+            return '{%s}' % ','.join(self._prepare_text_array(v) for v in d)
+        if d is None:
+            return 'null'
+        if not d:
+            return '""'
+        d = str(d)
+        if self._re_array_quote.search(d):
+            d = '"%s"' % self._re_array_escape.sub(r'\\\1', d)
+        return d
+
+    def _prepare_bytea_array(self, d):
+        """Prepare a bytea array parameter."""
+        if isinstance(d, list):
+            return '{%s}' % ','.join(self._prepare_bytea_array(v) for v in d)
+        if d is None:
+            return 'null'
+        return self.escape_bytea(d).replace('\\', '\\\\')
+
+    def _prepare_json_array(self, d):
+        """Prepare a json array parameter."""
+        if isinstance(d, list):
+            return '{%s}' % ','.join(self._prepare_json_array(v) for v in d)
+        if not d:
+            return 'null'
+        if not isinstance(d, basestring):
+            d = self.encode_json(d)
+        if self._re_array_quote.search(d):
+            d = '"%s"' % self._re_array_escape.sub(r'\\\1', d)
+        return d
 
     def _prepare_param(self, value, typ, params):
         """Prepare and add a parameter to the list."""
+        if isinstance(value, _Literal):
+            return value
         if value is not None and typ != 'text':
-            prepare = self._prepare_funcs[typ]
-            try:
-                value = prepare(self, value)
-            except ValueError:
+            if typ.endswith('[]'):
+                if isinstance(value, list):
+                    prepare = getattr(self, '_prepare_%s_array' % typ[:-2])
+                    value = prepare(value)
+                elif isinstance(value, basestring):
+                    value = value.strip()
+                    if not value.startswith('{') or not value.endswith('}'):
+                        if value[:5].lower() == 'array':
+                            value = value[5:].lstrip()
+                        if value.startswith('[') and value.endswith(']'):
+                            value = _Literal('ARRAY%s' % value)
+                        else:
+                            raise ValueError(
+                                'Invalid array expression: %s' % value)
+                else:
+                    raise ValueError('Invalid array parameter: %s' % value)
+            else:
+                prepare = getattr(self, '_prepare_%s' % typ)
+                value = prepare(value)
+            if isinstance(value, _Literal):
                 return value
         params.append(value)
         return '$%d' % len(params)
@@ -725,7 +815,7 @@ class DB(object):
             self._do_debug(q)
             self.db.query(q)
 
-    def query(self, qstr, *args):
+    def query(self, command, *args):
         """Execute a SQL command string.
 
         This method simply sends a SQL query to the database.  If the query is
@@ -747,8 +837,11 @@ class DB(object):
         # Wraps shared library function for debugging.
         if not self.db:
             raise _int_error('Connection is not valid')
-        self._do_debug(qstr)
-        return self.db.query(qstr, args)
+        if args:
+            self._do_debug(command, args)
+            return self.db.query(command, args)
+        self._do_debug(command)
+        return self.db.query(command)
 
     def pkey(self, table, composite=False, flush=False):
         """Get or set the primary key of a table.
@@ -849,7 +942,7 @@ class DB(object):
                     self._prepare_qualified_param(table, 1))
             names = self.db.query(q, (table,)).getresult()
             if not self._regtypes:
-                names = ((name, _simpletype(typ)) for name, typ in names)
+                names = ((name, _simpletype[typ]) for name, typ in names)
             names = AttrDict(names)
             attnames[table] = names  # cache it
         return names
@@ -950,8 +1043,6 @@ class DB(object):
         for n, value in res[0].items():
             if qoid and n == 'oid':
                 n = qoid
-            elif value is not None and attnames.get(n) == 'bytea':
-                value = self.unescape_bytea(value)
             row[n] = value
         return row
 
@@ -985,6 +1076,8 @@ class DB(object):
             if n in row:
                 names.append(col(n))
                 values.append(param(row[n], attnames[n]))
+        if not names:
+            raise _prg_error('No column found that can be inserted')
         names, values = ', '.join(names), ', '.join(values)
         ret = 'oid, *' if qoid else '*'
         q = 'INSERT INTO %s (%s) VALUES (%s) RETURNING %s' % (
@@ -996,8 +1089,6 @@ class DB(object):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
-                elif value is not None and attnames.get(n) == 'bytea':
-                    value = self.unescape_bytea(value)
                 row[n] = value
         return row
 
@@ -1065,8 +1156,6 @@ class DB(object):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
-                elif value is not None and attnames.get(n) == 'bytea':
-                    value = self.unescape_bytea(value)
                 row[n] = value
         return row
 
@@ -1168,8 +1257,6 @@ class DB(object):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
-                elif value is not None and attnames.get(n) == 'bytea':
-                    value = self.unescape_bytea(value)
                 row[n] = value
         else:
             self.get(table, row)

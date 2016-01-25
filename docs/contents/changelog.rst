@@ -39,12 +39,18 @@ Version 5.0
 - A method upsert() has been added to the DB wrapper class that exploits the
   "upsert" feature that is new in PostgreSQL 9.5. The new method nicely
   complements the existing get/insert/update/delete() methods.
+- You can now insert() PostgreSQL arrays as lists in the classic module.
+- A fast parser for PostgreSQL array output syntax has been added to the
+  C module. Data in an array type column is now returned as a Python list,
+  which can be nested if the array has more than one dimension.
 - PyGreSQL now supports the JSON and JSONB data types, converting such
   columns automatically to and from Python objects. If you want to insert
   Python objects as JSON data using DB-API 2, you should wrap them in the
   new Json() type constructor as a hint to PyGreSQL.
 - The pkey() method of the classic interface now returns tuples instead
   of frozenset. The order of the tuples is like in the primary key index.
+- The classic module now also returns bytea columns fetched from the database
+  as byte strings, you don't need to call unescape_bytea() any more.
 - The table name that is affixed to the name of the OID column returned
   by the get() method of the classic interface will not automatically
   be fully qualified any more. This reduces overhead from the interface,

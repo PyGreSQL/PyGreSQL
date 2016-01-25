@@ -26,6 +26,9 @@ More information about this result may be accessed using
 :meth:`Query.listfields`, :meth:`Query.fieldname`
 and :meth:`Query.fieldnum` methods.
 
+Note that since PyGreSQL 5.0 this will return the values of array type
+columns as Python lists.
+
 dictresult -- get query values as list of dictionaries
 ------------------------------------------------------
 
@@ -42,6 +45,9 @@ This method returns the list of the values returned by the query
 with each tuple returned as a dictionary with the field names
 used as the dictionary index.
 
+Note that since PyGreSQL 5.0 this will return the values of array type
+columns as Python lists.
+
 namedresult -- get query values as list of named tuples
 -------------------------------------------------------
 
@@ -57,6 +63,9 @@ namedresult -- get query values as list of named tuples
 
 This method returns the list of the values returned by the query
 with each row returned as a named tuple with proper field names.
+
+Note that since PyGreSQL 5.0 this will return the values of array type
+columns as Python lists.
 
 .. versionadded:: 4.1
 

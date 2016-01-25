@@ -113,6 +113,229 @@ class TestHasConnect(unittest.TestCase):
         self.assertEqual(pg.get_defbase(), d0)
 
 
+class TestParseArray(unittest.TestCase):
+    """Test the array parser."""
+
+    array_expressions = [
+        ('', str, ValueError),
+        ('{}', None, []),
+        ('{}', str, []),
+        ('   {   }   ', None, []),
+        ('{', str, ValueError),
+        ('{{}', str, ValueError),
+        ('{}{', str, ValueError),
+        ('[]', str, ValueError),
+        ('()', str, ValueError),
+        ('{[]}', str, ['[]']),
+        ('{hello}', int, ValueError),
+        ('{42}', int, [42]),
+        ('{ 42 }', int, [42]),
+        ('{42', int, ValueError),
+        ('{ 42 ', int, ValueError),
+        ('{hello}', str, ['hello']),
+        ('{ hello }', str, ['hello']),
+        ('{hi}   ', str, ['hi']),
+        ('{hi}   ?', str, ValueError),
+        ('{null}', str, [None]),
+        (' { NULL } ', str, [None]),
+        ('   {   NULL   }   ', str, [None]),
+        (' { not null } ', str, ['not null']),
+        (' { not NULL } ', str, ['not NULL']),
+        (' {"null"} ', str, ['null']),
+        (' {"NULL"} ', str, ['NULL']),
+        ('{Hi!}', str, ['Hi!']),
+        ('{"Hi!"}', str, ['Hi!']),
+        ('{" Hi! "}', str, [' Hi! ']),
+        ('{a"}', str, ValueError),
+        ('{"b}', str, ValueError),
+        ('{a"b}', str, ValueError),
+        (r'{a\"b}', str, ['a"b']),
+        (r'{a\,b}', str, ['a,b']),
+        (r'{a\bc}', str, ['abc']),
+        (r'{"a\bc"}', str, ['abc']),
+        (r'{\a\b\c}', str, ['abc']),
+        (r'{"\a\b\c"}', str, ['abc']),
+        ('{"{}"}', str, ['{}']),
+        (r'{\{\}}', str, ['{}']),
+        ('{"{a,b,c}"}', str, ['{a,b,c}']),
+        ("{'abc'}", str, ["'abc'"]),
+        ('{"abc"}', str, ['abc']),
+        (r'{\"abc\"}', str, ['"abc"']),
+        (r"{\'abc\'}", str, ["'abc'"]),
+        (r"{abc,d,efg}", str, ['abc', 'd', 'efg']),
+        ('{Hello World!}', str, ['Hello World!']),
+        ('{Hello, World!}', str, ['Hello', 'World!']),
+        ('{Hello,\ World!}', str, ['Hello', ' World!']),
+        ('{Hello\, World!}', str, ['Hello, World!']),
+        ('{"Hello World!"}', str, ['Hello World!']),
+        ('{this, should, be, null}', str, ['this', 'should', 'be', None]),
+        ('{This, should, be, NULL}', str, ['This', 'should', 'be', None]),
+        ('{3, 2, 1, null}', int, [3, 2, 1, None]),
+        ('{3, 2, 1, NULL}', int, [3, 2, 1, None]),
+        ('{3,17,51}', int, [3, 17, 51]),
+        (' { 3 , 17 , 51 } ', int, [3, 17, 51]),
+        ('{3,17,51}', str, ['3', '17', '51']),
+        (' { 3 , 17 , 51 } ', str, ['3', '17', '51']),
+        ('{1,"2",abc,"def"}', str, ['1', '2', 'abc', 'def']),
+        ('{{}}', int, [[]]),
+        ('{{},{}}', int, [[], []]),
+        ('{ {} , {} , {} }', int, [[], [], []]),
+        ('{ {} , {} , {} , }', int, ValueError),
+        ('{{{1,2,3},{4,5,6}}}', int, [[[1, 2, 3], [4, 5, 6]]]),
+        ('{{1,2,3},{4,5,6},{7,8,9}}', int, [[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
+        ('{20000, 25000, 25000, 25000}', int, [20000, 25000, 25000, 25000]),
+        ('{{{17,18,19},{14,15,16},{11,12,13}},'
+         '{{27,28,29},{24,25,26},{21,22,23}},'
+         '{{37,38,39},{34,35,36},{31,32,33}}}', int,
+            [[[17, 18, 19], [14, 15, 16], [11, 12, 13]],
+             [[27, 28, 29], [24, 25, 26], [21, 22, 23]],
+             [[37, 38, 39], [34, 35, 36], [31, 32, 33]]]),
+        ('{{"breakfast", "consulting"}, {"meeting", "lunch"}}', str,
+            [['breakfast', 'consulting'], ['meeting', 'lunch']]),
+        ('[1:3]={1,2,3}', int, [1, 2, 3]),
+        ('[-1:1]={1,2,3}', int, [1, 2, 3]),
+        ('[-1:+1]={1,2,3}', int, [1, 2, 3]),
+        ('[-3:-1]={1,2,3}', int, [1, 2, 3]),
+        ('[+1:+3]={1,2,3}', int, [1, 2, 3]),
+        ('[]={1,2,3}', int, ValueError),
+        ('[1:]={1,2,3}', int, ValueError),
+        ('[:3]={1,2,3}', int, ValueError),
+        ('[1:1][-2:-1][3:5]={{{1,2,3},{4,5,6}}}',
+            int, [[[1, 2, 3], [4, 5, 6]]]),
+        ('  [1:1]  [-2:-1]  [3:5]  =  { { { 1 , 2 , 3 }, {4 , 5 , 6 } } }',
+            int, [[[1, 2, 3], [4, 5, 6]]]),
+        ('[1:1][3:5]={{1,2,3},{4,5,6}}', int, [[1, 2, 3], [4, 5, 6]]),
+        ('[3:5]={{1,2,3},{4,5,6}}', int, ValueError),
+        ('[1:1][-2:-1][3:5]={{1,2,3},{4,5,6}}', int, ValueError)]
+
+    def testParserParams(self):
+        f = pg.cast_array
+        self.assertRaises(TypeError, f)
+        self.assertRaises(TypeError, f, None)
+        self.assertRaises(TypeError, f, '{}', 1)
+        self.assertRaises(TypeError, f, '{}', ',',)
+        self.assertRaises(TypeError, f, '{}', None, None)
+        self.assertRaises(TypeError, f, '{}', None, 1)
+        self.assertRaises(TypeError, f, '{}', None, '')
+        self.assertRaises(TypeError, f, '{}', None, ',;')
+        self.assertEqual(f('{}'), [])
+        self.assertEqual(f('{}', None), [])
+        self.assertEqual(f('{}', None, ';'), [])
+        self.assertEqual(f('{}', str), [])
+        self.assertEqual(f('{}', str, ';'), [])
+
+    def testParserSimple(self):
+        r = pg.cast_array('{a,b,c}')
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 3)
+        self.assertEqual(r, ['a', 'b', 'c'])
+
+    def testParserNested(self):
+        f = pg.cast_array
+        r = f('{{a,b,c}}')
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 1)
+        r = r[0]
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 3)
+        self.assertEqual(r, ['a', 'b', 'c'])
+        self.assertRaises(ValueError, f, '{a,{b,c}}')
+        r = f('{{a,b},{c,d}}')
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 2)
+        r = r[1]
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 2)
+        self.assertEqual(r, ['c', 'd'])
+        r = f('{{a},{b},{c}}')
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 3)
+        r = r[1]
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 1)
+        self.assertEqual(r[0], 'b')
+        r = f('{{{{{{{abc}}}}}}}')
+        for i in range(7):
+            self.assertIsInstance(r, list)
+            self.assertEqual(len(r), 1)
+            r = r[0]
+        self.assertEqual(r, 'abc')
+
+    def testParserTooDeeplyNested(self):
+        f = pg.cast_array
+        for n in 3, 5, 9, 12, 16, 32, 64, 256:
+            r = '%sa,b,c%s' % ('{' * n, '}' * n)
+            if n > 16:  # hard coded maximum depth
+                self.assertRaises(ValueError, f, r)
+            else:
+                r = f(r)
+                for i in range(n - 1):
+                    self.assertIsInstance(r, list)
+                    self.assertEqual(len(r), 1)
+                    r = r[0]
+                self.assertEqual(len(r), 3)
+                self.assertEqual(r, ['a', 'b', 'c'])
+
+    def testParserCast(self):
+        f = pg.cast_array
+        self.assertEqual(f('{1}'), ['1'])
+        self.assertEqual(f('{1}', None), ['1'])
+        self.assertEqual(f('{1}', int), [1])
+        self.assertEqual(f('{1}', str), ['1'])
+        self.assertEqual(f('{a}'), ['a'])
+        self.assertEqual(f('{a}', None), ['a'])
+        self.assertRaises(ValueError, f, '{a}', int)
+        self.assertEqual(f('{a}', str), ['a'])
+        cast = lambda s: '%s is ok' % s
+        self.assertEqual(f('{a}', cast), ['a is ok'])
+
+    def testParserDelim(self):
+        f = pg.cast_array
+        self.assertEqual(f('{1,2}'), ['1', '2'])
+        self.assertEqual(f('{1,2}', delim=','), ['1', '2'])
+        self.assertEqual(f('{1;2}'), ['1;2'])
+        self.assertEqual(f('{1;2}', delim=';'), ['1', '2'])
+        self.assertEqual(f('{1,2}', delim=';'), ['1,2'])
+
+    def testParserWithData(self):
+        f = pg.cast_array
+        for expression, cast, expected in self.array_expressions:
+            if expected is ValueError:
+                self.assertRaises(ValueError, f, expression, cast)
+            else:
+                self.assertEqual(f(expression, cast), expected)
+
+    def testParserWithoutCast(self):
+        f = pg.cast_array
+
+        for expression, cast, expected in self.array_expressions:
+            if cast is not str:
+                continue
+            if expected is ValueError:
+                self.assertRaises(ValueError, f, expression)
+            else:
+                self.assertEqual(f(expression), expected)
+
+    def testParserWithDifferentDelimiter(self):
+        f = pg.cast_array
+
+        def replace_comma(value):
+            if isinstance(value, basestring):
+                return value.replace(',', ';')
+            elif isinstance(value, list):
+                return [replace_comma(v) for v in value]
+            else:
+                return value
+
+        for expression, cast, expected in self.array_expressions:
+            expression = replace_comma(expression)
+            if expected is ValueError:
+                self.assertRaises(ValueError, f, expression, cast)
+            else:
+                expected = replace_comma(expected)
+                self.assertEqual(f(expression, cast, ';'), expected)
+
+
 class TestEscapeFunctions(unittest.TestCase):
     """Test pg escape and unescape functions.
 

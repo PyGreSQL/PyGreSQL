@@ -866,6 +866,81 @@ class TestParamQueries(unittest.TestCase):
             ).dictresult(), [{'garbage': garbage}])
 
 
+class TestQueryResultTypes(unittest.TestCase):
+    """Test proper result types via a basic pg connection."""
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query('set client_encoding=utf8')
+        self.c.query("set datestyle='ISO,YMD'")
+
+    def tearDown(self):
+        self.c.close()
+
+    def assert_proper_cast(self, value, pgtype, pytype):
+        q = 'select $1::%s' % (pgtype,)
+        r = self.c.query(q, (value,)).getresult()[0][0]
+        self.assertIsInstance(r, pytype)
+        if isinstance(value, (bytes, str)):
+            if not value or '{':
+                value = '"%s"' % value
+        value = '{%s}' % value
+        r = self.c.query(q + '[]', (value,)).getresult()[0][0]
+        self.assertIsInstance(r, list)
+        self.assertEqual(len(r), 1)
+        self.assertIsInstance(r[0], pytype)
+
+    def testInt(self):
+        self.assert_proper_cast(0, 'int', int)
+        self.assert_proper_cast(0, 'smallint', int)
+        self.assert_proper_cast(0, 'oid', int)
+        self.assert_proper_cast(0, 'cid', int)
+        self.assert_proper_cast(0, 'xid', int)
+
+    def testLong(self):
+        self.assert_proper_cast(0, 'bigint', long)
+
+    def testFloat(self):
+        self.assert_proper_cast(0, 'float', float)
+        self.assert_proper_cast(0, 'real', float)
+        self.assert_proper_cast(0, 'double', float)
+        self.assert_proper_cast(0, 'double precision', float)
+        self.assert_proper_cast('infinity', 'float', float)
+
+    def testFloat(self):
+        decimal = pg.get_decimal()
+        self.assert_proper_cast(decimal(0), 'numeric', decimal)
+        self.assert_proper_cast(decimal(0), 'decimal', decimal)
+
+    def testMoney(self):
+        decimal = pg.get_decimal()
+        self.assert_proper_cast(decimal('0'), 'money', decimal)
+
+    def testBool(self):
+        bool_type = bool if pg.get_bool() else str
+        self.assert_proper_cast('f', 'bool', bool_type)
+
+    def testDate(self):
+        self.assert_proper_cast('1956-01-31', 'date', str)
+        self.assert_proper_cast('0', 'interval', str)
+        self.assert_proper_cast('08:42', 'time', str)
+        self.assert_proper_cast('08:42', 'timetz', str)
+        self.assert_proper_cast('1956-01-31 08:42', 'timestamp', str)
+        self.assert_proper_cast('1956-01-31 08:42', 'timestamptz', str)
+
+    def testText(self):
+        self.assert_proper_cast('', 'text', str)
+        self.assert_proper_cast('', 'char', str)
+        self.assert_proper_cast('', 'bpchar', str)
+        self.assert_proper_cast('', 'varchar', str)
+
+    def testBytea(self):
+        self.assert_proper_cast('', 'bytea', bytes)
+
+    def testJson(self):
+        self.assert_proper_cast('{}', 'json', dict)
+
+
 class TestInserttable(unittest.TestCase):
     """Test inserttable method."""
 

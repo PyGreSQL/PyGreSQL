@@ -72,6 +72,7 @@ from time import localtime
 from decimal import Decimal
 from math import isnan, isinf
 from collections import namedtuple
+from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
 try:
@@ -165,12 +166,16 @@ class TypeCache(dict):
 
     @staticmethod
     def typecast(typ, value):
-        """Cast value to database type."""
+        """Cast value according to database type."""
         if value is None:
             # for NULL values, no typecast is necessary
             return None
         cast = _cast.get(typ)
         if cast is None:
+            if typ.startswith('_'):
+                # cast as an array type
+                cast = _cast.get(typ[1:])
+                return cast_array(value, cast)
             # no typecast available or necessary
             return value
         else:
@@ -191,6 +196,9 @@ class TypeCache(dict):
             self[oid] = res
             return res
 
+
+_re_array_escape = regex(r'(["\\])')
+_re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
 
 class _quotedict(dict):
     """Dictionary with auto quoting of its items.
@@ -240,6 +248,8 @@ class Cursor(object):
 
     def _quote(self, val):
         """Quote value depending on its type."""
+        if val is None:
+            return 'NULL'
         if isinstance(val, (datetime, date, time, timedelta, Json)):
             val = str(val)
         if isinstance(val, basestring):
@@ -249,30 +259,49 @@ class Cursor(object):
                     val = val.decode('ascii')
             else:
                 val = self._cnx.escape_string(val)
-            val = "'%s'" % val
-        elif isinstance(val, (int, long)):
-            pass
-        elif isinstance(val, float):
+            return "'%s'" % val
+        if isinstance(val, float):
             if isinf(val):
                 return "'-Infinity'" if val < 0 else "'Infinity'"
-            elif isnan(val):
+            if isnan(val):
                 return "'NaN'"
-        elif val is None:
-            val = 'NULL'
-        elif isinstance(val, list):
+            return val
+        if isinstance(val, (int, long, Decimal)):
+            return val
+        if isinstance(val, list):
+            return "'%s'" % self._quote_array(val)
+        if isinstance(val, tuple):
             q = self._quote
-            val = 'ARRAY[%s]' % ','.join(str(q(v)) for v in val)
-        elif isinstance(val, tuple):
-            q = self._quote
-            val = 'ROW(%s)' % ','.join(str(q(v)) for v in val)
-        elif Decimal is not float and isinstance(val, Decimal):
-            pass
-        elif hasattr(val, '__pg_repr__'):
-            val = val.__pg_repr__()
-        else:
+            return 'ROW(%s)' % ','.join(str(q(v)) for v in val)
+        try:
+            return val.__pg_repr__()
+        except AttributeError:
             raise InterfaceError(
                 'do not know how to handle type %s' % type(val))
-        return val
+
+    def _quote_array(self, val):
+        """Quote value as a literal constant for an array."""
+        # We could also cast to an array constructor here, but that is more
+        # verbose and you need to know the base type to build emtpy arrays.
+        if isinstance(val, list):
+            return '{%s}' % ','.join(self._quote_array(v) for v in val)
+        if val is None:
+            return 'null'
+        if isinstance(val, (int, long, float)):
+            return str(val)
+        if isinstance(val, bool):
+            return 't' if val else 'f'
+        if isinstance(val, basestring):
+            if not val:
+                return '""'
+            if _re_array_quote.search(val):
+                return '"%s"' % _re_array_escape.sub(r'\\\1', val)
+            return val
+        try:
+            return val.__pg_repr__()
+        except AttributeError:
+            raise InterfaceError(
+                'do not know how to handle type %s' % type(val))
 
     def _quoteparams(self, string, parameters):
         """Quote parameters.
@@ -901,15 +930,35 @@ class Type(frozenset):
 
     def __eq__(self, other):
         if isinstance(other, basestring):
+            if other.startswith('_'):
+                other = other[1:]
             return other in self
         else:
             return super(Type, self).__eq__(other)
 
     def __ne__(self, other):
         if isinstance(other, basestring):
+            if other.startswith('_'):
+                other = other[1:]
             return other not in self
         else:
             return super(Type, self).__ne__(other)
+
+
+class ArrayType:
+    """Type class for PostgreSQL array types."""
+
+    def __eq__(self, other):
+        if isinstance(other, basestring):
+            return other.startswith('_')
+        else:
+            return isinstance(other, ArrayType)
+
+    def __ne__(self, other):
+        if isinstance(other, basestring):
+            return not other.startswith('_')
+        else:
+            return not isinstance(other, ArrayType)
 
 
 # Mandatory type objects defined by DB-API 2 specs:
@@ -917,9 +966,9 @@ class Type(frozenset):
 STRING = Type('char bpchar name text varchar')
 BINARY = Type('bytea')
 NUMBER = Type('int2 int4 serial int8 float4 float8 numeric money')
-DATETIME = Type('date time timetz timestamp timestamptz datetime abstime'
-    ' interval tinterval timespan reltime')
-ROWID = Type('oid oid8')
+DATETIME = Type('date time timetz timestamp timestamptz interval'
+    ' abstime reltime')  # these are very old
+ROWID = Type('oid')
 
 
 # Additional type objects (more specific):
@@ -933,9 +982,13 @@ NUMERIC = Type('numeric')
 MONEY = Type('money')
 DATE = Type('date')
 TIME = Type('time timetz')
-TIMESTAMP = Type('timestamp timestamptz datetime abstime')
-INTERVAL = Type('interval tinterval timespan reltime')
+TIMESTAMP = Type('timestamp timestamptz')
+INTERVAL = Type('interval')
 JSON = Type('json jsonb')
+
+# Type object for arrays (also equate to their base types):
+
+ARRAY = ArrayType()
 
 
 # Mandatory type helpers defined by DB-API 2 specs:
