@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 4.2
------------
+Version 4.2 (2016-01-21)
+------------------------
 - The supported Python versions are 2.4 to 2.7.
 - PostgreSQL is supported in all versions from 8.3 to 9.5.
 - Set a better default for the user option "escaping-funcs".
