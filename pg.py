@@ -538,10 +538,11 @@ class DB(object):
     def _prepare_bytea_array(self, d):
         """Prepare a bytea array parameter."""
         if isinstance(d, list):
-            return '{%s}' % ','.join(self._prepare_bytea_array(v) for v in d)
+            return b'{' + b','.join(
+                self._prepare_bytea_array(v) for v in d) + b'}'
         if d is None:
-            return 'null'
-        return self.escape_bytea(d).replace('\\', '\\\\')
+            return b'null'
+        return self.escape_bytea(d).replace(b'\\', b'\\\\')
 
     def _prepare_json_array(self, d):
         """Prepare a json array parameter."""

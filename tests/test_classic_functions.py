@@ -220,9 +220,9 @@ class TestParseArray(unittest.TestCase):
         self.assertRaises(TypeError, f, '{}', None, ',;')
         self.assertEqual(f('{}'), [])
         self.assertEqual(f('{}', None), [])
-        self.assertEqual(f('{}', None, ';'), [])
+        self.assertEqual(f('{}', None, b';'), [])
         self.assertEqual(f('{}', str), [])
-        self.assertEqual(f('{}', str, ';'), [])
+        self.assertEqual(f('{}', str, b';'), [])
 
     def testParserSimple(self):
         r = pg.cast_array('{a,b,c}')
@@ -292,10 +292,10 @@ class TestParseArray(unittest.TestCase):
     def testParserDelim(self):
         f = pg.cast_array
         self.assertEqual(f('{1,2}'), ['1', '2'])
-        self.assertEqual(f('{1,2}', delim=','), ['1', '2'])
+        self.assertEqual(f('{1,2}', delim=b','), ['1', '2'])
         self.assertEqual(f('{1;2}'), ['1;2'])
-        self.assertEqual(f('{1;2}', delim=';'), ['1', '2'])
-        self.assertEqual(f('{1,2}', delim=';'), ['1,2'])
+        self.assertEqual(f('{1;2}', delim=b';'), ['1', '2'])
+        self.assertEqual(f('{1,2}', delim=b';'), ['1,2'])
 
     def testParserWithData(self):
         f = pg.cast_array
@@ -320,7 +320,7 @@ class TestParseArray(unittest.TestCase):
         f = pg.cast_array
 
         def replace_comma(value):
-            if isinstance(value, basestring):
+            if isinstance(value, str):
                 return value.replace(',', ';')
             elif isinstance(value, list):
                 return [replace_comma(v) for v in value]
@@ -333,7 +333,7 @@ class TestParseArray(unittest.TestCase):
                 self.assertRaises(ValueError, f, expression, cast)
             else:
                 expected = replace_comma(expected)
-                self.assertEqual(f(expression, cast, ';'), expected)
+                self.assertEqual(f(expression, cast, b';'), expected)
 
 
 class TestEscapeFunctions(unittest.TestCase):

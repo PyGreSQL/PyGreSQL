@@ -779,9 +779,8 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 					element = encoding == pg_encoding_ascii ? NULL :
 						get_decoded_string(estr, esize, encoding);
 					if (!element) /* no decoding necessary or possible */
-#else
-					element = PyBytes_FromStringAndSize(estr, esize);
 #endif
+					element = PyBytes_FromStringAndSize(estr, esize);
 					if (element && cast)
 					{
 						element = PyObject_CallFunctionObjArgs(
