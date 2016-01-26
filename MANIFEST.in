@@ -1,10 +1,19 @@
-include *.c
-include *.h
-include *.py
-include *.cfg
-include *.rst
-include *.txt
+
+include pgmodule.c
+include pgtypes.h
+include pgfs.h
+
+include pg.py
+include pgdb.py
+include setup.py
+
+include setup.cfg
+
+include README.rst
+include LICENSE.txt
+
 recursive-include tests *.py
+
 include docs/Makefile
 include docs/make.bat
 include docs/*.py
