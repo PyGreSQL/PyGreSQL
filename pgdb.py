@@ -234,9 +234,7 @@ class Cursor(object):
         self._type_cache = dbcnx._type_cache
         self._src = self._cnx.source()
         # the official attribute for describing the result columns
-        self.description = None
-        # unofficial attributes for convenience and performance
-        self.colnames = self.coltypes = None
+        self._description = None
         if self.row_factory is Cursor.row_factory:
             # the row factory needs to be determined dynamically
             self.row_factory = None
@@ -346,11 +344,30 @@ class Cursor(object):
         return CursorDescription(name, type_code,
             None, size, precision, scale, None)
 
+    @property
+    def description(self):
+        """Read-only attribute describing the result columns."""
+        descr = self._description
+        if self._description is True:
+            make = self._make_description
+            descr = [make(info) for info in self._src.listinfo()]
+            self._description = descr
+        return descr
+
+    @property
+    def colnames(self):
+        """Unofficial convenience method for getting the column names."""
+        return [d[0] for d in self.description]
+
+    @property
+    def coltypes(self):
+        """Unofficial convenience method for getting the column types."""
+        return [d[1] for d in self.description]
+
     def close(self):
         """Close the cursor object."""
         self._src.close()
-        self.description = None
-        self.colnames = self.coltypes = None
+        self._description = None
         self.rowcount = -1
         self.lastrowid = None
 
@@ -374,8 +391,7 @@ class Cursor(object):
         if not seq_of_parameters:
             # don't do anything without parameters
             return
-        self.description = None
-        self.colnames = self.coltypes = None
+        self._description = None
         self.rowcount = -1
         # first try to execute all queries
         rowcount = 0
@@ -407,12 +423,8 @@ class Cursor(object):
             raise _op_error("internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
+            self._description = True  # fetch on demand
             self.rowcount = self._src.ntuples
-            description = self._make_description
-            description = [description(info) for info in self._src.listinfo()]
-            self.colnames = [d[0] for d in description]
-            self.coltypes = [d[1] for d in description]
-            self.description = description
             self.lastrowid = None
             if self.build_row_factory:
                 self.row_factory = self.build_row_factory()

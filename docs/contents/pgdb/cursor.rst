@@ -36,8 +36,8 @@ description -- details regarding the result columns
         - *scale*
         - *null_ok*
 
-    Note that *display_size*, *precision*, *scale* and *null_ok*
-    are not implemented.
+    The values for *precision* and *scale* are only set for numeric types.
+    The values for *display_size* and *null_ok* are always ``None``.
 
     This attribute will be ``None`` for operations that do not return rows
     or if the cursor has not had an operation invoked via the
