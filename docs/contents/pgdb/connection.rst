@@ -69,7 +69,7 @@ Attributes that are not part of the standard
 
    The following attributes are not part of the DB-API 2 standard.
 
-.. attribute:: cursor_type
+.. attribute:: Connection.cursor_type
 
     The default cursor type used by the connection
 
@@ -79,7 +79,7 @@ then get your custom cursor whenever you call :meth:`Connection.cursor`.
 
 .. versionadded:: 5.0
 
-.. attribute:: type_cache
+.. attribute:: Connection.type_cache
 
     A dictionary with type information on the PostgreSQL types
 
