@@ -262,21 +262,44 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def test_description_fields(self):
         con = self._connect()
         cur = con.cursor()
-        cur.execute("select 123456789::int8 as col")
+        cur.execute("select 123456789::int8 col0,"
+            " 123456.789::numeric(41, 13) as col1,"
+            " 'foobar'::char(39) as col2")
         desc = cur.description
         self.assertIsInstance(desc, list)
-        self.assertEqual(len(desc), 1)
-        desc = desc[0]
-        self.assertIsInstance(desc, tuple)
-        self.assertEqual(len(desc), 7)
-        self.assertEqual(desc.name, 'col')
-        self.assertEqual(desc.type_code, 'int8')
-        self.assertIsNone(desc.display_size)
-        self.assertIsInstance(desc.internal_size, int)
-        self.assertEqual(desc.internal_size, 8)
-        self.assertIsNone(desc.precision)
-        self.assertIsNone(desc.scale)
-        self.assertIsNone(desc.null_ok)
+        self.assertEqual(len(desc), 3)
+        cols = [('int8', 8, None), ('numeric', 41, 13), ('bpchar', 39, None)]
+        for i in range(3):
+            c, d = cols[i], desc[i]
+            self.assertIsInstance(d, tuple)
+            self.assertEqual(len(d), 7)
+            self.assertIsInstance(d.name, str)
+            self.assertEqual(d.name, 'col%d' % i)
+            self.assertIsInstance(d.type_code, str)
+            self.assertEqual(d.type_code, c[0])
+            self.assertIsNone(d.display_size)
+            self.assertIsInstance(d.internal_size, int)
+            self.assertEqual(d.internal_size, c[1])
+            if c[2] is not None:
+                self.assertIsInstance(d.precision, int)
+                self.assertEqual(d.precision, c[1])
+                self.assertIsInstance(d.scale, int)
+                self.assertEqual(d.scale, c[2])
+            else:
+                self.assertIsNone(d.precision)
+                self.assertIsNone(d.scale)
+            self.assertIsNone(d.null_ok)
+
+    def test_type_cache(self):
+        con = self._connect()
+        cur = con.cursor()
+        type_info = cur._type_cache['numeric']
+        self.assertEqual(type_info.oid, 1700)
+        self.assertEqual(type_info.name, 'numeric')
+        self.assertEqual(type_info.type, 'b')  # base
+        self.assertEqual(type_info.category, 'N')  # numeric
+        self.assertEqual(type_info.delim, ',')
+        self.assertIs(cur._type_cache[1700], type_info)
 
     def test_cursor_iteration(self):
         con = self._connect()

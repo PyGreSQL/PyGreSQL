@@ -3621,7 +3621,7 @@ pgsource_buildinfo(sourceObject *self, int num)
 	PyObject *result;
 
 	/* allocates tuple */
-	result = PyTuple_New(3);
+	result = PyTuple_New(5);
 	if (!result)
 		return NULL;
 
@@ -3631,6 +3631,10 @@ pgsource_buildinfo(sourceObject *self, int num)
 		PyStr_FromString(PQfname(self->result, num)));
 	PyTuple_SET_ITEM(result, 2,
 		PyInt_FromLong(PQftype(self->result, num)));
+	PyTuple_SET_ITEM(result, 3,
+		PyInt_FromLong(PQfsize(self->result, num)));
+	PyTuple_SET_ITEM(result, 4,
+		PyInt_FromLong(PQfmod(self->result, num)));
 
 	return result;
 }

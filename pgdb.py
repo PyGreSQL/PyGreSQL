@@ -156,13 +156,39 @@ def _op_error(msg):
     return _db_error(msg, OperationalError)
 
 
+TypeInfo = namedtuple('TypeInfo',
+    ['oid', 'name', 'len', 'type', 'category', 'delim', 'relid'])
+
+
 class TypeCache(dict):
-    """Cache for database types."""
+    """Cache for database types.
+
+    This cache maps type OIDs to TypeInfo tuples containing the name
+    and other important info for the database type with the given OID.
+    """
 
     def __init__(self, cnx):
         """Initialize type cache for connection."""
         super(TypeCache, self).__init__()
+        self._escape_string = cnx.escape_string
         self._src = cnx.source()
+
+    def __missing__(self, key):
+        q = ("SELECT oid, typname,"
+             " typlen, typtype, typcategory, typdelim, typrelid"
+            " FROM pg_type WHERE ")
+        if isinstance(key, int):
+            q += "oid = %d" % key
+        else:
+            q += "typname = '%s'" % self._escape_string(key)
+        self._src.execute(q)
+        res = list(self._src.fetch(1)[0])
+        res[0] = int(res[0])
+        res[2] = int(res[2])
+        res[6] = int(res[6])
+        res = TypeInfo(*res)
+        self[res.oid] = self[res.name] = res
+        return res
 
     @staticmethod
     def typecast(typ, value):
@@ -181,24 +207,10 @@ class TypeCache(dict):
         else:
             return cast(value)
 
-    def getdescr(self, oid):
-        """Get name of database type with given oid."""
-        try:
-            return self[oid]
-        except KeyError:
-            self._src.execute(
-                "SELECT typname, typlen "
-                "FROM pg_type WHERE oid=%s" % oid)
-            res = self._src.fetch(1)[0]
-            # The column name is omitted from the return value.
-            # It will have to be prepended by the caller.
-            res = (res[0], None, int(res[1]), None, None, None)
-            self[oid] = res
-            return res
-
 
 _re_array_escape = regex(r'(["\\])')
 _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
+
 
 class _quotedict(dict):
     """Dictionary with auto quoting of its items.
@@ -315,6 +327,25 @@ class Cursor(object):
             parameters = tuple(map(self._quote, parameters))
         return string % parameters
 
+    def _make_description(self, info):
+        """Make the description tuple for the given field info."""
+        name, typ, size, mod = info[1:]
+        type_info = self._type_cache[typ]
+        type_code = type_info.name
+        if mod > 0:
+            mod -= 4
+        if type_code == 'numeric':
+            precision, scale = mod >> 16, mod & 0xffff
+            size = precision
+        else:
+            if not size:
+                size = type_info.size
+            if size == -1:
+                size = mod
+            precision = scale = None
+        return CursorDescription(name, type_code,
+            None, size, precision, scale, None)
+
     def close(self):
         """Close the cursor object."""
         self._src.close()
@@ -377,11 +408,10 @@ class Cursor(object):
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
             self.rowcount = self._src.ntuples
-            getdescr = self._type_cache.getdescr
-            description = [CursorDescription(
-                info[1], *getdescr(info[2])) for info in self._src.listinfo()]
-            self.colnames = [info[0] for info in description]
-            self.coltypes = [info[1] for info in description]
+            description = self._make_description
+            description = [description(info) for info in self._src.listinfo()]
+            self.colnames = [d[0] for d in description]
+            self.coltypes = [d[1] for d in description]
             self.description = description
             self.lastrowid = None
             if self.build_row_factory:
