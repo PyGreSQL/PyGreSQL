@@ -159,6 +159,8 @@ def _op_error(msg):
 TypeInfo = namedtuple('TypeInfo',
     ['oid', 'name', 'len', 'type', 'category', 'delim', 'relid'])
 
+ColumnInfo = namedtuple('ColumnInfo', ['name', 'type'])
+
 
 class TypeCache(dict):
     """Cache for database types.
@@ -174,14 +176,16 @@ class TypeCache(dict):
         self._src = cnx.source()
 
     def __missing__(self, key):
-        q = ("SELECT oid, typname,"
-             " typlen, typtype, typcategory, typdelim, typrelid"
-            " FROM pg_type WHERE ")
+        """Get the type info from the database if it is not cached."""
         if isinstance(key, int):
-            q += "oid = %d" % key
+            oid = key
         else:
-            q += "typname = '%s'" % self._escape_string(key)
-        self._src.execute(q)
+            if not '.' in key and not '"' in key:
+                key = '"%s"' % key
+            oid = "'%s'::regtype" % self._escape_string(key)
+        self._src.execute("SELECT oid, typname,"
+             " typlen, typtype, typcategory, typdelim, typrelid"
+            " FROM pg_type WHERE oid=%s" % oid)
         res = self._src.fetch(1)
         if not res:
             raise KeyError('Type %s could not be found' % key)
@@ -192,6 +196,17 @@ class TypeCache(dict):
         res = TypeInfo(*res)
         self[res.oid] = self[res.name] = res
         return res
+
+    def columns(self, key):
+        """Get the names and types of the columns of composite types."""
+        typ = self[key]
+        if typ.type != 'c' or not typ.relid:
+            return []  # this type is not composite
+        self._src.execute("SELECT attname, atttypid"
+            " FROM pg_attribute WHERE attrelid=%s AND attnum>0"
+            " AND NOT attisdropped ORDER BY attnum" % typ.relid)
+        return [ColumnInfo(name, int(oid))
+            for name, oid in self._src.fetch(-1)]
 
     @staticmethod
     def typecast(typ, value):

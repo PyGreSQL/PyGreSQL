@@ -98,4 +98,7 @@ The values are named tuples containing the following fields:
 For details, see the PostgreSQL documentation on `pg_type
 <http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.
 
+The :attr:`Connection.type_cache` also provides a method :meth:`columns`
+that returns the names and type OIDs of the columns of composite types.
+
 .. versionadded:: 5.0
