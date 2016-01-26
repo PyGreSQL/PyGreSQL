@@ -293,13 +293,13 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def test_type_cache(self):
         con = self._connect()
         cur = con.cursor()
-        type_info = cur._type_cache['numeric']
+        type_info = cur.type_cache['numeric']
         self.assertEqual(type_info.oid, 1700)
         self.assertEqual(type_info.name, 'numeric')
         self.assertEqual(type_info.type, 'b')  # base
         self.assertEqual(type_info.category, 'N')  # numeric
         self.assertEqual(type_info.delim, ',')
-        self.assertIs(cur._type_cache[1700], type_info)
+        self.assertIs(cur.type_cache[1700], type_info)
 
     def test_cursor_iteration(self):
         con = self._connect()

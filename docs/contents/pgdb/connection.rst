@@ -74,5 +74,28 @@ Attributes that are not part of the standard
     The default cursor type used by the connection
 
 If you want to use your own custom subclass of the :class:`Cursor` class
-with he connection, set this attribute to you custom cursor class. You will
+with he connection, set this attribute to your custom cursor class. You will
 then get your custom cursor whenever you call :meth:`Connection.cursor`.
+
+.. versionadded:: 5.0
+
+.. attribute:: type_cache
+
+    A dictionary with type information on the PostgreSQL types
+
+You can request the dictionary either via type names or type OIDs.
+
+The values are named tuples containing the following fields:
+
+        - *oid* -- the OID of the type
+        - *name*  -- the type's name
+        - *len*  -- the internal size
+        - *type*  -- ``'b'`` = base, ``'c'`` = composite, ...
+        - *category*  -- ``'A'`` = Array, ``'B'`` = Boolean, ...
+        - *delim*  -- delimiter to be used when parsing arrays
+        - *relid*  -- the table OID for composite types
+
+For details, see the PostgreSQL documentation on `pg_type
+<http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.
+
+.. versionadded:: 5.0

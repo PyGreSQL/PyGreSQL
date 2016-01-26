@@ -163,8 +163,8 @@ TypeInfo = namedtuple('TypeInfo',
 class TypeCache(dict):
     """Cache for database types.
 
-    This cache maps type OIDs to TypeInfo tuples containing the name
-    and other important info for the database type with the given OID.
+    This cache maps type OIDs and names to TypeInfo tuples containing
+    important information on the associated database type.
     """
 
     def __init__(self, cnx):
@@ -182,7 +182,10 @@ class TypeCache(dict):
         else:
             q += "typname = '%s'" % self._escape_string(key)
         self._src.execute(q)
-        res = list(self._src.fetch(1)[0])
+        res = self._src.fetch(1)
+        if not res:
+            raise KeyError('Type %s could not be found' % key)
+        res = list(res[0])
         res[0] = int(res[0])
         res[2] = int(res[2])
         res[6] = int(res[6])
@@ -231,7 +234,7 @@ class Cursor(object):
         """Create a cursor object for the database connection."""
         self.connection = self._dbcnx = dbcnx
         self._cnx = dbcnx._cnx
-        self._type_cache = dbcnx._type_cache
+        self.type_cache = dbcnx.type_cache
         self._src = self._cnx.source()
         # the official attribute for describing the result columns
         self._description = None
@@ -328,7 +331,7 @@ class Cursor(object):
     def _make_description(self, info):
         """Make the description tuple for the given field info."""
         name, typ, size, mod = info[1:]
-        type_info = self._type_cache[typ]
+        type_info = self.type_cache[typ]
         type_code = type_info.name
         if mod > 0:
             mod -= 4
@@ -465,7 +468,7 @@ class Cursor(object):
             raise
         except Error as err:
             raise _db_error(str(err))
-        typecast = self._type_cache.typecast
+        typecast = self.type_cache.typecast
         return [self.row_factory([typecast(typ, value)
             for typ, value in zip(self.coltypes, row)]) for row in result]
 
@@ -815,7 +818,7 @@ class Connection(object):
         """Create a database connection object."""
         self._cnx = cnx  # connection
         self._tnx = False  # transaction state
-        self._type_cache = TypeCache(cnx)
+        self.type_cache = TypeCache(cnx)
         self.cursor_type = Cursor
         try:
             self._cnx.source()
