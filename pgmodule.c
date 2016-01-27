@@ -555,7 +555,7 @@ cast_unsized_simple(char *s, int type)
 			}
 			buf[j] = '\0'; s = buf;
 			/* FALLTHROUGH */ /* no break here */
-	
+
 		case PYGRES_DECIMAL:
 			if (decimal)
 			{
@@ -597,8 +597,9 @@ cast_unsized_simple(char *s, int type)
 	&& (s[2] == 'l' || s[2] == 'L') \
 	&& (s[3] == 'l' || s[3] == 'L'))
 
-/* Cast string s with size and encoding to a Python list.
-   Use cast function if specified or basetype to cast elements.
+/* Cast string s with size and encoding to a Python list,
+   using the input and output syntax for arrays.
+   Use internal type or cast function to cast elements.
    The parameter delim specifies the delimiter for the elements,
    since some types do not use the default delimiter of a comma. */
 static PyObject *
@@ -614,7 +615,13 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 		type &= ~PYGRES_ARRAY; /* get the base type */
 		if (!type) type = PYGRES_TEXT;
 	}
-	if (!delim) delim = ',';
+	if (!delim)
+		delim = ',';
+	else if (delim == '{' || delim =='}' || delim=='\\')
+	{
+		PyErr_SetString(PyExc_ValueError, "Invalid array delimiter");
+		return NULL;
+	}
 
 	/* strip blanks at the beginning */
 	while (s != end && *s == ' ') ++s;
@@ -653,7 +660,7 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 	if (!depth)
 	{
 		PyErr_SetString(PyExc_ValueError,
-			"Array must start with an opening brace");
+			"Array must start with a left brace");
 		return NULL;
 	}
 	if (ranges && depth != ranges)
@@ -689,13 +696,16 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 				{
 					PyErr_SetString(PyExc_ValueError,
 						"Subarray expected but not found");
-					return NULL;
+					Py_DECREF(result); return NULL;
 				}
 			}
 			else if (*s != '}') break; /* error */
 			subresult = result;
 			result = stack[--level];
-			if (PyList_Append(result, subresult)) return NULL;
+			if (PyList_Append(result, subresult))
+			{
+				Py_DECREF(result); return NULL;
+			}
 		}
 		else if (level == depth) /* we expect elements at this level */
 		{
@@ -708,7 +718,7 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 			{
 				PyErr_SetString(PyExc_ValueError,
 					"Subarray found where not expected");
-				return NULL;
+				Py_DECREF(result); return NULL;
 			}
 			if (*s == '"') /* quoted element */
 			{
@@ -752,13 +762,16 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 			{
 				if (escaped)
 				{
-					char   *r;
-					int		i;
+					char	   *r;
+					Py_ssize_t	i;
 
 					/* create unescaped string */
 					t = estr;
 					estr = (char *) PyMem_Malloc(esize);
-					if (!estr) return PyErr_NoMemory();
+					if (!estr)
+					{
+						Py_DECREF(result); return PyErr_NoMemory();
+					}
 					for (i = 0, r = estr; i < esize; ++i)
 					{
 						if (*t == '\\') ++t, ++i;
@@ -788,14 +801,20 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 					}
 				}
 				if (escaped) PyMem_Free(estr);
-				if (!element) return NULL;
+				if (!element)
+				{
+					Py_DECREF(result); return NULL;
+				}
 			}
 			else
 			{
-				Py_INCREF(Py_None);
-				element = Py_None;
+				Py_INCREF(Py_None); element = Py_None;
 			}
-			if (PyList_Append(result, element)) return NULL;
+			if (PyList_Append(result, element))
+			{
+				Py_DECREF(element); Py_DECREF(result); return NULL;
+			}
+			Py_DECREF(element);
 			if (*s == delim)
 			{
 				do ++s; while (s != end && *s == ' ');
@@ -808,8 +827,8 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 			if (*s != '{')
 			{
 				PyErr_SetString(PyExc_ValueError,
-					"Subarray must start with an opening brace");
-				return NULL;
+					"Subarray must start with a left brace");
+				Py_DECREF(result); return NULL;
 			}
 			do ++s; while (s != end && *s == ' ');
 			if (s == end) break; /* error */
@@ -821,16 +840,200 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 	{
 		PyErr_SetString(PyExc_ValueError,
 			"Unexpected end of array");
-		return NULL;
+		Py_DECREF(result); return NULL;
 	}
 	do ++s; while (s != end && *s == ' ');
 	if (s != end)
 	{
 		PyErr_SetString(PyExc_ValueError,
 			"Unexpected characters after end of array");
-		return NULL;
+		Py_DECREF(result); return NULL;
 	}
 	return result;
+}
+
+/* Cast string s with size and encoding to a Python tuple.
+   using the input and output syntax for composite types.
+   Use array of internal types or cast function or sequence of cast
+   functions to cast elements. The parameter len is the record size.
+   The parameter delim can specify a delimiter for the elements,
+   although composite types always use a comma as delimiter. */
+
+static PyObject *
+cast_record(char *s, Py_ssize_t size, int encoding,
+	 int *type, PyObject *cast, Py_ssize_t len, char delim)
+{
+	PyObject   *result, *ret;
+	char	   *end = s + size, *t;
+	Py_ssize_t	i;
+
+	if (!delim)
+		delim = ',';
+	else if (delim == '(' || delim ==')' || delim=='\\')
+	{
+		PyErr_SetString(PyExc_ValueError, "Invalid record delimiter");
+		return NULL;
+	}
+
+	/* strip blanks at the beginning */
+	while (s != end && *s == ' ') ++s;
+	if (s == end || *s != '(')
+	{
+		PyErr_SetString(PyExc_ValueError,
+			"Record must start with a left parenthesis");
+		return NULL;
+	}
+	result = PyList_New(0);
+	if (!result) return NULL;
+	i = 0;
+	/* everything is set up, start parsing the record */
+	while (++s != end)
+	{
+		PyObject   *element;
+
+		if (*s == ')' || *s == delim)
+		{
+			Py_INCREF(Py_None); element = Py_None;
+		}
+		else
+		{
+			char	   *estr;
+			Py_ssize_t	esize;
+			int quoted = 0, escaped =0;
+
+			estr = s;
+			quoted = *s == '"';
+			if (quoted) ++s;
+			esize = 0;
+			while (s != end)
+			{
+				if (!quoted && (*s == ')' || *s == delim))
+					break;
+				if (*s == '"')
+				{
+					++s; if (s == end) break;
+					if (!(quoted && *s == '"'))
+					{
+						quoted = !quoted; continue;
+					}
+				}
+				if (*s == '\\')
+				{
+					++s; if (s == end) break;
+				}
+				++s, ++esize;
+			}
+			if (s == end) break; /* error */
+			if (estr + esize != s)
+			{
+				char	   *r;
+
+				escaped = 1;
+				/* create unescaped string */
+				t = estr;
+				estr = (char *) PyMem_Malloc(esize);
+				if (!estr)
+				{
+					Py_DECREF(result); return PyErr_NoMemory();
+				}
+				quoted = 0;
+				r = estr;
+				while (t != s)
+				{
+					if (*t == '"')
+					{
+						++t;
+						if (!(quoted && *t == '"'))
+						{
+							quoted = !quoted; continue;
+						}
+					}
+					if (*t == '\\') ++t;
+					*r++ = *t++;
+				}
+			}
+			if (type) /* internal casting of element type */
+			{
+				int etype = type[i];
+
+				if (etype & PYGRES_ARRAY)
+					element = cast_array(
+						estr, esize, encoding, etype, NULL, 0);
+				else if (etype & PYGRES_TEXT)
+					element = cast_sized_text(estr, esize, encoding, etype);
+				else
+					element = cast_sized_simple(estr, esize, etype);
+			}
+			else /* external casting of base type */
+			{
+#if IS_PY3
+				element = encoding == pg_encoding_ascii ? NULL :
+					get_decoded_string(estr, esize, encoding);
+				if (!element) /* no decoding necessary or possible */
+#endif
+				element = PyBytes_FromStringAndSize(estr, esize);
+				if (element && cast)
+				{
+					if (len)
+					{
+						PyObject *ecast = PySequence_GetItem(cast, i);
+
+						if (ecast)
+						{
+							if (ecast != Py_None)
+								element = PyObject_CallFunctionObjArgs(
+									ecast, element, NULL);
+						}
+						else
+						{
+							Py_DECREF(element); element = NULL;
+						}
+					}
+					else
+						element = PyObject_CallFunctionObjArgs(
+							cast, element, NULL);
+				}
+			}
+			if (escaped) PyMem_Free(estr);
+			if (!element)
+			{
+				Py_DECREF(result); return NULL;
+			}
+		}
+		if (PyList_Append(result, element))
+		{
+			Py_DECREF(element); Py_DECREF(result); return NULL;
+		}
+		Py_DECREF(element);
+		if (len) ++i;
+		if (*s != delim) break; /* no next record */
+		if (len && i >= len)
+		{
+			PyErr_SetString(PyExc_ValueError, "Too many columns");
+			Py_DECREF(result); return NULL;
+		}
+	}
+	if (s == end || *s != ')')
+	{
+		PyErr_SetString(PyExc_ValueError, "Unexpected end of record");
+		Py_DECREF(result); return NULL;
+	}
+	do ++s; while (s != end && *s == ' ');
+	if (s != end)
+	{
+		PyErr_SetString(PyExc_ValueError,
+			"Unexpected characters after end of record");
+		Py_DECREF(result); return NULL;
+	}
+	if (len && i < len)
+	{
+		PyErr_SetString(PyExc_ValueError, "Too few columns");
+		Py_DECREF(result); return NULL;
+	}
+
+	ret = PyList_AsTuple(result);
+	Py_DECREF(result);
+	return ret;
 }
 
 /* internal wrapper for the notice receiver callback */
@@ -5177,11 +5380,10 @@ PyObject *
 pgCastArray(PyObject *self, PyObject *args, PyObject *dict)
 {
 	static const char *kwlist[] = {"string", "cast", "delim", NULL};
-	PyObject   *string_obj, *cast_obj = NULL;
-	char  	   *string;
+	PyObject   *string_obj, *cast_obj = NULL, *ret;
+	char  	   *string, delim = ',';
 	Py_ssize_t	size;
 	int			encoding;
-	char		delim = ',';
 
 	if (!PyArg_ParseTupleAndKeywords(args, dict, "O|Oc",
 			(char **) kwlist, &string_obj, &cast_obj, &delim))
@@ -5207,14 +5409,89 @@ pgCastArray(PyObject *self, PyObject *args, PyObject *dict)
 	}
 
 	if (!cast_obj || cast_obj == Py_None)
-		cast_obj = NULL;
+	{
+		if (cast_obj)
+		{
+			Py_DECREF(cast_obj); cast_obj = NULL;
+		}
+	}
 	else if (!PyCallable_Check(cast_obj))
 	{
 		PyErr_SetString(PyExc_TypeError, "The cast argument must be callable");
 		return NULL;
 	}
 
-	return cast_array(string, size, encoding, 0, cast_obj, delim);
+	ret = cast_array(string, size, encoding, 0, cast_obj, delim);
+
+	Py_XDECREF(string_obj);
+
+	return ret;
+}
+
+/* cast a string with a text representation of a record to a tuple */
+static char pgCastRecord__doc__[] =
+"cast_record(string, cast=None, delim=',') -- cast a string as a record";
+
+PyObject *
+pgCastRecord(PyObject *self, PyObject *args, PyObject *dict)
+{
+	static const char *kwlist[] = {"string", "cast", "delim", NULL};
+	PyObject   *string_obj, *cast_obj = NULL, *ret;
+	char  	   *string, delim = ',';
+	Py_ssize_t	size, len;
+	int			encoding;
+
+	if (!PyArg_ParseTupleAndKeywords(args, dict, "O|Oc",
+			(char **) kwlist, &string_obj, &cast_obj, &delim))
+		return NULL;
+
+	if (PyBytes_Check(string_obj))
+	{
+		encoding = pg_encoding_ascii;
+		PyBytes_AsStringAndSize(string_obj, &string, &size);
+		string_obj = NULL;
+	}
+	else if (PyUnicode_Check(string_obj))
+	{
+		encoding = pg_encoding_utf8;
+		string_obj = get_encoded_string(string_obj, encoding);
+		if (!string_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(string_obj, &string, &size);
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError, "cast_record() expects a string");
+		return NULL;
+	}
+
+	if (!cast_obj || PyCallable_Check(cast_obj))
+	{
+		len = 0;
+	}
+	else if (cast_obj == Py_None)
+	{
+		Py_DECREF(cast_obj); cast_obj = NULL; len = 0;
+	}
+	else if (PyTuple_Check(cast_obj) || PyList_Check(cast_obj))
+	{
+		len = PySequence_Size(cast_obj);
+		if (!len)
+		{
+			Py_DECREF(cast_obj); cast_obj = NULL;
+		}
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"The cast argument must be callable or a tuple or list of such");
+		return NULL;
+	}
+
+	ret = cast_record(string, size, encoding, 0, cast_obj, len, delim);
+
+	Py_XDECREF(string_obj);
+
+	return ret;
 }
 
 
@@ -5249,6 +5526,8 @@ static struct PyMethodDef pgMethods[] = {
 			pgSetJsondecode__doc__},
 	{"cast_array", (PyCFunction) pgCastArray, METH_VARARGS|METH_KEYWORDS,
 			pgCastArray__doc__},
+	{"cast_record", (PyCFunction) pgCastRecord, METH_VARARGS|METH_KEYWORDS,
+			pgCastRecord__doc__},
 
 #ifdef DEFAULT_VARS
 	{"get_defhost", pgGetDefHost, METH_VARARGS, pgGetDefHost__doc__},

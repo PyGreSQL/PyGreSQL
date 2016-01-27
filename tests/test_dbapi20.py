@@ -293,15 +293,19 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def test_type_cache(self):
         con = self._connect()
         cur = con.cursor()
-        type_cache = cur.type_cache
+        type_cache = con.type_cache
+        self.assertNotIn('numeric', type_cache)
         type_info = type_cache['numeric']
+        self.assertIn('numeric', type_cache)
         self.assertEqual(type_info.oid, 1700)
         self.assertEqual(type_info.name, 'numeric')
         self.assertEqual(type_info.type, 'b')  # base
         self.assertEqual(type_info.category, 'N')  # numeric
         self.assertEqual(type_info.delim, ',')
-        self.assertIs(cur.type_cache[1700], type_info)
+        self.assertIs(con.type_cache[1700], type_info)
+        self.assertNotIn('pg_type', type_cache)
         type_info = type_cache['pg_type']
+        self.assertIn('numeric', type_cache)
         self.assertEqual(type_info.type, 'c')  # composite
         self.assertEqual(type_info.category, 'C')  # composite
         cols = type_cache.columns('pg_type')
@@ -315,6 +319,22 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(typlen.name, 'int2')
         self.assertEqual(typlen.type, 'b')  # base
         self.assertEqual(typlen.category, 'N')  # numeric
+        cur.close()
+        cur = con.cursor()
+        type_cache = con.type_cache
+        self.assertIn('numeric', type_cache)
+        cur.close()
+        con.close()
+        con = self._connect()
+        cur = con.cursor()
+        type_cache = con.type_cache
+        self.assertNotIn('pg_type', type_cache)
+        self.assertEqual(type_cache.get('pg_type'), type_info)
+        self.assertIn('pg_type', type_cache)
+        self.assertIsNone(type_cache.get(
+            self.table_prefix + '_surely_does_not_exist'))
+        cur.close()
+        con.close()
 
     def test_cursor_iteration(self):
         con = self._connect()
@@ -450,7 +470,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 inval = inval.strftime('%Y-%m-%d %H:%M:%S')
             self.assertEqual(inval, outval)
 
-    def test_roundtrip_with_list(self):
+    def test_insert_array(self):
         values = [(None, None), ([], []), ([None], [[None], ['null']]),
             ([1, 2, 3], [['a', 'b'], ['c', 'd']]),
             ([20000, 25000, 25000, 30000],
@@ -463,7 +483,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute("create table %s"
                 " (n smallint, i int[], t text[][])" % table)
             params = [(n, v[0], v[1]) for n, v in enumerate(values)]
-            cur.execute("insert into %s values (%%d,%%s,%%s)" % table, params)
+            cur.executemany(
+                "insert into %s values (%%d,%%s,%%s)" % table, params)
             cur.execute("select i, t from %s order by n" % table)
             self.assertEqual(cur.description[0].type_code, pgdb.ARRAY)
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
@@ -475,17 +496,70 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             con.close()
         self.assertEqual(rows, values)
 
-    def test_tuple_binds_as_row(self):
-        values = [(1, 2.5, 'this is a test')]
-        output = '(1,2.5,"this is a test")'
+    def test_select_array(self):
+        values = ([1, 2, 3, None], ['a', 'b', 'c', None])
         con = self._connect()
         try:
             cur = con.cursor()
-            cur.execute("select %s", values)
-            outval = cur.fetchone()[0]
+            cur.execute("select %s::int[], %s::text[]", values)
+            row = cur.fetchone()
         finally:
             con.close()
-        self.assertEqual(outval, output)
+        self.assertEqual(row, values)
+
+    def test_insert_record(self):
+        values = [('John', 61), ('Jane', 63),
+                  ('Fred', None), ('Wilma', None),
+                  (None, 42), (None, None)]
+        table = self.table_prefix + 'booze'
+        record = self.table_prefix + 'munch'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create type %s as (name varchar, age int)" % record)
+            cur.execute("create table %s (n smallint, r %s)" % (table, record))
+            params = enumerate(values)
+            cur.executemany("insert into %s values (%%d,%%s)" % table, params)
+            cur.execute("select r from %s order by n" % table)
+            type_code = cur.description[0].type_code
+            self.assertEqual(type_code, record)
+            columns = con.type_cache.columns(type_code)
+            self.assertEqual(columns[0].name, 'name')
+            self.assertEqual(columns[1].name, 'age')
+            self.assertEqual(con.type_cache[columns[0].type].name, 'varchar')
+            self.assertEqual(con.type_cache[columns[1].type].name, 'int4')
+            rows = cur.fetchall()
+        finally:
+            cur.execute('drop table %s' % table)
+            cur.execute('drop type %s' % record)
+            con.close()
+        self.assertEqual(len(rows), len(values))
+        rows = [row[0] for row in rows]
+        self.assertEqual(rows, values)
+        self.assertEqual(rows[0].name, 'John')
+        self.assertEqual(rows[0].age, 61)
+
+    def test_select_record(self):
+        values = (1, 25000, 2.5, 'hello', 'Hello World!', 'Hello, World!',
+            '(test)', '(x,y)', ' x y ', 'null', None)
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            # Note that %s::record does not work on input unfortunately
+            # ("input of anonymous composite types is not implemented").
+            # so we need to resort to a row constructor instead.
+            row = ','.join(["%s"] * len(values))
+            cur.execute("select ROW(%s) as test_record" % row, values)
+            self.assertEqual(cur.description[0].name, 'test_record')
+            self.assertEqual(cur.description[0].type_code, 'record')
+            row = cur.fetchone()[0]
+        finally:
+            con.close()
+        # Note that the element types get lost since we created an
+        # untyped record (an anonymous composite type). For the same
+        # reason this is also a normal tuple, not a named tuple.
+        text_values = tuple(None if v is None else str(v) for v in values)
+        self.assertEqual(row, text_values)
 
     def test_custom_type(self):
         values = [3, 5, 65]

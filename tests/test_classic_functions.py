@@ -116,7 +116,7 @@ class TestHasConnect(unittest.TestCase):
 class TestParseArray(unittest.TestCase):
     """Test the array parser."""
 
-    array_expressions = [
+    test_strings = [
         ('', str, ValueError),
         ('{}', None, []),
         ('{}', str, []),
@@ -155,6 +155,9 @@ class TestParseArray(unittest.TestCase):
         (r'{"a\bc"}', str, ['abc']),
         (r'{\a\b\c}', str, ['abc']),
         (r'{"\a\b\c"}', str, ['abc']),
+        (r'{"a"b"}', str, ValueError),
+        (r'{"a""b"}', str, ValueError),
+        (r'{"a\"b"}', str, ['a"b']),
         ('{"{}"}', str, ['{}']),
         (r'{\{\}}', str, ['{}']),
         ('{"{a,b,c}"}', str, ['{a,b,c}']),
@@ -217,6 +220,9 @@ class TestParseArray(unittest.TestCase):
         self.assertRaises(TypeError, f, '{}', None, None)
         self.assertRaises(TypeError, f, '{}', None, 1)
         self.assertRaises(TypeError, f, '{}', None, '')
+        self.assertRaises(ValueError, f, '{}', None, '\\')
+        self.assertRaises(ValueError, f, '{}', None, '{')
+        self.assertRaises(ValueError, f, '{}', None, '}')
         self.assertRaises(TypeError, f, '{}', None, ',;')
         self.assertEqual(f('{}'), [])
         self.assertEqual(f('{}', None), [])
@@ -299,22 +305,22 @@ class TestParseArray(unittest.TestCase):
 
     def testParserWithData(self):
         f = pg.cast_array
-        for expression, cast, expected in self.array_expressions:
+        for string, cast, expected in self.test_strings:
             if expected is ValueError:
-                self.assertRaises(ValueError, f, expression, cast)
+                self.assertRaises(ValueError, f, string, cast)
             else:
-                self.assertEqual(f(expression, cast), expected)
+                self.assertEqual(f(string, cast), expected)
 
     def testParserWithoutCast(self):
         f = pg.cast_array
 
-        for expression, cast, expected in self.array_expressions:
+        for string, cast, expected in self.test_strings:
             if cast is not str:
                 continue
             if expected is ValueError:
-                self.assertRaises(ValueError, f, expression)
+                self.assertRaises(ValueError, f, string)
             else:
-                self.assertEqual(f(expression), expected)
+                self.assertEqual(f(string), expected)
 
     def testParserWithDifferentDelimiter(self):
         f = pg.cast_array
@@ -327,13 +333,285 @@ class TestParseArray(unittest.TestCase):
             else:
                 return value
 
-        for expression, cast, expected in self.array_expressions:
-            expression = replace_comma(expression)
+        for string, cast, expected in self.test_strings:
+            string = replace_comma(string)
             if expected is ValueError:
-                self.assertRaises(ValueError, f, expression, cast)
+                self.assertRaises(ValueError, f, string, cast)
             else:
                 expected = replace_comma(expected)
-                self.assertEqual(f(expression, cast, b';'), expected)
+                self.assertEqual(f(string, cast, b';'), expected)
+
+
+class TestParseRecord(unittest.TestCase):
+    """Test the record parser."""
+
+    test_strings = [
+        ('', None, ValueError),
+        ('', str, ValueError),
+        ('(', None, ValueError),
+        ('(', str, ValueError),
+        ('()', None, (None,)),
+        ('()', str, (None,)),
+        ('()', int, (None,)),
+        ('(,)', str, (None, None)),
+        ('( , )', str, (' ', ' ')),
+        ('(")', None, ValueError),
+        ('("")', None, ('',)),
+        ('("")', str, ('',)),
+        ('("")', int, ValueError),
+        ('("" )', None, (' ',)),
+        ('("" )', str, (' ',)),
+        ('("" )', int, ValueError),
+        ('    ()    ', None, (None,)),
+        ('   (   )   ', None, ('   ',)),
+        ('(', str, ValueError),
+        ('(()', str, ('(',)),
+        ('(())', str, ValueError),
+        ('()(', str, ValueError),
+        ('()()', str, ValueError),
+        ('[]', str, ValueError),
+        ('{}', str, ValueError),
+        ('([])', str, ('[]',)),
+        ('(hello)', int, ValueError),
+        ('(42)', int, (42,)),
+        ('( 42 )', int, (42,)),
+        ('(  42)', int, (42,)),
+        ('(42)', str, ('42',)),
+        ('( 42 )', str, (' 42 ',)),
+        ('(  42)', str, ('  42',)),
+        ('(42', int, ValueError),
+        ('( 42 ', int, ValueError),
+        ('(hello)', str, ('hello',)),
+        ('( hello )', str, (' hello ',)),
+        ('(hello))', str, ValueError),
+        ('   (hello)   ', str, ('hello',)),
+        ('   (hello)   )', str, ValueError),
+        ('(hello)?', str, ValueError),
+        ('(null)', str, ('null',)),
+        ('(null)', int, ValueError),
+        (' ( NULL ) ', str, (' NULL ',)),
+        ('   (   NULL   )   ', str, ('   NULL   ',)),
+        (' ( null null ) ', str, (' null null ',)),
+        (' ("null") ', str, ('null',)),
+        (' ("NULL") ', str, ('NULL',)),
+        ('(Hi!)', str, ('Hi!',)),
+        ('("Hi!")', str, ('Hi!',)),
+        ("('Hi!')", str, ("'Hi!'",)),
+        ('(" Hi! ")', str, (' Hi! ',)),
+        ('("Hi!" )', str, ('Hi! ',)),
+        ('( "Hi!")', str, (' Hi!',)),
+        ('( "Hi!" )', str, (' Hi! ',)),
+        ('( ""Hi!"" )', str, (' Hi! ',)),
+        ('( """Hi!""" )', str, (' "Hi!" ',)),
+        ('(a")', str, ValueError),
+        ('("b)', str, ValueError),
+        ('("a" "b)', str, ValueError),
+        ('("a" "b")', str, ('a b',)),
+        ('( "a" "b" "c" )', str, (' a b c ',)),
+        ('(  "a"  "b"  "c"  )', str, ('  a  b  c  ',)),
+        ('(  "a,b"  "c,d"  )', str, ('  a,b  c,d  ',)),
+        ('( "(a,b,c)" d, e, "f,g")', str, (' (a,b,c) d', ' e', ' f,g')),
+        ('(a",b,c",d,"e,f")', str, ('a,b,c', 'd', 'e,f')),
+        ('( """a,b""", ""c,d"", "e,f", "g", ""h"", """i""")', str,
+            (' "a,b"', ' c', 'd', ' e,f', ' g', ' h', ' "i"')),
+        ('(a",b)",c"),(d,e)",f,g)', str, ('a,b)', 'c),(d,e)', 'f', 'g')),
+        ('(a"b)', str, ValueError),
+        (r'(a\"b)', str, ('a"b',)),
+        ('(a""b)', str, ('ab',)),
+        ('("a""b")', str, ('a"b',)),
+        (r'(a\,b)', str, ('a,b',)),
+        (r'(a\bc)', str, ('abc',)),
+        (r'("a\bc")', str, ('abc',)),
+        (r'(\a\b\c)', str, ('abc',)),
+        (r'("\a\b\c")', str, ('abc',)),
+        ('("()")', str, ('()',)),
+        (r'(\,)', str, (',',)),
+        (r'(\(\))', str, ('()',)),
+        (r'(\)\()', str, (')(',)),
+        ('("(a,b,c)")', str, ('(a,b,c)',)),
+        ("('abc')", str, ("'abc'",)),
+        ('("abc")', str, ('abc',)),
+        (r'(\"abc\")', str, ('"abc"',)),
+        (r"(\'abc\')", str, ("'abc'",)),
+        ('(Hello World!)', str, ('Hello World!',)),
+        ('(Hello, World!)', str, ('Hello', ' World!',)),
+        ('(Hello,\ World!)', str, ('Hello', ' World!',)),
+        ('(Hello\, World!)', str, ('Hello, World!',)),
+        ('("Hello World!")', str, ('Hello World!',)),
+        ("(this,shouldn't,be,null)", str, ('this', "shouldn't", 'be', 'null')),
+        ('(null,should,be,)', str, ('null', 'should', 'be', None)),
+        ('(abcABC0123!?+-*/=&%$\\\\\'\\"{[]}"""":;\\,,)', str,
+            ('abcABC0123!?+-*/=&%$\\\'"{[]}":;,', None)),
+        ('(3, 2, 1,)', int, (3, 2, 1, None)),
+        ('(3, 2, 1, )', int, ValueError),
+        ('(, 1, 2, 3)', int, (None, 1, 2, 3)),
+        ('( , 1, 2, 3)', int, ValueError),
+        ('(,1,,2,,3,)', int, (None, 1, None, 2, None, 3, None)),
+        ('(3,17,51)', int, (3, 17, 51)),
+        (' ( 3 , 17 , 51 ) ', int, (3, 17, 51)),
+        ('(3,17,51)', str, ('3', '17', '51')),
+        (' ( 3 , 17 , 51 ) ', str, (' 3 ', ' 17 ', ' 51 ')),
+        ('(1,"2",abc,"def")', str, ('1', '2', 'abc', 'def')),
+        ('(())', str, ValueError),
+        ('()))', str, ValueError),
+        ('()()', str, ValueError),
+        ('((()', str, ('((',)),
+        ('(())', int, ValueError),
+        ('((),())', str, ValueError),
+        ('("()","()")', str, ('()', '()')),
+        ('( " () , () , () " )', str, ('  () , () , ()  ',)),
+        ('(20000, 25000, 25000, 25000)', int, (20000, 25000, 25000, 25000)),
+        ('("breakfast","consulting","meeting","lunch")', str,
+            ('breakfast', 'consulting', 'meeting', 'lunch')),
+        ('("breakfast","consulting","meeting","lunch")',
+            (str, str, str), ValueError),
+        ('("breakfast","consulting","meeting","lunch")', (str, str, str, str),
+            ('breakfast', 'consulting', 'meeting', 'lunch')),
+        ('("breakfast","consulting","meeting","lunch")',
+            (str, str, str, str, str), ValueError),
+        ('("fuzzy dice",42,1.9375)', None, ('fuzzy dice', '42', '1.9375')),
+        ('("fuzzy dice",42,1.9375)', str, ('fuzzy dice', '42', '1.9375')),
+        ('("fuzzy dice",42,1.9375)', int, ValueError),
+        ('("fuzzy dice",42,1.9375)', (str, int, float),
+            ('fuzzy dice', 42, 1.9375)),
+        ('("fuzzy dice",42,1.9375)', (str, int), ValueError),
+        ('("fuzzy dice",42,1.9375)', (str, int, float, str), ValueError),
+        ('("fuzzy dice",42,)', (str, int, float), ('fuzzy dice', 42, None)),
+        ('("fuzzy dice",42,)', (str, int), ValueError),
+        ('("",42,)', (str, int, float), ('', 42, None)),
+        ('("fuzzy dice","",1.9375)', (str, int, float), ValueError),
+        ('(fuzzy dice,"42","1.9375")', (str, int, float),
+            ('fuzzy dice', 42, 1.9375))]
+
+    def testParserParams(self):
+        f = pg.cast_record
+        self.assertRaises(TypeError, f)
+        self.assertRaises(TypeError, f, None)
+        self.assertRaises(TypeError, f, '()', 1)
+        self.assertRaises(TypeError, f, '()', ',',)
+        self.assertRaises(TypeError, f, '()', None, None)
+        self.assertRaises(TypeError, f, '()', None, 1)
+        self.assertRaises(TypeError, f, '()', None, '')
+        self.assertRaises(ValueError, f, '()', None, '\\')
+        self.assertRaises(ValueError, f, '()', None, '(')
+        self.assertRaises(ValueError, f, '()', None, ')')
+        self.assertRaises(TypeError, f, '{}', None, ',;')
+        self.assertEqual(f('()'), (None,))
+        self.assertEqual(f('()', None), (None,))
+        self.assertEqual(f('()', None, b';'), (None,))
+        self.assertEqual(f('()', str), (None,))
+        self.assertEqual(f('()', str, b';'), (None,))
+
+    def testParserSimple(self):
+        r = pg.cast_record('(a,b,c)')
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(len(r), 3)
+        self.assertEqual(r, ('a', 'b', 'c'))
+
+    def testParserNested(self):
+        f = pg.cast_record
+        self.assertRaises(ValueError, f, '((a,b,c))')
+        self.assertRaises(ValueError, f, '((a,b),(c,d))')
+        self.assertRaises(ValueError, f, '((a),(b),(c))')
+        self.assertRaises(ValueError, f, '(((((((abc)))))))')
+
+    def testParserManyElements(self):
+        f = pg.cast_record
+        for n in 3, 5, 9, 12, 16, 32, 64, 256:
+            r = '(%s)' % ','.join(map(str, range(n)))
+            r = f(r, int)
+            self.assertEqual(r, tuple(range(n)))
+
+    def testParserCastUniform(self):
+        f = pg.cast_record
+        self.assertEqual(f('(1)'), ('1',))
+        self.assertEqual(f('(1)', None), ('1',))
+        self.assertEqual(f('(1)', int), (1,))
+        self.assertEqual(f('(1)', str), ('1',))
+        self.assertEqual(f('(a)'), ('a',))
+        self.assertEqual(f('(a)', None), ('a',))
+        self.assertRaises(ValueError, f, '(a)', int)
+        self.assertEqual(f('(a)', str), ('a',))
+        cast = lambda s: '%s is ok' % s
+        self.assertEqual(f('(a)', cast), ('a is ok',))
+
+    def testParserCastNonUniform(self):
+        f = pg.cast_record
+        self.assertEqual(f('(1)', []), ('1',))
+        self.assertEqual(f('(1)', [None]), ('1',))
+        self.assertEqual(f('(1)', [str]), ('1',))
+        self.assertEqual(f('(1)', [int]), (1,))
+        self.assertRaises(ValueError, f, '(1)', [None, None])
+        self.assertRaises(ValueError, f, '(1)', [str, str])
+        self.assertRaises(ValueError, f, '(1)', [int, int])
+        self.assertEqual(f('(a)', [None]), ('a',))
+        self.assertEqual(f('(a)', [str]), ('a',))
+        self.assertRaises(ValueError, f, '(a)', [int])
+        self.assertEqual(f('(1,a)', [int, str]), (1, 'a'))
+        self.assertRaises(ValueError, f, '(1,a)', [str, int])
+        self.assertEqual(f('(a,1)', [str, int]), ('a', 1))
+        self.assertRaises(ValueError, f, '(a,1)', [int, str])
+        self.assertEqual(f('(1,a,2,b,3,c)',
+            [int, str, int, str, int, str]), (1, 'a', 2, 'b', 3, 'c'))
+        self.assertEqual(f('(1,a,2,b,3,c)',
+            (int, str, int, str, int, str)), (1, 'a', 2, 'b', 3, 'c'))
+        cast1 = lambda s: '%s is ok' % s
+        self.assertEqual(f('(a)', [cast1]), ('a is ok',))
+        cast2 = lambda s: 'and %s is ok, too' % s
+        self.assertEqual(f('(a,b)', [cast1, cast2]),
+            ('a is ok', 'and b is ok, too'))
+        self.assertRaises(ValueError, f, '(a)', [cast1, cast2])
+        self.assertRaises(ValueError, f, '(a,b,c)', [cast1, cast2])
+        self.assertEqual(f('(1,2,3,4,5,6)',
+            [int, float, str, None, cast1, cast2]),
+            (1, 2.0, '3', '4', '5 is ok', 'and 6 is ok, too'))
+
+    def testParserDelim(self):
+        f = pg.cast_record
+        self.assertEqual(f('(1,2)'), ('1', '2'))
+        self.assertEqual(f('(1,2)', delim=b','), ('1', '2'))
+        self.assertEqual(f('(1;2)'), ('1;2',))
+        self.assertEqual(f('(1;2)', delim=b';'), ('1', '2'))
+        self.assertEqual(f('(1,2)', delim=b';'), ('1,2',))
+
+    def testParserWithData(self):
+        f = pg.cast_record
+        for string, cast, expected in self.test_strings:
+            if expected is ValueError:
+                self.assertRaises(ValueError, f, string, cast)
+            else:
+                self.assertEqual(f(string, cast), expected)
+
+    def testParserWithoutCast(self):
+        f = pg.cast_record
+
+        for string, cast, expected in self.test_strings:
+            if cast is not str:
+                continue
+            if expected is ValueError:
+                self.assertRaises(ValueError, f, string)
+            else:
+                self.assertEqual(f(string), expected)
+
+    def testParserWithDifferentDelimiter(self):
+        f = pg.cast_record
+
+        def replace_comma(value):
+            if isinstance(value, str):
+                return value.replace(';', '@').replace(
+                    ',', ';').replace('@', ',')
+            elif isinstance(value, tuple):
+                return tuple(replace_comma(v) for v in value)
+            else:
+                return value
+
+        for string, cast, expected in self.test_strings:
+            string = replace_comma(string)
+            if expected is ValueError:
+                self.assertRaises(ValueError, f, string, cast)
+            else:
+                expected = replace_comma(expected)
+                self.assertEqual(f(string, cast, b';'), expected)
 
 
 class TestEscapeFunctions(unittest.TestCase):

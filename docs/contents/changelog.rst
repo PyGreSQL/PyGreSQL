@@ -25,9 +25,14 @@ Version 5.0
   are now named tuples, i.e. their elements can be also accessed by name.
   The column names and types can now also be requested through the
   colnames and coltypes attributes, which are not part of DB-API 2 though.
-- If you pass a list as one of the parameters to a DB-API 2 cursor, it is
-  now automatically bound as PostgreSQL ARRAY. If you pass a tuple, then
-  it will be bound as a PostgreSQL ROW expression.
+- If you pass a Python list as one of the parameters to a DB-API 2 cursor,
+  it is now automatically bound as a PostgreSQL array. If you pass a Python
+  tuple, it is bound as a PostgreSQL composite type. Inversely, if a query
+  returns a PostgreSQL array, it is passed to Python as a list, and if it
+  returns a PostgreSQL composite type, it is passed to Python as a (named)
+  tuple. PyGreSQL uses the special input and output syntax for PostgreSQL
+  arrays and composite types in all of these cases. Anonymous composite
+  types are returned as ordinary (unnamed) tuples with string values.
 - Re-activated the shortcut methods of the DB-API connection since they
   can be handy when doing experiments or writing quick scripts. We keep
   them undocumented though and discourage using them in production.

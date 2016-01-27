@@ -136,12 +136,15 @@ def _cast_money(value):
         lambda v: v in '0123456789.-', value)))
 
 
-_cast = {'bool': _cast_bool, 'bytea': unescape_bytea,
+_cast = {'char': str, 'bpchar': str, 'name': str,
+    'text': str, 'varchar': str,
+    'bool': _cast_bool, 'bytea': unescape_bytea,
     'int2': int, 'int4': int, 'serial': int,
     'int8': long, 'json': jsondecode, 'jsonb': jsondecode,
     'oid': long, 'oid8': long,
     'float4': float, 'float8': float,
-    'numeric': Decimal, 'money': _cast_money}
+    'numeric': Decimal, 'money': _cast_money,
+    'record': cast_record}
 
 
 def _db_error(msg, cls=DatabaseError):
@@ -183,10 +186,14 @@ class TypeCache(dict):
             if not '.' in key and not '"' in key:
                 key = '"%s"' % key
             oid = "'%s'::regtype" % self._escape_string(key)
-        self._src.execute("SELECT oid, typname,"
-             " typlen, typtype, typcategory, typdelim, typrelid"
-            " FROM pg_type WHERE oid=%s" % oid)
-        res = self._src.fetch(1)
+        try:
+            self._src.execute("SELECT oid, typname,"
+                 " typlen, typtype, typcategory, typdelim, typrelid"
+                " FROM pg_type WHERE oid=%s" % oid)
+        except ProgrammingError:
+            res = None
+        else:
+            res = self._src.fetch(1)
         if not res:
             raise KeyError('Type %s could not be found' % key)
         res = list(res[0])
@@ -197,37 +204,69 @@ class TypeCache(dict):
         self[res.oid] = self[res.name] = res
         return res
 
+    def get(self, key, default=None):
+        """Get the type even if it is not cached."""
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
     def columns(self, key):
         """Get the names and types of the columns of composite types."""
-        typ = self[key]
+        try:
+            typ = self[key]
+        except KeyError:
+            return None  # this type is not known
         if typ.type != 'c' or not typ.relid:
-            return []  # this type is not composite
+            return None  # this type is not composite
         self._src.execute("SELECT attname, atttypid"
             " FROM pg_attribute WHERE attrelid=%s AND attnum>0"
             " AND NOT attisdropped ORDER BY attnum" % typ.relid)
         return [ColumnInfo(name, int(oid))
             for name, oid in self._src.fetch(-1)]
 
-    @staticmethod
-    def typecast(typ, value):
+    def typecast(self, typ, value):
         """Cast value according to database type."""
         if value is None:
             # for NULL values, no typecast is necessary
             return None
         cast = _cast.get(typ)
+        if cast is str:
+            return value  # no typecast necessary
         if cast is None:
             if typ.startswith('_'):
                 # cast as an array type
                 cast = _cast.get(typ[1:])
                 return cast_array(value, cast)
-            # no typecast available or necessary
-            return value
+            # check whether this is a composite type
+            cols = self.columns(typ)
+            if cols:
+                getcast = self.getcast
+                cast = [getcast(col.type) for col in cols]
+                value = cast_record(value, cast)
+                fields = [col.name for col in cols]
+                record = namedtuple(typ, fields)
+                return record(*value)
+            return value  # no typecast available or necessary
         else:
             return cast(value)
 
+    def getcast(self, key):
+        """Get a cast function for the given database type."""
+        if isinstance(key, int):
+            try:
+                typ = self[key].name
+            except KeyError:
+                return None
+        else:
+            typ = key
+        typecast = self.typecast
+        return lambda value: typecast(typ, value)
 
-_re_array_escape = regex(r'(["\\])')
+
 _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
+_re_record_quote = regex(r'[(,"\\]')
+_re_array_escape = _re_record_escape = regex(r'(["\\])')
 
 
 class _quotedict(dict):
@@ -299,8 +338,7 @@ class Cursor(object):
         if isinstance(val, list):
             return "'%s'" % self._quote_array(val)
         if isinstance(val, tuple):
-            q = self._quote
-            return 'ROW(%s)' % ','.join(str(q(v)) for v in val)
+            return "'%s'" % self._quote_record(val)
         try:
             return val.__pg_repr__()
         except AttributeError:
@@ -309,27 +347,53 @@ class Cursor(object):
 
     def _quote_array(self, val):
         """Quote value as a literal constant for an array."""
-        # We could also cast to an array constructor here, but that is more
-        # verbose and you need to know the base type to build emtpy arrays.
+        q = self._quote_array_element
+        return '{%s}' % ','.join(q(v) for v in val)
+
+    def _quote_array_element(self, val):
+        """Quote value using the output syntax for arrays."""
         if isinstance(val, list):
-            return '{%s}' % ','.join(self._quote_array(v) for v in val)
+            return self._quote_array(val)
         if val is None:
             return 'null'
         if isinstance(val, (int, long, float)):
             return str(val)
         if isinstance(val, bool):
             return 't' if val else 'f'
+        if isinstance(val, tuple):
+            val = self._quote_record(val)
         if isinstance(val, basestring):
             if not val:
                 return '""'
             if _re_array_quote.search(val):
                 return '"%s"' % _re_array_escape.sub(r'\\\1', val)
             return val
-        try:
-            return val.__pg_repr__()
-        except AttributeError:
-            raise InterfaceError(
-                'do not know how to handle type %s' % type(val))
+        raise InterfaceError(
+            'do not know how to handle base type %s' % type(val))
+
+    def _quote_record(self, val):
+        """Quote value as a literal constant for a record."""
+        q = self._quote_record_element
+        return '(%s)' % ','.join(q(v) for v in val)
+
+    def _quote_record_element(self, val):
+        """Quote value using the output syntax for records."""
+        if val is None:
+            return ''
+        if isinstance(val, (int, long, float)):
+            return str(val)
+        if isinstance(val, bool):
+            return 't' if val else 'f'
+        if isinstance(val, list):
+            val = self._quote_array(val)
+        if isinstance(val, basestring):
+            if not val:
+                return '""'
+            if _re_record_quote.search(val):
+                return '"%s"' % _re_record_escape.sub(r'\\\1', val)
+            return val
+        raise InterfaceError(
+            'do not know how to handle component type %s' % type(val))
 
     def _quoteparams(self, string, parameters):
         """Quote parameters.
