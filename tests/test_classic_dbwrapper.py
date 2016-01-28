@@ -379,6 +379,8 @@ class TestDBClass(unittest.TestCase):
 
     cls_set_up = False
 
+    regtypes = None
+
     @classmethod
     def setUpClass(cls):
         db = DB()
@@ -401,6 +403,10 @@ class TestDBClass(unittest.TestCase):
     def setUp(self):
         self.assertTrue(self.cls_set_up)
         self.db = DB()
+        if self.regtypes is None:
+            self.regtypes = self.db.use_regtypes()
+        else:
+            self.db.use_regtypes(self.regtypes)
         query = self.db.query
         query('set client_encoding=utf8')
         query('set standard_conforming_strings=on')
@@ -985,18 +991,29 @@ class TestDBClass(unittest.TestCase):
             self.db.get_attnames, 'has.too.many.dots')
         r = get_attnames('test')
         self.assertIsInstance(r, dict)
-        self.assertEqual(r, dict(
-            i2='int', i4='int', i8='int', d='num',
-            f4='float', f8='float', m='money',
-            v4='text', c4='text', t='text'))
+        if self.regtypes:
+            self.assertEqual(r, dict(
+                i2='smallint', i4='integer', i8='bigint', d='numeric',
+                f4='real', f8='double precision', m='money',
+                v4='character varying', c4='character', t='text'))
+        else:
+            self.assertEqual(r, dict(
+                i2='int', i4='int', i8='int', d='num',
+                f4='float', f8='float', m='money',
+                v4='text', c4='text', t='text'))
         self.createTable('test_table',
             'n int, alpha smallint, beta bool,'
             ' gamma char(5), tau text, v varchar(3)')
         r = get_attnames('test_table')
         self.assertIsInstance(r, dict)
-        self.assertEqual(r, dict(
-            n='int', alpha='int', beta='bool',
-            gamma='text', tau='text', v='text'))
+        if self.regtypes:
+            self.assertEqual(r, dict(
+                n='integer', alpha='smallint', beta='boolean',
+                gamma='character', tau='text', v='character varying'))
+        else:
+            self.assertEqual(r, dict(
+                n='int', alpha='int', beta='bool',
+                gamma='text', tau='text', v='text'))
 
     def testGetAttnamesWithQuotes(self):
         get_attnames = self.db.get_attnames
@@ -1005,23 +1022,37 @@ class TestDBClass(unittest.TestCase):
             '"Prime!" smallint, "much space" integer, "Questions?" text')
         r = get_attnames(table)
         self.assertIsInstance(r, dict)
-        self.assertEqual(r, {
-            'Prime!': 'int', 'much space': 'int', 'Questions?': 'text'})
+        if self.regtypes:
+            self.assertEqual(r, {
+                'Prime!': 'smallint', 'much space': 'integer',
+                'Questions?': 'text'})
+        else:
+            self.assertEqual(r, {
+                'Prime!': 'int', 'much space': 'int', 'Questions?': 'text'})
         table = 'yet another test table for get_attnames()'
         self.createTable(table,
             'a smallint, b integer, c bigint,'
-            ' e numeric, f float, f2 double precision, m money,'
+            ' e numeric, f real, f2 double precision, m money,'
             ' x smallint, y smallint, z smallint,'
             ' Normal_NaMe smallint, "Special Name" smallint,'
             ' t text, u char(2), v varchar(2),'
             ' primary key (y, u)', oids=True)
         r = get_attnames(table)
         self.assertIsInstance(r, dict)
-        self.assertEqual(r, {'a': 'int', 'c': 'int', 'b': 'int',
-            'e': 'num', 'f': 'float', 'f2': 'float', 'm': 'money',
-            'normal_name': 'int', 'Special Name': 'int',
-            'u': 'text', 't': 'text', 'v': 'text',
-            'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int'})
+        if self.regtypes:
+            self.assertEqual(r, {
+                'a': 'smallint', 'b': 'integer', 'c': 'bigint',
+                'e': 'numeric', 'f': 'real', 'f2': 'double precision',
+                'm': 'money', 'normal_name': 'smallint',
+                'Special Name': 'smallint', 'u': 'character',
+                't': 'text', 'v': 'character varying', 'y': 'smallint',
+                'x': 'smallint', 'z': 'smallint', 'oid': 'oid'})
+        else:
+            self.assertEqual(r, {'a': 'int', 'b': 'int', 'c': 'int',
+                'e': 'num', 'f': 'float', 'f2': 'float', 'm': 'money',
+                'normal_name': 'int', 'Special Name': 'int',
+                'u': 'text', 't': 'text', 'v': 'text',
+                'y': 'int', 'x': 'int', 'z': 'int', 'oid': 'int'})
 
     def testGetAttnamesWithRegtypes(self):
         get_attnames = self.db.get_attnames
@@ -1030,7 +1061,7 @@ class TestDBClass(unittest.TestCase):
             ' gamma char(5), tau text, v varchar(3)')
         use_regtypes = self.db.use_regtypes
         regtypes = use_regtypes()
-        self.assertFalse(regtypes)
+        self.assertEqual(regtypes, self.regtypes)
         use_regtypes(True)
         try:
             r = get_attnames("test_table")
@@ -1041,27 +1072,47 @@ class TestDBClass(unittest.TestCase):
             n='integer', alpha='smallint', beta='boolean',
             gamma='character', tau='text', v='character varying'))
 
+    def testGetAttnamesWithoutRegtypes(self):
+        get_attnames = self.db.get_attnames
+        self.createTable('test_table',
+            ' n int, alpha smallint, beta bool,'
+            ' gamma char(5), tau text, v varchar(3)')
+        use_regtypes = self.db.use_regtypes
+        regtypes = use_regtypes()
+        self.assertEqual(regtypes, self.regtypes)
+        use_regtypes(False)
+        try:
+            r = get_attnames("test_table")
+            self.assertIsInstance(r, dict)
+        finally:
+            use_regtypes(regtypes)
+        self.assertEqual(r, dict(
+            n='int', alpha='int', beta='bool',
+            gamma='text', tau='text', v='text'))
+
     def testGetAttnamesIsCached(self):
         get_attnames = self.db.get_attnames
+        int_type = 'integer' if self.regtypes else 'int'
+        text_type = 'text'
         query = self.db.query
         self.createTable('test_table', 'col int')
         r = get_attnames("test_table")
         self.assertIsInstance(r, dict)
-        self.assertEqual(r, dict(col='int'))
+        self.assertEqual(r, dict(col=int_type))
         query("alter table test_table alter column col type text")
         query("alter table test_table add column col2 int")
         r = get_attnames("test_table")
-        self.assertEqual(r, dict(col='int'))
+        self.assertEqual(r, dict(col=int_type))
         r = get_attnames("test_table", flush=True)
-        self.assertEqual(r, dict(col='text', col2='int'))
+        self.assertEqual(r, dict(col=text_type, col2=int_type))
         query("alter table test_table drop column col2")
         r = get_attnames("test_table")
-        self.assertEqual(r, dict(col='text', col2='int'))
+        self.assertEqual(r, dict(col=text_type, col2=int_type))
         r = get_attnames("test_table", flush=True)
-        self.assertEqual(r, dict(col='text'))
+        self.assertEqual(r, dict(col=text_type))
         query("alter table test_table drop column col")
         r = get_attnames("test_table")
-        self.assertEqual(r, dict(col='text'))
+        self.assertEqual(r, dict(col=text_type))
         r = get_attnames("test_table", flush=True)
         self.assertEqual(r, dict())
 
@@ -1069,10 +1120,17 @@ class TestDBClass(unittest.TestCase):
         get_attnames = self.db.get_attnames
         r = get_attnames('test', flush=True)
         self.assertIsInstance(r, OrderedDict)
-        self.assertEqual(r, OrderedDict([
-            ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
-            ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
-            ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
+        if self.regtypes:
+            self.assertEqual(r, OrderedDict([
+                ('i2', 'smallint'), ('i4', 'integer'), ('i8', 'bigint'),
+                ('d', 'numeric'), ('f4', 'real'), ('f8', 'double precision'),
+                ('m', 'money'), ('v4', 'character varying'),
+                ('c4', 'character'), ('t', 'text')]))
+        else:
+            self.assertEqual(r, OrderedDict([
+                ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
+                ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
+                ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
         if OrderedDict is not dict:
             r = ' '.join(list(r.keys()))
             self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
@@ -1082,9 +1140,15 @@ class TestDBClass(unittest.TestCase):
             ' gamma char(5), tau text, beta bool')
         r = get_attnames(table)
         self.assertIsInstance(r, OrderedDict)
-        self.assertEqual(r, OrderedDict([
-            ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
-            ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
+        if self.regtypes:
+            self.assertEqual(r, OrderedDict([
+                ('n', 'integer'), ('alpha', 'smallint'),
+                ('v', 'character varying'), ('gamma', 'character'),
+                ('tau', 'text'), ('beta', 'boolean')]))
+        else:
+            self.assertEqual(r, OrderedDict([
+                ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
+                ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
         if OrderedDict is not dict:
             r = ' '.join(list(r.keys()))
             self.assertEqual(r, 'n alpha v gamma tau beta')
@@ -1096,10 +1160,17 @@ class TestDBClass(unittest.TestCase):
         get_attnames = self.db.get_attnames
         r = get_attnames('test', flush=True)
         self.assertIsInstance(r, AttrDict)
-        self.assertEqual(r, AttrDict([
-            ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
-            ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
-            ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
+        if self.regtypes:
+            self.assertEqual(r, AttrDict([
+                ('i2', 'smallint'), ('i4', 'integer'), ('i8', 'bigint'),
+                ('d', 'numeric'), ('f4', 'real'), ('f8', 'double precision'),
+                ('m', 'money'), ('v4', 'character varying'),
+                ('c4', 'character'), ('t', 'text')]))
+        else:
+            self.assertEqual(r, AttrDict([
+                ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
+                ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
+                ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
         table = 'test table for get_attnames'
@@ -1108,9 +1179,15 @@ class TestDBClass(unittest.TestCase):
             ' gamma char(5), tau text, beta bool')
         r = get_attnames(table)
         self.assertIsInstance(r, AttrDict)
-        self.assertEqual(r, AttrDict([
-            ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
-            ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
+        if self.regtypes:
+            self.assertEqual(r, AttrDict([
+                ('n', 'integer'), ('alpha', 'smallint'),
+                ('v', 'character varying'), ('gamma', 'character'),
+                ('tau', 'text'), ('beta', 'boolean')]))
+        else:
+            self.assertEqual(r, AttrDict([
+                ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
+                ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'n alpha v gamma tau beta')
 
@@ -2969,9 +3046,17 @@ class TestDBClass(unittest.TestCase):
             ' d numeric[], f4 real[], f8 double precision[], m money[],'
             ' b bool[], v4 varchar(4)[], c4 char(4)[], t text[]')
         r = self.db.get_attnames('arraytest')
-        self.assertEqual(r, dict(id='int', i2='int[]', i4='int[]', i8='int[]',
-            d='num[]', f4='float[]', f8='float[]', m='money[]',
-            b='bool[]', v4='text[]', c4='text[]', t='text[]'))
+        if self.regtypes:
+            self.assertEqual(r, dict(
+                id='smallint', i2='smallint[]', i4='integer[]', i8='bigint[]',
+                d='numeric[]', f4='real[]', f8='double precision[]',
+                m='money[]', b='boolean[]',
+                v4='character varying[]', c4='character[]', t='text[]'))
+        else:
+            self.assertEqual(r, dict(
+                id='int', i2='int[]', i4='int[]', i8='int[]',
+                d='num[]', f4='float[]', f8='float[]', m='money[]',
+                b='bool[]', v4='text[]', c4='text[]', t='text[]'))
         decimal = pg.get_decimal()
         if decimal is Decimal:
             long_decimal = decimal('123456789.123456789')
@@ -3004,7 +3089,7 @@ class TestDBClass(unittest.TestCase):
         r = self.db.query('select * from arraytest limit 1').dictresult()[0]
         self.assertEqual(r, data)
 
-    def testArrayInput(self):
+    def testArrayLiteral(self):
         insert = self.db.insert
         self.createTable('arraytest', 'i int[], t text[]', oids=True)
         r = dict(i=[1, 2, 3], t=['a', 'b', 'c'])
@@ -3015,25 +3100,23 @@ class TestDBClass(unittest.TestCase):
         self.db.insert('arraytest', r)
         self.assertEqual(r['i'], [1, 2, 3])
         self.assertEqual(r['t'], ['a', 'b', 'c'])
-        r = dict(i="[1, 2, 3]", t="['a', 'b', 'c']")
-        self.db.insert('arraytest', r)
-        self.assertEqual(r['i'], [1, 2, 3])
-        self.assertEqual(r['t'], ['a', 'b', 'c'])
-        r = dict(i="array[1, 2, 3]", t="array['a', 'b', 'c']")
-        self.db.insert('arraytest', r)
-        self.assertEqual(r['i'], [1, 2, 3])
-        self.assertEqual(r['t'], ['a', 'b', 'c'])
-        r = dict(i="ARRAY[1, 2, 3]", t="ARRAY['a', 'b', 'c']")
+        L = pg._Literal
+        r = dict(i=L("ARRAY[1, 2, 3]"), t=L("ARRAY['a', 'b', 'c']"))
         self.db.insert('arraytest', r)
         self.assertEqual(r['i'], [1, 2, 3])
         self.assertEqual(r['t'], ['a', 'b', 'c'])
         r = dict(i="1, 2, 3", t="'a', 'b', 'c'")
-        self.assertRaises(ValueError, self.db.insert, 'arraytest', r)
+        self.assertRaises(pg.ProgrammingError, self.db.insert, 'arraytest', r)
 
     def testArrayOfIds(self):
         self.createTable('arraytest', 'c cid[], o oid[], x xid[]', oids=True)
         r = self.db.get_attnames('arraytest')
-        self.assertEqual(r, dict(oid='int', c='int[]', o='int[]', x='int[]'))
+        if self.regtypes:
+            self.assertEqual(r, dict(
+                oid='oid', c='cid[]', o='oid[]', x='xid[]'))
+        else:
+            self.assertEqual(r, dict(
+                oid='int', c='int[]', o='int[]', x='int[]'))
         data = dict(c=[11, 12, 13], o=[21, 22, 23], x=[31, 32, 33])
         r = data.copy()
         self.db.insert('arraytest', r)
@@ -3125,7 +3208,7 @@ class TestDBClass(unittest.TestCase):
                 self.skipTest('database does not support jsonb')
             self.fail(str(error))
         r = self.db.get_attnames('arraytest')
-        self.assertEqual(r['data'], 'json[]')
+        self.assertEqual(r['data'], 'jsonb[]' if self.regtypes else 'json[]')
         data = [dict(id=815, name='John Doe'), dict(id=816, name='Jane Roe')]
         jsondecode = pg.get_jsondecode()
         r = dict(data=data)
@@ -3165,6 +3248,170 @@ class TestDBClass(unittest.TestCase):
         r['data'] = None
         self.db.get('arraytest', r)
         self.assertEqual(r['data'], data)
+
+    def testInsertUpdateGetRecord(self):
+        query = self.db.query
+        query('create type test_person_type as'
+            ' (name varchar, age smallint, married bool,'
+              ' weight real, salary money)')
+        self.addCleanup(query, 'drop type test_person_type')
+        self.createTable('test_person', 'person test_person_type',
+            temporary=False, oids=True)
+        attnames = self.db.get_attnames('test_person')
+        self.assertEqual(len(attnames), 2)
+        self.assertIn('oid', attnames)
+        self.assertIn('person', attnames)
+        person_typ = attnames['person']
+        if self.regtypes:
+            self.assertEqual(person_typ, 'test_person_type')
+        else:
+            self.assertEqual(person_typ, 'record')
+        if self.regtypes:
+            self.assertEqual(person_typ.attnames,
+                dict(name='character varying', age='smallint',
+                    married='boolean', weight='real', salary='money'))
+        else:
+            self.assertEqual(person_typ.attnames,
+                dict(name='text', age='int', married='bool',
+                    weight='float', salary='money'))
+        decimal = pg.get_decimal()
+        if pg.get_bool():
+            bool_class = bool
+            t, f = True, False
+        else:
+            bool_class = str
+            t, f = 't', 'f'
+        person = ('John Doe', 61, t, 99.5, decimal('93456.75'))
+        r = self.db.insert('test_person', None, person=person)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        self.assertEqual(p, person)
+        self.assertEqual(p.name, 'John Doe')
+        self.assertIsInstance(p.name, str)
+        self.assertIsInstance(p.age, int)
+        self.assertIsInstance(p.married, bool_class)
+        self.assertIsInstance(p.weight, float)
+        self.assertIsInstance(p.salary, decimal)
+        person = ('Jane Roe', 59, f, 64.5, decimal('96543.25'))
+        r['person'] = person
+        self.db.update('test_person', r)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        self.assertEqual(p, person)
+        self.assertEqual(p.name, 'Jane Roe')
+        self.assertIsInstance(p.name, str)
+        self.assertIsInstance(p.age, int)
+        self.assertIsInstance(p.married, bool_class)
+        self.assertIsInstance(p.weight, float)
+        self.assertIsInstance(p.salary, decimal)
+        r['person'] = None
+        self.db.get('test_person', r)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        self.assertEqual(p, person)
+        self.assertEqual(p.name, 'Jane Roe')
+        self.assertIsInstance(p.name, str)
+        self.assertIsInstance(p.age, int)
+        self.assertIsInstance(p.married, bool_class)
+        self.assertIsInstance(p.weight, float)
+        self.assertIsInstance(p.salary, decimal)
+        person = (None,) * 5
+        r = self.db.insert('test_person', None, person=person)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        self.assertIsNone(p.name)
+        self.assertIsNone(p.age)
+        self.assertIsNone(p.married)
+        self.assertIsNone(p.weight)
+        self.assertIsNone(p.salary)
+        r['person'] = None
+        self.db.get('test_person', r)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        self.assertIsNone(p.name)
+        self.assertIsNone(p.age)
+        self.assertIsNone(p.married)
+        self.assertIsNone(p.weight)
+        self.assertIsNone(p.salary)
+        r = self.db.insert('test_person', None, person=None)
+        self.assertIsNone(r['person'])
+        r['person'] = None
+        self.db.get('test_person', r)
+        self.assertIsNone(r['person'])
+
+    def testRecordInsertBytea(self):
+        query = self.db.query
+        query('create type test_person_type as'
+            ' (name text, picture bytea)')
+        self.addCleanup(query, 'drop type test_person_type')
+        self.createTable('test_person', 'person test_person_type',
+            temporary=False, oids=True)
+        person_typ = self.db.get_attnames('test_person')['person']
+        self.assertEqual(person_typ.attnames,
+            dict(name='text', picture='bytea'))
+        person = ('John Doe', b'O\x00ps\xff!')
+        r = self.db.insert('test_person', None, person=person)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        self.assertEqual(p, person)
+        self.assertEqual(p.name, 'John Doe')
+        self.assertIsInstance(p.name, str)
+        self.assertEqual(p.picture, person[1])
+        self.assertIsInstance(p.picture, bytes)
+
+    def testRecordInsertJson(self):
+        query = self.db.query
+        try:
+            query('create type test_person_type as'
+                ' (name text, data json)')
+        except pg.ProgrammingError as error:
+            if self.db.server_version < 90200:
+                self.skipTest('database does not support json')
+            self.fail(str(error))
+        self.addCleanup(query, 'drop type test_person_type')
+        self.createTable('test_person', 'person test_person_type',
+            temporary=False, oids=True)
+        person_typ = self.db.get_attnames('test_person')['person']
+        self.assertEqual(person_typ.attnames,
+            dict(name='text', data='json'))
+        person = ('John Doe', dict(age=61, married=True, weight=99.5))
+        r = self.db.insert('test_person', None, person=person)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        if pg.get_jsondecode() is None:
+            p = p._replace(data=json.loads(p.data))
+        self.assertEqual(p, person)
+        self.assertEqual(p.name, 'John Doe')
+        self.assertIsInstance(p.name, str)
+        self.assertEqual(p.data, person[1])
+        self.assertIsInstance(p.data, dict)
+
+    def testRecordLiteral(self):
+        query = self.db.query
+        query('create type test_person_type as'
+            ' (name varchar, age smallint)')
+        self.addCleanup(query, 'drop type test_person_type')
+        self.createTable('test_person', 'person test_person_type',
+            temporary=False, oids=True)
+        person_typ = self.db.get_attnames('test_person')['person']
+        if self.regtypes:
+            self.assertEqual(person_typ, 'test_person_type')
+        else:
+            self.assertEqual(person_typ, 'record')
+        if self.regtypes:
+            self.assertEqual(person_typ.attnames,
+                dict(name='character varying', age='smallint'))
+        else:
+            self.assertEqual(person_typ.attnames,
+                dict(name='text', age='int'))
+        person = pg._Literal("('John Doe', 61)")
+        r = self.db.insert('test_person', None, person=person)
+        p = r['person']
+        self.assertIsInstance(p, tuple)
+        self.assertEqual(p.name, 'John Doe')
+        self.assertIsInstance(p.name, str)
+        self.assertEqual(p.age, 61)
+        self.assertIsInstance(p.age, int)
 
     def testNotificationHandler(self):
         # the notification handler itself is tested separately
@@ -3255,6 +3502,7 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.set_option('bool', not_bool)
         cls.set_option('namedresult', None)
         cls.set_option('jsondecode', None)
+        cls.regtypes = not DB().use_regtypes()
         super(TestDBClassNonStdOpts, cls).setUpClass()
 
     @classmethod

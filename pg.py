@@ -166,6 +166,311 @@ class _SimpleType(dict):
 _simpletype = _SimpleType()
 
 
+class _Adapt:
+    """Mixin providing methods for adapting records and record elements.
+
+    This is used when passing values from one of the higher level DB
+    methods as parameters for a query.
+
+    This class must be mixed in to a connection class, because it needs
+    connection specific methods such as escape_bytea().
+    """
+
+    _bool_true_values = frozenset('t true 1 y yes on'.split())
+
+    _date_literals = frozenset('current_date current_time'
+        ' current_timestamp localtime localtimestamp'.split())
+
+    _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
+    _re_record_quote = regex(r'[(,"\\]')
+    _re_array_escape = _re_record_escape = regex(r'(["\\])')
+
+    @classmethod
+    def _adapt_bool(cls, v):
+        """Adapt a boolean parameter."""
+        if isinstance(v, basestring):
+            if not v:
+                return None
+            v = v.lower() in cls._bool_true_values
+        return 't' if v else 'f'
+
+    @classmethod
+    def _adapt_date(cls, v):
+        """Adapt a date parameter."""
+        if not v:
+            return None
+        if isinstance(v, basestring) and v.lower() in cls._date_literals:
+            return _Literal(v)
+        return v
+
+    @staticmethod
+    def _adapt_num(v):
+        """Adapt a numeric parameter."""
+        if not v and v != 0:
+            return None
+        return v
+
+    _adapt_int = _adapt_float = _adapt_money = _adapt_num
+
+    def _adapt_bytea(self, v):
+        """Adapt a bytea parameter."""
+        return self.escape_bytea(v)
+
+    def _adapt_json(self, v):
+        """Adapt a json parameter."""
+        if not v:
+            return None
+        if isinstance(v, basestring):
+            return v
+        return self.encode_json(v)
+
+    @classmethod
+    def _adapt_text_array(cls, v):
+        """Adapt a text type array parameter."""
+        if isinstance(v, list):
+            adapt = cls._adapt_text_array
+            return '{%s}' % ','.join(adapt(v) for v in v)
+        if v is None:
+            return 'null'
+        if not v:
+            return '""'
+        v = str(v)
+        if cls._re_array_quote.search(v):
+            v = '"%s"' % cls._re_array_escape.sub(r'\\\1', v)
+        return v
+
+    _adapt_date_array = _adapt_text_array
+
+    @classmethod
+    def _adapt_bool_array(cls, v):
+        """Adapt a boolean array parameter."""
+        if isinstance(v, list):
+            adapt = cls._adapt_bool_array
+            return '{%s}' % ','.join(adapt(v) for v in v)
+        if v is None:
+            return 'null'
+        if isinstance(v, basestring):
+            if not v:
+                return 'null'
+            v = v.lower() in cls._bool_true_values
+        return 't' if v else 'f'
+
+    @classmethod
+    def _adapt_num_array(cls, v):
+        """Adapt a numeric array parameter."""
+        if isinstance(v, list):
+            adapt = cls._adapt_num_array
+            return '{%s}' % ','.join(adapt(v) for v in v)
+        if not v and v != 0:
+            return 'null'
+        return str(v)
+
+    _adapt_int_array = _adapt_float_array = _adapt_money_array = \
+            _adapt_num_array
+
+    def _adapt_bytea_array(self, v):
+        """Adapt a bytea array parameter."""
+        if isinstance(v, list):
+            return b'{' + b','.join(
+                self._adapt_bytea_array(v) for v in v) + b'}'
+        if v is None:
+            return b'null'
+        return self.escape_bytea(v).replace(b'\\', b'\\\\')
+
+    def _adapt_json_array(self, v):
+        """Adapt a json array parameter."""
+        if isinstance(v, list):
+            adapt = self._adapt_json_array
+            return '{%s}' % ','.join(adapt(v) for v in v)
+        if not v:
+            return 'null'
+        if not isinstance(v, basestring):
+            v = self.encode_json(v)
+        if self._re_array_quote.search(v):
+            v = '"%s"' % self._re_array_escape.sub(r'\\\1', v)
+        return v
+
+    def _adapt_record(self, v, typ):
+        """Adapt a record parameter with given type."""
+        typ = typ.attnames.values()
+        if len(typ) != len(v):
+            raise TypeError('Record parameter %s has wrong size' % v)
+        return '(%s)' % ','.join(getattr(self,
+            '_adapt_record_%s' % t.simple)(v) for v, t in zip(v, typ))
+
+    @classmethod
+    def _adapt_record_text(cls, v):
+        """Adapt a text type record component."""
+        if v is None:
+            return ''
+        if not v:
+            return '""'
+        v = str(v)
+        if cls._re_record_quote.search(v):
+            v = '"%s"' % cls._re_record_escape.sub(r'\\\1', v)
+        return v
+
+    _adapt_record_date = _adapt_record_text
+
+    @classmethod
+    def _adapt_record_bool(cls, v):
+        """Adapt a boolean record component."""
+        if v is None:
+            return ''
+        if isinstance(v, basestring):
+            if not v:
+                return ''
+            v = v.lower() in cls._bool_true_values
+        return 't' if v else 'f'
+
+    @staticmethod
+    def _adapt_record_num(v):
+        """Adapt a numeric record component."""
+        if not v and v != 0:
+            return ''
+        return str(v)
+
+    _adapt_record_int = _adapt_record_float = _adapt_record_money = \
+        _adapt_record_num
+
+    def _adapt_record_bytea(self, v):
+        if v is None:
+            return ''
+        v = self.escape_bytea(v)
+        if bytes is not str and isinstance(v, bytes):
+            v = v.decode('ascii')
+        return v.replace('\\', '\\\\')
+
+    def _adapt_record_json(self, v):
+        """Adapt a bytea record component."""
+        if not v:
+            return ''
+        if not isinstance(v, basestring):
+            v = self.encode_json(v)
+        if self._re_array_quote.search(v):
+            v = '"%s"' % self._re_array_escape.sub(r'\\\1', v)
+        return v
+
+    def _adapt_param(self, value, typ, params):
+        """Adapt and add a parameter to the list."""
+        if isinstance(value, _Literal):
+            return value
+        if value is not None:
+            simple = typ.simple
+            if simple == 'text':
+                pass
+            elif simple == 'record':
+                if isinstance(value, tuple):
+                    value = self._adapt_record(value, typ)
+            elif simple.endswith('[]'):
+                if isinstance(value, list):
+                    adapt = getattr(self, '_adapt_%s_array' % simple[:-2])
+                    value = adapt(value)
+            else:
+                adapt = getattr(self, '_adapt_%s' % simple)
+                value = adapt(value)
+                if isinstance(value, _Literal):
+                    return value
+        params.append(value)
+        return '$%d' % len(params)
+
+
+class _CastRecord:
+    """Class providing methods for casting records and record elements.
+
+    This is needed when getting result values from one of the higher level DB
+    methods, since the lower level query method only casts the other types.
+    """
+
+    @staticmethod
+    def cast_bool(v):
+        if not get_bool():
+            return v
+        return v[0] == 't'
+
+    @staticmethod
+    def cast_bytea(v):
+        return unescape_bytea(v)
+
+    @staticmethod
+    def cast_float(v):
+        return float(v)
+
+    @staticmethod
+    def cast_int(v):
+        return int(v)
+
+    @staticmethod
+    def cast_json(v):
+        cast = get_jsondecode()
+        if not cast:
+            return v
+        return cast(v)
+
+    @staticmethod
+    def cast_num(v):
+        return (get_decimal() or float)(v)
+
+    @staticmethod
+    def cast_money(v):
+        point = get_decimal_point()
+        if not point:
+            return v
+        if point != '.':
+            v = v.replace(point, '.')
+        v = v.replace('(', '-')
+        v = ''.join(c for c in v if c.isdigit() or c in '.-')
+        return (get_decimal() or float)(v)
+
+    @classmethod
+    def cast(cls, v, typ):
+        types = typ.attnames.values()
+        cast = [getattr(cls, 'cast_%s' % t.simple, None) for t in types]
+        v = cast_record(v, cast)
+        return typ.namedtuple(*v)
+
+
+class _PgType(str):
+    """Class augmenting the simple type name with additional info."""
+
+    _num_types = frozenset('int float num money'
+        ' int2 int4 int8 float4 float8 numeric money'.split())
+
+    @classmethod
+    def create(cls, db, pgtype, regtype, typrelid):
+        """Create a PostgreSQL type name with additional info."""
+        simple = 'record' if typrelid else _simpletype[pgtype]
+        self = cls(regtype if db._regtypes else simple)
+        self.db = db
+        self.simple = simple
+        self.pgtype = pgtype
+        self.regtype = regtype
+        self.typrelid = typrelid
+        self._attnames = self._namedtuple = None
+        return self
+
+    @property
+    def attnames(self):
+        """Get names and types of the fields of a composite type."""
+        if not self.typrelid:
+            return None
+        if not self._attnames:
+            self._attnames = self.db.get_attnames(self.typrelid)
+        return self._attnames
+
+    @property
+    def namedtuple(self):
+        """Return named tuple class representing a composite type."""
+        if not self._namedtuple:
+            self._namedtuple = namedtuple(self, self.attnames)
+        return self._namedtuple
+
+    def cast(self, value):
+        if value is not None and self.typrelid:
+            value = _CastRecord.cast(value, self)
+        return value
+
+
 class _Literal(str):
     """Wrapper class for literal SQL."""
 
@@ -349,7 +654,7 @@ def pgnotify(*args, **kw):
 
 # The actual PostGreSQL database connection interface:
 
-class DB(object):
+class DB(_Adapt):
     """Wrapper class for the _pg connection type."""
 
     def __init__(self, *args, **kw):
@@ -451,146 +756,12 @@ class DB(object):
         """Get boolean value corresponding to d."""
         return bool(d) if get_bool() else ('t' if d else 'f')
 
-    _bool_true_values = frozenset('t true 1 y yes on'.split())
-
-    def _prepare_bool(self, d):
-        """Prepare a boolean parameter."""
-        if isinstance(d, basestring):
-            if not d:
-                return None
-            d = d.lower() in self._bool_true_values
-        return 't' if d else 'f'
-
-    _date_literals = frozenset('current_date current_time'
-        ' current_timestamp localtime localtimestamp'.split())
-
-    def _prepare_date(self, d):
-        """Prepare a date parameter."""
-        if not d:
-            return None
-        if isinstance(d, basestring) and d.lower() in self._date_literals:
-            return _Literal(d)
-        return d
-
-    _num_types = frozenset('int float num money'
-        ' int2 int4 int8 float4 float8 numeric money'.split())
-
-    @staticmethod
-    def _prepare_num(d):
-        """Prepare a numeric parameter."""
-        if not d and d != 0:
-            return None
-        return d
-
-    _prepare_int = _prepare_float = _prepare_money = _prepare_num
-
-    def _prepare_bytea(self, d):
-        """Prepare a bytea parameter."""
-        return self.escape_bytea(d)
-
-    def _prepare_json(self, d):
-        """Prepare a json parameter."""
-        if not d:
-            return None
-        if isinstance(d, basestring):
-            return d
-        return self.encode_json(d)
-
-    _re_array_escape = regex(r'(["\\])')
-    _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
-
-    def _prepare_bool_array(self, d):
-        """Prepare a bool array parameter."""
-        if isinstance(d, list):
-            return '{%s}' % ','.join(self._prepare_bool_array(v) for v in d)
-        if d is None:
-            return 'null'
-        if isinstance(d, basestring):
-            if not d:
-                return 'null'
-            d = d.lower() in self._bool_true_values
-        return 't' if d else 'f'
-
-    def _prepare_num_array(self, d):
-        """Prepare a numeric array parameter."""
-        if isinstance(d, list):
-            return '{%s}' % ','.join(self._prepare_num_array(v) for v in d)
-        if not d and d != 0:
-            return 'null'
-        return str(d)
-
-    _prepare_int_array = _prepare_float_array = _prepare_money_array = \
-            _prepare_num_array
-
-    def _prepare_text_array(self, d):
-        """Prepare a text array parameter."""
-        if isinstance(d, list):
-            return '{%s}' % ','.join(self._prepare_text_array(v) for v in d)
-        if d is None:
-            return 'null'
-        if not d:
-            return '""'
-        d = str(d)
-        if self._re_array_quote.search(d):
-            d = '"%s"' % self._re_array_escape.sub(r'\\\1', d)
-        return d
-
-    def _prepare_bytea_array(self, d):
-        """Prepare a bytea array parameter."""
-        if isinstance(d, list):
-            return b'{' + b','.join(
-                self._prepare_bytea_array(v) for v in d) + b'}'
-        if d is None:
-            return b'null'
-        return self.escape_bytea(d).replace(b'\\', b'\\\\')
-
-    def _prepare_json_array(self, d):
-        """Prepare a json array parameter."""
-        if isinstance(d, list):
-            return '{%s}' % ','.join(self._prepare_json_array(v) for v in d)
-        if not d:
-            return 'null'
-        if not isinstance(d, basestring):
-            d = self.encode_json(d)
-        if self._re_array_quote.search(d):
-            d = '"%s"' % self._re_array_escape.sub(r'\\\1', d)
-        return d
-
-    def _prepare_param(self, value, typ, params):
-        """Prepare and add a parameter to the list."""
-        if isinstance(value, _Literal):
-            return value
-        if value is not None and typ != 'text':
-            if typ.endswith('[]'):
-                if isinstance(value, list):
-                    prepare = getattr(self, '_prepare_%s_array' % typ[:-2])
-                    value = prepare(value)
-                elif isinstance(value, basestring):
-                    value = value.strip()
-                    if not value.startswith('{') or not value.endswith('}'):
-                        if value[:5].lower() == 'array':
-                            value = value[5:].lstrip()
-                        if value.startswith('[') and value.endswith(']'):
-                            value = _Literal('ARRAY%s' % value)
-                        else:
-                            raise ValueError(
-                                'Invalid array expression: %s' % value)
-                else:
-                    raise ValueError('Invalid array parameter: %s' % value)
-            else:
-                prepare = getattr(self, '_prepare_%s' % typ)
-                value = prepare(value)
-            if isinstance(value, _Literal):
-                return value
-        params.append(value)
-        return '$%d' % len(params)
-
     def _list_params(self, params):
         """Create a human readable parameter list."""
         return ', '.join('$%d=%r' % (n, v) for n, v in enumerate(params, 1))
 
     @staticmethod
-    def _prepare_qualified_param(name, param):
+    def _adapt_qualified_param(name, param):
         """Quote parameter representing a qualified name.
 
         Escapes the name for use as an SQL parameter, unless the
@@ -601,7 +772,7 @@ class DB(object):
         """
         if isinstance(param, int):
             param = "$%d" % param
-        if '.' not in name:
+        if isinstance(name, basestring) and '.' not in name:
             param = 'quote_ident(%s)' % (param,)
         return param
 
@@ -869,7 +1040,7 @@ class DB(object):
                 " AND NOT a.attisdropped"
                 " WHERE i.indrelid=%s::regclass"
                 " AND i.indisprimary ORDER BY a.attnum") % (
-                    self._prepare_qualified_param(table, 1),)
+                    self._adapt_qualified_param(table, 1),)
             pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
                 raise KeyError('Table %s has no primary key' % table)
@@ -933,17 +1104,16 @@ class DB(object):
         try:  # cache lookup
             names = attnames[table]
         except KeyError:  # cache miss, check the database
-            q = ("SELECT a.attname, t.typname%s"
+            q = ("SELECT a.attname, t.typname, t.typname::regtype, t.typrelid"
                 " FROM pg_attribute a"
                 " JOIN pg_type t ON t.oid = a.atttypid"
                 " WHERE a.attrelid = %s::regclass"
                 " AND (a.attnum > 0 OR a.attname = 'oid')"
                 " AND NOT a.attisdropped ORDER BY a.attnum") % (
-                    '::regtype' if self._regtypes else '',
-                    self._prepare_qualified_param(table, 1))
+                    self._adapt_qualified_param(table, 1))
             names = self.db.query(q, (table,)).getresult()
-            if not self._regtypes:
-                names = ((name, _simpletype[typ]) for name, typ in names)
+            names = ((name, _PgType.create(self, pgtype, regtype, typrelid))
+                for name, pgtype, regtype, typrelid in names)
             names = AttrDict(names)
             attnames[table] = names  # cache it
         return names
@@ -966,7 +1136,7 @@ class DB(object):
             return self._privileges[(table, privilege)]
         except KeyError:  # cache miss, ask the database
             q = "SELECT has_table_privilege(%s, $2)" % (
-                self._prepare_qualified_param(table, 1),)
+                self._adapt_qualified_param(table, 1),)
             q = self.db.query(q, (table, privilege))
             ret = q.getresult()[0][0] == self._make_bool(True)
             self._privileges[(table, privilege)] = ret  # cache it
@@ -1024,7 +1194,7 @@ class DB(object):
                     'Differing number of items in keyname and row')
             row = dict(zip(keyname, row))
         params = []
-        param = partial(self._prepare_param, params=params)
+        param = partial(self._adapt_param, params=params)
         col = self.escape_identifier
         what = 'oid, *' if qoid else '*'
         where = ' AND '.join('%s = %s' % (
@@ -1044,6 +1214,8 @@ class DB(object):
         for n, value in res[0].items():
             if qoid and n == 'oid':
                 n = qoid
+            else:
+                value = attnames[n].cast(value)
             row[n] = value
         return row
 
@@ -1070,7 +1242,7 @@ class DB(object):
         attnames = self.get_attnames(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
         params = []
-        param = partial(self._prepare_param, params=params)
+        param = partial(self._adapt_param, params=params)
         col = self.escape_identifier
         names, values = [], []
         for n in attnames:
@@ -1090,6 +1262,8 @@ class DB(object):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
+                else:
+                    value = attnames[n].cast(value)
                 row[n] = value
         return row
 
@@ -1131,7 +1305,7 @@ class DB(object):
                 else:
                     raise KeyError('Missing primary key in row')
         params = []
-        param = partial(self._prepare_param, params=params)
+        param = partial(self._adapt_param, params=params)
         col = self.escape_identifier
         where = ' AND '.join('%s = %s' % (
             col(k), param(row[k], attnames[k])) for k in keyname)
@@ -1157,6 +1331,8 @@ class DB(object):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
+                else:
+                    value = attnames[n].cast(value)
                 row[n] = value
         return row
 
@@ -1214,7 +1390,7 @@ class DB(object):
         attnames = self.get_attnames(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
         params = []
-        param = partial(self._prepare_param,params=params)
+        param = partial(self._adapt_param,params=params)
         col = self.escape_identifier
         names, values, updates = [], [], []
         for n in attnames:
@@ -1258,6 +1434,8 @@ class DB(object):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
+                else:
+                    value = attnames[n].cast(value)
                 row[n] = value
         else:
             self.get(table, row)
@@ -1278,7 +1456,8 @@ class DB(object):
         for n, t in attnames.items():
             if n == 'oid':
                 continue
-            if t in self._num_types:
+            t = t.simple
+            if t in _PgType._num_types:
                 row[n] = 0
             elif t == 'bool':
                 row[n] = self._make_bool(False)
@@ -1327,7 +1506,7 @@ class DB(object):
                 else:
                     raise KeyError('Missing primary key in row')
         params = []
-        param = partial(self._prepare_param, params=params)
+        param = partial(self._adapt_param, params=params)
         col = self.escape_identifier
         where = ' AND '.join('%s = %s' % (
             col(k), param(row[k], attnames[k])) for k in keyname)
