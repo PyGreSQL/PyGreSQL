@@ -796,8 +796,10 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 					element = PyBytes_FromStringAndSize(estr, esize);
 					if (element && cast)
 					{
+						PyObject *tmp = element;
 						element = PyObject_CallFunctionObjArgs(
 							cast, element, NULL);
+						Py_DECREF(tmp);
 					}
 				}
 				if (escaped) PyMem_Free(estr);
@@ -981,8 +983,12 @@ cast_record(char *s, Py_ssize_t size, int encoding,
 						if (ecast)
 						{
 							if (ecast != Py_None)
+							{
+								PyObject *tmp = element;
 								element = PyObject_CallFunctionObjArgs(
 									ecast, element, NULL);
+								Py_DECREF(tmp);
+							}
 						}
 						else
 						{
@@ -990,8 +996,12 @@ cast_record(char *s, Py_ssize_t size, int encoding,
 						}
 					}
 					else
+					{
+						PyObject *tmp = element;
 						element = PyObject_CallFunctionObjArgs(
 							cast, element, NULL);
+						Py_DECREF(tmp);
+					}
 				}
 			}
 			if (escaped) PyMem_Free(estr);
