@@ -483,8 +483,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute("create table %s"
                 " (n smallint, i int[], t text[][])" % table)
             params = [(n, v[0], v[1]) for n, v in enumerate(values)]
-            cur.executemany(
-                "insert into %s values (%%d,%%s,%%s)" % table, params)
+            # Note that we must explicit casts because we are inserting
+            # empty arrays.  Otherwise this is not necessary.
+            cur.executemany("insert into %s values"
+                " (%%d,%%s::int[],%%s::text[][])" % table, params)
             cur.execute("select i, t from %s order by n" % table)
             self.assertEqual(cur.description[0].type_code, pgdb.ARRAY)
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
@@ -540,16 +542,12 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(rows[0].age, 61)
 
     def test_select_record(self):
-        values = (1, 25000, 2.5, 'hello', 'Hello World!', 'Hello, World!',
+        value = (1, 25000, 2.5, 'hello', 'Hello World!', 'Hello, World!',
             '(test)', '(x,y)', ' x y ', 'null', None)
         con = self._connect()
         try:
             cur = con.cursor()
-            # Note that %s::record does not work on input unfortunately
-            # ("input of anonymous composite types is not implemented").
-            # so we need to resort to a row constructor instead.
-            row = ','.join(["%s"] * len(values))
-            cur.execute("select ROW(%s) as test_record" % row, values)
+            cur.execute("select %s as test_record", [value])
             self.assertEqual(cur.description[0].name, 'test_record')
             self.assertEqual(cur.description[0].type_code, 'record')
             row = cur.fetchone()[0]
@@ -558,8 +556,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         # Note that the element types get lost since we created an
         # untyped record (an anonymous composite type). For the same
         # reason this is also a normal tuple, not a named tuple.
-        text_values = tuple(None if v is None else str(v) for v in values)
-        self.assertEqual(row, text_values)
+        text_row = tuple(None if v is None else str(v) for v in value)
+        self.assertEqual(row, text_row)
 
     def test_custom_type(self):
         values = [3, 5, 65]

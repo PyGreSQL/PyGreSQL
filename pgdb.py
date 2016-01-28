@@ -72,7 +72,6 @@ from time import localtime
 from decimal import Decimal
 from math import isnan, isinf
 from collections import namedtuple
-from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
 try:
@@ -264,11 +263,6 @@ class TypeCache(dict):
         return lambda value: typecast(typ, value)
 
 
-_re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
-_re_record_quote = regex(r'[(,"\\]')
-_re_array_escape = _re_record_escape = regex(r'(["\\])')
-
-
 class _quotedict(dict):
     """Dictionary with auto quoting of its items.
 
@@ -336,64 +330,27 @@ class Cursor(object):
         if isinstance(val, (int, long, Decimal)):
             return val
         if isinstance(val, list):
-            return "'%s'" % self._quote_array(val)
+            # Quote value as an ARRAY constructor. This is better than using
+            # an array literal because it carries the information that this is
+            # an array and not a string.  One issue with this syntax is that
+            # you need to add an explicit type cast when passing empty arrays.
+            # The ARRAY keyword is actually only necessary at the top level.
+            q = self._quote
+            return 'ARRAY[%s]' % ','.join(str(q(v)) for v in val)
         if isinstance(val, tuple):
-            return "'%s'" % self._quote_record(val)
+            # Quote as a ROW constructor.  This is better than using a record
+            # literal because it carries the information that this is a record
+            # and not a string.  We don't use the keyword ROW in order to make
+            # this usable with the IN synntax as well.  It is only necessary
+            # when the records has a single column which is not really useful.
+            q = self._quote
+            return '(%s)' % ','.join(str(q(v)) for v in val)
         try:
             return val.__pg_repr__()
         except AttributeError:
             raise InterfaceError(
                 'do not know how to handle type %s' % type(val))
 
-    def _quote_array(self, val):
-        """Quote value as a literal constant for an array."""
-        q = self._quote_array_element
-        return '{%s}' % ','.join(q(v) for v in val)
-
-    def _quote_array_element(self, val):
-        """Quote value using the output syntax for arrays."""
-        if isinstance(val, list):
-            return self._quote_array(val)
-        if val is None:
-            return 'null'
-        if isinstance(val, (int, long, float)):
-            return str(val)
-        if isinstance(val, bool):
-            return 't' if val else 'f'
-        if isinstance(val, tuple):
-            val = self._quote_record(val)
-        if isinstance(val, basestring):
-            if not val:
-                return '""'
-            if _re_array_quote.search(val):
-                return '"%s"' % _re_array_escape.sub(r'\\\1', val)
-            return val
-        raise InterfaceError(
-            'do not know how to handle base type %s' % type(val))
-
-    def _quote_record(self, val):
-        """Quote value as a literal constant for a record."""
-        q = self._quote_record_element
-        return '(%s)' % ','.join(q(v) for v in val)
-
-    def _quote_record_element(self, val):
-        """Quote value using the output syntax for records."""
-        if val is None:
-            return ''
-        if isinstance(val, (int, long, float)):
-            return str(val)
-        if isinstance(val, bool):
-            return 't' if val else 'f'
-        if isinstance(val, list):
-            val = self._quote_array(val)
-        if isinstance(val, basestring):
-            if not val:
-                return '""'
-            if _re_record_quote.search(val):
-                return '"%s"' % _re_record_escape.sub(r'\\\1', val)
-            return val
-        raise InterfaceError(
-            'do not know how to handle component type %s' % type(val))
 
     def _quoteparams(self, string, parameters):
         """Quote parameters.
