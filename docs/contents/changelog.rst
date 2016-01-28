@@ -26,6 +26,10 @@ Version 5.0
     are now named tuples, i.e. their elements can be also accessed by name.
     The column names and types can now also be requested through the
     colnames and coltypes attributes, which are not part of DB-API 2 though.
+    The type_code provided by the description attribute is still equal to
+    the PostgreSQL internal type name, but now carries some more information
+    in additional attributes. The size, precision and scale information that
+    is part of the description is now properly set for numeric types.
   - If you pass a Python list as one of the parameters to a DB-API 2 cursor,
     it is now automatically bound using an ARRAY constructor. If you pass a
     Python tuple, it is bound using a ROW constructor. This is useful for

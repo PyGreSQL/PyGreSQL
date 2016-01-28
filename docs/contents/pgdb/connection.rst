@@ -81,14 +81,14 @@ then get your custom cursor whenever you call :meth:`Connection.cursor`.
 
 .. attribute:: Connection.type_cache
 
-    A dictionary with type information on the PostgreSQL types
+    A dictionary with the various type codes for the PostgreSQL types
 
-You can request the dictionary either via type names or type OIDs.
+You can request the dictionary either via a PostgreSQL type name (which
+(is equal to the DB-API 2 *type_code*) or via a PostgreSQL type OIDs.
 
-The values are named tuples containing the following fields:
+The values are *type_code* strings carrying additional attributes:
 
         - *oid* -- the OID of the type
-        - *name*  -- the type's name
         - *len*  -- the internal size
         - *type*  -- ``'b'`` = base, ``'c'`` = composite, ...
         - *category*  -- ``'A'`` = Array, ``'B'`` = Boolean, ...

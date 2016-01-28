@@ -297,8 +297,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertNotIn('numeric', type_cache)
         type_info = type_cache['numeric']
         self.assertIn('numeric', type_cache)
+        self.assertEqual(type_info, 'numeric')
         self.assertEqual(type_info.oid, 1700)
-        self.assertEqual(type_info.name, 'numeric')
         self.assertEqual(type_info.type, 'b')  # base
         self.assertEqual(type_info.category, 'N')  # numeric
         self.assertEqual(type_info.delim, ',')
@@ -311,12 +311,12 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         cols = type_cache.columns('pg_type')
         self.assertEqual(cols[0].name, 'typname')
         typname = type_cache[cols[0].type]
-        self.assertEqual(typname.name, 'name')
+        self.assertEqual(typname, 'name')
         self.assertEqual(typname.type, 'b')  # base
         self.assertEqual(typname.category, 'S')  # string
         self.assertEqual(cols[3].name, 'typlen')
         typlen = type_cache[cols[3].type]
-        self.assertEqual(typlen.name, 'int2')
+        self.assertEqual(typlen, 'int2')
         self.assertEqual(typlen.type, 'b')  # base
         self.assertEqual(typlen.category, 'N')  # numeric
         cur.close()
@@ -424,6 +424,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             rows = cur.fetchall()
             self.assertEqual(cur.description[0].type_code, pgdb.FLOAT)
             self.assertNotEqual(cur.description[0].type_code, pgdb.ARRAY)
+            self.assertNotEqual(cur.description[0].type_code, pgdb.RECORD)
         finally:
             con.close()
         self.assertEqual(len(rows), len(values))
@@ -461,6 +462,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             rows = cur.fetchall()
             self.assertEqual(cur.description[0].type_code, pgdb.DATETIME)
             self.assertNotEqual(cur.description[0].type_code, pgdb.ARRAY)
+            self.assertNotEqual(cur.description[0].type_code, pgdb.RECORD)
         finally:
             con.close()
         self.assertEqual(len(rows), len(values))
@@ -488,11 +490,14 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.executemany("insert into %s values"
                 " (%%d,%%s::int[],%%s::text[][])" % table, params)
             cur.execute("select i, t from %s order by n" % table)
-            self.assertEqual(cur.description[0].type_code, pgdb.ARRAY)
-            self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
-            self.assertEqual(cur.description[0].type_code, pgdb.INTEGER)
-            self.assertEqual(cur.description[1].type_code, pgdb.ARRAY)
-            self.assertEqual(cur.description[1].type_code, pgdb.STRING)
+            d = cur.description
+            self.assertEqual(d[0].type_code, pgdb.ARRAY)
+            self.assertNotEqual(d[0].type_code, pgdb.RECORD)
+            self.assertEqual(d[0].type_code, pgdb.NUMBER)
+            self.assertEqual(d[0].type_code, pgdb.INTEGER)
+            self.assertEqual(d[1].type_code, pgdb.ARRAY)
+            self.assertNotEqual(d[1].type_code, pgdb.RECORD)
+            self.assertEqual(d[1].type_code, pgdb.STRING)
             rows = cur.fetchall()
         finally:
             con.close()
@@ -525,11 +530,13 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute("select r from %s order by n" % table)
             type_code = cur.description[0].type_code
             self.assertEqual(type_code, record)
+            self.assertEqual(type_code, pgdb.RECORD)
+            self.assertNotEqual(type_code, pgdb.ARRAY)
             columns = con.type_cache.columns(type_code)
             self.assertEqual(columns[0].name, 'name')
             self.assertEqual(columns[1].name, 'age')
-            self.assertEqual(con.type_cache[columns[0].type].name, 'varchar')
-            self.assertEqual(con.type_cache[columns[1].type].name, 'int4')
+            self.assertEqual(con.type_cache[columns[0].type], 'varchar')
+            self.assertEqual(con.type_cache[columns[1].type], 'int4')
             rows = cur.fetchall()
         finally:
             cur.execute('drop table %s' % table)
@@ -878,6 +885,11 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertNotEqual(pgdb.ARRAY, pgdb.STRING)
         self.assertEqual('_char', pgdb.ARRAY)
         self.assertNotEqual('char', pgdb.ARRAY)
+        self.assertEqual(pgdb.RECORD, pgdb.RECORD)
+        self.assertNotEqual(pgdb.RECORD, pgdb.STRING)
+        self.assertNotEqual(pgdb.RECORD, pgdb.ARRAY)
+        self.assertEqual('record', pgdb.RECORD)
+        self.assertNotEqual('_record', pgdb.RECORD)
 
 
 if __name__ == '__main__':

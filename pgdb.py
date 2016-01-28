@@ -158,8 +158,24 @@ def _op_error(msg):
     return _db_error(msg, OperationalError)
 
 
-TypeInfo = namedtuple('TypeInfo',
-    ['oid', 'name', 'len', 'type', 'category', 'delim', 'relid'])
+class TypeCode(str):
+    """Class representing the type_code used by the DB-API 2.0.
+
+    TypeCode objects are strings equal to the PostgreSQL type name,
+    but carry some additional information.
+    """
+
+    @classmethod
+    def create(cls, oid, name, len, type, category, delim, relid):
+        """Create a type code for a PostgreSQL data type."""
+        self = cls(name)
+        self.oid = oid
+        self.len = len
+        self.type = type
+        self.category = category
+        self.delim = delim
+        self.relid = relid
+        return self
 
 ColumnInfo = namedtuple('ColumnInfo', ['name', 'type'])
 
@@ -167,7 +183,7 @@ ColumnInfo = namedtuple('ColumnInfo', ['name', 'type'])
 class TypeCache(dict):
     """Cache for database types.
 
-    This cache maps type OIDs and names to TypeInfo tuples containing
+    This cache maps type OIDs and names to TypeCode strings containing
     important information on the associated database type.
     """
 
@@ -195,13 +211,11 @@ class TypeCache(dict):
             res = self._src.fetch(1)
         if not res:
             raise KeyError('Type %s could not be found' % key)
-        res = list(res[0])
-        res[0] = int(res[0])
-        res[2] = int(res[2])
-        res[6] = int(res[6])
-        res = TypeInfo(*res)
-        self[res.oid] = self[res.name] = res
-        return res
+        res = res[0]
+        type_code = TypeCode.create(int(res[0]), res[1],
+            int(res[2]), res[3], res[4], res[5], int(res[6]))
+        self[type_code.oid] = self[str(type_code)] = type_code
+        return type_code
 
     def get(self, key, default=None):
         """Get the type even if it is not cached."""
@@ -254,7 +268,7 @@ class TypeCache(dict):
         """Get a cast function for the given database type."""
         if isinstance(key, int):
             try:
-                typ = self[key].name
+                typ = self[key]
             except KeyError:
                 return None
         else:
@@ -367,8 +381,7 @@ class Cursor(object):
     def _make_description(self, info):
         """Make the description tuple for the given field info."""
         name, typ, size, mod = info[1:]
-        type_info = self.type_cache[typ]
-        type_code = type_info.name
+        type_code = self.type_cache[typ]
         if mod > 0:
             mod -= 4
         if type_code == 'numeric':
@@ -1042,6 +1055,26 @@ class ArrayType:
             return not isinstance(other, ArrayType)
 
 
+class RecordType:
+    """Type class for PostgreSQL record types."""
+
+    def __eq__(self, other):
+        if isinstance(other, TypeCode):
+            return other.type == 'c'
+        elif isinstance(other, basestring):
+            return other == 'record'
+        else:
+            return isinstance(other, RecordType)
+
+    def __ne__(self, other):
+        if isinstance(other, TypeCode):
+            return other.type != 'c'
+        elif isinstance(other, basestring):
+            return other != 'record'
+        else:
+            return not isinstance(other, RecordType)
+
+
 # Mandatory type objects defined by DB-API 2 specs:
 
 STRING = Type('char bpchar name text varchar')
@@ -1070,6 +1103,10 @@ JSON = Type('json jsonb')
 # Type object for arrays (also equate to their base types):
 
 ARRAY = ArrayType()
+
+# Type object for records (encompassing all composite types):
+
+RECORD = RecordType()
 
 
 # Mandatory type helpers defined by DB-API 2 specs:

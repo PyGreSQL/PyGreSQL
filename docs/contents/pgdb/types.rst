@@ -156,6 +156,14 @@ DB-API 2 standard:
 
     Used to describe ``json`` and ``jsonb`` columns
 
+.. object:: ARRAY
+
+    Used to describe columns containing PostgreSQL arrays
+
+.. object:: RECORD
+
+    Used to describe columns containing PostgreSQL records
+
 Example for using some type objects::
 
     >>> cursor = con.cursor()
