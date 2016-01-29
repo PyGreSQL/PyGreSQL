@@ -83,22 +83,8 @@ then get your custom cursor whenever you call :meth:`Connection.cursor`.
 
     A dictionary with the various type codes for the PostgreSQL types
 
-You can request the dictionary either via a PostgreSQL type name (which
-(is equal to the DB-API 2 *type_code*) or via a PostgreSQL type OIDs.
-
-The values are *type_code* strings carrying additional attributes:
-
-        - *oid* -- the OID of the type
-        - *len*  -- the internal size
-        - *type*  -- ``'b'`` = base, ``'c'`` = composite, ...
-        - *category*  -- ``'A'`` = Array, ``'B'`` = Boolean, ...
-        - *delim*  -- delimiter to be used when parsing arrays
-        - *relid*  -- the table OID for composite types
-
-For details, see the PostgreSQL documentation on `pg_type
-<http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.
-
-The :attr:`Connection.type_cache` also provides a method :meth:`columns`
-that returns the names and type OIDs of the columns of composite types.
+This can be used for getting more information on the PostgreSQL database
+types or changing the typecast functions used for the connection.  See the
+description of the :class:`TypeCache` class for details.
 
 .. versionadded:: 5.0

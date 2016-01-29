@@ -3,6 +3,8 @@ Type -- Type objects and constructors
 
 .. py:currentmodule:: pgdb
 
+.. _type_constructors:
+
 Type constructors
 -----------------
 
@@ -69,6 +71,8 @@ Example for using a type constructor::
 
     SQL ``NULL`` values are always represented by the Python *None* singleton
     on input and output.
+
+.. _type_objects:
 
 Type objects
 ------------

@@ -290,51 +290,106 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 self.assertIsNone(d.scale)
             self.assertIsNone(d.null_ok)
 
-    def test_type_cache(self):
+    def test_type_cache_info(self):
         con = self._connect()
-        cur = con.cursor()
-        type_cache = con.type_cache
-        self.assertNotIn('numeric', type_cache)
-        type_info = type_cache['numeric']
-        self.assertIn('numeric', type_cache)
-        self.assertEqual(type_info, 'numeric')
-        self.assertEqual(type_info.oid, 1700)
-        self.assertEqual(type_info.type, 'b')  # base
-        self.assertEqual(type_info.category, 'N')  # numeric
-        self.assertEqual(type_info.delim, ',')
-        self.assertIs(con.type_cache[1700], type_info)
-        self.assertNotIn('pg_type', type_cache)
-        type_info = type_cache['pg_type']
-        self.assertIn('numeric', type_cache)
-        self.assertEqual(type_info.type, 'c')  # composite
-        self.assertEqual(type_info.category, 'C')  # composite
-        cols = type_cache.columns('pg_type')
-        self.assertEqual(cols[0].name, 'typname')
-        typname = type_cache[cols[0].type]
-        self.assertEqual(typname, 'name')
-        self.assertEqual(typname.type, 'b')  # base
-        self.assertEqual(typname.category, 'S')  # string
-        self.assertEqual(cols[3].name, 'typlen')
-        typlen = type_cache[cols[3].type]
-        self.assertEqual(typlen, 'int2')
-        self.assertEqual(typlen.type, 'b')  # base
-        self.assertEqual(typlen.category, 'N')  # numeric
-        cur.close()
-        cur = con.cursor()
-        type_cache = con.type_cache
-        self.assertIn('numeric', type_cache)
-        cur.close()
-        con.close()
+        try:
+            cur = con.cursor()
+            type_cache = con.type_cache
+            self.assertNotIn('numeric', type_cache)
+            type_info = type_cache['numeric']
+            self.assertIn('numeric', type_cache)
+            self.assertEqual(type_info, 'numeric')
+            self.assertEqual(type_info.oid, 1700)
+            self.assertEqual(type_info.len, -1)
+            self.assertEqual(type_info.type, 'b')  # base
+            self.assertEqual(type_info.category, 'N')  # numeric
+            self.assertEqual(type_info.delim, ',')
+            self.assertEqual(type_info.relid, 0)
+            self.assertIs(con.type_cache[1700], type_info)
+            self.assertNotIn('pg_type', type_cache)
+            type_info = type_cache['pg_type']
+            self.assertIn('numeric', type_cache)
+            self.assertEqual(type_info.type, 'c')  # composite
+            self.assertEqual(type_info.category, 'C')  # composite
+            cols = type_cache.get_fields('pg_type')
+            self.assertEqual(cols[0].name, 'typname')
+            typname = type_cache[cols[0].type]
+            self.assertEqual(typname, 'name')
+            self.assertEqual(typname.type, 'b')  # base
+            self.assertEqual(typname.category, 'S')  # string
+            self.assertEqual(cols[3].name, 'typlen')
+            typlen = type_cache[cols[3].type]
+            self.assertEqual(typlen, 'int2')
+            self.assertEqual(typlen.type, 'b')  # base
+            self.assertEqual(typlen.category, 'N')  # numeric
+            cur.close()
+            cur = con.cursor()
+            type_cache = con.type_cache
+            self.assertIn('numeric', type_cache)
+            cur.close()
+        finally:
+            con.close()
         con = self._connect()
-        cur = con.cursor()
-        type_cache = con.type_cache
-        self.assertNotIn('pg_type', type_cache)
-        self.assertEqual(type_cache.get('pg_type'), type_info)
-        self.assertIn('pg_type', type_cache)
-        self.assertIsNone(type_cache.get(
-            self.table_prefix + '_surely_does_not_exist'))
-        cur.close()
-        con.close()
+        try:
+            cur = con.cursor()
+            type_cache = con.type_cache
+            self.assertNotIn('pg_type', type_cache)
+            self.assertEqual(type_cache.get('pg_type'), type_info)
+            self.assertIn('pg_type', type_cache)
+            self.assertIsNone(type_cache.get(
+                self.table_prefix + '_surely_does_not_exist'))
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_typecast(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            type_cache = con.type_cache
+            self.assertIs(type_cache.get_typecast('int4'), int)
+            cast_int = lambda v: 'int(%s)' % v
+            type_cache.set_typecast('int4', cast_int)
+            query = 'select 2::int2, 4::int4, 8::int8'
+            cur.execute(query)
+            i2, i4, i8 = cur.fetchone()
+            self.assertEqual(i2, 2)
+            self.assertEqual(i4, 'int(4)')
+            self.assertEqual(i8, 8)
+            self.assertEqual(type_cache.typecast('int4', 42), 'int(42)')
+            type_cache.set_typecast(['int2', 'int8'], cast_int)
+            cur.execute(query)
+            i2, i4, i8 = cur.fetchone()
+            self.assertEqual(i2, 'int(2)')
+            self.assertEqual(i4, 'int(4)')
+            self.assertEqual(i8, 'int(8)')
+            type_cache.reset_typecast('int4')
+            cur.execute(query)
+            i2, i4, i8 = cur.fetchone()
+            self.assertEqual(i2, 'int(2)')
+            self.assertEqual(i4, 4)
+            self.assertEqual(i8, 'int(8)')
+            type_cache.reset_typecast(['int2', 'int8'])
+            cur.execute(query)
+            i2, i4, i8 = cur.fetchone()
+            self.assertEqual(i2, 2)
+            self.assertEqual(i4, 4)
+            self.assertEqual(i8, 8)
+            type_cache.set_typecast(['int2', 'int8'], cast_int)
+            cur.execute(query)
+            i2, i4, i8 = cur.fetchone()
+            self.assertEqual(i2, 'int(2)')
+            self.assertEqual(i4, 4)
+            self.assertEqual(i8, 'int(8)')
+            type_cache.reset_typecast()
+            cur.execute(query)
+            i2, i4, i8 = cur.fetchone()
+            self.assertEqual(i2, 2)
+            self.assertEqual(i4, 4)
+            self.assertEqual(i8, 8)
+            cur.close()
+        finally:
+            con.close()
 
     def test_cursor_iteration(self):
         con = self._connect()
@@ -532,7 +587,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(type_code, record)
             self.assertEqual(type_code, pgdb.RECORD)
             self.assertNotEqual(type_code, pgdb.ARRAY)
-            columns = con.type_cache.columns(type_code)
+            columns = con.type_cache.get_fields(type_code)
             self.assertEqual(columns[0].name, 'name')
             self.assertEqual(columns[1].name, 'age')
             self.assertEqual(con.type_cache[columns[0].type], 'varchar')
@@ -597,22 +652,94 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         try:
             cur = con.cursor()
-            self.assertTrue(pgdb.decimal_type(int) is int)
-            cur.execute('select 42')
-            self.assertEqual(cur.description[0].type_code, pgdb.INTEGER)
+            # change decimal type globally to int
+            int_type = lambda v: int(float(v))
+            self.assertTrue(pgdb.decimal_type(int_type) is int_type)
+            cur.execute('select 4.25')
+            self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
             self.assertTrue(isinstance(value, int))
-            self.assertEqual(value, 42)
+            self.assertEqual(value, 4)
+            # change decimal type again to float
             self.assertTrue(pgdb.decimal_type(float) is float)
             cur.execute('select 4.25')
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
+            # the connection still uses the old setting
+            self.assertTrue(isinstance(value, int))
+            # bust the cache for type functions for the connection
+            con.type_cache.reset_typecast()
+            cur.execute('select 4.25')
+            self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
+            value = cur.fetchone()[0]
+            # now the connection uses the new setting
             self.assertTrue(isinstance(value, float))
             self.assertEqual(value, 4.25)
         finally:
             con.close()
             pgdb.decimal_type(decimal_type)
         self.assertTrue(pgdb.decimal_type() is decimal_type)
+
+    def test_global_typecast(self):
+        try:
+            query = 'select 2::int2, 4::int4, 8::int8'
+            self.assertIs(pgdb.get_typecast('int4'), int)
+            cast_int = lambda v: 'int(%s)' % v
+            pgdb.set_typecast('int4', cast_int)
+            con = self._connect()
+            try:
+                i2, i4, i8 = con.cursor().execute(query).fetchone()
+            finally:
+                con.close()
+            self.assertEqual(i2, 2)
+            self.assertEqual(i4, 'int(4)')
+            self.assertEqual(i8, 8)
+            pgdb.set_typecast(['int2', 'int8'], cast_int)
+            con = self._connect()
+            try:
+                i2, i4, i8 = con.cursor().execute(query).fetchone()
+            finally:
+                con.close()
+            self.assertEqual(i2, 'int(2)')
+            self.assertEqual(i4, 'int(4)')
+            self.assertEqual(i8, 'int(8)')
+            pgdb.reset_typecast('int4')
+            con = self._connect()
+            try:
+                i2, i4, i8 = con.cursor().execute(query).fetchone()
+            finally:
+                con.close()
+            self.assertEqual(i2, 'int(2)')
+            self.assertEqual(i4, 4)
+            self.assertEqual(i8, 'int(8)')
+            pgdb.reset_typecast(['int2', 'int8'])
+            con = self._connect()
+            try:
+                i2, i4, i8 = con.cursor().execute(query).fetchone()
+            finally:
+                con.close()
+            self.assertEqual(i2, 2)
+            self.assertEqual(i4, 4)
+            self.assertEqual(i8, 8)
+            pgdb.set_typecast(['int2', 'int8'], cast_int)
+            con = self._connect()
+            try:
+                i2, i4, i8 = con.cursor().execute(query).fetchone()
+            finally:
+                con.close()
+            self.assertEqual(i2, 'int(2)')
+            self.assertEqual(i4, 4)
+            self.assertEqual(i8, 'int(8)')
+        finally:
+            pgdb.reset_typecast()
+        con = self._connect()
+        try:
+            i2, i4, i8 = con.cursor().execute(query).fetchone()
+        finally:
+            con.close()
+        self.assertEqual(i2, 2)
+        self.assertEqual(i4, 4)
+        self.assertEqual(i8, 8)
 
     def test_unicode_with_utf8(self):
         table = self.table_prefix + 'booze'

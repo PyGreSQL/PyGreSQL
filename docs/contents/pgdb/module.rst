@@ -37,6 +37,63 @@ Example::
     con = connect(dsn='myhost:mydb', user='guido', password='234$')
 
 
+get/set/reset_typecast -- Control the global typecast functions
+---------------------------------------------------------------
+
+PyGreSQL uses typecast functions to cast the raw data coming from the
+database to Python objects suitable for the particular database type.
+These functions take a single string argument that represents the data
+to be casted and must return the casted value.
+
+PyGreSQL provides built-in typecast functions for the common database types,
+but if you want to change these or add more typecast functions, you can use
+the following functions.
+
+.. note::
+
+    The following functions are not part of the DB-API 2 standard.
+
+.. method:: get_typecast(typ)
+
+    Get the global cast function for the given database type
+
+    :param str typ: PostgreSQL type name or type code
+    :returns: the typecast function for the specified type
+    :rtype: function or None
+
+.. versionadded:: 5.0
+
+.. method:: set_typecast(typ, cast)
+
+    Set a global typecast function for the given database type(s)
+
+    :param typ: PostgreSQL type name or type code, or list of such
+    :type typ: str or list
+    :param cast: the typecast function to be set for the specified type(s)
+    :type typ: str or int
+
+.. versionadded:: 5.0
+
+.. method:: reset_typecast([typ])
+
+    Reset the typecasts for the specified (or all) type(s) to their defaults
+
+    :param str typ: PostgreSQL type name or type code, or list of such,
+        or None to reset all typecast functions
+    :type typ: str, list or None
+
+.. versionadded:: 5.0
+
+Note that database connections cache types and their cast functions using
+connection specific :class:`TypeCache` objects.  You can also get, set and
+reset typecast functions on the connection level using the methods
+:meth:`TypeCache.get_typecast`, :meth:`TypeCache.set_typecast` and
+:meth:`TypeCache.reset_typecast` of the :attr:`Connection.type_cache`.  This
+will not affect other connections or future connections. In order to be sure
+a global change is picked up by a running connection, you must reopen it or
+call :meth:`TypeCache.reset_typecast` on the :attr:`Connection.type_cache`.
+
+
 Module constants
 ----------------
 

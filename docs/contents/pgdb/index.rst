@@ -13,3 +13,5 @@ Contents
     connection
     cursor
     types
+    typecache
+    adaptation

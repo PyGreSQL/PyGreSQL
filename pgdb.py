@@ -116,46 +116,179 @@ paramstyle = 'pyformat'
 shortcutmethods = 1
 
 
-### Internal Types Handling
+### Internal Type Handling
 
 def decimal_type(decimal_type=None):
-    """Get or set global type to be used for decimal values."""
+    """Get or set global type to be used for decimal values.
+
+    Note that connections cache cast functions. To be sure a global change
+    is picked up by a running connection, call con.type_cache.reset_typecast().
+    """
     global Decimal
     if decimal_type is not None:
-        _cast['numeric'] = Decimal = decimal_type
+        Decimal = decimal_type
+        set_typecast('numeric', decimal_type)
     return Decimal
 
 
-def _cast_bool(value):
-    return value[:1] in ('t', 'T')
+def cast_bool(value):
+    """Cast boolean value in database format to bool."""
+    if value:
+        return value[0] in ('t', 'T')
 
 
-def _cast_money(value):
-    return Decimal(''.join(filter(
-        lambda v: v in '0123456789.-', value)))
+def cast_money(value):
+    """Cast money value in database format to Decimal."""
+    if value:
+        value = value.replace('(', '-')
+        return Decimal(''.join(c for c in value if c.isdigit() or c in '.-'))
 
 
-_cast = {'char': str, 'bpchar': str, 'name': str,
-    'text': str, 'varchar': str,
-    'bool': _cast_bool, 'bytea': unescape_bytea,
-    'int2': int, 'int4': int, 'serial': int,
-    'int8': long, 'json': jsondecode, 'jsonb': jsondecode,
-    'oid': long, 'oid8': long,
-    'float4': float, 'float8': float,
-    'numeric': Decimal, 'money': _cast_money,
-    'record': cast_record}
+class Typecasts(dict):
+    """Dictionary mapping database types to typecast functions.
+
+    The cast functions must accept one Python object as an argument and
+    convert that object to a string representation of the corresponding type
+    in the database.  The Python None object is always converted to NULL,
+    so the cast functions can assume they never get passed None as argument.
+    However, they may get passed an empty string or a numeric null value.
+    """
+
+    # the default cast functions
+    # (str functions are ignored but have been added for faster access)
+    defaults = {'char': str, 'bpchar': str, 'name': str,
+        'text': str, 'varchar': str,
+        'bool': cast_bool, 'bytea': unescape_bytea,
+        'int2': int, 'int4': int, 'serial': int,
+        'int8': long, 'json': jsondecode, 'jsonb': jsondecode,
+        'oid': long, 'oid8': long,
+        'float4': float, 'float8': float,
+        'numeric': Decimal, 'money': cast_money,
+        'anyarray': cast_array, 'record': cast_record}
+
+    def __missing__(self, typ):
+        """Create a cast function if it is not cached.
+
+        Note that this class never raises a KeyError,
+        but return None when no special cast function exists.
+        """
+        cast = self.defaults.get(typ)
+        if cast:
+            # store default for faster access
+            self[typ] = cast
+        elif typ.startswith('_'):
+            # create array cast
+            base_cast = self[typ[1:]]
+            cast = self.create_array_cast(base_cast)
+            if base_cast:
+                # store only if base type exists
+                self[typ] = cast
+        return cast
+
+    def get(self, typ, default=None):
+        """Get the typecast function for the given database type."""
+        return self[typ] or default
+
+    def set(self, typ, cast):
+        """Set a typecast function for the specified database type(s)."""
+        if isinstance(typ, basestring):
+            typ = [typ]
+        if cast is None:
+            for t in typ:
+                self.pop(t, None)
+                self.pop('_%s' % t, None)
+        else:
+            if not callable(cast):
+                raise TypeError("Cast parameter must be callable")
+            for t in typ:
+                self[t] = cast
+                self.pop('_%s % t', None)
+
+    def reset(self, typ=None):
+        """Reset the typecasts for the specified type(s) to their defaults.
+
+        When no type is specified, all typecasts will be reset.
+        """
+        defaults = self.defaults
+        if typ is None:
+            self.clear()
+            self.update(defaults)
+        else:
+            if isinstance(typ, basestring):
+                typ = [typ]
+            for t in typ:
+                self.set(t, defaults.get(t))
+
+    def create_array_cast(self, cast):
+        """Create an array typecast for the given base cast."""
+        return lambda v: cast_array(v, cast)
+
+    def create_record_cast(self, name, fields, casts):
+        """Create a named record typecast for the given fields and casts."""
+        record = namedtuple(name, fields)
+        return lambda v: record(*cast_record(v, casts))
 
 
-def _db_error(msg, cls=DatabaseError):
-    """Return DatabaseError with empty sqlstate attribute."""
-    error = cls(msg)
-    error.sqlstate = None
-    return error
+_typecasts = Typecasts()  # this is the global typecast dictionary
 
 
-def _op_error(msg):
-    """Return OperationalError."""
-    return _db_error(msg, OperationalError)
+def get_typecast(typ):
+    """Get the global typecast function for the given database type(s)."""
+    return _typecasts.get(typ)
+
+
+def set_typecast(typ, cast):
+    """Set a global typecast function for the given database type(s).
+
+    Note that connections cache cast functions. To be sure a global change
+    is picked up by a running connection, call con.type_cache.reset_typecast().
+    """
+    _typecasts.set(typ, cast)
+
+
+def reset_typecast(typ=None):
+    """Reset the global typecasts for the given type(s) to their default.
+
+    When no type is specified, all typecasts will be reset.
+
+    Note that connections cache cast functions. To be sure a global change
+    is picked up by a running connection, call con.type_cache.reset_typecast().
+    """
+    _typecasts.reset(typ)
+
+
+class LocalTypecasts(Typecasts):
+    """Map typecasts, including local composite types, to cast functions."""
+
+    defaults = _typecasts
+
+    def __missing__(self, typ):
+        """Create a cast function if it is not cached."""
+        if typ.startswith('_'):
+            base_cast = self[typ[1:]]
+            cast = self.create_array_cast(base_cast)
+            if base_cast:
+                self[typ] = cast
+        else:
+            cast = self.defaults.get(typ)
+            if cast:
+                self[typ] = cast
+            else:
+                fields = self.get_fields(typ)
+                if fields:
+                    casts = [self[field.type] for field in fields]
+                    fields = [field.name for field in fields]
+                    cast = self.create_record_cast(typ, fields, casts)
+                    self[typ] = cast
+        return cast
+
+    def get_fields(self, typ):
+        """Return the fields for the given record type.
+
+        This method will be replaced with a method that looks up the fields
+        using the type cache of the connection.
+        """
+        return []
 
 
 class TypeCode(str):
@@ -177,7 +310,7 @@ class TypeCode(str):
         self.relid = relid
         return self
 
-ColumnInfo = namedtuple('ColumnInfo', ['name', 'type'])
+FieldInfo = namedtuple('FieldInfo', ['name', 'type'])
 
 
 class TypeCache(dict):
@@ -192,6 +325,8 @@ class TypeCache(dict):
         super(TypeCache, self).__init__()
         self._escape_string = cnx.escape_string
         self._src = cnx.source()
+        self._typecasts = LocalTypecasts()
+        self._typecasts.get_fields = self.get_fields
 
     def __missing__(self, key):
         """Get the type info from the database if it is not cached."""
@@ -224,57 +359,42 @@ class TypeCache(dict):
         except KeyError:
             return default
 
-    def columns(self, key):
-        """Get the names and types of the columns of composite types."""
-        try:
-            typ = self[key]
-        except KeyError:
-            return None  # this type is not known
-        if typ.type != 'c' or not typ.relid:
+    def get_fields(self, typ):
+        """Get the names and types of the fields of composite types."""
+        if not isinstance(typ, TypeCode):
+            typ = self.get(typ)
+            if not typ:
+                return None
+        if not typ.relid:
             return None  # this type is not composite
         self._src.execute("SELECT attname, atttypid"
             " FROM pg_attribute WHERE attrelid=%s AND attnum>0"
             " AND NOT attisdropped ORDER BY attnum" % typ.relid)
-        return [ColumnInfo(name, int(oid))
+        return [FieldInfo(name, self.get(int(oid)))
             for name, oid in self._src.fetch(-1)]
 
+    def get_typecast(self, typ):
+        """Get the typecast function for the given database type."""
+        return self._typecasts.get(typ)
+
+    def set_typecast(self, typ, cast):
+        """Set a typecast function for the specified database type(s)."""
+        self._typecasts.set(typ, cast)
+
+    def reset_typecast(self, typ=None):
+        """Reset the typecast function for the specified database type(s)."""
+        self._typecasts.reset(typ)
+
     def typecast(self, typ, value):
-        """Cast value according to database type."""
+        """Cast the given value according to the given database type."""
         if value is None:
             # for NULL values, no typecast is necessary
             return None
-        cast = _cast.get(typ)
-        if cast is str:
-            return value  # no typecast necessary
-        if cast is None:
-            if typ.startswith('_'):
-                # cast as an array type
-                cast = _cast.get(typ[1:])
-                return cast_array(value, cast)
-            # check whether this is a composite type
-            cols = self.columns(typ)
-            if cols:
-                getcast = self.getcast
-                cast = [getcast(col.type) for col in cols]
-                value = cast_record(value, cast)
-                fields = [col.name for col in cols]
-                record = namedtuple(typ, fields)
-                return record(*value)
-            return value  # no typecast available or necessary
-        else:
-            return cast(value)
-
-    def getcast(self, key):
-        """Get a cast function for the given database type."""
-        if isinstance(key, int):
-            try:
-                typ = self[key]
-            except KeyError:
-                return None
-        else:
-            typ = key
-        typecast = self.typecast
-        return lambda value: typecast(typ, value)
+        cast = self.get_typecast(typ)
+        if not cast or cast is str:
+            # no typecast is necessary
+            return value
+        return cast(value)
 
 
 class _quotedict(dict):
@@ -285,6 +405,20 @@ class _quotedict(dict):
 
     def __getitem__(self, key):
         return self.quote(super(_quotedict, self).__getitem__(key))
+
+
+### Error messages
+
+def _db_error(msg, cls=DatabaseError):
+    """Return DatabaseError with empty sqlstate attribute."""
+    error = cls(msg)
+    error.sqlstate = None
+    return error
+
+
+def _op_error(msg):
+    """Return OperationalError."""
+    return _db_error(msg, OperationalError)
 
 
 ### Cursor Object
@@ -321,50 +455,52 @@ class Cursor(object):
         """Exit the runtime context for the cursor object."""
         self.close()
 
-    def _quote(self, val):
+    def _quote(self, value):
         """Quote value depending on its type."""
-        if val is None:
+        if value is None:
             return 'NULL'
-        if isinstance(val, (datetime, date, time, timedelta, Json)):
-            val = str(val)
-        if isinstance(val, basestring):
-            if isinstance(val, Binary):
-                val = self._cnx.escape_bytea(val)
+        if isinstance(value, (datetime, date, time, timedelta, Json)):
+            value = str(value)
+        if isinstance(value, basestring):
+            if isinstance(value, Binary):
+                value = self._cnx.escape_bytea(value)
                 if bytes is not str:  # Python >= 3.0
-                    val = val.decode('ascii')
+                    value = value.decode('ascii')
             else:
-                val = self._cnx.escape_string(val)
-            return "'%s'" % val
-        if isinstance(val, float):
-            if isinf(val):
-                return "'-Infinity'" if val < 0 else "'Infinity'"
-            if isnan(val):
+                value = self._cnx.escape_string(value)
+            return "'%s'" % value
+        if isinstance(value, float):
+            if isinf(value):
+                return "'-Infinity'" if value < 0 else "'Infinity'"
+            if isnan(value):
                 return "'NaN'"
-            return val
-        if isinstance(val, (int, long, Decimal)):
-            return val
-        if isinstance(val, list):
+            return value
+        if isinstance(value, (int, long, Decimal)):
+            return value
+        if isinstance(value, list):
             # Quote value as an ARRAY constructor. This is better than using
             # an array literal because it carries the information that this is
             # an array and not a string.  One issue with this syntax is that
-            # you need to add an explicit type cast when passing empty arrays.
+            # you need to add an explicit typecast when passing empty arrays.
             # The ARRAY keyword is actually only necessary at the top level.
             q = self._quote
-            return 'ARRAY[%s]' % ','.join(str(q(v)) for v in val)
-        if isinstance(val, tuple):
+            return 'ARRAY[%s]' % ','.join(str(q(v)) for v in value)
+        if isinstance(value, tuple):
             # Quote as a ROW constructor.  This is better than using a record
             # literal because it carries the information that this is a record
             # and not a string.  We don't use the keyword ROW in order to make
             # this usable with the IN synntax as well.  It is only necessary
             # when the records has a single column which is not really useful.
             q = self._quote
-            return '(%s)' % ','.join(str(q(v)) for v in val)
+            return '(%s)' % ','.join(str(q(v)) for v in value)
         try:
-            return val.__pg_repr__()
+            value = value.__pg_repr__()
+            if isinstance(value, (tuple, list)):
+                value = self._quote(value)
+            return value
         except AttributeError:
             raise InterfaceError(
-                'do not know how to handle type %s' % type(val))
-
+                'Do not know how to adapt type %s' % type(value))
 
     def _quoteparams(self, string, parameters):
         """Quote parameters.
@@ -455,7 +591,7 @@ class Cursor(object):
                 except DatabaseError:
                     raise  # database provides error message
                 except Exception as err:
-                    raise _op_error("can't start transaction")
+                    raise _op_error("Can't start transaction")
                 self._dbcnx._tnx = True
             for parameters in seq_of_parameters:
                 sql = operation
@@ -470,9 +606,9 @@ class Cursor(object):
             raise  # database provides error message
         except Error as err:
             raise _db_error(
-                "error in '%s': '%s' " % (sql, err), InterfaceError)
+                "Error in '%s': '%s' " % (sql, err), InterfaceError)
         except Exception as err:
-            raise _op_error("internal error in '%s': %s" % (sql, err))
+            raise _op_error("Internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
             self._description = True  # fetch on demand
@@ -560,7 +696,7 @@ class Cursor(object):
             read = stream.read
         except AttributeError:
             if size:
-                raise ValueError("size must only be set for file-like objects")
+                raise ValueError("Size must only be set for file-like objects")
             if binary_format:
                 input_type = bytes
                 type_name = 'byte strings'
@@ -629,22 +765,24 @@ class Cursor(object):
         params = []
         if format is not None:
             if not isinstance(format, basestring):
-                raise TypeError("format option must be be a string")
+                raise TypeError("The frmat option must be be a string")
             if format not in ('text', 'csv', 'binary'):
-                raise ValueError("invalid format")
+                raise ValueError("Invalid format")
             options.append('format %s' % (format,))
         if sep is not None:
             if not isinstance(sep, basestring):
-                raise TypeError("sep option must be a string")
+                raise TypeError("The sep option must be a string")
             if format == 'binary':
-                raise ValueError("sep is not allowed with binary format")
+                raise ValueError(
+                    "The sep option is not allowed with binary format")
             if len(sep) != 1:
-                raise ValueError("sep must be a single one-byte character")
+                raise ValueError(
+                    "The sep option must be a single one-byte character")
             options.append('delimiter %s')
             params.append(sep)
         if null is not None:
             if not isinstance(null, basestring):
-                raise TypeError("null option must be a string")
+                raise TypeError("The null option must be a string")
             options.append('null %s')
             params.append(null)
         if columns:
@@ -696,12 +834,12 @@ class Cursor(object):
             try:
                 write = stream.write
             except AttributeError:
-                raise TypeError("need an output stream to copy to")
+                raise TypeError("Need an output stream to copy to")
         if not table or not isinstance(table, basestring):
-            raise TypeError("need a table to copy to")
+            raise TypeError("Need a table to copy to")
         if table.lower().startswith('select'):
             if columns:
-                raise ValueError("columns must be specified in the query")
+                raise ValueError("Columns must be specified in the query")
             table = '(%s)' % (table,)
         else:
             table = '"%s"' % (table,)
@@ -710,22 +848,24 @@ class Cursor(object):
         params = []
         if format is not None:
             if not isinstance(format, basestring):
-                raise TypeError("format option must be a string")
+                raise TypeError("The format option must be a string")
             if format not in ('text', 'csv', 'binary'):
-                raise ValueError("invalid format")
+                raise ValueError("Invalid format")
             options.append('format %s' % (format,))
         if sep is not None:
             if not isinstance(sep, basestring):
-                raise TypeError("sep option must be a string")
+                raise TypeError("The sep option must be a string")
             if binary_format:
-                raise ValueError("sep is not allowed with binary format")
+                raise ValueError(
+                    "The sep option is not allowed with binary format")
             if len(sep) != 1:
-                raise ValueError("sep must be a single one-byte character")
+                raise ValueError(
+                    "The sep option must be a single one-byte character")
             options.append('delimiter %s')
             params.append(sep)
         if null is not None:
             if not isinstance(null, basestring):
-                raise TypeError("null option must be a string")
+                raise TypeError("The null option must be a string")
             options.append('null %s')
             params.append(null)
         if decode is None:
@@ -735,9 +875,10 @@ class Cursor(object):
                 decode = str is unicode
         else:
             if not isinstance(decode, (int, bool)):
-                raise TypeError("decode option must be a boolean")
+                raise TypeError("The decode option must be a boolean")
             if decode and binary_format:
-                raise ValueError("decode is not allowed with binary format")
+                raise ValueError(
+                    "The decode option is not allowed with binary format")
         if columns:
             if not isinstance(columns, basestring):
                 columns = ','.join('"%s"' % (col,) for col in columns)
@@ -787,7 +928,7 @@ class Cursor(object):
     @staticmethod
     def nextset():
         """Not supported."""
-        raise NotSupportedError("nextset() is not supported")
+        raise NotSupportedError("The nextset() method is not supported")
 
     @staticmethod
     def setinputsizes(sizes):
@@ -872,7 +1013,7 @@ class Connection(object):
         try:
             self._cnx.source()
         except Exception:
-            raise _op_error("invalid connection")
+            raise _op_error("Invalid connection")
 
     def __enter__(self):
         """Enter the runtime context for the connection object.
@@ -902,7 +1043,7 @@ class Connection(object):
             self._cnx.close()
             self._cnx = None
         else:
-            raise _op_error("connection has been closed")
+            raise _op_error("Connection has been closed")
 
     def commit(self):
         """Commit any pending transaction to the database."""
@@ -914,9 +1055,9 @@ class Connection(object):
                 except DatabaseError:
                     raise
                 except Exception:
-                    raise _op_error("can't commit")
+                    raise _op_error("Can't commit")
         else:
-            raise _op_error("connection has been closed")
+            raise _op_error("Connection has been closed")
 
     def rollback(self):
         """Roll back to the start of any pending transaction."""
@@ -928,9 +1069,9 @@ class Connection(object):
                 except DatabaseError:
                     raise
                 except Exception:
-                    raise _op_error("can't rollback")
+                    raise _op_error("Can't rollback")
         else:
-            raise _op_error("connection has been closed")
+            raise _op_error("Connection has been closed")
 
     def cursor(self):
         """Return a new cursor object using the connection."""
@@ -938,9 +1079,9 @@ class Connection(object):
             try:
                 return self.cursor_type(self)
             except Exception:
-                raise _op_error("invalid connection")
+                raise _op_error("Invalid connection")
         else:
-            raise _op_error("connection has been closed")
+            raise _op_error("Connection has been closed")
 
     if shortcutmethods:  # otherwise do not implement and document this
 
