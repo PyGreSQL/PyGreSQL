@@ -122,9 +122,9 @@ class TestConnectObject(unittest.TestCase):
     def testAllConnectMethods(self):
         methods = '''cancel close endcopy
             escape_bytea escape_identifier escape_literal escape_string
-            fileno get_notice_receiver getline getlo getnotify
+            fileno get_cast_hook get_notice_receiver getline getlo getnotify
             inserttable locreate loimport parameter putline query reset
-            set_notice_receiver source transaction'''.split()
+            set_cast_hook set_notice_receiver source transaction'''.split()
         connection_methods = [a for a in dir(self.connection)
             if not a.startswith('__') and self.is_method(a)]
         self.assertEqual(methods, connection_methods)
@@ -1324,14 +1324,17 @@ class TestNotificatons(unittest.TestCase):
         self.assertIsNone(self.c.get_notice_receiver())
 
     def testSetNoticeReceiver(self):
-        self.assertRaises(TypeError, self.c.set_notice_receiver, None)
         self.assertRaises(TypeError, self.c.set_notice_receiver, 42)
+        self.assertRaises(TypeError, self.c.set_notice_receiver, 'invalid')
         self.assertIsNone(self.c.set_notice_receiver(lambda notice: None))
+        self.assertIsNone(self.c.set_notice_receiver(None))
 
     def testSetAndGetNoticeReceiver(self):
         r = lambda notice: None
         self.assertIsNone(self.c.set_notice_receiver(r))
         self.assertIs(self.c.get_notice_receiver(), r)
+        self.assertIsNone(self.c.set_notice_receiver(None))
+        self.assertIsNone(self.c.get_notice_receiver())
 
     def testNoticeReceiver(self):
         self.addCleanup(self.c.query, 'drop function bilbo_notice();')

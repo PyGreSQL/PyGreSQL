@@ -308,7 +308,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertIs(con.type_cache[1700], type_info)
             self.assertNotIn('pg_type', type_cache)
             type_info = type_cache['pg_type']
-            self.assertIn('numeric', type_cache)
+            self.assertIn('pg_type', type_cache)
             self.assertEqual(type_info.type, 'c')  # composite
             self.assertEqual(type_info.category, 'C')  # composite
             cols = type_cache.get_fields('pg_type')
@@ -356,7 +356,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(i2, 2)
             self.assertEqual(i4, 'int(4)')
             self.assertEqual(i8, 8)
-            self.assertEqual(type_cache.typecast('int4', 42), 'int(42)')
+            self.assertEqual(type_cache.typecast(42, 'int4'), 'int(42)')
             type_cache.set_typecast(['int2', 'int8'], cast_int)
             cur.execute(query)
             i2, i4, i8 = cur.fetchone()

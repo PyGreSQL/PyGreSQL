@@ -144,14 +144,18 @@ def cast_money(value):
         return Decimal(''.join(c for c in value if c.isdigit() or c in '.-'))
 
 
+def cast_int2vector(value):
+    """Cast an int2vector value."""
+    return [int(v) for v in value.split()]
+
+
 class Typecasts(dict):
     """Dictionary mapping database types to typecast functions.
 
-    The cast functions must accept one Python object as an argument and
-    convert that object to a string representation of the corresponding type
-    in the database.  The Python None object is always converted to NULL,
-    so the cast functions can assume they never get passed None as argument.
-    However, they may get passed an empty string or a numeric null value.
+    The cast functions get passed the string representation of a value in
+    the database which they need to convert to a Python object.  The
+    passed string will never be None since NULL values are already be
+    handled before the cast function is called.
     """
 
     # the default cast functions
@@ -164,14 +168,17 @@ class Typecasts(dict):
         'oid': long, 'oid8': long,
         'float4': float, 'float8': float,
         'numeric': Decimal, 'money': cast_money,
+        'int2vector': cast_int2vector,
         'anyarray': cast_array, 'record': cast_record}
 
     def __missing__(self, typ):
         """Create a cast function if it is not cached.
 
         Note that this class never raises a KeyError,
-        but return None when no special cast function exists.
+        but returns None when no special cast function exists.
         """
+        if not isinstance(typ, str):
+            raise TypeError('Invalid type: %s' % typ)
         cast = self.defaults.get(typ)
         if cast:
             # store default for faster access
@@ -333,7 +340,7 @@ class TypeCache(dict):
         if isinstance(key, int):
             oid = key
         else:
-            if not '.' in key and not '"' in key:
+            if '.' not in key and '"' not in key:
                 key = '"%s"' % key
             oid = "'%s'::regtype" % self._escape_string(key)
         try:
@@ -385,7 +392,7 @@ class TypeCache(dict):
         """Reset the typecast function for the specified database type(s)."""
         self._typecasts.reset(typ)
 
-    def typecast(self, typ, value):
+    def typecast(self, value, typ):
         """Cast the given value according to the given database type."""
         if value is None:
             # for NULL values, no typecast is necessary
@@ -654,7 +661,7 @@ class Cursor(object):
         except Error as err:
             raise _db_error(str(err))
         typecast = self.type_cache.typecast
-        return [self.row_factory([typecast(typ, value)
+        return [self.row_factory([typecast(value, typ)
             for typ, value in zip(self.coltypes, row)]) for row in result]
 
     def callproc(self, procname, parameters=None):

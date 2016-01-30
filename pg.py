@@ -42,6 +42,11 @@ from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
 try:
+    long
+except NameError:  # Python >= 3.0
+    long = int
+
+try:
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
@@ -375,100 +380,300 @@ class _Adapt:
         return '$%d' % len(params)
 
 
-class _CastRecord:
-    """Class providing methods for casting records and record elements.
+def cast_bool(value):
+    """Cast a boolean value."""
+    if not get_bool():
+        return value
+    return value[0] == 't'
 
-    This is needed when getting result values from one of the higher level DB
-    methods, since the lower level query method only casts the other types.
+
+def cast_json(value):
+    """Cast a JSON value."""
+    cast = get_jsondecode()
+    if not cast:
+        return value
+    return cast(value)
+
+
+def cast_num(value):
+    """Cast a numeric value."""
+    return (get_decimal() or float)(value)
+
+
+def cast_money(value):
+    """Cast a money value."""
+    point = get_decimal_point()
+    if not point:
+        return value
+    if point != '.':
+        value = value.replace(point, '.')
+    value = value.replace('(', '-')
+    value = ''.join(c for c in value if c.isdigit() or c in '.-')
+    return (get_decimal() or float)(value)
+
+
+def cast_int2vector(value):
+    """Cast an int2vector value."""
+    return [int(v) for v in value.split()]
+
+
+class Typecasts(dict):
+    """Dictionary mapping database types to typecast functions.
+
+    The cast functions get passed the string representation of a value in
+    the database which they need to convert to a Python object.  The
+    passed string will never be None since NULL values are already be
+    handled before the cast function is called.
+
+    Note that the basic types are already handled by the C extension.
+    They only need to be handled here as record or array components.
     """
 
-    @staticmethod
-    def cast_bool(v):
-        if not get_bool():
-            return v
-        return v[0] == 't'
+    # the default cast functions
+    # (str functions are ignored but have been added for faster access)
+    defaults = {'char': str, 'bpchar': str, 'name': str,
+        'text': str, 'varchar': str,
+        'bool': cast_bool, 'bytea': unescape_bytea,
+        'int2': int, 'int4': int, 'serial': int,
+        'int8': long, 'json': cast_json, 'jsonb': cast_json,
+        'oid': long, 'oid8': long,
+        'float4': float, 'float8': float,
+        'numeric': cast_num, 'money': cast_money,
+        'int2vector': cast_int2vector,
+        'anyarray': cast_array, 'record': cast_record}
 
-    @staticmethod
-    def cast_bytea(v):
-        return unescape_bytea(v)
+    def __missing__(self, typ):
+        """Create a cast function if it is not cached.
+        
+        Note that this class never raises a KeyError,
+        but returns None when no special cast function exists.
+        """
+        if not isinstance(typ, str):
+            raise TypeError('Invalid type: %s' % typ)
+        cast = self.defaults.get(typ)
+        if cast:
+            # store default for faster access
+            self[typ] = cast
+        elif typ.startswith('_'):
+            base_cast = self[typ[1:]]
+            cast = self.create_array_cast(base_cast)
+            if base_cast:
+                self[typ] = cast
+        else:
+            attnames = self.get_attnames(typ)
+            if attnames:
+                casts = [self[v.pgtype] for v in attnames.values()]
+                cast = self.create_record_cast(typ, attnames, casts)
+                self[typ] = cast
+        return cast
 
-    @staticmethod
-    def cast_float(v):
-        return float(v)
+    def get(self, typ, default=None):
+        """Get the typecast function for the given database type."""
+        return self[typ] or default
 
-    @staticmethod
-    def cast_int(v):
-        return int(v)
+    def set(self, typ, cast):
+        """Set a typecast function for the specified database type(s)."""
+        if isinstance(typ, basestring):
+            typ = [typ]
+        if cast is None:
+            for t in typ:
+                self.pop(t, None)
+                self.pop('_%s' % t, None)
+        else:
+            if not callable(cast):
+                raise TypeError("Cast parameter must be callable")
+            for t in typ:
+                self[t] = cast
+                self.pop('_%s % t', None)
 
-    @staticmethod
-    def cast_json(v):
-        cast = get_jsondecode()
-        if not cast:
-            return v
-        return cast(v)
+    def reset(self, typ=None):
+        """Reset the typecasts for the specified type(s) to their defaults.
 
-    @staticmethod
-    def cast_num(v):
-        return (get_decimal() or float)(v)
-
-    @staticmethod
-    def cast_money(v):
-        point = get_decimal_point()
-        if not point:
-            return v
-        if point != '.':
-            v = v.replace(point, '.')
-        v = v.replace('(', '-')
-        v = ''.join(c for c in v if c.isdigit() or c in '.-')
-        return (get_decimal() or float)(v)
+        When no type is specified, all typecasts will be reset.
+        """
+        defaults = self.defaults
+        if typ is None:
+            self.clear()
+            self.update(defaults)
+        else:
+            if isinstance(typ, basestring):
+                typ = [typ]
+            for t in typ:
+                self.set(t, defaults.get(t))
 
     @classmethod
-    def cast(cls, v, typ):
-        types = typ.attnames.values()
-        cast = [getattr(cls, 'cast_%s' % t.simple, None) for t in types]
-        v = cast_record(v, cast)
-        return typ.namedtuple(*v)
-
-
-class _PgType(str):
-    """Class augmenting the simple type name with additional info."""
-
-    _num_types = frozenset('int float num money'
-        ' int2 int4 int8 float4 float8 numeric money'.split())
+    def get_default(cls, typ):
+        """Get the default typecast function for the given database type."""
+        return cls.defaults.get(typ)
 
     @classmethod
-    def create(cls, db, pgtype, regtype, typrelid):
-        """Create a PostgreSQL type name with additional info."""
-        simple = 'record' if typrelid else _simpletype[pgtype]
-        self = cls(regtype if db._regtypes else simple)
-        self.db = db
-        self.simple = simple
-        self.pgtype = pgtype
-        self.regtype = regtype
-        self.typrelid = typrelid
-        self._attnames = self._namedtuple = None
-        return self
+    def set_default(cls, typ, cast):
+        """Set a default typecast function for the given database type(s)."""
+        if isinstance(typ, basestring):
+            typ = [typ]
+        defaults = cls.defaults
+        if cast is None:
+            for t in typ:
+                defaults.pop(t, None)
+                defaults.pop('_%s' % t, None)
+        else:
+            if not callable(cast):
+                raise TypeError("Cast parameter must be callable")
+            for t in typ:
+                defaults[t] = cast
+                defaults.pop('_%s % t', None)
+
+    def get_attnames(self, typ):
+        """Return the fields for the given record type.
+
+        This method will be replaced with the get_attnames() method of DbTypes.
+        """
+        return {}
+
+    def create_array_cast(self, cast):
+        """Create an array typecast for the given base cast."""
+        return lambda v: cast_array(v, cast)
+
+    def create_record_cast(self, name, fields, casts):
+        """Create a named record typecast for the given fields and casts."""
+        record = namedtuple(name, fields)
+        return lambda v: record(*cast_record(v, casts))
+
+
+def get_typecast(typ):
+    """Get the global typecast function for the given database type(s)."""
+    return Typecasts.get_default(typ)
+
+
+def set_typecast(typ, cast):
+    """Set a global typecast function for the given database type(s).
+
+    Note that connections cache cast functions. To be sure a global change
+    is picked up by a running connection, call db.db_types.reset_typecast().
+    """
+    Typecasts.set_default(typ, cast)
+
+
+class DbType(str):
+    """Class augmenting the simple type name with additional info.
+
+    The following additional information is provided:
+
+        oid: the PostgreSQL type OID
+        pgtype: the PostgreSQL type name
+        regtype: the regular type name
+        simple: the simple PyGreSQL type name
+        typtype: b = base type, c = composite type etc.
+        category: A = Array, b =Boolean, C = Composite etc.
+        delim: delimiter for array types
+        relid: corresponding table for composite types
+        attnames: attributes for composite types
+    """
 
     @property
     def attnames(self):
         """Get names and types of the fields of a composite type."""
-        if not self.typrelid:
+        return self._get_attnames(self)
+
+
+class DbTypes(dict):
+    """Cache for PostgreSQL data types.
+
+    This cache maps type OIDs and names to DbType objects containing
+    information on the associated database type.
+    """
+
+    _num_types = frozenset('int float num money'
+        ' int2 int4 int8 float4 float8 numeric money'.split())
+
+    def __init__(self, db):
+        """Initialize type cache for connection."""
+        super(DbTypes, self).__init__()
+        self._get_attnames = db.get_attnames
+        db = db.db
+        self.query = db.query
+        self.escape_string = db.escape_string
+        self._typecasts = Typecasts()
+        self._typecasts.get_attnames = self.get_attnames
+        self._regtypes = False
+
+    def add(self, oid, pgtype, regtype,
+               typtype, category, delim, relid):
+        """Create a PostgreSQL type name with additional info."""
+        if oid in self:
+            return self[oid]
+        simple = 'record' if relid else _simpletype[pgtype]
+        typ = DbType(regtype if self._regtypes else simple)
+        typ.oid = oid
+        typ.simple = simple
+        typ.pgtype = pgtype
+        typ.regtype = regtype
+        typ.typtype = typtype
+        typ.category = category
+        typ.delim = delim
+        typ.relid = relid
+        typ._get_attnames = self.get_attnames
+        return typ
+
+    def __missing__(self, key):
+        """Get the type info from the database if it is not cached."""
+        try:
+            res = self.query("SELECT oid, typname, typname::regtype,"
+                " typtype, typcategory, typdelim, typrelid"
+                " FROM pg_type WHERE oid=%s::regtype" %
+                (DB._adapt_qualified_param(key, 1),), (key,)).getresult()
+        except ProgrammingError:
+            res = None
+        if not res:
+            raise KeyError('Type %s could not be found' % key)
+        res = res[0]
+        typ = self.add(*res)
+        self[typ.oid] = self[typ.pgtype] = typ
+        return typ
+
+    def get(self, key, default=None):
+        """Get the type even if it is not cached."""
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def get_attnames(self, typ):
+        """Get names and types of the fields of a composite type."""
+        if not isinstance(typ, DbType):
+            typ = self.get(typ)
+            if not typ:
+                return None
+        if not typ.relid:
             return None
-        if not self._attnames:
-            self._attnames = self.db.get_attnames(self.typrelid)
-        return self._attnames
+        return self._get_attnames(typ.relid, with_oid=False)
 
-    @property
-    def namedtuple(self):
-        """Return named tuple class representing a composite type."""
-        if not self._namedtuple:
-            self._namedtuple = namedtuple(self, self.attnames)
-        return self._namedtuple
+    def get_typecast(self, typ):
+        """Get the typecast function for the given database type."""
+        return self._typecasts.get(typ)
 
-    def cast(self, value):
-        if value is not None and self.typrelid:
-            value = _CastRecord.cast(value, self)
-        return value
+    def set_typecast(self, typ, cast):
+        """Set a typecast function for the specified database type(s)."""
+        self._typecasts.set(typ, cast)
+
+    def reset_typecast(self, typ=None):
+        """Reset the typecast function for the specified database type(s)."""
+        self._typecasts.reset(typ)
+
+    def typecast(self, value, typ):
+        """Cast the given value according to the given database type."""
+        if value is None:
+            # for NULL values, no typecast is necessary
+            return None
+        if not isinstance(typ, DbType):
+            typ = self.get(typ)
+            if typ:
+                typ = typ.pgtype
+        cast = self.get_typecast(typ) if typ else None
+        if not cast or cast is str:
+            # no typecast is necessary
+            return value
+        return cast(value)
 
 
 class _Literal(str):
@@ -690,6 +895,8 @@ class DB(_Adapt):
         self._pkeys = {}
         self._privileges = {}
         self._args = args, kw
+        self.dbtypes = DbTypes(self)
+        db.set_cast_hook(self.dbtypes.typecast)
         self.debug = None  # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
             # * to a file object to write debug statements or
@@ -1047,7 +1254,7 @@ class DB(_Adapt):
             # we want to use the order defined in the primary key index here,
             # not the order as defined by the columns in the table
             if len(pkey) > 1:
-                indkey = [int(k) for k in pkey[0][2].split()]
+                indkey = pkey[0][2]
                 pkey = sorted(pkey, key=lambda row: indkey.index(row[1]))
                 pkey = tuple(row[0] for row in pkey)
             else:
@@ -1083,7 +1290,7 @@ class DB(_Adapt):
         """Return list of tables in connected database."""
         return self.get_relations('r')
 
-    def get_attnames(self, table, flush=False):
+    def get_attnames(self, table, with_oid=True, flush=False):
         """Given the name of a table, dig out the set of attribute names.
 
         Returns a read-only dictionary of attribute names (the names are
@@ -1104,16 +1311,19 @@ class DB(_Adapt):
         try:  # cache lookup
             names = attnames[table]
         except KeyError:  # cache miss, check the database
-            q = ("SELECT a.attname, t.typname, t.typname::regtype, t.typrelid"
+            q = "a.attnum > 0"
+            if with_oid:
+                q = "(%s OR a.attname = 'oid')" % q
+            q = ("SELECT a.attname, t.oid, t.typname, t.typname::regtype,"
+                " t.typtype, t.typcategory, t.typdelim, t.typrelid" 
                 " FROM pg_attribute a"
                 " JOIN pg_type t ON t.oid = a.atttypid"
-                " WHERE a.attrelid = %s::regclass"
-                " AND (a.attnum > 0 OR a.attname = 'oid')"
+                " WHERE a.attrelid = %s::regclass AND %s"
                 " AND NOT a.attisdropped ORDER BY a.attnum") % (
-                    self._adapt_qualified_param(table, 1))
+                    self._adapt_qualified_param(table, 1), q)
             names = self.db.query(q, (table,)).getresult()
-            names = ((name, _PgType.create(self, pgtype, regtype, typrelid))
-                for name, pgtype, regtype, typrelid in names)
+            types = self.dbtypes
+            names = ((name[0], types.add(*name[1:])) for name in names)
             names = AttrDict(names)
             attnames[table] = names  # cache it
         return names
@@ -1121,12 +1331,13 @@ class DB(_Adapt):
     def use_regtypes(self, regtypes=None):
         """Use regular type names instead of simplified type names."""
         if regtypes is None:
-            return self._regtypes
+            return self.dbtypes._regtypes
         else:
             regtypes = bool(regtypes)
-            if regtypes != self._regtypes:
-                self._regtypes = regtypes
+            if regtypes != self.dbtypes._regtypes:
+                self.dbtypes._regtypes = regtypes
                 self._attnames.clear()
+                self.dbtypes.clear()
             return regtypes
 
     def has_table_privilege(self, table, privilege='select'):
@@ -1214,8 +1425,6 @@ class DB(_Adapt):
         for n, value in res[0].items():
             if qoid and n == 'oid':
                 n = qoid
-            else:
-                value = attnames[n].cast(value)
             row[n] = value
         return row
 
@@ -1262,8 +1471,6 @@ class DB(_Adapt):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
-                else:
-                    value = attnames[n].cast(value)
                 row[n] = value
         return row
 
@@ -1331,8 +1538,6 @@ class DB(_Adapt):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
-                else:
-                    value = attnames[n].cast(value)
                 row[n] = value
         return row
 
@@ -1434,8 +1639,6 @@ class DB(_Adapt):
             for n, value in res[0].items():
                 if qoid and n == 'oid':
                     n = qoid
-                else:
-                    value = attnames[n].cast(value)
                 row[n] = value
         else:
             self.get(table, row)
@@ -1457,7 +1660,7 @@ class DB(_Adapt):
             if n == 'oid':
                 continue
             t = t.simple
-            if t in _PgType._num_types:
+            if t in DbTypes._num_types:
                 row[n] = 0
             elif t == 'bool':
                 row[n] = self._make_bool(False)

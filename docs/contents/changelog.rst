@@ -84,6 +84,12 @@ Version 5.0
   - The methods for adapting and typecasting values pertaining to PostgreSQL
     types have been refactored and swapped out to separate classes.
 - Changes concerning both modules:
+  - The modules now provide get_typecast() and set_typecast() methods
+    allowing to control the typecasting on the global level.  The connection
+    objects have got type caches with the same methods which give control
+    over the typecasting on the level of the current connection.
+    See the documentation on details about the type cache and the typecast
+    mechanisms provided by PyGreSQL.
   - PyGreSQL now supports the JSON and JSONB data types, converting such
     columns automatically to and from Python objects. If you want to insert
     Python objects as JSON data using DB-API 2, you should wrap them in the

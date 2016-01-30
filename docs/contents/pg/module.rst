@@ -452,6 +452,53 @@ the automatic deserialization of JSON strings will be deactivated.
 
 .. versionadded:: 5.0
 
+get/set_typecast -- custom typecasting
+--------------------------------------
+
+PyGreSQL uses typecast functions to cast the raw data coming from the
+database to Python objects suitable for the particular database type.
+These functions take a single string argument that represents the data
+to be casted and must return the casted value.
+
+PyGreSQL provides through its C extension module basic typecast functions
+for the common database types, but if you want to add more typecast functions,
+you can set these using the following functions.
+
+.. method:: get_typecast(typ)
+
+    Get the global cast function for the given database type
+
+    :param str typ: PostgreSQL type name
+    :returns: the typecast function for the specified type
+    :rtype: function or None
+
+.. versionadded:: 5.0
+
+.. method:: set_typecast(typ, cast)
+
+    Set a global typecast function for the given database type(s)
+
+    :param typ: PostgreSQL type name or list of type names
+    :type typ: str or list
+    :param cast: the typecast function to be set for the specified type(s)
+    :type typ: str or int
+
+.. versionadded:: 5.0
+
+Note that database connections cache types and their cast functions using
+connection specific :class:`DbTypes` objects.  You can also get, set and
+reset typecast functions on the connection level using the methods
+:meth:`DbTypes.get_typecast`, :meth:`DbTypes.set_typecast` and
+:meth:`DbTypes.reset_typecast` of the :attr:`DB.dbtypes` object.  This will
+not affect other connections or future connections.  In order to be sure
+a global change is picked up by a running connection, you must reopen it or
+call :meth:`DbTypes.reset_typecast` on the :attr:`DB.dbtypes` object.
+
+Also note that the typecasting for all of the basic types happens already
+in the C extension module.  The typecast functions that can be set with
+the above methods are only called for the types that are not already
+supported by the C extension module.
+
 
 Module constants
 ----------------

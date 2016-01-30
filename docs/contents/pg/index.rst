@@ -15,3 +15,4 @@ Contents
     query
     large_objects
     notification
+    db_types

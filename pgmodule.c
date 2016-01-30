@@ -141,8 +141,9 @@ typedef struct
 {
 	PyObject_HEAD
 	int			valid;				/* validity flag */
-	PGconn		*cnx;				/* PostGres connection handle */
-	PyObject	*notice_receiver;	/* current notice receiver */
+	PGconn	   *cnx;				/* PostGres connection handle */
+	PyObject   *cast_hook;			/* external typecast method */
+	PyObject   *notice_receiver;	/* current notice receiver */
 }	connObject;
 #define is_connObject(v) (PyType(v) == &connType)
 
@@ -150,7 +151,7 @@ typedef struct
 {
 	PyObject_HEAD
 	int			valid;			/* validity flag */
-	connObject	*pgcnx;			/* parent connection object */
+	connObject *pgcnx;			/* parent connection object */
 	PGresult	*result;		/* result content */
 	int			encoding; 		/* client encoding */
 	int			result_type;	/* result type (DDL/DML/DQL) */
@@ -164,15 +165,16 @@ typedef struct
 typedef struct
 {
 	PyObject_HEAD
-	connObject	*pgcnx;		/* parent connection object */
-	PGresult	const *res;	/* an error or warning */
+	connObject *pgcnx;			/* parent connection object */
+	PGresult	const *res;		/* an error or warning */
 }	noticeObject;
 #define is_noticeObject(v) (PyType(v) == &noticeType)
 
 typedef struct
 {
 	PyObject_HEAD
-	PGresult	*result;		/* result content */
+	connObject *pgcnx;			/* parent connection object */
+	PGresult   *result;			/* result content */
 	int			encoding; 		/* client encoding */
 }	queryObject;
 #define is_queryObject(v) (PyType(v) == &queryType)
@@ -181,7 +183,7 @@ typedef struct
 typedef struct
 {
 	PyObject_HEAD
-	connObject	*pgcnx;			/* parent connection object */
+	connObject *pgcnx;			/* parent connection object */
 	Oid			lo_oid;			/* large object oid */
 	int			lo_fd;			/* large object fd */
 }	largeObject;
@@ -201,7 +203,7 @@ typedef struct
 #define PYGRES_TEXT 8
 #define PYGRES_BYTEA 9
 #define PYGRES_JSON 10
-#define PYGRES_EXTERNAL 11
+#define PYGRES_OTHER 11
 /* array types */
 #define PYGRES_ARRAY 16
 
@@ -241,7 +243,7 @@ get_encoded_string(PyObject *unicode_obj, int encoding)
 
 /* helper functions */
 
-/* get PyGreSQL internal types for  a PostgreSQL type */
+/* get PyGreSQL internal types for a PostgreSQL type */
 static int
 get_type(Oid pgtype)
 {
@@ -289,6 +291,21 @@ get_type(Oid pgtype)
 			t = jsondecode ? PYGRES_JSON : PYGRES_TEXT;
 			break;
 
+		case BPCHAROID:
+		case CHAROID:
+		case TEXTOID:
+		case VARCHAROID:
+		case NAMEOID:
+		case DATEOID:
+		case INTERVALOID:
+		case TIMEOID:
+		case TIMETZOID:
+		case TIMESTAMPOID:
+		case TIMESTAMPTZOID:
+		case REGTYPEOID:
+			t = PYGRES_TEXT;
+			break;
+
 		/* array types */
 
 		case INT2ARRAYOID:
@@ -330,22 +347,23 @@ get_type(Oid pgtype)
 			t = (jsondecode ? PYGRES_JSON : PYGRES_TEXT) | PYGRES_ARRAY;
 			break;
 
-		case ANYARRAYOID:
 		case BPCHARARRAYOID:
 		case CHARARRAYOID:
 		case TEXTARRAYOID:
 		case VARCHARARRAYOID:
+		case NAMEARRAYOID:
 		case DATEARRAYOID:
 		case INTERVALARRAYOID:
 		case TIMEARRAYOID:
 		case TIMETZARRAYOID:
 		case TIMESTAMPARRAYOID:
 		case TIMESTAMPTZARRAYOID:
+		case REGTYPEARRAYOID:
 			t = PYGRES_TEXT | PYGRES_ARRAY;
 			break;
 
 		default:
-			t = PYGRES_TEXT;
+			t = PYGRES_OTHER;
 	}
 
 	return t;
@@ -426,6 +444,26 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
 			obj = PyBytes_FromStringAndSize(s, size);
 	}
 
+	return obj;
+}
+
+/* Cast an arbitrary type to a Python object using a callback function.
+   This needs the character string, size, encoding, the Postgres type
+   and the external typecast function to be called. */
+static PyObject *
+cast_other(char *s, Py_ssize_t size, int encoding, int pgtype,
+	PyObject *cast_hook)
+{
+	PyObject *obj;
+
+	obj = cast_sized_text(s, size, encoding, PYGRES_TEXT);
+
+	if (cast_hook)
+	{
+		PyObject *tmp_obj = obj;
+		obj = PyObject_CallFunction(cast_hook, "(Oi)", obj, pgtype);
+		Py_DECREF(tmp_obj);
+	}
 	return obj;
 }
 
@@ -1052,8 +1090,9 @@ notice_receiver(void *arg, const PGresult *res)
 {
 	PyGILState_STATE gstate = PyGILState_Ensure();
 	connObject *self = (connObject*) arg;
-	PyObject *proc = self->notice_receiver;
-	if (proc && PyCallable_Check(proc))
+	PyObject *func = self->notice_receiver;
+
+	if (func)
 	{
 		noticeObject *notice = PyObject_NEW(noticeObject, &noticeType);
 		PyObject *ret;
@@ -1067,7 +1106,7 @@ notice_receiver(void *arg, const PGresult *res)
 			Py_INCREF(Py_None);
 			notice = (noticeObject *)(void *)Py_None;
 		}
-		ret = PyObject_CallFunction(proc, "(O)", notice);
+		ret = PyObject_CallFunction(func, "(O)", notice);
 		Py_XDECREF(ret);
 	}
 	PyGILState_Release(gstate);
@@ -1358,7 +1397,8 @@ largeOpen(largeObject *self, PyObject *args)
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &mode))
 	{
-		PyErr_SetString(PyExc_TypeError, "open(mode), with mode(integer)");
+		PyErr_SetString(PyExc_TypeError,
+			"The open() method takes an integer argument");
 		return NULL;
 	}
 
@@ -1390,7 +1430,7 @@ largeClose(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method close() takes no parameters");
+			"Method close() takes no arguments");
 		return NULL;
 	}
 
@@ -1425,13 +1465,15 @@ largeRead(largeObject *self, PyObject *args)
 	/* gets arguments */
 	if (!PyArg_ParseTuple(args, "i", &size))
 	{
-		PyErr_SetString(PyExc_TypeError, "read(size), with size (integer)");
+		PyErr_SetString(PyExc_TypeError,
+			"Method read() takes an integer argument");
 		return NULL;
 	}
 
 	if (size <= 0)
 	{
-		PyErr_SetString(PyExc_ValueError, "Parameter size must be positive");
+		PyErr_SetString(PyExc_ValueError,
+			"Method read() takes a positive integer as argument");
 		return NULL;
 	}
 
@@ -1471,7 +1513,7 @@ largeWrite(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s#", &buffer, &bufsize))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"write(buffer), with buffer (sized string)");
+			"Method write() expects a sized string as argument");
 		return NULL;
 	}
 
@@ -1510,7 +1552,7 @@ largeSeek(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "ii", &offset, &whence))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"lseek(offset, whence), with offset and whence (integers)");
+			"Method lseek() expects two integer arguments");
 		return NULL;
 	}
 
@@ -1544,7 +1586,7 @@ largeSize(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method size() takes no parameters");
+			"Method size() takes no arguments");
 		return NULL;
 	}
 
@@ -1593,7 +1635,7 @@ largeTell(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method tell() takes no parameters");
+			"Method tell() takes no arguments");
 		return NULL;
 	}
 
@@ -1657,7 +1699,7 @@ largeUnlink(largeObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method unlink() takes no parameters");
+			"Method unlink() takes no arguments");
 		return NULL;
 	}
 
@@ -1804,10 +1846,8 @@ connDelete(connObject *self)
 		PQfinish(self->cnx);
 		Py_END_ALLOW_THREADS
 	}
-	if (self->notice_receiver)
-	{
-		Py_DECREF(self->notice_receiver);
-	}
+	Py_XDECREF(self->cast_hook);
+	Py_XDECREF(self->notice_receiver);
 	PyObject_Del(self);
 }
 
@@ -1828,7 +1868,7 @@ connSource(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method source() takes no parameter");
+			"Method source() takes no arguments");
 		return NULL;
 	}
 
@@ -1892,7 +1932,7 @@ connQuery(connObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Query command must be a string");
+			"Method query() expects a string as first argument");
 		return NULL;
 	}
 
@@ -1903,7 +1943,7 @@ connQuery(connObject *self, PyObject *args)
 	if (param_obj)
 	{
 		param_obj = PySequence_Fast(param_obj,
-			"Query parameters must be a sequence");
+			"Method query() expects a sequence as second argument");
 		if (!param_obj)
 		{
 			Py_XDECREF(query_obj);
@@ -2069,6 +2109,8 @@ connQuery(connObject *self, PyObject *args)
 		return PyErr_NoMemory();
 
 	/* stores result and returns object */
+	Py_XINCREF(self);
+	npgobj->pgcnx = self;
 	npgobj->result = result;
 	npgobj->encoding = encoding;
 	return (PyObject *) npgobj;
@@ -2128,7 +2170,7 @@ connGetLine(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method getline() takes no parameters");
+			"Method getline() takes no arguments");
 		return NULL;
 	}
 
@@ -2168,7 +2210,7 @@ connEndCopy(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method endcopy() takes no parameters");
+			"Method endcopy() takes no arguments");
 		return NULL;
 	}
 
@@ -2224,8 +2266,7 @@ connInsertTable(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "sO:filter", &table, &list))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"inserttable(table, content), with table (string) "
-			"and content (list)");
+			"Method inserttable() expects a string and a list as arguments");
 		return NULL;
 	}
 
@@ -2243,7 +2284,8 @@ connInsertTable(connObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Second arg must be some kind of array");
+			"Method inserttable() expects some kind of array"
+			" as second argument");
 		return NULL;
 	}
 
@@ -2448,7 +2490,7 @@ connTransaction(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method transaction() takes no parameters");
+			"Method transaction() takes no arguments");
 		return NULL;
 	}
 
@@ -2457,7 +2499,7 @@ connTransaction(connObject *self, PyObject *args)
 
 /* get parameter setting */
 static char connParameter__doc__[] =
-"parameter() -- look up a current parameter setting";
+"parameter(name) -- look up a current parameter setting";
 
 static PyObject *
 connParameter(connObject *self, PyObject *args)
@@ -2474,7 +2516,7 @@ connParameter(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s", &name))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"parameter(name), with name (string)");
+			"Method parameter() takes a string as argument");
 		return NULL;
 	}
 
@@ -2522,7 +2564,8 @@ connEscapeLiteral(connObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_literal() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Method escape_literal() expects a string as argument");
 		return NULL;
 	}
 
@@ -2573,7 +2616,7 @@ connEscapeIdentifier(connObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"escape_identifier() expects a string");
+			"Method escape_identifier() expects a string as argument");
 		return NULL;
 	}
 
@@ -2625,7 +2668,8 @@ connEscapeString(connObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Method escape_string() expects a string as argument");
 		return NULL;
 	}
 
@@ -2681,7 +2725,8 @@ connEscapeBytea(connObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Method escape_bytea() expects a string as argument");
 		return NULL;
 	}
 
@@ -2815,7 +2860,7 @@ connReset(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method reset() takes no parameters");
+			"Method reset() takes no arguments");
 		return NULL;
 	}
 
@@ -2842,7 +2887,7 @@ connCancel(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method cancel() takes no parameters");
+			"Method cancel() takes no arguments");
 		return NULL;
 	}
 
@@ -2867,7 +2912,7 @@ connFileno(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method fileno() takes no parameters");
+			"Method fileno() takes no arguments");
 		return NULL;
 	}
 
@@ -2878,28 +2923,90 @@ connFileno(connObject *self, PyObject *args)
 #endif
 }
 
+/* set external typecast callback function */
+static char connSetCastHook__doc__[] =
+"set_cast_hook(func) -- set a fallback typecast function";
+
+static PyObject *
+connSetCastHook(connObject * self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	PyObject *func;
+
+	if (PyArg_ParseTuple(args, "O", &func))
+	{
+		if (func == Py_None)
+		{
+			Py_XDECREF(self->cast_hook);
+			self->cast_hook = NULL;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else if (PyCallable_Check(func))
+		{
+			Py_XINCREF(func); Py_XDECREF(self->cast_hook);
+			self->cast_hook = func;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else
+			PyErr_SetString(PyExc_TypeError,
+				"Method set_cast_hook() expects"
+				 " a callable or None as argument");
+	}
+	return ret;
+}
+
+/* get notice receiver callback function */
+static char connGetCastHook__doc__[] =
+"get_cast_hook() -- get the fallback typecast function";
+
+static PyObject *
+connGetCastHook(connObject * self, PyObject * args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = self->cast_hook;
+		if (!ret)
+			ret = Py_None;
+		Py_INCREF(ret);
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Method get_cast_hook() takes no arguments");
+
+	return ret;
+}
+
 /* set notice receiver callback function */
 static char connSetNoticeReceiver__doc__[] =
-"set_notice_receiver() -- set the current notice receiver";
+"set_notice_receiver(func) -- set the current notice receiver";
 
 static PyObject *
 connSetNoticeReceiver(connObject * self, PyObject * args)
 {
 	PyObject *ret = NULL;
-	PyObject *proc;
+	PyObject *func;
 
-	if (PyArg_ParseTuple(args, "O", &proc))
+	if (PyArg_ParseTuple(args, "O", &func))
 	{
-		if (PyCallable_Check(proc))
+		if (func == Py_None)
 		{
-			Py_XINCREF(proc);
-			self->notice_receiver = proc;
+			Py_XDECREF(self->notice_receiver);
+			self->notice_receiver = NULL;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else if (PyCallable_Check(func))
+		{
+			Py_XINCREF(func); Py_XDECREF(self->notice_receiver);
+			self->notice_receiver = func;
 			PQsetNoticeReceiver(self->cnx, notice_receiver, self);
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
 			PyErr_SetString(PyExc_TypeError,
-				"Notice receiver must be callable");
+				"Method set_notice_receiver() expects"
+				 " a callable or None as argument");
 	}
 	return ret;
 }
@@ -2921,10 +3028,9 @@ connGetNoticeReceiver(connObject * self, PyObject * args)
 		Py_INCREF(ret);
 	}
 	else
-	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method get_notice_receiver() takes no parameters");
-	}
+			"Method get_notice_receiver() takes no arguments");
+
 	return ret;
 }
 
@@ -2979,7 +3085,7 @@ connGetNotify(connObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method getnotify() takes no parameters");
+			"Method getnotify() takes no arguments");
 		return NULL;
 	}
 
@@ -3051,6 +3157,10 @@ static struct PyMethodDef connMethods[] = {
 	{"cancel", (PyCFunction) connCancel, METH_VARARGS, connCancel__doc__},
 	{"close", (PyCFunction) connClose, METH_VARARGS, connClose__doc__},
 	{"fileno", (PyCFunction) connFileno, METH_VARARGS, connFileno__doc__},
+	{"get_cast_hook", (PyCFunction) connGetCastHook, METH_VARARGS,
+			connGetCastHook__doc__},
+	{"set_cast_hook", (PyCFunction) connSetCastHook, METH_VARARGS,
+			connSetCastHook__doc__},
 	{"get_notice_receiver", (PyCFunction) connGetNoticeReceiver, METH_VARARGS,
 			connGetNoticeReceiver__doc__},
 	{"set_notice_receiver", (PyCFunction) connSetNoticeReceiver, METH_VARARGS,
@@ -3241,7 +3351,7 @@ sourceClose(sourceObject *self, PyObject *args)
 	/* checks args */
 	if (!PyArg_ParseTuple(args, ""))
 	{
-		PyErr_SetString(PyExc_TypeError, "Method close() takes no parameter");
+		PyErr_SetString(PyExc_TypeError, "Method close() takes no arguments");
 		return NULL;
 	}
 
@@ -3303,7 +3413,8 @@ sourceExecute(sourceObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "Executed SQL must be a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Method execute() expects a string as argument");
 		return NULL;
 	}
 
@@ -3398,7 +3509,7 @@ sourceStatusOID(sourceObject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method oidstatus() takes no parameters");
+			"Method oidstatus() takes no arguments");
 		return NULL;
 	}
 
@@ -3516,7 +3627,7 @@ pgsource_move(sourceObject *self, PyObject *args, int move)
 	{
 		char		errbuf[256];
 		PyOS_snprintf(errbuf, sizeof(errbuf),
-			"Method %s() takes no parameter", __movename[move]);
+			"Method %s() takes no arguments", __movename[move]);
 		PyErr_SetString(PyExc_TypeError, errbuf);
 		return NULL;
 	}
@@ -3647,7 +3758,8 @@ sourcePutData(sourceObject *self, PyObject *args)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"putdata() expects a buffer, None or an exception");
+			"Method putdata() expects a buffer, None"
+			 " or an exception as argument");
 		return NULL;
 	}
 
@@ -3870,7 +3982,7 @@ sourceListInfo(sourceObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method listinfo() takes no parameter");
+			"Method listinfo() takes no arguments");
 		return NULL;
 	}
 
@@ -4122,7 +4234,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 			   *pgpasswd;
 	int			pgport;
 	char		port_buffer[20];
-	connObject   *npgobj;
+	connObject *npgobj;
 
 	pghost = pgopt = pgdbname = pguser = pgpasswd = NULL;
 	pgport = -1;
@@ -4166,6 +4278,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 
 	npgobj->valid = 1;
 	npgobj->cnx = NULL;
+	npgobj->cast_hook = NULL;
 	npgobj->notice_receiver = NULL;
 
 	if (pgport != -1)
@@ -4192,6 +4305,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 static void
 queryDealloc(queryObject *self)
 {
+	Py_XDECREF(self->pgcnx);
 	if (self->result)
 		PQclear(self->result);
 
@@ -4209,7 +4323,7 @@ queryNTuples(queryObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method ntuples() takes no parameters");
+			"Method ntuples() takes no arguments");
 		return NULL;
 	}
 
@@ -4233,7 +4347,7 @@ queryListFields(queryObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method listfields() takes no parameters");
+			"Method listfields() takes no arguments");
 		return NULL;
 	}
 
@@ -4325,7 +4439,7 @@ queryGetResult(queryObject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method getresult() takes no parameters");
+			"Method getresult() takes no arguments");
 		return NULL;
 	}
 
@@ -4370,6 +4484,10 @@ queryGetResult(queryObject *self, PyObject *args)
 						encoding, type, NULL, 0);
 				else if (type == PYGRES_BYTEA)
 					val = cast_bytea_text(s);
+				else if (type == PYGRES_OTHER)
+					val = cast_other(s,
+						PQgetlength(self->result, i, j), encoding,
+						PQftype(self->result, j), self->pgcnx->cast_hook);
 				else if (type & PYGRES_TEXT)
 					val = cast_sized_text(s, PQgetlength(self->result, i, j),
 						encoding, type);
@@ -4418,7 +4536,7 @@ queryDictResult(queryObject *self, PyObject *args)
 	if (args && !PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method dictresult() takes no parameters");
+			"Method dictresult() takes no arguments");
 		return NULL;
 	}
 
@@ -4463,6 +4581,10 @@ queryDictResult(queryObject *self, PyObject *args)
 						encoding, type, NULL, 0);
 				else if (type == PYGRES_BYTEA)
 					val = cast_bytea_text(s);
+				else if (type == PYGRES_OTHER)
+					val = cast_other(s,
+						PQgetlength(self->result, i, j), encoding,
+						PQftype(self->result, j), self->pgcnx->cast_hook);
 				else if (type & PYGRES_TEXT)
 					val = cast_sized_text(s, PQgetlength(self->result, i, j),
 						encoding, type);
@@ -4509,7 +4631,7 @@ queryNamedResult(queryObject *self, PyObject *args)
 		if (args && !PyArg_ParseTuple(args, ""))
 		{
 			PyErr_SetString(PyExc_TypeError,
-				"Method namedresult() takes no parameters");
+				"Method namedresult() takes no arguments");
 			return NULL;
 		}
 
@@ -4730,7 +4852,8 @@ pgEscapeString(PyObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_string() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Method escape_string() expects a string as argument");
 		return NULL;
 	}
 
@@ -4785,7 +4908,8 @@ pgEscapeBytea(PyObject *self, PyObject *args)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "escape_bytea() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Method escape_bytea() expects a string as argument");
 		return NULL;
 	}
 
@@ -4833,7 +4957,8 @@ static PyObject
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "unescape_bytea() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Method unescape_bytea() expects a string as argument");
 		return NULL;
 	}
 
@@ -4872,10 +4997,8 @@ pgGetDecimalPoint(PyObject *self, PyObject * args)
 		}
 	}
 	else
-	{
 		PyErr_SetString(PyExc_TypeError,
-			"get_decimal_point() takes no parameter");
-	}
+			"Function get_decimal_point() takes no arguments");
 
 	return ret;
 }
@@ -4905,17 +5028,16 @@ pgSetDecimalPoint(PyObject *self, PyObject * args)
 		Py_INCREF(Py_None); ret = Py_None;
 	}
 	else
-	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_decimal_point() expects a decimal mark character");
-	}
+			"Function set_decimal_mark() expects"
+			" a decimal mark character as argument");
 
 	return ret;
 }
 
 /* get decimal type */
 static char pgGetDecimal__doc__[] =
-"get_decimal() -- set a decimal type to be used for numeric values";
+"get_decimal() -- get the decimal type to be used for numeric values";
 
 static PyObject *
 pgGetDecimal(PyObject *self, PyObject *args)
@@ -4927,6 +5049,9 @@ pgGetDecimal(PyObject *self, PyObject *args)
 		ret = decimal ? decimal : Py_None;
 		Py_INCREF(ret);
 	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function get_decimal() takes no arguments");
 
 	return ret;
 }
@@ -4955,7 +5080,8 @@ pgSetDecimal(PyObject *self, PyObject *args)
 		}
 		else
 			PyErr_SetString(PyExc_TypeError,
-				"Decimal type must be None or callable");
+				"Function set_decimal() expects"
+				 " a callable or None as argument");
 	}
 
 	return ret;
@@ -4975,6 +5101,9 @@ pgGetBool(PyObject *self, PyObject * args)
 		ret = use_bool ? Py_True : Py_False;
 		Py_INCREF(ret);
 	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function get_bool() takes no arguments");
 
 	return ret;
 }
@@ -4995,13 +5124,16 @@ pgSetBool(PyObject *self, PyObject * args)
 		use_bool = i ? 1 : 0;
 		Py_INCREF(Py_None); ret = Py_None;
 	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_bool() expects a boolean value as argument");
 
 	return ret;
 }
 
 /* get named result factory */
 static char pgGetNamedresult__doc__[] =
-"get_namedresult(cls) -- get the function used for getting named results";
+"get_namedresult() -- get the function used for getting named results";
 
 static PyObject *
 pgGetNamedresult(PyObject *self, PyObject *args)
@@ -5013,13 +5145,16 @@ pgGetNamedresult(PyObject *self, PyObject *args)
 		ret = namedresult ? namedresult : Py_None;
 		Py_INCREF(ret);
 	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function get_namedresult() takes no arguments");
 
 	return ret;
 }
 
 /* set named result factory */
 static char pgSetNamedresult__doc__[] =
-"set_namedresult(cls) -- set a function to be used for getting named results";
+"set_namedresult(func) -- set a function to be used for getting named results";
 
 static PyObject *
 pgSetNamedresult(PyObject *self, PyObject *args)
@@ -5040,7 +5175,9 @@ pgSetNamedresult(PyObject *self, PyObject *args)
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
-			PyErr_SetString(PyExc_TypeError, "Parameter must be callable");
+			PyErr_SetString(PyExc_TypeError,
+				"Function set_namedresult() expectst"
+				 " a callable or None as argument");
 	}
 
 	return ret;
@@ -5048,7 +5185,7 @@ pgSetNamedresult(PyObject *self, PyObject *args)
 
 /* get json decode function */
 static char pgGetJsondecode__doc__[] =
-"get_jsondecode(cls) -- get the function used for decoding json results";
+"get_jsondecode() -- get the function used for decoding json results";
 
 static PyObject *
 pgGetJsondecode(PyObject *self, PyObject *args)
@@ -5057,16 +5194,22 @@ pgGetJsondecode(PyObject *self, PyObject *args)
 
 	if (PyArg_ParseTuple(args, ""))
 	{
-		ret = jsondecode ? jsondecode : Py_None;
+		ret = jsondecode;
+		if (!ret)
+			ret = Py_None;
 		Py_INCREF(ret);
 	}
-
+	else
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"Function get_jsondecode() takes no arguments");
+	}
 	return ret;
 }
 
 /* set json decode function */
 static char pgSetJsondecode__doc__[] =
-"set_jsondecode(cls) -- set a function to be used for decoding json results";
+"set_jsondecode() -- set a function to be used for decoding json results";
 
 static PyObject *
 pgSetJsondecode(PyObject *self, PyObject *args)
@@ -5087,7 +5230,9 @@ pgSetJsondecode(PyObject *self, PyObject *args)
 			Py_INCREF(Py_None); ret = Py_None;
 		}
 		else
-			PyErr_SetString(PyExc_TypeError, "Parameter must be callable");
+			PyErr_SetString(PyExc_TypeError,
+				"Function jsondecode() expects"
+				 " a callable or None as argument");
 	}
 
 	return ret;
@@ -5106,7 +5251,7 @@ pgGetDefHost(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method get_defhost() takes no parameter");
+			"Function get_defhost() takes no arguments");
 		return NULL;
 	}
 
@@ -5128,7 +5273,7 @@ pgSetDefHost(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defhost(name), with name (string/None)");
+			"Function set_defhost() expects a string or None as argument");
 		return NULL;
 	}
 
@@ -5157,7 +5302,7 @@ pgGetDefBase(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method get_defbase() takes no parameter");
+			"Function get_defbase() takes no arguments");
 		return NULL;
 	}
 
@@ -5179,7 +5324,7 @@ pgSetDefBase(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defbase(name), with name (string/None)");
+			"Function set_defbase() Argument a string or None as argument");
 		return NULL;
 	}
 
@@ -5208,7 +5353,7 @@ pgGetDefOpt(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method get_defopt() takes no parameter");
+			"Function get_defopt() takes no arguments");
 		return NULL;
 	}
 
@@ -5230,7 +5375,7 @@ pgSetDefOpt(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defopt(name), with name (string/None)");
+			"Function set_defopt() expects a string or None as argument");
 		return NULL;
 	}
 
@@ -5259,8 +5404,7 @@ pgGetDefUser(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method get_defuser() takes no parameter");
-
+			"Function get_defuser() takes no arguments");
 		return NULL;
 	}
 
@@ -5283,7 +5427,7 @@ pgSetDefUser(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defuser(name), with name (string/None)");
+			"Function set_defuser() expects a string or None as argument");
 		return NULL;
 	}
 
@@ -5314,7 +5458,7 @@ pgSetDefPassword(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "z", &temp))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"set_defpasswd(password), with password (string/None)");
+			"Function set_defpasswd() expects a string or None as argument");
 		return NULL;
 	}
 
@@ -5341,7 +5485,7 @@ pgGetDefPort(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, ""))
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"Method get_defport() takes no parameter");
+			"Function get_defport() takes no arguments");
 		return NULL;
 	}
 
@@ -5362,8 +5506,9 @@ pgSetDefPort(PyObject *self, PyObject *args)
 	/* gets arguments */
 	if ((!PyArg_ParseTuple(args, "l", &port)) || (port < -1))
 	{
-		PyErr_SetString(PyExc_TypeError, "set_defport(port), with port "
-			"(positive integer/-1)");
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_deport expects"
+			 " a positive integer or -1 as argument");
 		return NULL;
 	}
 
@@ -5414,7 +5559,8 @@ pgCastArray(PyObject *self, PyObject *args, PyObject *dict)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "cast_array() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Function cast_array() expects a string as first argument");
 		return NULL;
 	}
 
@@ -5427,7 +5573,8 @@ pgCastArray(PyObject *self, PyObject *args, PyObject *dict)
 	}
 	else if (!PyCallable_Check(cast_obj))
 	{
-		PyErr_SetString(PyExc_TypeError, "The cast argument must be callable");
+		PyErr_SetString(PyExc_TypeError,
+			"Function cast_array() expects a callable as second argument");
 		return NULL;
 	}
 
@@ -5470,7 +5617,8 @@ pgCastRecord(PyObject *self, PyObject *args, PyObject *dict)
 	}
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "cast_record() expects a string");
+		PyErr_SetString(PyExc_TypeError,
+			"Function cast_record() expects a string as first argument");
 		return NULL;
 	}
 
@@ -5493,7 +5641,8 @@ pgCastRecord(PyObject *self, PyObject *args, PyObject *dict)
 	else
 	{
 		PyErr_SetString(PyExc_TypeError,
-			"The cast argument must be callable or a tuple or list of such");
+			"Function cast_record() expects a callable"
+			 " or tuple or list of callables as second argument");
 		return NULL;
 	}
 

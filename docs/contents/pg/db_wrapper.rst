@@ -764,3 +764,28 @@ This method creates a :class:`pg.NotificationHandler` object using the
 :class:`DB` connection as explained under :doc:`notification`.
 
 .. versionadded:: 4.1.1
+
+Attributes of the DB wrapper class
+----------------------------------
+
+.. attribute:: DB.db
+
+    The wrapped :class:`Connection` object
+
+You normally don't need this, since all of the members can be accessed
+from the :class:`DB` wrapper class as well.
+
+.. attribute:: DB.dbname
+
+    The name of the database that the connection is using
+
+
+.. attribute:: DB.dbtypes
+
+    A dictionary with the various type names for the PostgreSQL types
+
+This can be used for getting more information on the PostgreSQL database
+types or changing the typecast functions used for the connection.  See the
+description of the :class:`DbTypes` class for details.
+
+.. versionadded:: 5.0

@@ -66,13 +66,12 @@ the following methods:
         or None to reset all typecast functions
     :type typ: str, list or None
 
-.. method:: TypeCache.typecast(typ, value)
+.. method:: TypeCache.typecast(value, typ)
 
     Cast the given value according to the given database type
 
     :param str typ: PostgreSQL type name or type code
     :returns: the casted value
-
 
 .. note::
 
@@ -81,5 +80,5 @@ the following methods:
     the functions :func:`pgdb.get_typecast`, :func:`pgdb.set_typecast` and
     :func:`pgdb.reset_typecast`.  If you do this, the current database
     connections will continue to use their already cached typecast functions
-    unless you call the :meth:`TypeCache.reset_typecast` method on the
-    :attr:`Connection.type_cache` of the running connections.
+    unless call the :meth:`TypeCache.reset_typecast` method on the
+    :attr:`Connection.type_cache` objects of the running connections.

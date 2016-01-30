@@ -190,11 +190,11 @@ custom notice receiver has ever been set on the connection.
 
 .. versionadded:: 4.1
 
-.. method:: Connection.set_notice_receiver(proc)
+.. method:: Connection.set_notice_receiver(func)
 
     Set a custom notice receiver
 
-    :param proc: the custom notice receiver callback function
+    :param func: the custom notice receiver callback function
     :rtype: None
     :raises TypeError: the specified notice receiver is not callable
 
