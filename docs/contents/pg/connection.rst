@@ -110,6 +110,53 @@ be closed in any case when the connection is deleted but this
 allows you to explicitly close it. It is mainly here to allow
 the DB-SIG API wrapper to implement a close function.
 
+transaction -- get the current transaction state
+------------------------------------------------
+
+.. method:: Connection.transaction()
+
+    Get the current in-transaction status of the server
+
+    :returns: the current in-transaction status
+    :rtype: int
+    :raises TypeError: too many (any) arguments
+    :raises TypeError: invalid connection
+
+The status returned by this method can be :const:`TRANS_IDLE` (currently idle),
+:const:`TRANS_ACTIVE` (a command is in progress), :const:`TRANS_INTRANS` (idle,
+in a valid transaction block), or :const:`TRANS_INERROR` (idle, in a failed
+transaction block).  :const:`TRANS_UNKNOWN` is reported if the connection is
+bad.  The status :const:`TRANS_ACTIVE` is reported only when a query has been
+sent to the server and not yet completed.
+
+parameter -- get a current server parameter setting
+---------------------------------------------------
+
+.. method:: Connection.parameter(name)
+
+    Looks up a current parameter setting of the server
+
+    :param str name: the name of the parameter to look up
+    :returns: the current setting of the specified parameter
+    :rtype: str or None
+    :raises TypeError: too many (any) arguments
+    :raises TypeError: invalid connection
+
+Certain parameter values are reported by the server automatically at
+connection startup or whenever their values change.  This method can be used
+to interrogate these settings.  It returns the current value of a parameter
+if known, or *None* if the parameter is not known.
+
+You can use this method to check the settings of important parameters such as
+`server_version`, `server_encoding`, `client_encoding`, `application_name`,
+`is_superuser`, `session_authorization`, `DateStyle`, `IntervalStyle`,
+`TimeZone`, `integer_datetimes`, and `standard_conforming_strings`.
+
+Values that are not reported by this method can be requested using
+:meth:`DB.get_parameter`.
+
+.. versionadded:: 4.0
+
 fileno -- returns the socket used to connect to the database
 ------------------------------------------------------------
 

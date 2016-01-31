@@ -255,6 +255,38 @@ class TestConnectObject(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertGreaterEqual(r, 0)
 
+    def testMethodTransaction(self):
+        transaction = self.connection.transaction
+        self.assertRaises(TypeError, transaction, None)
+        self.assertEqual(transaction(), pg.TRANS_IDLE)
+        self.connection.query('begin')
+        self.assertEqual(transaction(), pg.TRANS_INTRANS)
+        self.connection.query('rollback')
+        self.assertEqual(transaction(), pg.TRANS_IDLE)
+
+    def testMethodParameter(self):
+        parameter = self.connection.parameter
+        query = self.connection.query
+        self.assertRaises(TypeError, parameter)
+        r = parameter('this server setting does not exist')
+        self.assertIsNone(r)
+        s = query('show server_version').getresult()[0][0].upper()
+        self.assertIsNotNone(s)
+        r = parameter('server_version')
+        self.assertEqual(r, s)
+        s = query('show server_encoding').getresult()[0][0].upper()
+        self.assertIsNotNone(s)
+        r = parameter('server_encoding')
+        self.assertEqual(r, s)
+        s = query('show client_encoding').getresult()[0][0].upper()
+        self.assertIsNotNone(s)
+        r = parameter('client_encoding')
+        self.assertEqual(r, s)
+        s = query('show server_encoding').getresult()[0][0].upper()
+        self.assertIsNotNone(s)
+        r = parameter('server_encoding')
+        self.assertEqual(r, s)
+
 
 class TestSimpleQueries(unittest.TestCase):
     """Test simple queries via a basic pg connection."""

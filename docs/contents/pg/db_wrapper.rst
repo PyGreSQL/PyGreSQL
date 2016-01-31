@@ -172,8 +172,12 @@ names to their settings.  Finally, if you pass a dict as parameter,
 its values will be set to the current parameter settings corresponding
 to its keys.
 
-By passing the special name `'all'` as the parameter, you can get a dict
+By passing the special name ``'all'`` as the parameter, you can get a dict
 of all existing configuration parameters.
+
+Note that you can request most of the important parameters also using
+:meth:`Connection.parameter()` which does not involve a database query
+like it is the case for :meth:`DB.get_parameter` and :meth:`DB.set_parameter`.
 
 .. versionadded:: 4.2
 
@@ -201,7 +205,7 @@ Finally, you can pass a dict with parameter names as keys.  In this
 case, you should not pass a value, since the values for the parameters
 will be taken from the dict.
 
-By passing the special name `'all'` as the parameter, you can reset
+By passing the special name ``'all'`` as the parameter, you can reset
 all existing settable run-time parameters to their default values.
 
 If you set *local* to `True`, then the command takes effect for only the

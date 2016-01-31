@@ -526,15 +526,27 @@ They are intended to be used as parameters for methods calls.
 You should refer to the libpq description in the PostgreSQL user manual
 for more information about them. These constants are:
 
-.. data:: version, __version__
+.. data:: version
+.. data:: __version__
 
     constants that give the current version
 
-.. data:: INV_READ, INV_WRITE
+.. data:: INV_READ
+.. data:: INV_WRITE
 
     large objects access modes,
     used by :meth:`Connection.locreate` and :meth:`LargeObject.open`
 
-.. data:: SEEK_SET, SEEK_CUR, SEEK_END:
+.. data:: SEEK_SET
+.. data:: SEEK_CUR
+.. data:: SEEK_END
 
     positional flags, used by :meth:`LargeObject.seek`
+
+.. data:: TRANS_IDLE
+.. data:: TRANS_ACTIVE
+.. data:: TRANS_INTRANS
+.. data:: TRANS_INERROR
+.. data:: TRANS_UNKNOWN
+
+    transaction states, used by :meth:`Connection.transaction`
