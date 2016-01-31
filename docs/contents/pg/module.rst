@@ -308,6 +308,30 @@ return unescaped byte strings, you normally don't have to use this method.
 Note that there is also a :class:`DB` method with the same name
 which does exactly the same.
 
+get/set_namedresult -- conversion to named tuples
+-------------------------------------------------
+
+.. function:: get_namedresult()
+
+    Get the function that converts to named tuples
+
+This returns the function used by PyGreSQL to construct the result of the
+:meth:`Query.namedresult` method.
+
+.. versionadded:: 4.1
+
+.. function:: set_namedresult(func)
+
+    Set a function that will convert to named tuples
+
+    :param func: the function to be used to convert results to named tuples
+
+You can use this if you want to create different kinds of named tuples
+returned by the :meth:`Query.namedresult` method.  If you set this function
+to *None*, then it will become equal to :meth:`Query.getresult`.
+
+.. versionadded:: 4.1
+
 get/set_decimal -- decimal type to be used for numeric values
 -------------------------------------------------------------
 
@@ -346,8 +370,8 @@ get/set_decimal_point -- decimal mark used for monetary values
 This function returns the decimal mark used by PyGreSQL to interpret
 PostgreSQL monetary values when converting them to decimal numbers.
 The default setting is ``'.'`` as a decimal point. This setting is not
-adapted automatically to the locale used by PostGreSQL, but you can
-use ``set_decimal()`` to set a different decimal mark manually. A return
+adapted automatically to the locale used by PostGreSQL, but you can use
+:func:`set_decimal()` to set a different decimal mark manually.  A return
 value of ``None`` means monetary values are not interpreted as decimal
 numbers, but returned as strings including the formatting and currency.
 
@@ -386,7 +410,7 @@ This function checks whether PyGreSQL returns PostgreSQL boolean
 values converted to Python bool objects, or as ``'f'`` and ``'t'``
 strings which are the values used internally by PostgreSQL. By default,
 conversion to bool objects is not activated, but you can enable
-this with the ``set_bool()`` method.
+this with the :func:`set_bool` function.
 
 .. versionadded:: 4.2
 
@@ -404,8 +428,8 @@ enable this by calling ``set_bool(True)``.
 
 .. versionadded:: 4.2
 
-get/set_bytea_escaped -- whether bytea values are returned escaped
-------------------------------------------------------------------
+get/set_bytea_escaped -- whether bytea data is returned escaped
+---------------------------------------------------------------
 
 .. function:: get_bytea_escaped()
 
@@ -417,7 +441,7 @@ get/set_bytea_escaped -- whether bytea values are returned escaped
 This function checks whether PyGreSQL returns PostgreSQL ``bytea`` values in
 escaped form or in unescaped from as byte strings.  By default, bytea values
 will be returned unescaped as byte strings, but you can change this with the
-``set_bytea_escaped()`` method.
+:func:`set_bytea_escaped` function.
 
 .. versionadded:: 5.0
 
@@ -435,31 +459,7 @@ strings, but you can change this by calling ``set_bytea_escaped(True)``.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-   Bytea values had been returned in escaped form in earlier versions.
-
-get/set_namedresult -- conversion to named tuples
--------------------------------------------------
-
-.. function:: get_namedresult()
-
-    Get the function that converts to named tuples
-
-This returns the function used by PyGreSQL to construct the result of the
-:meth:`Query.namedresult` method.
-
-.. versionadded:: 4.1
-
-.. function:: set_namedresult(func)
-
-    Set a function that will convert to named tuples
-
-    :param func: the function to be used to convert results to named tuples
-
-You can use this if you want to create different kinds of named tuples
-returned by the :meth:`Query.namedresult` method.  If you set this function
-to *None*, then it will become equal to :meth:`Query.getresult`.
-
-.. versionadded:: 4.1
+   Bytea data had been returned in escaped form in earlier versions.
 
 get/set_jsondecode -- decoding JSON format
 ------------------------------------------
@@ -479,9 +479,35 @@ from JSON formatted strings.
 
 You can use this if you do not want to deserialize JSON strings coming
 in from the database, or if want to use a different function than the
-standard function :meth:`json.loads` or if you want to use it with parameters
+standard function :func:`json.loads` or if you want to use it with parameters
 different from the default ones.  If you set this function to *None*, then
 the automatic deserialization of JSON strings will be deactivated.
+
+.. versionadded:: 5.0
+
+.. versionchanged:: 5.0
+   JSON data had been returned in as text strings in earlier versions.
+
+get/set_cast_hook -- fallback typecast function
+-----------------------------------------------
+
+.. function:: get_cast_hook()
+
+    Get the function that handles all external typecasting
+
+This returns the callback function used by PyGreSQL to provide plug-in
+Python typecast functions.
+
+.. function:: set_cast_hook(func)
+
+    Set a function that will handle all external typecasting
+
+    :param func: the function to be used as a callback
+
+If you set this function to *None*, then only the typecast functions
+implemented in the C extension module are enabled.  You normally would
+not want to change this.  Instead, you can use :func:`get_typecast` and
+:func:`set_typecast` to add or change the plug-in Python typecast functions.
 
 .. versionadded:: 5.0
 
