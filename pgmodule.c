@@ -96,7 +96,8 @@ static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL, /* function for getting named results */
 				*jsondecode = NULL; /* function for decoding json strings */
 static char decimal_point = '.'; /* decimal point used in money values */
-static int use_bool = 0; /* whether or not bool objects shall be returned */
+static int bool_as_text = 1; /* whether bool shall be returned as text */
+static int array_as_text = 0; /* whether arrays shall be returned as text */
 static int bytea_escaped = 0; /* whether bytea shall be returned escaped */
 
 static int pg_encoding_utf8 = 0;
@@ -314,38 +315,40 @@ get_type(Oid pgtype)
 		case CIDARRAYOID:
 		case OIDARRAYOID:
 		case XIDARRAYOID:
-			t = PYGRES_INT | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : (PYGRES_INT | PYGRES_ARRAY);
 			break;
 
 		case INT8ARRAYOID:
-			t = PYGRES_LONG | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : (PYGRES_LONG | PYGRES_ARRAY);
 			break;
 
 		case FLOAT4ARRAYOID:
 		case FLOAT8ARRAYOID:
-			t = PYGRES_FLOAT | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : (PYGRES_FLOAT | PYGRES_ARRAY);
 			break;
 
 		case NUMERICARRAYOID:
-			t = PYGRES_DECIMAL | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : (PYGRES_DECIMAL | PYGRES_ARRAY);
 			break;
 
 		case CASHARRAYOID:
-			t = (decimal_point ?
-				PYGRES_MONEY : PYGRES_TEXT) | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : ((decimal_point ?
+				PYGRES_MONEY : PYGRES_TEXT) | PYGRES_ARRAY);
 			break;
 
 		case BOOLARRAYOID:
-			t = PYGRES_BOOL | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : (PYGRES_BOOL | PYGRES_ARRAY);
 			break;
 
 		case BYTEAARRAYOID:
-			t = (bytea_escaped ? PYGRES_TEXT : PYGRES_BYTEA) | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : ((bytea_escaped ?
+			    PYGRES_TEXT : PYGRES_BYTEA) | PYGRES_ARRAY);
 			break;
 
 		case JSONARRAYOID:
 		case JSONBARRAYOID:
-			t = (jsondecode ? PYGRES_JSON : PYGRES_TEXT) | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : ((jsondecode ?
+			    PYGRES_JSON : PYGRES_TEXT) | PYGRES_ARRAY);
 			break;
 
 		case BPCHARARRAYOID:
@@ -360,7 +363,7 @@ get_type(Oid pgtype)
 		case TIMESTAMPARRAYOID:
 		case TIMESTAMPTZARRAYOID:
 		case REGTYPEARRAYOID:
-			t = PYGRES_TEXT | PYGRES_ARRAY;
+			t = array_as_text ? PYGRES_TEXT : (PYGRES_TEXT | PYGRES_ARRAY);
 			break;
 
 		default:
@@ -537,15 +540,15 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 			break;
 
 		case PYGRES_BOOL:
-			/* convert to bool only if use_bool is set */
-			if (use_bool)
+			/* convert to bool only if bool_as_text is not set */
+			if (bool_as_text)
 			{
-				obj = *s == 't' ? Py_True : Py_False;
-				Py_INCREF(obj);
+				obj = PyStr_FromString(*s == 't' ? "t" : "f");
 			}
 			else
 			{
-				obj = PyStr_FromString(*s == 't' ? "t" : "f");
+				obj = *s == 't' ? Py_True : Py_False;
+				Py_INCREF(obj);
 			}
 			break;
 
@@ -611,15 +614,15 @@ cast_unsized_simple(char *s, int type)
 			break;
 
 		case PYGRES_BOOL:
-			/* convert to bool only if use_bool is set */
-			if (use_bool)
+			/* convert to bool only if bool_as_text is not set */
+			if (bool_as_text)
 			{
-				obj = *s == 't' ? Py_True : Py_False;
-				Py_INCREF(obj);
+				obj = PyStr_FromString(*s == 't' ? "t" : "f");
 			}
 			else
 			{
-				obj = PyStr_FromString(*s == 't' ? "t" : "f");
+				obj = *s == 't' ? Py_True : Py_False;
+				Py_INCREF(obj);
 			}
 			break;
 
@@ -5101,7 +5104,7 @@ pgGetBool(PyObject *self, PyObject * args)
 
 	if (PyArg_ParseTuple(args, ""))
 	{
-		ret = use_bool ? Py_True : Py_False;
+		ret = bool_as_text ? Py_False : Py_True;
 		Py_INCREF(ret);
 	}
 	else
@@ -5124,12 +5127,56 @@ pgSetBool(PyObject *self, PyObject * args)
 	/* gets arguments */
 	if (PyArg_ParseTuple(args, "i", &i))
 	{
-		use_bool = i ? 1 : 0;
+		bool_as_text = i ? 0 : 1;
 		Py_INCREF(Py_None); ret = Py_None;
 	}
 	else
 		PyErr_SetString(PyExc_TypeError,
 			"Function set_bool() expects a boolean value as argument");
+
+	return ret;
+}
+
+/* get conversion of arrays to lists */
+static char pgGetArray__doc__[] =
+"get_array() -- check whether arrays are converted as lists";
+
+static PyObject *
+pgGetArray(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = array_as_text ? Py_False : Py_True;
+		Py_INCREF(ret);
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function get_array() takes no arguments");
+
+	return ret;
+}
+
+/* set conversion of arrays to lists */
+static char pgSetArray__doc__[] =
+"set_array(on) -- set whether arrays should be converted to lists";
+
+static PyObject *
+pgSetArray(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	int			i;
+
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "i", &i))
+	{
+		array_as_text = i ? 0 : 1;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_array() expects a boolean value as argument");
 
 	return ret;
 }
@@ -5722,6 +5769,8 @@ static struct PyMethodDef pgMethods[] = {
 			pgSetDecimal__doc__},
 	{"get_bool", (PyCFunction) pgGetBool, METH_VARARGS, pgGetBool__doc__},
 	{"set_bool", (PyCFunction) pgSetBool, METH_VARARGS, pgSetBool__doc__},
+	{"get_array", (PyCFunction) pgGetArray, METH_VARARGS, pgGetArray__doc__},
+	{"set_array", (PyCFunction) pgSetArray, METH_VARARGS, pgSetArray__doc__},
 	{"get_bytea_escaped", (PyCFunction) pgGetByteaEscaped, METH_VARARGS,
 		pgGetByteaEscaped__doc__},
 	{"set_bytea_escaped", (PyCFunction) pgSetByteaEscaped, METH_VARARGS,

@@ -51,7 +51,8 @@ Version 5.0
     - Conversely, when the query method returns a PostgreSQL array, it is passed
       to Python as a list. PostgreSQL records are converted to named tuples as
       well, but only if you use one of the get/insert/update/delete() methods.
-      PyGreSQL uses a new fast built-in parser to achieve this.
+      PyGreSQL uses a new fast built-in parser to achieve this.  The automatic
+      conversion of arrays to lists can be disabled with set_array(False).
     - The pkey() method of the classic interface now returns tuples instead
       of frozenset. The order of the tuples is like in the primary key index.
     - Like the DB-API 2 module, the classic module now also returns bytea

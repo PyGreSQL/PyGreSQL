@@ -3077,6 +3077,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r['stock'], dict)
 
     def testArray(self):
+        returns_arrays = pg.get_array()
         self.createTable('arraytest',
             'id smallint, i2 smallint[], i4 integer[], i8 bigint[],'
             ' d numeric[], f4 real[], f8 double precision[], m money[],'
@@ -3118,33 +3119,56 @@ class TestDBClass(unittest.TestCase):
             t=['abc', 'Hello, World!', '"Hello, World!"', '', None])
         r = data.copy()
         self.db.insert('arraytest', r)
-        self.assertEqual(r, data)
+        if returns_arrays:
+            self.assertEqual(r, data)
+        else:
+            self.assertEqual(r['i4'], '{42,123456789,NULL,0,1,-1}')
         self.db.insert('arraytest', r)
         r = self.db.get('arraytest', 42, 'id')
-        self.assertEqual(r, data)
+        if returns_arrays:
+            self.assertEqual(r, data)
+        else:
+            self.assertEqual(r['i4'], '{42,123456789,NULL,0,1,-1}')
         r = self.db.query('select * from arraytest limit 1').dictresult()[0]
-        self.assertEqual(r, data)
+        if returns_arrays:
+            self.assertEqual(r, data)
+        else:
+            self.assertEqual(r['i4'], '{42,123456789,NULL,0,1,-1}')
 
     def testArrayLiteral(self):
         insert = self.db.insert
+        returns_arrays = pg.get_array()
         self.createTable('arraytest', 'i int[], t text[]', oids=True)
         r = dict(i=[1, 2, 3], t=['a', 'b', 'c'])
         insert('arraytest', r)
-        self.assertEqual(r['i'], [1, 2, 3])
-        self.assertEqual(r['t'], ['a', 'b', 'c'])
+        if returns_arrays:
+            self.assertEqual(r['i'], [1, 2, 3])
+            self.assertEqual(r['t'], ['a', 'b', 'c'])
+        else:
+            self.assertEqual(r['i'], '{1,2,3}')
+            self.assertEqual(r['t'], '{a,b,c}')
         r = dict(i='{1,2,3}', t='{a,b,c}')
         self.db.insert('arraytest', r)
-        self.assertEqual(r['i'], [1, 2, 3])
-        self.assertEqual(r['t'], ['a', 'b', 'c'])
+        if returns_arrays:
+            self.assertEqual(r['i'], [1, 2, 3])
+            self.assertEqual(r['t'], ['a', 'b', 'c'])
+        else:
+            self.assertEqual(r['i'], '{1,2,3}')
+            self.assertEqual(r['t'], '{a,b,c}')
         L = pg.Literal
         r = dict(i=L("ARRAY[1, 2, 3]"), t=L("ARRAY['a', 'b', 'c']"))
         self.db.insert('arraytest', r)
-        self.assertEqual(r['i'], [1, 2, 3])
-        self.assertEqual(r['t'], ['a', 'b', 'c'])
+        if returns_arrays:
+            self.assertEqual(r['i'], [1, 2, 3])
+            self.assertEqual(r['t'], ['a', 'b', 'c'])
+        else:
+            self.assertEqual(r['i'], '{1,2,3}')
+            self.assertEqual(r['t'], '{a,b,c}')
         r = dict(i="1, 2, 3", t="'a', 'b', 'c'")
         self.assertRaises(pg.ProgrammingError, self.db.insert, 'arraytest', r)
 
     def testArrayOfIds(self):
+        array_on = pg.get_array()
         self.createTable('arraytest', 'c cid[], o oid[], x xid[]', oids=True)
         r = self.db.get_attnames('arraytest')
         if self.regtypes:
@@ -3158,13 +3182,20 @@ class TestDBClass(unittest.TestCase):
         self.db.insert('arraytest', r)
         qoid = 'oid(arraytest)'
         oid = r.pop(qoid)
-        self.assertEqual(r, data)
+        if array_on:
+            self.assertEqual(r, data)
+        else:
+            self.assertEqual(r['o'], '{21,22,23}')
         r = {qoid: oid}
         self.db.get('arraytest', r)
         self.assertEqual(oid, r.pop(qoid))
-        self.assertEqual(r, data)
+        if array_on:
+            self.assertEqual(r, data)
+        else:
+            self.assertEqual(r['o'], '{21,22,23}')
 
     def testArrayOfText(self):
+        array_on = pg.get_array()
         self.createTable('arraytest', 'data text[]', oids=True)
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'text[]')
@@ -3173,17 +3204,22 @@ class TestDBClass(unittest.TestCase):
                 "It's all \\ kinds of\r nasty stuff!\n"]
         r = dict(data=data)
         self.db.insert('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'])
         self.assertEqual(r['data'], data)
         self.assertIsInstance(r['data'][1], str)
         self.assertIsNone(r['data'][2])
         r['data'] = None
         self.db.get('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'])
         self.assertEqual(r['data'], data)
         self.assertIsInstance(r['data'][1], str)
         self.assertIsNone(r['data'][2])
 
     def testArrayOfBytea(self):
-        unescape = pg.unescape_bytea if pg.get_bytea_escaped() else None
+        array_on = pg.get_array()
+        bytea_escaped = pg.get_bytea_escaped()
         self.createTable('arraytest', 'data bytea[]', oids=True)
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'bytea[]')
@@ -3191,20 +3227,24 @@ class TestDBClass(unittest.TestCase):
                 b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"]
         r = dict(data=data)
         self.db.insert('arraytest', r)
-        if unescape:
+        if array_on:
+            self.assertIsInstance(r['data'], list)
+        if array_on and not bytea_escaped:
+            self.assertEqual(r['data'], data)
+            self.assertIsInstance(r['data'][1], bytes)
+            self.assertIsNone(r['data'][2])
+        else:
             self.assertNotEqual(r['data'], data)
-            r['data'] = [unescape(v) if v else v for v in r['data']]
-        self.assertEqual(r['data'], data)
-        self.assertIsInstance(r['data'][1], bytes)
-        self.assertIsNone(r['data'][2])
         r['data'] = None
         self.db.get('arraytest', r)
-        if unescape:
+        if array_on:
+            self.assertIsInstance(r['data'], list)
+        if array_on and not bytea_escaped:
+            self.assertEqual(r['data'], data)
+            self.assertIsInstance(r['data'][1], bytes)
+            self.assertIsNone(r['data'][2])
+        else:
             self.assertNotEqual(r['data'], data)
-            r['data'] = [unescape(v) if v else v for v in r['data']]
-        self.assertEqual(r['data'], data)
-        self.assertIsInstance(r['data'][1], bytes)
-        self.assertIsNone(r['data'][2])
 
     def testArrayOfJson(self):
         try:
@@ -3216,19 +3256,26 @@ class TestDBClass(unittest.TestCase):
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'json[]')
         data = [dict(id=815, name='John Doe'), dict(id=816, name='Jane Roe')]
+        array_on = pg.get_array()
         jsondecode = pg.get_jsondecode()
         r = dict(data=data)
         self.db.insert('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'], jsondecode)
         if jsondecode is None:
             r['data'] = [json.loads(d) for d in r['data']]
         self.assertEqual(r['data'], data)
         r['data'] = None
         self.db.get('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'], jsondecode)
         if jsondecode is None:
             r['data'] = [json.loads(d) for d in r['data']]
         self.assertEqual(r['data'], data)
         r = dict(data=[json.dumps(d) for d in data])
         self.db.insert('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'], jsondecode)
         if jsondecode is None:
             r['data'] = [json.loads(d) for d in r['data']]
         self.assertEqual(r['data'], data)
@@ -3238,10 +3285,13 @@ class TestDBClass(unittest.TestCase):
         r = dict(data=['', None])
         self.db.insert('arraytest', r)
         r = r['data']
-        self.assertIsInstance(r, list)
-        self.assertEqual(len(r), 2)
-        self.assertIsNone(r[0])
-        self.assertIsNone(r[1])
+        if array_on:
+            self.assertIsInstance(r, list)
+            self.assertEqual(len(r), 2)
+            self.assertIsNone(r[0])
+            self.assertIsNone(r[1])
+        else:
+            self.assertEqual(r, '{NULL,NULL}')
 
     def testArrayOfJsonb(self):
         try:
@@ -3253,19 +3303,26 @@ class TestDBClass(unittest.TestCase):
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'jsonb[]' if self.regtypes else 'json[]')
         data = [dict(id=815, name='John Doe'), dict(id=816, name='Jane Roe')]
+        array_on = pg.get_array()
         jsondecode = pg.get_jsondecode()
         r = dict(data=data)
         self.db.insert('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'], jsondecode)
         if jsondecode is None:
             r['data'] = [json.loads(d) for d in r['data']]
         self.assertEqual(r['data'], data)
         r['data'] = None
         self.db.get('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'], jsondecode)
         if jsondecode is None:
             r['data'] = [json.loads(d) for d in r['data']]
         self.assertEqual(r['data'], data)
         r = dict(data=[json.dumps(d) for d in data])
         self.db.insert('arraytest', r)
+        if not array_on:
+            r['data'] = pg.cast_array(r['data'], jsondecode)
         if jsondecode is None:
             r['data'] = [json.loads(d) for d in r['data']]
         self.assertEqual(r['data'], data)
@@ -3275,22 +3332,32 @@ class TestDBClass(unittest.TestCase):
         r = dict(data=['', None])
         self.db.insert('arraytest', r)
         r = r['data']
-        self.assertIsInstance(r, list)
-        self.assertEqual(len(r), 2)
-        self.assertIsNone(r[0])
-        self.assertIsNone(r[1])
+        if array_on:
+            self.assertIsInstance(r, list)
+            self.assertEqual(len(r), 2)
+            self.assertIsNone(r[0])
+            self.assertIsNone(r[1])
+        else:
+            self.assertEqual(r, '{NULL,NULL}')
 
     def testDeepArray(self):
+        array_on = pg.get_array()
         self.createTable('arraytest', 'data text[][][]', oids=True)
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'text[]')
         data = [[['Hello, World!', '{a,b,c}', 'back\\slash']]]
         r = dict(data=data)
         self.db.insert('arraytest', r)
-        self.assertEqual(r['data'], data)
+        if array_on:
+            self.assertEqual(r['data'], data)
+        else:
+            self.assertTrue(r['data'].startswith('{{{"Hello,'))
         r['data'] = None
         self.db.get('arraytest', r)
-        self.assertEqual(r['data'], data)
+        if array_on:
+            self.assertEqual(r['data'], data)
+        else:
+            self.assertTrue(r['data'].startswith('{{{"Hello,'))
 
     def testInsertUpdateGetRecord(self):
         query = self.db.query
@@ -3635,6 +3702,8 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.set_option('decimal', float)
         not_bool = not pg.get_bool()
         cls.set_option('bool', not_bool)
+        not_array = not pg.get_array()
+        cls.set_option('array', not_array)
         not_bytea_escaped = not pg.get_bytea_escaped()
         cls.set_option('bytea_escaped', not_bytea_escaped)
         cls.set_option('namedresult', None)
@@ -3648,6 +3717,7 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.reset_option('jsondecode')
         cls.reset_option('namedresult')
         cls.reset_option('bool')
+        cls.reset_option('array')
         cls.reset_option('bytea_escaped')
         cls.reset_option('decimal')
 

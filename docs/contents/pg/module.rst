@@ -428,6 +428,39 @@ enable this by calling ``set_bool(True)``.
 
 .. versionadded:: 4.2
 
+get/set_array -- whether arrays are returned as list objects
+-------------------------------------------------------------
+
+.. function:: get_array()
+
+    Check whether arrays are returned as list objects
+
+    :returns: whether or not list objects will be returned
+    :rtype: bool
+
+This function checks whether PyGreSQL returns PostgreSQL arrays converted
+to Python list objects, or simply as text in the internal special output
+syntax of PostgreSQL.  By default, conversion to list objects is activated,
+but you can disable this with the :func:`set_array` function.
+
+.. versionadded:: 5.0
+
+.. function:: set_array(on)
+
+    Set whether arrays are returned as list objects
+
+    :param on: whether or not list objects shall be returned
+
+This function can be used to specify whether PyGreSQL shall return PostgreSQL
+arrays converted to Python list objects, or simply as text in the internal
+special output syntax of PostgreSQL.  By default, conversion to list objects
+is activated, but you can disable this by calling ``set_array(False)``.
+
+.. versionadded:: 5.0
+
+.. versionchanged:: 5.0
+   Arrays had been returned as text strings only in earlier versions.
+
 get/set_bytea_escaped -- whether bytea data is returned escaped
 ---------------------------------------------------------------
 
