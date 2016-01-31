@@ -499,9 +499,28 @@ in the C extension module.  The typecast functions that can be set with
 the above methods are only called for the types that are not already
 supported by the C extension module.
 
+Type helpers
+------------
+
+The module provides the following type helper functions.  You can wrap
+parameters with these functions when passing them to :meth:`DB.query_formatted`
+in order to give PyGreSQL a hint about the type of the parameters.
+
+.. function:: Bytea(bytes)
+
+    A wrapper for holding a bytea value
+
+.. function:: Json(obj)
+
+    A wrapper for holding an object serializable to JSON
+
+.. function:: Literal(sql)
+
+    A wrapper for holding a literal SQL string
 
 Module constants
 ----------------
+
 Some constants are defined in the module dictionary.
 They are intended to be used as parameters for methods calls.
 You should refer to the libpq description in the PostgreSQL user manual

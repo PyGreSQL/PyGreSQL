@@ -208,9 +208,9 @@ As you noticed, PyGreSQL automatically converted the PostgreSQL data to
 suitable Python objects when returning values via one of the "fetch" methods
 of a cursor.  This is done by the use of built-in typecast functions.
 
-If you want to use different typecast functions or add your own  if no
+If you want to use different typecast functions or add your own if no
 built-in typecast function is available, then this is possible using
-the :func:`set_typecast` function.  With the :func:`get_typecast` method
+the :func:`set_typecast` function.  With the :func:`get_typecast` function
 you can check which function is currently set, and :func:`reset_typecast`
 allows you to reset the typecast function to its default.  If no typecast
 function is set, then PyGreSQL will return the raw strings from the database.
@@ -229,7 +229,7 @@ You can change this to return float values instead::
     >>> cur.execute('select 42::int4').fetchone()[0]
     42.0
 
-Note that the connections cache typecast functions, so you may need to
+Note that the connections cache the typecast functions, so you may need to
 reopen the database connection, or reset the cache of the connection to
 make this effective, using the following command::
 
@@ -261,9 +261,9 @@ accomplished as follows::
     >>> cur.execute("SELECT data FROM json_data").fetchone()[0]
     [1.0, 2.0, 3.0]
 
-Note again that you may need to ``type_cache.reset_typecast()`` to make
-this effective.  Also note that the two types ``json`` and ``jsonb`` have
-their own typecast functions, so if you use ``jsonb`` instead of ``json``,
-you need to use this type name when setting the typecast function::
+Note again that you may need to run ``con.type_cache.reset_typecast()`` to
+make this effective.  Also note that the two types ``json`` and ``jsonb`` have
+their own typecast functions, so if you use ``jsonb`` instead of ``json``, you
+need to use this type name when setting the typecast function::
 
     >>> pgdb.set_typecast('jsonb', cast_json)

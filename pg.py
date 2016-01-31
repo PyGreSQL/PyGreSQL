@@ -34,9 +34,10 @@ from _pg import *
 import select
 import warnings
 
+from datetime import date, time, datetime, timedelta
 from decimal import Decimal
+from math import isnan, isinf
 from collections import namedtuple
-from functools import partial
 from operator import itemgetter
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
@@ -144,7 +145,7 @@ def _oid_key(table):
     return 'oid(%s)' % table
 
 
-class _SimpleType(dict):
+class _SimpleTypes(dict):
     """Dictionary mapping pg_type names to simple type names."""
 
     _types = {'bool': 'bool',
@@ -168,18 +169,55 @@ class _SimpleType(dict):
     def __missing__(key):
         return 'text'
 
-_simpletype = _SimpleType()
+_simpletypes = _SimpleTypes()
 
 
-class _Adapt:
-    """Mixin providing methods for adapting records and record elements.
+def _quote_if_unqualified(param, name):
+    """Quote parameter representing a qualified name.
 
-    This is used when passing values from one of the higher level DB
-    methods as parameters for a query.
-
-    This class must be mixed in to a connection class, because it needs
-    connection specific methods such as escape_bytea().
+    Puts a quote_ident() call around the give parameter unless
+    the name contains a dot, in which case the name is ambiguous
+    (could be a qualified name or just a name with a dot in it)
+    and must be quoted manually by the caller.
     """
+    if isinstance(name, basestring) and '.' not in name:
+        return 'quote_ident(%s)' % (param,)
+    return param
+
+
+class _ParameterList(list):
+    """Helper class for building typed parameter lists."""
+
+    def add(self, value, typ=None):
+        """Typecast value with known database type and build parameter list.
+
+        If this is a literal value, it will be returned as is.  Otherwise, a
+        placeholder will be returned and the parameter list will be augmented.
+        """
+        value = self.adapt(value, typ)
+        if isinstance(value, Literal):
+            return value
+        self.append(value)
+        return '$%d' % len(self)
+
+
+class Literal(str):
+    """Wrapper class for marking literal SQL values."""
+
+
+class Json:
+    """Wrapper class for marking Json values."""
+
+    def __init__(self, obj):
+        self.obj = obj
+
+
+class Bytea(bytes):
+    """Wrapper class for marking Bytea values."""
+
+
+class Adapter:
+    """Class providing methods for adapting parameters to the database."""
 
     _bool_true_values = frozenset('t true 1 y yes on'.split())
 
@@ -189,6 +227,13 @@ class _Adapt:
     _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
     _re_record_quote = regex(r'[(,"\\]')
     _re_array_escape = _re_record_escape = regex(r'(["\\])')
+
+    def __init__(self, db):
+        self.db = db
+        self.encode_json = db.encode_json
+        db = db.db
+        self.escape_bytea = db.escape_bytea
+        self.escape_string = db.escape_string
 
     @classmethod
     def _adapt_bool(cls, v):
@@ -205,7 +250,7 @@ class _Adapt:
         if not v:
             return None
         if isinstance(v, basestring) and v.lower() in cls._date_literals:
-            return _Literal(v)
+            return Literal(v)
         return v
 
     @staticmethod
@@ -297,71 +342,39 @@ class _Adapt:
 
     def _adapt_record(self, v, typ):
         """Adapt a record parameter with given type."""
-        typ = typ.attnames.values()
+        typ = self.get_attnames(typ).values()
         if len(typ) != len(v):
             raise TypeError('Record parameter %s has wrong size' % v)
-        return '(%s)' % ','.join(getattr(self,
-            '_adapt_record_%s' % t.simple)(v) for v, t in zip(v, typ))
+        adapt = self.adapt
+        value = []
+        for v, t in zip(v, typ):
+            v = adapt(v, t)
+            if v is None:
+                v = ''
+            elif not v:
+                v = '""'
+            else:
+                if isinstance(v, bytes):
+                    if str is not bytes:
+                        v = v.decode('ascii')
+                else:
+                    v = str(v)
+                if self._re_record_quote.search(v):
+                    v = '"%s"' % self._re_record_escape.sub(r'\\\1', v)
+            value.append(v)
+        return '(%s)' % ','.join(value)
 
-    @classmethod
-    def _adapt_record_text(cls, v):
-        """Adapt a text type record component."""
-        if v is None:
-            return ''
-        if not v:
-            return '""'
-        v = str(v)
-        if cls._re_record_quote.search(v):
-            v = '"%s"' % cls._re_record_escape.sub(r'\\\1', v)
-        return v
-
-    _adapt_record_date = _adapt_record_text
-
-    @classmethod
-    def _adapt_record_bool(cls, v):
-        """Adapt a boolean record component."""
-        if v is None:
-            return ''
-        if isinstance(v, basestring):
-            if not v:
-                return ''
-            v = v.lower() in cls._bool_true_values
-        return 't' if v else 'f'
-
-    @staticmethod
-    def _adapt_record_num(v):
-        """Adapt a numeric record component."""
-        if not v and v != 0:
-            return ''
-        return str(v)
-
-    _adapt_record_int = _adapt_record_float = _adapt_record_money = \
-        _adapt_record_num
-
-    def _adapt_record_bytea(self, v):
-        if v is None:
-            return ''
-        v = self.escape_bytea(v)
-        if bytes is not str and isinstance(v, bytes):
-            v = v.decode('ascii')
-        return v.replace('\\', '\\\\')
-
-    def _adapt_record_json(self, v):
-        """Adapt a bytea record component."""
-        if not v:
-            return ''
-        if not isinstance(v, basestring):
-            v = self.encode_json(v)
-        if self._re_array_quote.search(v):
-            v = '"%s"' % self._re_array_escape.sub(r'\\\1', v)
-        return v
-
-    def _adapt_param(self, value, typ, params):
-        """Adapt and add a parameter to the list."""
-        if isinstance(value, _Literal):
-            return value
-        if value is not None:
-            simple = typ.simple
+    def adapt(self, value, typ=None):
+        """Adapt a value with known database type."""
+        if value is not None and not isinstance(value, Literal):
+            if typ:
+                simple = self.get_simple_name(typ)
+            else:
+                typ = simple = self.guess_simple_type(value) or 'text'
+            try:
+                value = value.__pg_str__(typ)
+            except AttributeError:
+                pass
             if simple == 'text':
                 pass
             elif simple == 'record':
@@ -374,10 +387,167 @@ class _Adapt:
             else:
                 adapt = getattr(self, '_adapt_%s' % simple)
                 value = adapt(value)
-                if isinstance(value, _Literal):
-                    return value
-        params.append(value)
-        return '$%d' % len(params)
+        return value
+
+    @staticmethod
+    def simple_type(name):
+        """Create a simple database type with given attribute names."""
+        typ = DbType(name)
+        typ.simple = name
+        return typ
+
+    @staticmethod
+    def get_simple_name(typ):
+        """Get the simple name of a database type."""
+        if isinstance(typ, DbType):
+            return typ.simple
+        return _simpletypes[typ]
+
+    @staticmethod
+    def get_attnames(typ):
+        """Get the attribute names of a composite database type."""
+        if isinstance(typ, DbType):
+            return typ.attnames
+        return {}
+
+    @classmethod
+    def guess_simple_type(cls, value):
+        """Try to guess which database type the given value has."""
+        if isinstance(value, Bytea):
+            return 'bytea'
+        if isinstance(value, basestring):
+            return 'text'
+        if isinstance(value, bool):
+            return 'bool'
+        if isinstance(value, (int, long)):
+            return 'int'
+        if isinstance(value, float):
+            return 'float'
+        if isinstance(value, Decimal):
+            return 'num'
+        if isinstance(value, (date, time, datetime, timedelta)):
+            return 'date'
+        if isinstance(value, list):
+            return '%s[]' % cls.guess_simple_base_type(value)
+        if isinstance(value, tuple):
+            simple_type = cls.simple_type
+            typ = simple_type('record')
+            guess = cls.guess_simple_type
+            typ._get_attnames = lambda _self: AttrDict(
+                (str(n + 1), simple_type(guess(v)))
+                for n, v in enumerate(value))
+            return typ
+
+    @classmethod
+    def guess_simple_base_type(cls, value):
+        """Try to guess the base type of a given array."""
+        for v in value:
+            if isinstance(v, list):
+                typ = cls.guess_simple_base_type(v)
+            else:
+                typ = cls.guess_simple_type(v)
+            if typ:
+                return typ
+
+    def adapt_inline(self, value, nested=False):
+        """Adapt a value that is put into the SQL and needs to be quoted."""
+        if value is None:
+            return 'NULL'
+        if isinstance(value, Literal):
+            return value
+        if isinstance(value, Bytea):
+            value = self.escape_bytea(value)
+            if bytes is not str:  # Python >= 3.0
+                value = value.decode('ascii')
+        elif isinstance(value, Json):
+            if value.encode:
+                return value.encode()
+            value = self.encode_json(value)
+        elif isinstance(value, (datetime, date, time, timedelta)):
+            value = str(value)
+        if isinstance(value, basestring):
+            value = self.escape_string(value)
+            return "'%s'" % value
+        if isinstance(value, bool):
+            return 'true' if value else 'false'
+        if isinstance(value, float):
+            if isinf(value):
+                return "'-Infinity'" if value < 0 else "'Infinity'"
+            if isnan(value):
+                return "'NaN'"
+            return value
+        if isinstance(value, (int, long, Decimal)):
+            return value
+        if isinstance(value, list):
+            q = self.adapt_inline
+            s = '[%s]' if nested else 'ARRAY[%s]'
+            return s % ','.join(str(q(v, nested=True)) for v in value)
+        if isinstance(value, tuple):
+            q = self.adapt_inline
+            return '(%s)' % ','.join(str(q(v)) for v in value)
+        try:
+            value = value.__pg_repr__()
+        except AttributeError:
+            raise InterfaceError(
+                'Do not know how to adapt type %s' % type(value))
+        if isinstance(value, (tuple, list)):
+            value = self.adapt_inline(value)
+        return value
+
+    def parameter_list(self):
+        """Return a parameter list for parameters with known database types.
+
+        The list has an add(value, typ) method that will build up the
+        list and return either the literal value or a placeholder.
+        """
+        params = _ParameterList()
+        params.adapt = self.adapt
+        return params
+
+    def format_query(self, command, values, types=None, inline=False):
+        """Format a database query using the given values and types."""
+        if inline and types:
+            raise ValueError('Typed parameters must be sent separately')
+        params = self.parameter_list()
+        if isinstance(values, (list, tuple)):
+            if inline:
+                adapt = self.adapt_inline
+                literals = [adapt(value) for value in values]
+            else:
+                add = params.add
+                literals = []
+                append = literals.append
+                if types:
+                    if (not isinstance(types, (list, tuple)) or
+                            len(types) != len(values)):
+                        raise TypeError('The values and types do not match')
+                    for value, typ in zip(values, types):
+                        append(add(value, typ))
+                else:
+                    for value in values:
+                        append(add(value))
+            command = command % tuple(literals)
+        elif isinstance(values, dict):
+            if inline:
+                adapt = self.adapt_inline
+                literals = dict((key, adapt(value))
+                    for key, value in values.items())
+            else:
+                add = params.add
+                literals = {}
+                if types:
+                    if (not isinstance(types, dict) or
+                            len(types) < len(values)):
+                        raise TypeError('The values and types do not match')
+                    for key in sorted(values):
+                        literals[key] = add(values[key], types[key])
+                else:
+                    for key in sorted(values):
+                        literals[key] = add(values[key])
+            command = command % literals
+        else:
+            raise TypeError('The values must be passed as tuple, list or dict')
+        return command, params
 
 
 def cast_bool(value):
@@ -484,22 +654,20 @@ class Typecasts(dict):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 self[t] = cast
-                self.pop('_%s % t', None)
+                self.pop('_%s' % t, None)
 
     def reset(self, typ=None):
         """Reset the typecasts for the specified type(s) to their defaults.
 
         When no type is specified, all typecasts will be reset.
         """
-        defaults = self.defaults
         if typ is None:
             self.clear()
-            self.update(defaults)
         else:
             if isinstance(typ, basestring):
                 typ = [typ]
             for t in typ:
-                self.set(t, defaults.get(t))
+                self.pop(t, None)
 
     @classmethod
     def get_default(cls, typ):
@@ -521,7 +689,7 @@ class Typecasts(dict):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 defaults[t] = cast
-                defaults.pop('_%s % t', None)
+                defaults.pop('_%s' % t, None)
 
     def get_attnames(self, typ):
         """Return the fields for the given record type.
@@ -602,7 +770,7 @@ class DbTypes(dict):
         """Create a PostgreSQL type name with additional info."""
         if oid in self:
             return self[oid]
-        simple = 'record' if relid else _simpletype[pgtype]
+        simple = 'record' if relid else _simpletypes[pgtype]
         typ = DbType(regtype if self._regtypes else simple)
         typ.oid = oid
         typ.simple = simple
@@ -621,7 +789,7 @@ class DbTypes(dict):
             res = self.query("SELECT oid, typname, typname::regtype,"
                 " typtype, typcategory, typdelim, typrelid"
                 " FROM pg_type WHERE oid=%s::regtype" %
-                (DB._adapt_qualified_param(key, 1),), (key,)).getresult()
+                (_quote_if_unqualified('$1', key),), (key,)).getresult()
         except ProgrammingError:
             res = None
         if not res:
@@ -674,10 +842,6 @@ class DbTypes(dict):
             # no typecast is necessary
             return value
         return cast(value)
-
-
-class _Literal(str):
-    """Wrapper class for literal SQL."""
 
 
 def _namedresult(q):
@@ -859,7 +1023,7 @@ def pgnotify(*args, **kw):
 
 # The actual PostGreSQL database connection interface:
 
-class DB(_Adapt):
+class DB:
     """Wrapper class for the _pg connection type."""
 
     def __init__(self, *args, **kw):
@@ -895,6 +1059,7 @@ class DB(_Adapt):
         self._pkeys = {}
         self._privileges = {}
         self._args = args, kw
+        self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
         db.set_cast_hook(self.dbtypes.typecast)
         self.debug = None  # For debugging scripts, this can be set
@@ -966,22 +1131,6 @@ class DB(_Adapt):
     def _list_params(self, params):
         """Create a human readable parameter list."""
         return ', '.join('$%d=%r' % (n, v) for n, v in enumerate(params, 1))
-
-    @staticmethod
-    def _adapt_qualified_param(name, param):
-        """Quote parameter representing a qualified name.
-
-        Escapes the name for use as an SQL parameter, unless the
-        name contains a dot, in which case the name is ambiguous
-        (could be a qualified name or just a name with a dot in it)
-        and must be quoted manually by the caller.
-
-        """
-        if isinstance(param, int):
-            param = "$%d" % param
-        if isinstance(name, basestring) and '.' not in name:
-            param = 'quote_ident(%s)' % (param,)
-        return param
 
     # Public methods
 
@@ -1222,6 +1371,21 @@ class DB(_Adapt):
         self._do_debug(command)
         return self.db.query(command)
 
+    def query_formatted(self, command, parameters, types=None, inline=False):
+        """Execute a formatted SQL command string.
+
+        Similar to query, but using Python format placeholders of the form
+        %s or %(names)s instead of PostgreSQL placeholders of the form $1.
+        The parameters must be passed as a tuple, list or dict.  You can
+        also pass a corresponding tuple, list or dict of database types in
+        order to format the parameters properly in case there is ambiguity.
+
+        If you set inline to True, the parameters will be sent to the database
+        embedded in the SQL command, otherwise they will be sent separately.
+        """
+        return self.query(*self.adapter.format_query(
+            command, parameters, types, inline))
+
     def pkey(self, table, composite=False, flush=False):
         """Get or set the primary key of a table.
 
@@ -1247,7 +1411,7 @@ class DB(_Adapt):
                 " AND NOT a.attisdropped"
                 " WHERE i.indrelid=%s::regclass"
                 " AND i.indisprimary ORDER BY a.attnum") % (
-                    self._adapt_qualified_param(table, 1),)
+                    _quote_if_unqualified('$1', table),)
             pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
                 raise KeyError('Table %s has no primary key' % table)
@@ -1320,7 +1484,7 @@ class DB(_Adapt):
                 " JOIN pg_type t ON t.oid = a.atttypid"
                 " WHERE a.attrelid = %s::regclass AND %s"
                 " AND NOT a.attisdropped ORDER BY a.attnum") % (
-                    self._adapt_qualified_param(table, 1), q)
+                    _quote_if_unqualified('$1', table), q)
             names = self.db.query(q, (table,)).getresult()
             types = self.dbtypes
             names = ((name[0], types.add(*name[1:])) for name in names)
@@ -1347,7 +1511,7 @@ class DB(_Adapt):
             return self._privileges[(table, privilege)]
         except KeyError:  # cache miss, ask the database
             q = "SELECT has_table_privilege(%s, $2)" % (
-                self._adapt_qualified_param(table, 1),)
+                _quote_if_unqualified('$1', table),)
             q = self.db.query(q, (table, privilege))
             ret = q.getresult()[0][0] == self._make_bool(True)
             self._privileges[(table, privilege)] = ret  # cache it
@@ -1404,12 +1568,12 @@ class DB(_Adapt):
                 raise KeyError(
                     'Differing number of items in keyname and row')
             row = dict(zip(keyname, row))
-        params = []
-        param = partial(self._adapt_param, params=params)
+        params = self.adapter.parameter_list()
+        adapt = params.add
         col = self.escape_identifier
         what = 'oid, *' if qoid else '*'
         where = ' AND '.join('%s = %s' % (
-            col(k), param(row[k], attnames[k])) for k in keyname)
+            col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
@@ -1450,14 +1614,14 @@ class DB(_Adapt):
             del row['oid']  # do not insert oid
         attnames = self.get_attnames(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
-        params = []
-        param = partial(self._adapt_param, params=params)
+        params = self.adapter.parameter_list()
+        adapt = params.add
         col = self.escape_identifier
         names, values = [], []
         for n in attnames:
             if n in row:
                 names.append(col(n))
-                values.append(param(row[n], attnames[n]))
+                values.append(adapt(row[n], attnames[n]))
         if not names:
             raise _prg_error('No column found that can be inserted')
         names, values = ', '.join(names), ', '.join(values)
@@ -1511,11 +1675,11 @@ class DB(_Adapt):
                     keyname = ('oid',)
                 else:
                     raise KeyError('Missing primary key in row')
-        params = []
-        param = partial(self._adapt_param, params=params)
+        params = self.adapter.parameter_list()
+        adapt = params.add
         col = self.escape_identifier
         where = ' AND '.join('%s = %s' % (
-            col(k), param(row[k], attnames[k])) for k in keyname)
+            col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
@@ -1524,7 +1688,7 @@ class DB(_Adapt):
         keyname = set(keyname)
         for n in attnames:
             if n in row and n not in keyname:
-                values.append('%s = %s' % (col(n), param(row[n], attnames[n])))
+                values.append('%s = %s' % (col(n), adapt(row[n], attnames[n])))
         if not values:
             return row
         values = ', '.join(values)
@@ -1594,14 +1758,14 @@ class DB(_Adapt):
             del kw['oid']  # do not update oid
         attnames = self.get_attnames(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
-        params = []
-        param = partial(self._adapt_param,params=params)
+        params = self.adapter.parameter_list()
+        adapt = params.add
         col = self.escape_identifier
         names, values, updates = [], [], []
         for n in attnames:
             if n in row:
                 names.append(col(n))
-                values.append(param(row[n], attnames[n]))
+                values.append(adapt(row[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
         try:
             keyname = self.pkey(table, True)
@@ -1708,11 +1872,11 @@ class DB(_Adapt):
                     keyname = ('oid',)
                 else:
                     raise KeyError('Missing primary key in row')
-        params = []
-        param = partial(self._adapt_param, params=params)
+        params = self.adapter.parameter_list()
+        adapt = params.add
         col = self.escape_identifier
         where = ' AND '.join('%s = %s' % (
-            col(k), param(row[k], attnames[k])) for k in keyname)
+            col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']

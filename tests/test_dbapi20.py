@@ -827,6 +827,18 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         values[4] = values[6] = False
         self.assertEqual(rows, values)
 
+    def test_literal(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            value = "lower('Hello')"
+            cur.execute("select %s, %s", (value, pgdb.Literal(value)))
+            row = cur.fetchone()
+        finally:
+            con.close()
+        self.assertEqual(row, (value, 'hello'))
+
+
     def test_json(self):
         inval = {"employees":
             [{"firstName": "John", "lastName": "Doe", "age": 61}]}

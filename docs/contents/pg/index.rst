@@ -16,3 +16,4 @@ Contents
     large_objects
     notification
     db_types
+    adaptation

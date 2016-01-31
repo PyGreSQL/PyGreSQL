@@ -54,12 +54,20 @@ the DB-API 2 standard:
 Additionally, PyGreSQL provides the following constructors for PostgreSQL
 specific data types:
 
+.. function:: Bytea(bytes)
+
+    Construct an object capable of holding a bytea value
+
 .. function:: Json(obj, [encode])
 
-    Construct a wrapper for holding an object serializable to JSON.
+    Construct a wrapper for holding an object serializable to JSON
 
     You can pass an optional serialization function as a parameter.
     By default, PyGreSQL uses :func:`json.dumps` to serialize it.
+
+.. function:: Literal(sql)
+
+    Construct a wrapper for holding a literal SQL string
 
 Example for using a type constructor::
 

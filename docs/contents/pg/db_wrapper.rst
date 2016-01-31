@@ -452,6 +452,47 @@ Example::
     rows = db.query("update employees set phone=$2 where name=$1",
          name, phone).getresult()[0][0]
 
+query_formatted -- execute a formatted SQL command string
+---------------------------------------------------------
+
+.. method:: DB.query_formatted(command, parameters, [types], [inline])
+
+    Execute a formatted SQL command string
+
+    :param str command: SQL command
+    :param parameters: the values of the parameters for the SQL command
+    :type parameters: tuple, list or dict
+    :param types: optionally, the types of the parameters
+    :type types: tuple, list or dict
+    :param bool inline: whether the parameters should be passed in the SQL
+    :rtype: :class:`Query`, None
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises ValueError: empty SQL query or lost connection
+    :raises pg.ProgrammingError: error in query
+    :raises pg.InternalError: error during query processing
+
+Similar to :meth:`DB.query`, but using Python format placeholders of the form
+``%s`` or ``%(names)s`` instead of PostgreSQL placeholders of the form ``$1``.
+The parameters must be passed as a tuple, list or dict.  You can also pass a
+corresponding tuple, list or dict of database types in order to format the
+parameters properly in case there is ambiguity.
+
+If you set *inline* to True, the parameters will be sent to the database
+embedded in the SQL command, otherwise they will be sent separately.
+
+Example::
+
+    name = input("Name? ")
+    phone = input("Phone? ")
+    rows = db.query_formatted(
+        "update employees set phone=%s where name=%s",
+        (phone, name)).getresult()[0][0]
+    # or
+    rows = db.query_formatted(
+        "update employees set phone=%(phone)s where name=%(name)s",
+        dict(name=name, phone=phone)).getresult()[0][0]
+
 clear -- clear row values in memory
 -----------------------------------
 
@@ -779,7 +820,6 @@ from the :class:`DB` wrapper class as well.
 
     The name of the database that the connection is using
 
-
 .. attribute:: DB.dbtypes
 
     A dictionary with the various type names for the PostgreSQL types
@@ -787,5 +827,14 @@ from the :class:`DB` wrapper class as well.
 This can be used for getting more information on the PostgreSQL database
 types or changing the typecast functions used for the connection.  See the
 description of the :class:`DbTypes` class for details.
+
+.. versionadded:: 5.0
+
+.. attribute:: DB.adapter
+
+    A class with some helper functions for adapting parameters
+
+This can be used for building queries with parameters.  You normally will
+not need this, as you can use the :class:`DB.query_formatted` method.
 
 .. versionadded:: 5.0

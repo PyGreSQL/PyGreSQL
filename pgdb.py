@@ -209,7 +209,7 @@ class Typecasts(dict):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 self[t] = cast
-                self.pop('_%s % t', None)
+                self.pop('_%s' % t, None)
 
     def reset(self, typ=None):
         """Reset the typecasts for the specified type(s) to their defaults.
@@ -224,7 +224,18 @@ class Typecasts(dict):
             if isinstance(typ, basestring):
                 typ = [typ]
             for t in typ:
-                self.set(t, defaults.get(t))
+                cast = defaults.get(t)
+                if cast:
+                    self[t] = cast
+                    t = '_%s' % t
+                    cast = defaults.get(t)
+                    if cast:
+                        self[t] = cast
+                    else:
+                        self.pop(t, None)
+                else:
+                    self.pop(t, None)
+                    self.pop('_%s' % t, None)
 
     def create_array_cast(self, cast):
         """Create an array typecast for the given base cast."""
@@ -482,7 +493,7 @@ class Cursor(object):
             if isnan(value):
                 return "'NaN'"
             return value
-        if isinstance(value, (int, long, Decimal)):
+        if isinstance(value, (int, long, Decimal, Literal)):
             return value
         if isinstance(value, list):
             # Quote value as an ARRAY constructor. This is better than using
@@ -496,18 +507,18 @@ class Cursor(object):
             # Quote as a ROW constructor.  This is better than using a record
             # literal because it carries the information that this is a record
             # and not a string.  We don't use the keyword ROW in order to make
-            # this usable with the IN synntax as well.  It is only necessary
+            # this usable with the IN syntax as well.  It is only necessary
             # when the records has a single column which is not really useful.
             q = self._quote
             return '(%s)' % ','.join(str(q(v)) for v in value)
         try:
             value = value.__pg_repr__()
-            if isinstance(value, (tuple, list)):
-                value = self._quote(value)
-            return value
         except AttributeError:
             raise InterfaceError(
                 'Do not know how to adapt type %s' % type(value))
+        if isinstance(value, (tuple, list)):
+            value = self._quote(value)
+        return value
 
     def _quoteparams(self, string, parameters):
         """Quote parameters.
@@ -1295,6 +1306,10 @@ class Binary(bytes):
 
 # Additional type helpers for PyGreSQL:
 
+class Bytea(bytes):
+    """Construct an object capable of holding a bytea value."""
+
+
 class Json:
     """Construct a wrapper for holding an object serializable to JSON."""
 
@@ -1307,6 +1322,18 @@ class Json:
         if isinstance(obj, basestring):
             return obj
         return self.encode(obj)
+
+    __pg_repr__ = __str__
+
+
+class Literal:
+    """Construct a wrapper for holding a literal SQL string."""
+
+    def __init__(self, sql):
+        self.sql = sql
+
+    def __str__(self):
+        return self.sql
 
     __pg_repr__ = __str__
 
