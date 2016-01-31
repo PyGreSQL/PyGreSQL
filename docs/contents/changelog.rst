@@ -7,103 +7,104 @@ Version 5.0
 - The supported versions are Python 2.6 to 2.7, and 3.3 to 3.5.
 - PostgreSQL is supported in all versions from 9.0 to 9.5.
 - Changes in the DB-API 2 module (pgdb):
-  - The DB-API 2 module now always returns result rows as named tuples
-    instead of simply lists as before. The documentation explains how
-    you can restore the old behavior or use custom row objects instead.
-  - The names of the various classes used by the classic and DB-API 2
-    modules have been renamed to become simpler, more intuitive and in
-    line with the names used in the DB-API 2 documentation.
-    Since the API provides only objects of these types through constructor
-    functions, this should not cause any incompatibilities.
-  - The DB-API 2 module now supports the callproc() cursor method. Note
-    that output parameters are currently not replaced in the return value.
-  - The DB-API 2 module now supports copy operations between data streams
-    on the client and database tables via the COPY command of PostgreSQL.
-    The cursor method copy_from() can be used to copy data from the database
-    to the client, and the cursor method copy_to() can be used to copy data
-    from the client to the database.
-  - The 7-tuples returned by the description attribute of a pgdb cursor
-    are now named tuples, i.e. their elements can be also accessed by name.
-    The column names and types can now also be requested through the
-    colnames and coltypes attributes, which are not part of DB-API 2 though.
-    The type_code provided by the description attribute is still equal to
-    the PostgreSQL internal type name, but now carries some more information
-    in additional attributes. The size, precision and scale information that
-    is part of the description is now properly set for numeric types.
-  - If you pass a Python list as one of the parameters to a DB-API 2 cursor,
-    it is now automatically bound using an ARRAY constructor. If you pass a
-    Python tuple, it is bound using a ROW constructor. This is useful for
-    passing records as well as making use of the IN syntax.
-  - Inversely, when a fetch method of a DB-API 2 cursor returns a PostgreSQL
-    array, it is passed to Python as a list, and when it returns a PostgreSQL
-    composite type, it is passed to Python as a named tuple. PyGreSQL uses
-    a new fast built-in parser to achieve this. Anonymous composite types are
-    also supported, but yield only an ordinary tuple containing text strings.
+    - The DB-API 2 module now always returns result rows as named tuples
+      instead of simply lists as before. The documentation explains how
+      you can restore the old behavior or use custom row objects instead.
+    - The names of the various classes used by the classic and DB-API 2
+      modules have been renamed to become simpler, more intuitive and in
+      line with the names used in the DB-API 2 documentation.
+      Since the API provides only objects of these types through constructor
+      functions, this should not cause any incompatibilities.
+    - The DB-API 2 module now supports the callproc() cursor method. Note
+      that output parameters are currently not replaced in the return value.
+    - The DB-API 2 module now supports copy operations between data streams
+      on the client and database tables via the COPY command of PostgreSQL.
+      The cursor method copy_from() can be used to copy data from the database
+      to the client, and the cursor method copy_to() can be used to copy data
+      from the client to the database.
+    - The 7-tuples returned by the description attribute of a pgdb cursor
+      are now named tuples, i.e. their elements can be also accessed by name.
+      The column names and types can now also be requested through the
+      colnames and coltypes attributes, which are not part of DB-API 2 though.
+      The type_code provided by the description attribute is still equal to
+      the PostgreSQL internal type name, but now carries some more information
+      in additional attributes. The size, precision and scale information that
+      is part of the description is now properly set for numeric types.
+    - If you pass a Python list as one of the parameters to a DB-API 2 cursor,
+      it is now automatically bound using an ARRAY constructor. If you pass a
+      Python tuple, it is bound using a ROW constructor. This is useful for
+      passing records as well as making use of the IN syntax.
+    - Inversely, when a fetch method of a DB-API 2 cursor returns a PostgreSQL
+      array, it is passed to Python as a list, and when it returns a PostgreSQL
+      composite type, it is passed to Python as a named tuple. PyGreSQL uses
+      a new fast built-in parser to achieve this. Anonymous composite types are
+      also supported, but yield only an ordinary tuple containing text strings.
 - Changes in the classic PyGreSQL module (pg):
-  - The classic interface got two new methods get_as_list() and get_as_dict()
-    returning a database table as a Python list or dict. The amount of data
-    returned can be controlled with various parameters.
-  - A method upsert() has been added to the DB wrapper class that utilitses
-    the "upsert" feature that is new in PostgreSQL 9.5. The new method nicely
-    complements the existing get/insert/update/delete() methods.
-  - When using insert/update/upsert(), you can now pass PostgreSQL arrays as
-    lists and PostgreSQL records as tuples in the classic module.
-  - Conversely, when the query method returns a PostgreSQL array, it is passed
-    to Python as a list. PostgreSQL records are converted to named tuples as
-    well, but only if you use one of the get/insert/update/delete() methods.
-    PyGreSQL uses a new fast built-in parser to achieve this.
-  - The pkey() method of the classic interface now returns tuples instead
-    of frozenset. The order of the tuples is like in the primary key index.
-  - Like the DB-API 2 module, the classic module now also returns bytea columns
-    fetched from the database as byte strings, so you don't need to call
-    unescape_bytea() any more.
-  - A method set_jsondecode() has been added for changing or removing the
-    function that automatically decodes JSON data coming from the database.
-    By default, decoding JSON is now enabled and uses the decoder function
-    in the standard library with its default parameters.
-  - The table name that is affixed to the name of the OID column returned
-    by the get() method of the classic interface will not automatically
-    be fully qualified any more. This reduces overhead from the interface,
-    but it means you must always write the table name in the same way when
-    you call the methods using it and you are using tables with OIDs.
-    Also, OIDs are now only used when access via primary key is not possible.
-    Note that OIDs are considered deprecated anyway, and they are not created
-    by default any more in PostgreSQL 8.1 and later.
-  - The internal caching and automatic quoting of class names in the classic
-    interface has been simplified and improved, it should now perform better
-    and use less memory. Also, overhead for quoting values in the DB wrapper
-    methods has been reduced and security has been improved by passing the
-    values to libpq separately as parameters instead of inline.
-  - It is now possible to use regular type names instead of the simpler
-    type names that are used by default in PyGreSQL, without breaking any
-    of the mechanisms for quoting and typecasting, which rely on the type
-    information. This is achieved while maintaining simplicity and backward
-    compatibility by augmenting the type name string objects with all the
-    necessary information under the cover. To switch regular type names on
-    or off (this is the default), call the DB wrapper method use_regtypes().
-  - A new method query_formatted() has been added to the DB wrapper class that
-    allows using the format specifications from Python.  A flag "inline"
-    can be set to specify whether parameters should be sent to the database
-    separately or formatted into the SQL.
-  - The methods for adapting and typecasting values pertaining to PostgreSQL
-    types have been refactored and swapped out to separate classes.
+    - The classic interface got two new methods get_as_list() and get_as_dict()
+      returning a database table as a Python list or dict. The amount of data
+      returned can be controlled with various parameters.
+    - A method upsert() has been added to the DB wrapper class that utilitses
+      the "upsert" feature that is new in PostgreSQL 9.5. The new method nicely
+      complements the existing get/insert/update/delete() methods.
+    - When using insert/update/upsert(), you can now pass PostgreSQL arrays as
+      lists and PostgreSQL records as tuples in the classic module.
+    - Conversely, when the query method returns a PostgreSQL array, it is passed
+      to Python as a list. PostgreSQL records are converted to named tuples as
+      well, but only if you use one of the get/insert/update/delete() methods.
+      PyGreSQL uses a new fast built-in parser to achieve this.
+    - The pkey() method of the classic interface now returns tuples instead
+      of frozenset. The order of the tuples is like in the primary key index.
+    - Like the DB-API 2 module, the classic module now also returns bytea
+      columns fetched from the database as byte strings, so you don't need to
+      call unescape_bytea() any more.  This has been made configurable though,
+      and you can restore the old behavior by calling set_bytea_escaped(True).
+    - A method set_jsondecode() has been added for changing or removing the
+      function that automatically decodes JSON data coming from the database.
+      By default, decoding JSON is now enabled and uses the decoder function
+      in the standard library with its default parameters.
+    - The table name that is affixed to the name of the OID column returned
+      by the get() method of the classic interface will not automatically
+      be fully qualified any more. This reduces overhead from the interface,
+      but it means you must always write the table name in the same way when
+      you call the methods using it and you are using tables with OIDs.
+      Also, OIDs are now only used when access via primary key is not possible.
+      Note that OIDs are considered deprecated anyway, and they are not created
+      by default any more in PostgreSQL 8.1 and later.
+    - The internal caching and automatic quoting of class names in the classic
+      interface has been simplified and improved, it should now perform better
+      and use less memory. Also, overhead for quoting values in the DB wrapper
+      methods has been reduced and security has been improved by passing the
+      values to libpq separately as parameters instead of inline.
+    - It is now possible to use regular type names instead of the simpler
+      type names that are used by default in PyGreSQL, without breaking any
+      of the mechanisms for quoting and typecasting, which rely on the type
+      information. This is achieved while maintaining simplicity and backward
+      compatibility by augmenting the type name string objects with all the
+      necessary information under the cover. To switch regular type names on
+      or off (this is the default), call the DB wrapper method use_regtypes().
+    - A new method query_formatted() has been added to the DB wrapper class
+      that allows using the format specifications from Python.  A flag "inline"
+      can be set to specify whether parameters should be sent to the database
+      separately or formatted into the SQL.
+    - The methods for adapting and typecasting values pertaining to PostgreSQL
+      types have been refactored and swapped out to separate classes.
 - Changes concerning both modules:
-  - The modules now provide get_typecast() and set_typecast() methods
-    allowing to control the typecasting on the global level.  The connection
-    objects have got type caches with the same methods which give control
-    over the typecasting on the level of the current connection.
-    See the documentation on details about the type cache and the typecast
-    mechanisms provided by PyGreSQL.
-  - PyGreSQL now supports the JSON and JSONB data types, converting such
-    columns automatically to and from Python objects. If you want to insert
-    Python objects as JSON data using DB-API 2, you should wrap them in the
-    new Json() type constructor as a hint to PyGreSQL.
-  - New type helpers Literal(), Json() and Bytea() have been added.
-  - Fast parsers for the input and output syntax for PostgreSQL arrays and
-    composite types have been added to the C module. Note that you can also
-    use multi-dimensional arrays with PyGreSQL.
-  - The tty parameter and attribute of database connections has been
-    removed since it is not supported any more since PostgreSQL 7.4.
+    - The modules now provide get_typecast() and set_typecast() methods
+      allowing to control the typecasting on the global level.  The connection
+      objects have got type caches with the same methods which give control
+      over the typecasting on the level of the current connection.
+      See the documentation on details about the type cache and the typecast
+      mechanisms provided by PyGreSQL.
+    - PyGreSQL now supports the JSON and JSONB data types, converting such
+      columns automatically to and from Python objects. If you want to insert
+      Python objects as JSON data using DB-API 2, you should wrap them in the
+      new Json() type constructor as a hint to PyGreSQL.
+    - New type helpers Literal(), Json() and Bytea() have been added.
+    - Fast parsers for the input and output syntax for PostgreSQL arrays and
+      composite types have been added to the C module. Note that you can also
+      use multi-dimensional arrays with PyGreSQL.
+    - The tty parameter and attribute of database connections has been
+      removed since it is not supported any more since PostgreSQL 7.4.
 
 Version 4.2 (2016-01-21)
 ------------------------

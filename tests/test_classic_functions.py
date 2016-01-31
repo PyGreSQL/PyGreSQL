@@ -732,6 +732,29 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, use_bool)
 
+    def testGetByteaEscaped(self):
+        r = pg.get_bytea_escaped()
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, False)
+
+    def testSetByteaEscaped(self):
+        bytea_escaped = pg.get_bytea_escaped()
+        try:
+            pg.set_bytea_escaped(True)
+            r = pg.get_bytea_escaped()
+            pg.set_bytea_escaped(bytea_escaped)
+            self.assertIsInstance(r, bool)
+            self.assertIs(r, True)
+            pg.set_bytea_escaped(False)
+            r = pg.get_bytea_escaped()
+            self.assertIsInstance(r, bool)
+            self.assertIs(r, False)
+        finally:
+            pg.set_bool(bytea_escaped)
+        r = pg.get_bytea_escaped()
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, bytea_escaped)
+
     def testGetNamedresult(self):
         r = pg.get_namedresult()
         self.assertTrue(callable(r))

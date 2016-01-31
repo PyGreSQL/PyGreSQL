@@ -2837,11 +2837,15 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(len(r), 2)
         self.assertEqual(r[0], 3)
         r = r[1]
+        if pg.get_bytea_escaped():
+            self.assertNotEqual(r, s)
+            r = pg.unescape_bytea(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
 
     def testInsertUpdateGetBytea(self):
         query = self.db.query
+        unescape = pg.unescape_bytea if pg.get_bytea_escaped() else None
         self.createTable('bytea_test', 'n smallint primary key, data bytea')
         # insert null value
         r = self.db.insert('bytea_test', n=0, data=None)
@@ -2857,6 +2861,9 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 0)
         self.assertIn('data', r)
         r = r['data']
+        if unescape:
+            self.assertNotEqual(r, s)
+            r = unescape(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         r = self.db.update('bytea_test', n=0, data=None)
@@ -2869,6 +2876,9 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 5)
         self.assertIn('data', r)
         r = r['data']
+        if unescape:
+            self.assertNotEqual(r, s)
+            r = unescape(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         # update as bytes
@@ -2879,6 +2889,9 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 5)
         self.assertIn('data', r)
         r = r['data']
+        if unescape:
+            self.assertNotEqual(r, s)
+            r = unescape(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         r = query('select * from bytea_test where n=5').getresult()
@@ -2887,6 +2900,9 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(len(r), 2)
         self.assertEqual(r[0], 5)
         r = r[1]
+        if unescape:
+            self.assertNotEqual(r, s)
+            r = unescape(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
         r = self.db.get('bytea_test', dict(n=5))
@@ -2895,6 +2911,9 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 5)
         self.assertIn('data', r)
         r = r['data']
+        if unescape:
+            self.assertNotEqual(r, s)
+            r = pg.unescape_bytea(r)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
 
@@ -2912,6 +2931,9 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('n', r)
         self.assertEqual(r['n'], 7)
         self.assertIn('data', r)
+        if pg.get_bytea_escaped():
+            self.assertNotEqual(r['data'], s)
+            r['data'] = pg.unescape_bytea(r['data'])
         self.assertIsInstance(r['data'], bytes)
         self.assertEqual(r['data'], s)
         r['data'] = None
@@ -2920,7 +2942,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('n', r)
         self.assertEqual(r['n'], 7)
         self.assertIn('data', r)
-        self.assertIsNone(r['data'], bytes)
+        self.assertIsNone(r['data'])
 
     def testInsertGetJson(self):
         try:
@@ -3161,6 +3183,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsNone(r['data'][2])
 
     def testArrayOfBytea(self):
+        unescape = pg.unescape_bytea if pg.get_bytea_escaped() else None
         self.createTable('arraytest', 'data bytea[]', oids=True)
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'bytea[]')
@@ -3168,11 +3191,17 @@ class TestDBClass(unittest.TestCase):
                 b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"]
         r = dict(data=data)
         self.db.insert('arraytest', r)
+        if unescape:
+            self.assertNotEqual(r['data'], data)
+            r['data'] = [unescape(v) if v else v for v in r['data']]
         self.assertEqual(r['data'], data)
         self.assertIsInstance(r['data'][1], bytes)
         self.assertIsNone(r['data'][2])
         r['data'] = None
         self.db.get('arraytest', r)
+        if unescape:
+            self.assertNotEqual(r['data'], data)
+            r['data'] = [unescape(v) if v else v for v in r['data']]
         self.assertEqual(r['data'], data)
         self.assertIsInstance(r['data'][1], bytes)
         self.assertIsNone(r['data'][2])
@@ -3606,6 +3635,8 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.set_option('decimal', float)
         not_bool = not pg.get_bool()
         cls.set_option('bool', not_bool)
+        not_bytea_escaped = not pg.get_bytea_escaped()
+        cls.set_option('bytea_escaped', not_bytea_escaped)
         cls.set_option('namedresult', None)
         cls.set_option('jsondecode', None)
         cls.regtypes = not DB().use_regtypes()
@@ -3617,6 +3648,7 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.reset_option('jsondecode')
         cls.reset_option('namedresult')
         cls.reset_option('bool')
+        cls.reset_option('bytea_escaped')
         cls.reset_option('decimal')
 
     @classmethod

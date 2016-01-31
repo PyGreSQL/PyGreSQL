@@ -97,6 +97,7 @@ static PyObject *decimal = NULL, /* decimal type */
 				*jsondecode = NULL; /* function for decoding json strings */
 static char decimal_point = '.'; /* decimal point used in money values */
 static int use_bool = 0; /* whether or not bool objects shall be returned */
+static int bytea_escaped = 0; /* whether bytea shall be returned escaped */
 
 static int pg_encoding_utf8 = 0;
 static int pg_encoding_latin1 = 0;
@@ -283,7 +284,7 @@ get_type(Oid pgtype)
 			break;
 
 		case BYTEAOID:
-			t = PYGRES_BYTEA;
+			t = bytea_escaped ? PYGRES_TEXT : PYGRES_BYTEA;
 			break;
 
 		case JSONOID:
@@ -339,7 +340,7 @@ get_type(Oid pgtype)
 			break;
 
 		case BYTEAARRAYOID:
-			t = PYGRES_BYTEA | PYGRES_ARRAY;
+			t = (bytea_escaped ? PYGRES_TEXT : PYGRES_BYTEA) | PYGRES_ARRAY;
 			break;
 
 		case JSONARRAYOID:
@@ -393,6 +394,7 @@ cast_bytea_text(char *s)
 	char	   *tmp_str;
 	size_t		str_len;
 
+    /* this function should not be called when bytea_escaped is set */
 	tmp_str = (char *)PQunescapeBytea((unsigned char*)s, &str_len);
 	obj = PyBytes_FromStringAndSize(tmp_str, str_len);
 	if (tmp_str)
@@ -412,6 +414,7 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
 	switch (type) /* this must be the PyGreSQL internal type */
 	{
 		case PYGRES_BYTEA:
+		    /* this type should not be passed when bytea_escaped is set */
 			/* we need to add a null byte */
 			tmp_str = (char *) PyMem_Malloc(size + 1);
 			if (!tmp_str) return PyErr_NoMemory();
@@ -5131,6 +5134,50 @@ pgSetBool(PyObject *self, PyObject * args)
 	return ret;
 }
 
+/* check whether bytea values are unescaped */
+static char pgGetByteaEscaped__doc__[] =
+"get_bytea_escaped() -- check whether bytea will be returned escaped";
+
+static PyObject *
+pgGetByteaEscaped(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+
+	if (PyArg_ParseTuple(args, ""))
+	{
+		ret = bytea_escaped ? Py_True : Py_False;
+		Py_INCREF(ret);
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function get_bytea_escaped() takes no arguments");
+
+	return ret;
+}
+
+/* set usage of bool values */
+static char pgSetByteaEscaped__doc__[] =
+"set_bytea_escaped(on) -- set whether bytea will be returned escaped";
+
+static PyObject *
+pgSetByteaEscaped(PyObject *self, PyObject * args)
+{
+	PyObject *ret = NULL;
+	int			i;
+
+	/* gets arguments */
+	if (PyArg_ParseTuple(args, "i", &i))
+	{
+		bytea_escaped = i ? 1 : 0;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_bytea_escaped() expects a boolean value as argument");
+
+	return ret;
+}
+
 /* get named result factory */
 static char pgGetNamedresult__doc__[] =
 "get_namedresult() -- get the function used for getting named results";
@@ -5675,6 +5722,10 @@ static struct PyMethodDef pgMethods[] = {
 			pgSetDecimal__doc__},
 	{"get_bool", (PyCFunction) pgGetBool, METH_VARARGS, pgGetBool__doc__},
 	{"set_bool", (PyCFunction) pgSetBool, METH_VARARGS, pgSetBool__doc__},
+	{"get_bytea_escaped", (PyCFunction) pgGetByteaEscaped, METH_VARARGS,
+		pgGetByteaEscaped__doc__},
+	{"set_bytea_escaped", (PyCFunction) pgSetByteaEscaped, METH_VARARGS,
+		pgSetByteaEscaped__doc__},
 	{"get_namedresult", (PyCFunction) pgGetNamedresult, METH_VARARGS,
 			pgGetNamedresult__doc__},
 	{"set_namedresult", (PyCFunction) pgSetNamedresult, METH_VARARGS,

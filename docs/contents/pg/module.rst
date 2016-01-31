@@ -404,6 +404,39 @@ enable this by calling ``set_bool(True)``.
 
 .. versionadded:: 4.2
 
+get/set_bytea_escaped -- whether bytea values are returned escaped
+------------------------------------------------------------------
+
+.. function:: get_bytea_escaped()
+
+    Check whether bytea values are returned as escaped strings
+
+    :returns: whether or not bytea objects will be returned escaped
+    :rtype: bool
+
+This function checks whether PyGreSQL returns PostgreSQL ``bytea`` values in
+escaped form or in unescaped from as byte strings.  By default, bytea values
+will be returned unescaped as byte strings, but you can change this with the
+``set_bytea_escaped()`` method.
+
+.. versionadded:: 5.0
+
+.. function:: set_bytea_escaped(on)
+
+    Set whether bytea values are returned as escaped strings
+
+    :param on: whether or not bytea objects shall be returned escaped
+
+This function can be used to specify whether PyGreSQL shall return
+PostgreSQL ``bytea`` values in escaped form or in unescaped from as byte
+strings.  By default, bytea values will be returned unescaped as byte
+strings, but you can change this by calling ``set_bytea_escaped(True)``.
+
+.. versionadded:: 5.0
+
+.. versionchanged:: 5.0
+   Bytea values had been returned in escaped form in earlier versions.
+
 get/set_namedresult -- conversion to named tuples
 -------------------------------------------------
 
