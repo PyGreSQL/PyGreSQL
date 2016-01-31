@@ -81,6 +81,10 @@ Version 5.0
     compatibility by augmenting the type name string objects with all the
     necessary information under the cover. To switch regular type names on
     or off (this is the default), call the DB wrapper method use_regtypes().
+  - A new method query_formatted() has been added to the DB wrapper class that
+    allows using the format specifications from Python.  A flag "inline"
+    can be set to specify whether parameters should be sent to the database
+    separately or formatted into the SQL.
   - The methods for adapting and typecasting values pertaining to PostgreSQL
     types have been refactored and swapped out to separate classes.
 - Changes concerning both modules:
@@ -94,6 +98,7 @@ Version 5.0
     columns automatically to and from Python objects. If you want to insert
     Python objects as JSON data using DB-API 2, you should wrap them in the
     new Json() type constructor as a hint to PyGreSQL.
+  - New type helpers Literal(), Json() and Bytea() have been added.
   - Fast parsers for the input and output syntax for PostgreSQL arrays and
     composite types have been added to the C module. Note that you can also
     use multi-dimensional arrays with PyGreSQL.
