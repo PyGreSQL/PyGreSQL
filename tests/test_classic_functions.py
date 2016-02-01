@@ -712,20 +712,20 @@ class TestConfigFunctions(unittest.TestCase):
     def testGetBool(self):
         r = pg.get_bool()
         self.assertIsInstance(r, bool)
-        self.assertIs(r, False)
+        self.assertIs(r, True)
 
     def testSetBool(self):
         use_bool = pg.get_bool()
         try:
-            pg.set_bool(True)
+            pg.set_bool(False)
             r = pg.get_bool()
             pg.set_bool(use_bool)
             self.assertIsInstance(r, bool)
-            self.assertIs(r, True)
-            pg.set_bool(False)
+            self.assertIs(r, False)
+            pg.set_bool(True)
             r = pg.get_bool()
             self.assertIsInstance(r, bool)
-            self.assertIs(r, False)
+            self.assertIs(r, True)
         finally:
             pg.set_bool(use_bool)
         r = pg.get_bool()

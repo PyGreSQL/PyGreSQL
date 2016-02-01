@@ -55,8 +55,11 @@ Version 5.0
       conversion of arrays to lists can be disabled with set_array(False).
     - The pkey() method of the classic interface now returns tuples instead
       of frozenset. The order of the tuples is like in the primary key index.
+    - Like the DB-API 2 module, the classic module now also returns bool values
+      from the database as Python bool objects instead of strings.  You can
+      still restore the old behavior by calling set_bool(False).
     - Like the DB-API 2 module, the classic module now also returns bytea
-      columns fetched from the database as byte strings, so you don't need to
+      data fetched from the database as byte strings, so you don't need to
       call unescape_bytea() any more.  This has been made configurable though,
       and you can restore the old behavior by calling set_bytea_escaped(True).
     - A method set_jsondecode() has been added for changing or removing the

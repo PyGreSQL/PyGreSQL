@@ -752,13 +752,13 @@ class TestParamQueries(unittest.TestCase):
         self.assertEqual(self.c.query("select $1::text", [[None]]
             ).getresult(), [(None,)])
 
-    def testQueryWithBoolParams(self, use_bool=None):
+    def testQueryWithBoolParams(self, bool_enabled=None):
         query = self.c.query
-        if use_bool is not None:
-            use_bool_default = pg.get_bool()
-            pg.set_bool(use_bool)
+        if bool_enabled is not None:
+            bool_enabled_default = pg.get_bool()
+            pg.set_bool(bool_enabled)
         try:
-            v_false, v_true = (False, True) if use_bool else 'ft'
+            v_false, v_true = (False, True) if bool_enabled else 'ft'
             r_false, r_true = [(v_false,)], [(v_true,)]
             self.assertEqual(query("select false").getresult(), r_false)
             self.assertEqual(query("select true").getresult(), r_true)
@@ -775,11 +775,11 @@ class TestParamQueries(unittest.TestCase):
             self.assertEqual(query(q, (False,)).getresult(), r_false)
             self.assertEqual(query(q, (True,)).getresult(), r_true)
         finally:
-            if use_bool is not None:
-                pg.set_bool(use_bool_default)
+            if bool_enabled is not None:
+                pg.set_bool(bool_enabled_default)
 
-    def testQueryWithBoolParamsAndUseBool(self):
-        self.testQueryWithBoolParams(use_bool=True)
+    def testQueryWithBoolParamsNotDefault(self):
+        self.testQueryWithBoolParams(bool_enabled=not pg.get_bool())
 
     def testQueryWithIntParams(self):
         query = self.c.query

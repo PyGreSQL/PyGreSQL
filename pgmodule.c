@@ -96,7 +96,7 @@ static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL, /* function for getting named results */
 				*jsondecode = NULL; /* function for decoding json strings */
 static char decimal_point = '.'; /* decimal point used in money values */
-static int bool_as_text = 1; /* whether bool shall be returned as text */
+static int bool_as_text = 0; /* whether bool shall be returned as text */
 static int array_as_text = 0; /* whether arrays shall be returned as text */
 static int bytea_escaped = 0; /* whether bytea shall be returned escaped */
 

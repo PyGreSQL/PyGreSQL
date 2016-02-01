@@ -408,9 +408,9 @@ get/set_bool -- whether boolean values are returned as bool objects
 
 This function checks whether PyGreSQL returns PostgreSQL boolean
 values converted to Python bool objects, or as ``'f'`` and ``'t'``
-strings which are the values used internally by PostgreSQL. By default,
-conversion to bool objects is not activated, but you can enable
-this with the :func:`set_bool` function.
+strings which are the values used internally by PostgreSQL.  By default,
+conversion to bool objects is activated, but you can disable this with
+the :func:`set_bool` function.
 
 .. versionadded:: 4.2
 
@@ -422,11 +422,14 @@ this with the :func:`set_bool` function.
 
 This function can be used to specify whether PyGreSQL shall return
 PostgreSQL boolean values converted to Python bool objects, or as
-``'f'`` and ``'t'`` strings which are the values used internally by PostgreSQL.
-By default, conversion to bool objects is not activated, but you can
-enable this by calling ``set_bool(True)``.
+``'f'`` and ``'t'`` strings which are the values used internally by
+PostgreSQL.  By default, conversion to bool objects is activated,
+but you can disable this by calling ``set_bool(True)``.
 
 .. versionadded:: 4.2
+
+.. versionchanged:: 5.0
+   Boolean values had been returned as string by default in earlier versions.
 
 get/set_array -- whether arrays are returned as list objects
 -------------------------------------------------------------
@@ -459,7 +462,7 @@ is activated, but you can disable this by calling ``set_array(False)``.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-   Arrays had been returned as text strings only in earlier versions.
+   Arrays had been always returned as text strings only in earlier versions.
 
 get/set_bytea_escaped -- whether bytea data is returned escaped
 ---------------------------------------------------------------
@@ -492,7 +495,7 @@ strings, but you can change this by calling ``set_bytea_escaped(True)``.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-   Bytea data had been returned in escaped form in earlier versions.
+   Bytea data had been returned in escaped form by default in earlier versions.
 
 get/set_jsondecode -- decoding JSON format
 ------------------------------------------
@@ -519,7 +522,7 @@ the automatic deserialization of JSON strings will be deactivated.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-   JSON data had been returned in as text strings in earlier versions.
+   JSON data had been always returned as text strings in earlier versions.
 
 get/set_cast_hook -- fallback typecast function
 -----------------------------------------------
