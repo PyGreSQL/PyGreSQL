@@ -1787,10 +1787,11 @@ void notice_receiver(void *arg, const PGresult *res)
 	PyGILState_STATE gstate = PyGILState_Ensure();
 	pgobject *self = (pgobject*) arg;
 	PyObject *proc = self->notice_receiver;
+
 	if (proc && PyCallable_Check(proc))
 	{
 		pgnoticeobject *notice = PyObject_NEW(pgnoticeobject, &PgNoticeType);
-		PyObject *args, *ret;
+		PyObject *ret;
 		if (notice)
 		{
 			notice->pgcnx = arg;
@@ -1801,10 +1802,8 @@ void notice_receiver(void *arg, const PGresult *res)
 			Py_INCREF(Py_None);
 			notice = (pgnoticeobject *)(void *)Py_None;
 		}
-		args = Py_BuildValue("(O)", notice);
-		ret = PyObject_CallObject(proc, args);
+		ret = PyObject_CallFunction(proc, "(O)", notice);
 		Py_XDECREF(ret);
-		Py_DECREF(args);
 	}
 	PyGILState_Release(gstate);
 }
@@ -1963,9 +1962,15 @@ pg_set_notice_receiver(pgobject * self, PyObject * args)
 
 	if (PyArg_ParseTuple(args, "O", &proc))
 	{
-		if (PyCallable_Check(proc))
+		if (proc == Py_None)
 		{
-			Py_XINCREF(proc);
+			Py_XDECREF(self->notice_receiver);
+			self->notice_receiver = NULL;
+			Py_INCREF(Py_None); ret = Py_None;
+		}
+		else if (PyCallable_Check(proc))
+		{
+			Py_XINCREF(proc); Py_XDECREF(self->notice_receiver);
 			self->notice_receiver = proc;
 			PQsetNoticeReceiver(self->cnx, notice_receiver, self);
 			Py_INCREF(Py_None); ret = Py_None;
@@ -2202,15 +2207,14 @@ pgquery_getresult(pgqueryobject *self, PyObject *args)
 					case PYGRES_DECIMAL:
 						if (decimal)
 						{
-							tmp_obj = Py_BuildValue("(s)", s);
-							val = PyEval_CallObject(decimal, tmp_obj);
+							val = PyObject_CallFunction(decimal, "(s)", s);
 						}
 						else
 						{
 							tmp_obj = PyString_FromString(s);
 							val = PyFloat_FromString(tmp_obj, NULL);
+							Py_DECREF(tmp_obj);
 						}
-						Py_DECREF(tmp_obj);
 						break;
 
 					case PYGRES_BOOL:
@@ -2343,15 +2347,14 @@ pgquery_dictresult(pgqueryobject *self, PyObject *args)
 					case PYGRES_DECIMAL:
 						if (decimal)
 						{
-							tmp_obj = Py_BuildValue("(s)", s);
-							val = PyEval_CallObject(decimal, tmp_obj);
+							val = PyObject_CallFunction(decimal, "(s)", s);
 						}
 						else
 						{
 							tmp_obj = PyString_FromString(s);
 							val = PyFloat_FromString(tmp_obj, NULL);
+							Py_DECREF(tmp_obj);
 						}
-						Py_DECREF(tmp_obj);
 						break;
 
 					case PYGRES_BOOL:
@@ -2401,8 +2404,7 @@ static char pgquery_namedresult__doc__[] =
 static PyObject *
 pgquery_namedresult(pgqueryobject *self, PyObject *args)
 {
-	PyObject   *arglist,
-			   *ret;
+	PyObject   *ret;
 
 	/* checks args (args == NULL for an internal call) */
 	if (args && !PyArg_ParseTuple(args, ""))
@@ -2419,9 +2421,7 @@ pgquery_namedresult(pgqueryobject *self, PyObject *args)
 		return NULL;
 	}
 
-	arglist = Py_BuildValue("(O)", self);
-	ret = PyObject_CallObject(namedresult, arglist);
-	Py_DECREF(arglist);
+	ret = PyObject_CallFunction(namedresult, "(O)", self);
 
 	if (ret == NULL)
 	    return NULL;

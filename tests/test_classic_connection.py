@@ -903,14 +903,17 @@ class TestNotificatons(unittest.TestCase):
         self.assertIsNone(self.c.get_notice_receiver())
 
     def testSetNoticeReceiver(self):
-        self.assertRaises(TypeError, self.c.set_notice_receiver, None)
         self.assertRaises(TypeError, self.c.set_notice_receiver, 42)
+        self.assertRaises(TypeError, self.c.set_notice_receiver, 'invalid')
         self.assertIsNone(self.c.set_notice_receiver(lambda notice: None))
+        self.assertIsNone(self.c.set_notice_receiver(None))
 
     def testSetAndGetNoticeReceiver(self):
         r = lambda notice: None
         self.assertIsNone(self.c.set_notice_receiver(r))
         self.assertIs(self.c.get_notice_receiver(), r)
+        self.assertIsNone(self.c.set_notice_receiver(None))
+        self.assertIsNone(self.c.get_notice_receiver())
 
     def testNoticeReceiver(self):
         self.c.query('''create function bilbo_notice() returns void AS $$
