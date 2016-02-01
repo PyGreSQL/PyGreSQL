@@ -432,7 +432,7 @@ but you can disable this by calling ``set_bool(True)``.
    Boolean values had been returned as string by default in earlier versions.
 
 get/set_array -- whether arrays are returned as list objects
--------------------------------------------------------------
+------------------------------------------------------------
 
 .. function:: get_array()
 
@@ -593,6 +593,81 @@ Also note that the typecasting for all of the basic types happens already
 in the C extension module.  The typecast functions that can be set with
 the above methods are only called for the types that are not already
 supported by the C extension module.
+
+cast_array/record -- fast parsers for arrays and records
+--------------------------------------------------------
+
+PosgreSQL returns arrays and records (composite types) using a special output
+syntax with several quirks that cannot easily and quickly be parsed in Python.
+Therefore the C extension module provides two fast parsers that allow quickly
+turning these text representations into Python objects: Arrays will be
+converted to Python lists, and records to Python tuples.  These fast parsers
+are used automatically by PyGreSQL in order to return arrays and records from
+database queries as lists and tuples, so you normally don't need to call them
+directly.  You may only need them for typecasting arrays of data types that
+are not supported by default in PostgreSQL.
+
+.. function::  cast_array(string, [cast], [delim])
+
+    Cast a string representing a PostgreSQL array to a Python list
+
+    :param str string: the string with the text representation of the array
+    :param cast: a typecast function for the elements of the array
+    :type cast: callable or None
+    :param delim: delimiter character between adjacent elements
+    :type str: byte string with a single character
+    :returns: a list representing the PostgreSQL array in Python
+    :rtype: list
+    :raises TypeError: invalid argument types
+    :raises ValueError: error in the syntax of the given array
+
+This function takes a *string* containing the text representation of a
+PostgreSQL array (which may look like ``'{{1,2}{3,4}}'`` for a two-dimensional
+array), a typecast function *cast* that is called for every element, and
+an optional delimiter character *delim* (usually a comma), and returns a
+Python list representing the array (which may be nested like
+``[[1, 2], [3, 4]]`` in this example).  The cast function must take a single
+argument which will be the text representation of the element and must output
+the corresponding Python object that shall be put into the list.  If you don't
+pass a cast function or set it to *None*, then unprocessed text strings will
+be returned as elements of the array.  If you don't pass a delimiter character,
+then a comma will be used by default.
+
+.. versionadded:: 5.0
+
+.. function::  cast_record(string, [cast], [delim])
+
+    Cast a string representing a PostgreSQL record to a Python list
+
+    :param str string: the string with the text representation of the record
+    :param cast: typecast function(s) for the elements of the record
+    :type cast: callable, list or tuple of callables, or None
+    :param delim: delimiter character between adjacent elements
+    :type str: byte string with a single character
+    :returns: a tuple representing the PostgreSQL record in Python
+    :rtype: tuple
+    :raises TypeError: invalid argument types
+    :raises ValueError: error in the syntax of the given array
+
+This function takes a *string* containing the text representation of a
+PostgreSQL record (which may look like ``'(1,a,2,b)'`` for a record composed
+of four fields), a typecast function *cast* that is called for every element,
+or a list or tuple of such functions corresponding to the individual fields
+of the record, and an optional delimiter character *delim* (usually a comma),
+and returns a Python tuple representing the record (which may be inhomogeneous
+like ``(1, 'a', 2, 'b')`` in this example).  The cast function(s) must take a
+single argument which will be the text representation of the element and must
+output the corresponding Python object that shall be put into the tuple.  If
+you don't pass cast function(s) or pass *None* instead, then unprocessed text
+strings will be returned as elements of the tuple.  If you don't pass a
+delimiter character, then a comma will be used by default.
+
+.. versionadded:: 5.0
+
+Note that besides using parentheses instead of braces, there are other subtle
+differences in escaping special characters and NULL values between the syntax
+used for arrays and the one used for composite types, which these functions
+take into account.
 
 Type helpers
 ------------
