@@ -510,7 +510,7 @@ clear -- clear row values in memory
     :rtype: dict
 
 This method clears all the attributes to values determined by the types.
-Numeric types are set to 0, Booleans are set to ``'f'``, and everything
+Numeric types are set to 0, Booleans are set to *False*, and everything
 else is set to the empty string.  If the row argument is present, it is
 used as the row dictionary and any entries matching attribute names are
 cleared with everything else left unchanged.
