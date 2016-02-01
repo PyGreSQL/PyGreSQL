@@ -298,3 +298,56 @@ with separate module level functions, such as :meth:`set_decimal`,
 Also note that after changing global typecast functions with
 :meth:`set_typecast`, you may need to run ``db.dbtypes.reset_typecast()``
 to make these changes effective on connections that were already open.
+
+As one last example, let us try to typecast the geometric data type ``circle``
+of PostgreSQL into a `SymPy <http://www.sympy.org>`_ ``Circle`` object.  Let's
+assume we have created and populated a table with two circles, like so:
+
+.. code-block:: sql
+
+    CREATE TABLE circle (
+        name varchar(8) primary key, circle circle);
+    INSERT INTO circle VALUES ('C1', '<(2, 3), 3>');
+    INSERT INTO circle VALUES ('C2', '<(1, -1), 4>');
+
+With PostgreSQL we can easily calculate that these two circles overlap::
+
+    >>> q = db.query("""SELECT c1.circle && c2.circle
+    ...     FROM circle c1, circle c2
+    ...     WHERE c1.name = 'C1' AND c2.name = 'C2'""")
+    >>> q.getresult()[0][0]
+    True
+
+However, calculating the intersection points between the two circles using the
+``#`` operator does not work (at least not as of PostgreSQL version 9.5).
+So let' resort to SymPy to find out.  To ease importing circles from
+PostgreSQL to SymPy, we create and register the following typecast function::
+
+    >>> from sympy import Point, Circle
+    >>>
+    >>> def cast_circle(s):
+    ...     p, r = s[1:-1].split(',')
+    ...     p = p[1:-1].split(',')
+    ...     return Circle(Point(float(p[0]), float(p[1])), float(r))
+    ...
+    >>> pg.set_typecast('circle', cast_circle)
+
+Now we can import the circles in the table into Python simply using::
+
+    >>> circle = db.get_as_dict('circle', scalar=True)
+
+The result is a dictionary mapping circle names to SymPy ``Circle`` objects.
+We can verify that the circles have been imported correctly:
+
+    >>> circle['C1']
+    Circle(Point(2, 3), 3.0)
+    >>> circle['C2']
+    Circle(Point(1, -1), 4.0)
+
+Finally we can find the exact intersection points with SymPy:
+
+    >>> circle['C1'].intersection(circle['C2'])
+    [Point(29/17 + 64564173230121*sqrt(17)/100000000000000,
+        -80705216537651*sqrt(17)/500000000000000 + 31/17),
+     Point(-64564173230121*sqrt(17)/100000000000000 + 29/17,
+        80705216537651*sqrt(17)/500000000000000 + 31/17)]
