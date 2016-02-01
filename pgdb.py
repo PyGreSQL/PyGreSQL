@@ -90,14 +90,6 @@ except NameError:  # Python >= 3.0
     basestring = (str, bytes)
 
 from collections import Iterable
-try:
-    from collections import OrderedDict
-except ImportError:  # Python 2.6 or 3.0
-    try:
-        from ordereddict import OrderedDict
-    except Exception:
-        def OrderedDict(*args):
-            raise NotSupportedError('OrderedDict is not supported')
 
 
 ### Module Constants
@@ -543,7 +535,7 @@ class Cursor(object):
             size = precision
         else:
             if not size:
-                size = type_info.size
+                size = type_code.size
             if size == -1:
                 size = mod
             precision = scale = None
