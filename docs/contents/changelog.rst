@@ -104,9 +104,10 @@ Version 5.0
       Python objects as JSON data using DB-API 2, you should wrap them in the
       new Json() type constructor as a hint to PyGreSQL.
     - New type helpers Literal(), Json() and Bytea() have been added.
-    - Fast parsers for the input and output syntax for PostgreSQL arrays and
-      composite types have been added to the C module. Note that you can also
-      use multi-dimensional arrays with PyGreSQL.
+    - Fast parsers cast_array() and cast_record() for the input and output
+      syntax for PostgreSQL arrays and composite types have been added to the
+      C extension module. The array parser also allows using multi-dimensional
+      arrays with PyGreSQL.
     - The tty parameter and attribute of database connections has been
       removed since it is not supported any more since PostgreSQL 7.4.
 
