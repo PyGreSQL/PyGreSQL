@@ -758,7 +758,8 @@ class TestParamQueries(unittest.TestCase):
             bool_enabled_default = pg.get_bool()
             pg.set_bool(bool_enabled)
         try:
-            v_false, v_true = (False, True) if bool_enabled else 'ft'
+            bool_on = bool_enabled or bool_enabled is None
+            v_false, v_true = (False, True) if bool_on else 'ft'
             r_false, r_true = [(v_false,)], [(v_true,)]
             self.assertEqual(query("select false").getresult(), r_false)
             self.assertEqual(query("select true").getresult(), r_true)
@@ -1042,8 +1043,7 @@ class TestInserttable(unittest.TestCase):
             if row[2] is not None:  # bigint
                 self.assertIsInstance(row[2], long)
             if row[3] is not None:  # boolean
-                self.assertIsInstance(row[3], str)
-                row[3] = {'f': False, 't': True}.get(row[3])
+                self.assertIsInstance(row[3], bool)
             if row[4] is not None:  # date
                 self.assertIsInstance(row[4], str)
                 self.assertTrue(row[4].replace('-', '').isdigit())
@@ -1404,6 +1404,7 @@ class TestConfigFunctions(unittest.TestCase):
     def setUp(self):
         self.c = connect()
         self.c.query("set client_encoding=utf8")
+        self.c.query('set bytea_output=hex')
         self.c.query("set lc_monetary='C'")
 
     def tearDown(self):
@@ -1614,14 +1615,7 @@ class TestConfigFunctions(unittest.TestCase):
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_bool, use_bool)
         self.assertIsInstance(use_bool, bool)
-        self.assertIs(use_bool, False)  # the default setting
-        pg.set_bool(True)
-        try:
-            r = pg.get_bool()
-        finally:
-            pg.set_bool(use_bool)
-        self.assertIsInstance(r, bool)
-        self.assertIs(r, True)
+        self.assertIs(use_bool, True)  # the default setting
         pg.set_bool(False)
         try:
             r = pg.get_bool()
@@ -1629,7 +1623,7 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_bool(use_bool)
         self.assertIsInstance(r, bool)
         self.assertIs(r, False)
-        pg.set_bool(1)
+        pg.set_bool(True)
         try:
             r = pg.get_bool()
         finally:
@@ -1643,6 +1637,13 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_bool(use_bool)
         self.assertIsInstance(r, bool)
         self.assertIs(r, False)
+        pg.set_bool(1)
+        try:
+            r = pg.get_bool()
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
 
     def testSetBool(self):
         use_bool = pg.get_bool()
@@ -1654,16 +1655,8 @@ class TestConfigFunctions(unittest.TestCase):
         except pg.ProgrammingError:
             self.skipTest('database does not support bool')
         r = r.getresult()[0][0]
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 't')
-        r = query("select true::bool")
-        pg.set_bool(True)
-        try:
-            r = r.getresult()[0][0]
-        finally:
-            pg.set_bool(use_bool)
         self.assertIsInstance(r, bool)
-        self.assertIs(r, True)
+        self.assertEqual(r, True)
         r = query("select true::bool")
         pg.set_bool(False)
         try:
@@ -1672,6 +1665,78 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_bool(use_bool)
         self.assertIsInstance(r, str)
         self.assertIs(r, 't')
+        r = query("select true::bool")
+        pg.set_bool(True)
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_bool(use_bool)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
+
+    def testGetByteEscaped(self):
+        bytea_escaped = pg.get_bytea_escaped()
+        # error if a parameter is passed
+        self.assertRaises(TypeError, pg.get_bytea_escaped, bytea_escaped)
+        self.assertIsInstance(bytea_escaped, bool)
+        self.assertIs(bytea_escaped, False)  # the default setting
+        pg.set_bytea_escaped(True)
+        try:
+            r = pg.get_bytea_escaped()
+        finally:
+            pg.set_bytea_escaped(bytea_escaped)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
+        pg.set_bytea_escaped(False)
+        try:
+            r = pg.get_bytea_escaped()
+        finally:
+            pg.set_bytea_escaped(bytea_escaped)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, False)
+        pg.set_bytea_escaped(1)
+        try:
+            r = pg.get_bytea_escaped()
+        finally:
+            pg.set_bytea_escaped(bytea_escaped)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, True)
+        pg.set_bytea_escaped(0)
+        try:
+            r = pg.get_bytea_escaped()
+        finally:
+            pg.set_bytea_escaped(bytea_escaped)
+        self.assertIsInstance(r, bool)
+        self.assertIs(r, False)
+
+    def testSetByteaEscaped(self):
+        bytea_escaped = pg.get_bytea_escaped()
+        # error if no parameter is passed
+        self.assertRaises(TypeError, pg.set_bytea_escaped)
+        query = self.c.query
+        try:
+            r = query("select 'data'::bytea")
+        except pg.ProgrammingError:
+            self.skipTest('database does not support bytea')
+        r = r.getresult()[0][0]
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'data')
+        r = query("select 'data'::bytea")
+        pg.set_bytea_escaped(True)
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_bytea_escaped(bytea_escaped)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '\\x64617461')
+        r = query("select 'data'::bytea")
+        pg.set_bytea_escaped(False)
+        try:
+            r = r.getresult()[0][0]
+        finally:
+            pg.set_bytea_escaped(bytea_escaped)
+        self.assertIsInstance(r, bytes)
+        self.assertEqual(r, b'data')
 
     def testGetNamedresult(self):
         namedresult = pg.get_namedresult()

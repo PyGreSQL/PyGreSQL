@@ -750,7 +750,7 @@ class TestConfigFunctions(unittest.TestCase):
             self.assertIsInstance(r, bool)
             self.assertIs(r, False)
         finally:
-            pg.set_bool(bytea_escaped)
+            pg.set_bytea_escaped(bytea_escaped)
         r = pg.get_bytea_escaped()
         self.assertIsInstance(r, bool)
         self.assertIs(r, bytea_escaped)
