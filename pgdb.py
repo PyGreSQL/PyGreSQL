@@ -72,6 +72,7 @@ from time import localtime
 from decimal import Decimal
 from math import isnan, isinf
 from collections import namedtuple
+from functools import partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
@@ -116,9 +117,12 @@ try:
 except ImportError:  # Python < 3.3
     from inspect import getargspec
 
-    get_args = lambda func: getargspec(func).args
+    def get_args(func):
+        return getargspec(func).args
 else:
-    get_args = lambda func: list(signature(func).parameters)
+
+    def get_args(func):
+        return list(signature(func).parameters)
 
 try:
     if datetime.strptime('+0100', '%z') is None:
@@ -431,8 +435,7 @@ class Typecasts(dict):
         """Add a connection argument to the typecast function if necessary."""
         if not self.connection or not self._needs_connection(cast):
             return cast
-        connection = self.connection
-        return lambda value: cast(value, connection=connection)
+        return partial(cast, connection=self.connection)
 
     def get(self, typ, default=None):
         """Get the typecast function for the given database type."""
@@ -479,14 +482,18 @@ class Typecasts(dict):
                     self.pop(t, None)
                     self.pop('_%s' % t, None)
 
-    def create_array_cast(self, cast):
+    def create_array_cast(self, basecast):
         """Create an array typecast for the given base cast."""
-        return lambda v: cast_array(v, cast)
+        def cast(v):
+            return cast_array(v, basecast)
+        return cast
 
     def create_record_cast(self, name, fields, casts):
         """Create a named record typecast for the given fields and casts."""
         record = namedtuple(name, fields)
-        return lambda v: record(*cast_record(v, casts))
+        def cast(v):
+            return record(*cast_record(v, casts))
+        return cast
 
 
 _typecasts = Typecasts()  # this is the global typecast dictionary
