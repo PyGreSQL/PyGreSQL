@@ -91,6 +91,7 @@ static PyObject *pg_default_passwd;	/* default password */
 static PyObject *decimal = NULL, /* decimal type */
 				*namedresult = NULL, /* function for getting named results */
 				*jsondecode = NULL; /* function for decoding json strings */
+static const char *date_format = NULL; /* date format that is always assumed */
 static char decimal_point = '.'; /* decimal point used in money values */
 static int bool_as_text = 0; /* whether bool shall be returned as text */
 static int array_as_text = 0; /* whether arrays shall be returned as text */
@@ -139,7 +140,8 @@ typedef struct
 {
 	PyObject_HEAD
 	int			valid;				/* validity flag */
-	PGconn	   *cnx;				/* PostGres connection handle */
+	PGconn	   *cnx;				/* Postgres connection handle */
+	const char *date_format;		/* date format derived from datestyle */
 	PyObject   *cast_hook;			/* external typecast method */
 	PyObject   *notice_receiver;	/* current notice receiver */
 }	connObject;
@@ -294,12 +296,6 @@ get_type(Oid pgtype)
 		case TEXTOID:
 		case VARCHAROID:
 		case NAMEOID:
-		case DATEOID:
-		case INTERVALOID:
-		case TIMEOID:
-		case TIMETZOID:
-		case TIMESTAMPOID:
-		case TIMESTAMPTZOID:
 		case REGTYPEOID:
 			t = PYGRES_TEXT;
 			break;
@@ -352,12 +348,6 @@ get_type(Oid pgtype)
 		case TEXTARRAYOID:
 		case VARCHARARRAYOID:
 		case NAMEARRAYOID:
-		case DATEARRAYOID:
-		case INTERVALARRAYOID:
-		case TIMEARRAYOID:
-		case TIMETZARRAYOID:
-		case TIMESTAMPARRAYOID:
-		case TIMESTAMPTZARRAYOID:
 		case REGTYPEARRAYOID:
 			t = array_as_text ? PYGRES_TEXT : (PYGRES_TEXT | PYGRES_ARRAY);
 			break;
@@ -2021,6 +2011,10 @@ connQuery(connObject *self, PyObject *args)
 		return NULL;
 	}
 
+	/* this may have changed the datestyle, so we reset the date format
+	   in order to force fetching it newly when next time requested */
+	self->date_format = date_format; /* this is normally NULL */
+
 	/* checks result status */
 	if ((status = PQresultStatus(result)) != PGRES_TUPLES_OK)
 	{
@@ -2467,6 +2461,98 @@ connParameter(connObject *self, PyObject *args)
 	/* unknown parameter, return None */
 	Py_INCREF(Py_None);
 	return Py_None;
+}
+
+/* internal function converting a Postgres datestyles to date formats */
+static const char *
+date_style_to_format(const char *s)
+{
+	static const char *formats[] = {
+		"%Y-%m-%d",		/* 0 = ISO */
+		"%m-%d-%Y",		/* 1 = Postgres, MDY */
+		"%d-%m-%Y",		/* 2 = Postgres, DMY */
+		"%m/%d/%Y",		/* 3 = SQL, MDY */
+		"%d/%m/%Y",		/* 4 = SQL, DMY */
+		"%d.%m.%Y"}; 	/* 5 = German */
+
+	switch (s ? *s : 'I')
+	{
+		case 'P': /* Postgres */
+			s = strchr(s + 1, ',');
+			if (s) do ++s; while (*s && *s == ' ');
+			return formats[s && *s == 'D' ? 2 : 1];
+		case 'S': /* SQL */
+			s = strchr(s + 1, ',');
+			if (s) do ++s; while (*s && *s == ' ');
+			return formats[s && *s == 'D' ? 4 : 3];
+		case 'G': /* German */
+			return formats[5];
+		default: /* ISO */
+			return formats[0]; /* ISO is the default */
+	}
+}
+
+/* internal function converting a date format to a Postgres datestyle */
+static const char *
+date_format_to_style(const char *s)
+{
+	static const char *datestyle[] = {
+		"ISO, YMD",			/* 0 = %Y-%m-%d */
+		"Postgres, MDY", 	/* 1 = %m-%d-%Y */
+		"Postgres, DMY", 	/* 2 = %d-%m-%Y */
+		"SQL, MDY", 		/* 3 = %m/%d/%Y */
+		"SQL, DMY", 		/* 4 = %d/%m/%Y */
+		"German, DMY"};		/* 5 = %d.%m.%Y */
+
+	switch (s ? s[1] : 'Y')
+	{
+		case 'm':
+			switch (s[2])
+			{
+				case '/':
+					return datestyle[3]; /* SQL, MDY */
+				default:
+					return datestyle[1]; /* Postgres, MDY */
+			}
+		case 'd':
+			switch (s[2])
+			{
+				case '/':
+					return datestyle[4]; /* SQL, DMY */
+				case '.':
+					return datestyle[5]; /* German */
+				default:
+					return datestyle[2]; /* Postgres, DMY */
+			}
+		default:
+			return datestyle[0]; /* ISO */
+	}
+}
+
+/* get current date format */
+static char connDateFormat__doc__[] =
+"date_format() -- return the current date format";
+
+static PyObject *
+connDateFormat(connObject *self, PyObject *noargs)
+{
+	const char *fmt;
+
+	if (!self->cnx)
+	{
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		return NULL;
+	}
+
+	/* check if the date format is cached in the connection */
+	fmt = self->date_format;
+	if (!fmt)
+	{
+		fmt = date_style_to_format(PQparameterStatus(self->cnx, "DateStyle"));
+		self->date_format = fmt; /* cache the result */
+	}
+
+	return PyStr_FromString(fmt);
 }
 
 #ifdef ESCAPING_FUNCS
@@ -3039,6 +3125,8 @@ static struct PyMethodDef connMethods[] = {
 			connTransaction__doc__},
 	{"parameter", (PyCFunction) connParameter, METH_VARARGS,
 			connParameter__doc__},
+	{"date_format", (PyCFunction) connDateFormat, METH_NOARGS,
+			connDateFormat__doc__},
 
 #ifdef ESCAPING_FUNCS
 	{"escape_literal", (PyCFunction) connEscapeLiteral, METH_O,
@@ -3295,6 +3383,10 @@ sourceExecute(sourceObject *self, PyObject *sql)
 		PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->pgcnx->cnx));
 		return NULL;
 	}
+
+	/* this may have changed the datestyle, so we reset the date format
+	   in order to force fetching it newly when next time requested */
+	self->pgcnx->date_format = date_format; /* this is normally NULL */
 
 	/* checks result status */
 	switch (PQresultStatus(self->result))
@@ -4078,6 +4170,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 
 	npgobj->valid = 1;
 	npgobj->cnx = NULL;
+	npgobj->date_format = date_format;
 	npgobj->cast_hook = NULL;
 	npgobj->notice_receiver = NULL;
 
@@ -4723,6 +4816,45 @@ pgUnescapeBytea(PyObject *self, PyObject *data)
 	return to_obj;
 }
 
+/* set fixed datestyle */
+static char pgSetDatestyle__doc__[] =
+"set_datestyle(style) -- set which style is assumed";
+
+static PyObject *
+pgSetDatestyle(PyObject *self, PyObject *args)
+{
+	const char	   *datestyle = NULL;
+
+	/* gets arguments */
+	if (!PyArg_ParseTuple(args, "z", &datestyle))
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_datestyle() expects a string or None as argument");
+		return NULL;
+	}
+
+	date_format = datestyle ? date_style_to_format(datestyle) : NULL;
+
+	Py_INCREF(Py_None); return Py_None;
+}
+
+/* get fixed datestyle */
+static char pgGetDatestyle__doc__[] =
+"get_datestyle() -- get which date style is assumed";
+
+static PyObject *
+pgGetDatestyle(PyObject *self, PyObject *noargs)
+{
+	if (date_format)
+	{
+		return PyStr_FromString(date_format_to_style(date_format));
+	}
+	else
+	{
+		Py_INCREF(Py_None); return Py_None;
+	}
+}
+
 /* get decimal point */
 static char pgGetDecimalPoint__doc__[] =
 "get_decimal_point() -- get decimal point to be used for money values";
@@ -4798,28 +4930,24 @@ static char pgSetDecimal__doc__[] =
 "set_decimal(cls) -- set a decimal type to be used for numeric values";
 
 static PyObject *
-pgSetDecimal(PyObject *self, PyObject *args)
+pgSetDecimal(PyObject *self, PyObject *cls)
 {
 	PyObject *ret = NULL;
-	PyObject *cls;
 
-	if (PyArg_ParseTuple(args, "O", &cls))
+	if (cls == Py_None)
 	{
-		if (cls == Py_None)
-		{
-			Py_XDECREF(decimal); decimal = NULL;
-			Py_INCREF(Py_None); ret = Py_None;
-		}
-		else if (PyCallable_Check(cls))
-		{
-			Py_XINCREF(cls); Py_XDECREF(decimal); decimal = cls;
-			Py_INCREF(Py_None); ret = Py_None;
-		}
-		else
-			PyErr_SetString(PyExc_TypeError,
-				"Function set_decimal() expects"
-				 " a callable or None as argument");
+		Py_XDECREF(decimal); decimal = NULL;
+		Py_INCREF(Py_None); ret = Py_None;
 	}
+	else if (PyCallable_Check(cls))
+	{
+		Py_XINCREF(cls); Py_XDECREF(decimal); decimal = cls;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_decimal() expects"
+			 " a callable or None as argument");
 
 	return ret;
 }
@@ -4958,28 +5086,24 @@ static char pgSetNamedresult__doc__[] =
 "set_namedresult(func) -- set a function to be used for getting named results";
 
 static PyObject *
-pgSetNamedresult(PyObject *self, PyObject *args)
+pgSetNamedresult(PyObject *self, PyObject *func)
 {
 	PyObject *ret = NULL;
-	PyObject *func;
 
-	if (PyArg_ParseTuple(args, "O", &func))
+	if (func == Py_None)
 	{
-		if (func == Py_None)
-		{
-			Py_XDECREF(namedresult); namedresult = NULL;
-			Py_INCREF(Py_None); ret = Py_None;
-		}
-		else if (PyCallable_Check(func))
-		{
-			Py_XINCREF(func); Py_XDECREF(namedresult); namedresult = func;
-			Py_INCREF(Py_None); ret = Py_None;
-		}
-		else
-			PyErr_SetString(PyExc_TypeError,
-				"Function set_namedresult() expectst"
-				 " a callable or None as argument");
+		Py_XDECREF(namedresult); namedresult = NULL;
+		Py_INCREF(Py_None); ret = Py_None;
 	}
+	else if (PyCallable_Check(func))
+	{
+		Py_XINCREF(func); Py_XDECREF(namedresult); namedresult = func;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_namedresult() expects"
+			 " a callable or None as argument");
 
 	return ret;
 }
@@ -5003,31 +5127,27 @@ pgGetJsondecode(PyObject *self, PyObject *noargs)
 
 /* set json decode function */
 static char pgSetJsondecode__doc__[] =
-"set_jsondecode() -- set a function to be used for decoding json results";
+"set_jsondecode(func) -- set a function to be used for decoding json results";
 
 static PyObject *
-pgSetJsondecode(PyObject *self, PyObject *args)
+pgSetJsondecode(PyObject *self, PyObject *func)
 {
 	PyObject *ret = NULL;
-	PyObject *func;
 
-	if (PyArg_ParseTuple(args, "O", &func))
+	if (func == Py_None)
 	{
-		if (func == Py_None)
-		{
-			Py_XDECREF(jsondecode); jsondecode = NULL;
-			Py_INCREF(Py_None); ret = Py_None;
-		}
-		else if (PyCallable_Check(func))
-		{
-			Py_XINCREF(func); Py_XDECREF(jsondecode); jsondecode = func;
-			Py_INCREF(Py_None); ret = Py_None;
-		}
-		else
-			PyErr_SetString(PyExc_TypeError,
-				"Function jsondecode() expects"
-				 " a callable or None as argument");
+		Py_XDECREF(jsondecode); jsondecode = NULL;
+		Py_INCREF(Py_None); ret = Py_None;
 	}
+	else if (PyCallable_Check(func))
+	{
+		Py_XINCREF(func); Py_XDECREF(jsondecode); jsondecode = func;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function jsondecode() expects"
+			 " a callable or None as argument");
 
 	return ret;
 }
@@ -5419,13 +5539,17 @@ static struct PyMethodDef pgMethods[] = {
 			pgEscapeBytea__doc__},
 	{"unescape_bytea", (PyCFunction) pgUnescapeBytea, METH_O,
 			pgUnescapeBytea__doc__},
+	{"get_datestyle", (PyCFunction) pgGetDatestyle, METH_NOARGS,
+			pgGetDatestyle__doc__},
+	{"set_datestyle", (PyCFunction) pgSetDatestyle, METH_VARARGS,
+			pgSetDatestyle__doc__},
 	{"get_decimal_point", (PyCFunction) pgGetDecimalPoint, METH_NOARGS,
 			pgGetDecimalPoint__doc__},
 	{"set_decimal_point", (PyCFunction) pgSetDecimalPoint, METH_VARARGS,
 			pgSetDecimalPoint__doc__},
 	{"get_decimal", (PyCFunction) pgGetDecimal, METH_NOARGS,
 			pgGetDecimal__doc__},
-	{"set_decimal", (PyCFunction) pgSetDecimal, METH_VARARGS,
+	{"set_decimal", (PyCFunction) pgSetDecimal, METH_O,
 			pgSetDecimal__doc__},
 	{"get_bool", (PyCFunction) pgGetBool, METH_NOARGS, pgGetBool__doc__},
 	{"set_bool", (PyCFunction) pgSetBool, METH_VARARGS, pgSetBool__doc__},
@@ -5437,11 +5561,11 @@ static struct PyMethodDef pgMethods[] = {
 		pgSetByteaEscaped__doc__},
 	{"get_namedresult", (PyCFunction) pgGetNamedresult, METH_NOARGS,
 			pgGetNamedresult__doc__},
-	{"set_namedresult", (PyCFunction) pgSetNamedresult, METH_VARARGS,
+	{"set_namedresult", (PyCFunction) pgSetNamedresult, METH_O,
 			pgSetNamedresult__doc__},
 	{"get_jsondecode", (PyCFunction) pgGetJsondecode, METH_NOARGS,
 			pgGetJsondecode__doc__},
-	{"set_jsondecode", (PyCFunction) pgSetJsondecode, METH_VARARGS,
+	{"set_jsondecode", (PyCFunction) pgSetJsondecode, METH_O,
 			pgSetJsondecode__doc__},
 	{"cast_array", (PyCFunction) pgCastArray, METH_VARARGS|METH_KEYWORDS,
 			pgCastArray__doc__},

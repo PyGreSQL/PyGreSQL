@@ -134,7 +134,7 @@ parameter -- get a current server parameter setting
 
 .. method:: Connection.parameter(name)
 
-    Looks up a current parameter setting of the server
+    Look up a current parameter setting of the server
 
     :param str name: the name of the parameter to look up
     :returns: the current setting of the specified parameter
@@ -157,17 +157,40 @@ Values that are not reported by this method can be requested using
 
 .. versionadded:: 4.0
 
-fileno -- returns the socket used to connect to the database
-------------------------------------------------------------
+date_format -- get the currently used date format
+-------------------------------------------------
+
+.. method:: Connection.date_format()
+
+    Look up the date format currently being used by the database
+
+    :returns: the current date format
+    :rtype: str
+    :raises TypeError: too many (any) arguments
+    :raises TypeError: invalid connection
+
+This method returns the current date format used by the server.  Note that
+it is cheap to call this method, since there is no database query involved
+and the setting is also cached internally.  You will need the date format
+when you want to manually typecast dates and timestamps coming from the
+database instead of using the built-in typecast functions.  The date format
+returned by this method can be directly used with date formatting functions
+such as :meth:`datetime.strptime`.  It is derived from the current setting
+of the database parameter ``DateStyle``.
+
+.. versionadded:: 5.0
+
+fileno -- get the socket used to connect to the database
+--------------------------------------------------------
 
 .. method:: Connection.fileno()
 
-   Return the socket used to connect to the database
+    Get the socket used to connect to the database
 
-   :returns: the socket id of the database connection
-   :rtype: int
-   :raises TypeError: too many (any) arguments
-   :raises TypeError: invalid connection
+    :returns: the socket id of the database connection
+    :rtype: int
+    :raises TypeError: too many (any) arguments
+    :raises TypeError: invalid connection
 
 This method returns the underlying socket id used to connect
 to the database. This is useful for use in select calls, etc.
@@ -378,19 +401,19 @@ the connection and its status. These attributes are:
 
 .. attribute:: Connection.host
 
-   the host name of the server (str)
+    the host name of the server (str)
 
 .. attribute:: Connection.port
 
-   the port of the server (int)
+    the port of the server (int)
 
 .. attribute:: Connection.db
 
-   the selected database (str)
+    the selected database (str)
 
 .. attribute:: Connection.options
 
-   the connection options (str)
+    the connection options (str)
 
 .. attribute:: Connection.user
 
@@ -398,20 +421,20 @@ the connection and its status. These attributes are:
 
 .. attribute:: Connection.protocol_version
 
-   the frontend/backend protocol being used (int)
+    the frontend/backend protocol being used (int)
 
 .. versionadded:: 4.0
 
 .. attribute:: Connection.server_version
 
-   the backend version (int, e.g. 90305 for 9.3.5)
+    the backend version (int, e.g. 90305 for 9.3.5)
 
 .. versionadded:: 4.0
 
 .. attribute:: Connection.status
 
-   the status of the connection (int: 1 = OK, 0 = bad)
+    the status of the connection (int: 1 = OK, 0 = bad)
 
 .. attribute:: Connection.error
 
-   the last warning/error message from the server (str)
+    the last warning/error message from the server (str)

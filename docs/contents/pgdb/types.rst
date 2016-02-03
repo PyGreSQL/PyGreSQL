@@ -54,9 +54,17 @@ the DB-API 2 standard:
 Additionally, PyGreSQL provides the following constructors for PostgreSQL
 specific data types:
 
+.. function:: Interval(days, hours=0, minutes=0, seconds=0, microseconds=0)
+
+    Construct an object holding a time interval value
+
+.. versionadded:: 5.0
+
 .. function:: Bytea(bytes)
 
     Construct an object capable of holding a bytea value
+
+.. versionadded:: 5.0
 
 .. function:: Json(obj, [encode])
 
@@ -68,6 +76,8 @@ specific data types:
 .. function:: Literal(sql)
 
     Construct a wrapper for holding a literal SQL string
+
+.. versionadded:: 5.0
 
 Example for using a type constructor::
 
@@ -168,13 +178,19 @@ DB-API 2 standard:
 
     Used to describe ``json`` and ``jsonb`` columns
 
+.. versionadded:: 5.0
+
 .. object:: ARRAY
 
     Used to describe columns containing PostgreSQL arrays
 
+.. versionadded:: 5.0
+
 .. object:: RECORD
 
     Used to describe columns containing PostgreSQL records
+
+.. versionadded:: 5.0
 
 Example for using some type objects::
 

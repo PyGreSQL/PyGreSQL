@@ -163,15 +163,15 @@ to get some information about it. These attributes are:
 
 .. attribute:: LargeObject.oid
 
-   the OID associated with the large object (int)
+    the OID associated with the large object (int)
 
 .. attribute:: LargeObject.pgcnx
 
-   the :class:`Connection` object associated with the large object
+    the :class:`Connection` object associated with the large object
 
 .. attribute:: LargeObject.error
 
-   the last warning/error message of the connection (str)
+    the last warning/error message of the connection (str)
 
 .. warning::
 

@@ -252,10 +252,10 @@ which takes connection properties into account.
 
 .. note::
 
-   It is especially important to do proper escaping when
-   handling strings that were received from an untrustworthy source.
-   Otherwise there is a security risk: you are vulnerable to "SQL injection"
-   attacks wherein unwanted SQL commands are fed to your database.
+    It is especially important to do proper escaping when
+    handling strings that were received from an untrustworthy source.
+    Otherwise there is a security risk: you are vulnerable to "SQL injection"
+    attacks wherein unwanted SQL commands are fed to your database.
 
 Example::
 
@@ -429,7 +429,7 @@ but you can disable this by calling ``set_bool(True)``.
 .. versionadded:: 4.2
 
 .. versionchanged:: 5.0
-   Boolean values had been returned as string by default in earlier versions.
+    Boolean values had been returned as string by default in earlier versions.
 
 get/set_array -- whether arrays are returned as list objects
 ------------------------------------------------------------
@@ -462,7 +462,7 @@ is activated, but you can disable this by calling ``set_array(False)``.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-   Arrays had been always returned as text strings only in earlier versions.
+    Arrays had been always returned as text strings only in earlier versions.
 
 get/set_bytea_escaped -- whether bytea data is returned escaped
 ---------------------------------------------------------------
@@ -495,7 +495,7 @@ strings, but you can change this by calling ``set_bytea_escaped(True)``.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-   Bytea data had been returned in escaped form by default in earlier versions.
+    Bytea data had been returned in escaped form by default in earlier versions.
 
 get/set_jsondecode -- decoding JSON format
 ------------------------------------------
@@ -522,7 +522,7 @@ the automatic deserialization of JSON strings will be deactivated.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-   JSON data had been always returned as text strings in earlier versions.
+    JSON data had been always returned as text strings in earlier versions.
 
 get/set_cast_hook -- fallback typecast function
 -----------------------------------------------
@@ -544,6 +544,42 @@ If you set this function to *None*, then only the typecast functions
 implemented in the C extension module are enabled.  You normally would
 not want to change this.  Instead, you can use :func:`get_typecast` and
 :func:`set_typecast` to add or change the plug-in Python typecast functions.
+
+.. versionadded:: 5.0
+
+get/set_datestyle -- assume a fixed date style
+----------------------------------------------
+
+.. function:: get_datestyle()
+
+    Get the assumed date style for typecasting
+
+This returns the PostgreSQL date style that is silently assumed when
+typecasting dates or *None* if no fixed date style is assumed, in which case
+the date style is requested from the database when necessary (this is the
+default).  Note that this method will *not* get the date style that is
+currently set in the session or in the database.  You can get the current
+setting with the methods :meth:`DB.get_parameter` and
+:meth:`Connection.parameter`.  You can also get the date format corresponding
+to the current date style by calling :meth:`Connection.date_format`.
+
+.. versionadded:: 5.0
+
+.. function:: set_datestyle(datestyle)
+
+    Set a fixed date style that shall be assumed when typecasting
+
+    :param str datestyle: the date style that shall be assumed,
+      or *None* if no fixed dat style shall be assumed
+
+PyGreSQL is able to automatically pick up the right date style for typecasting
+date values from the database, even if you change it for the current session
+with a ``SET DateStyle`` command.  This is happens very effectively without
+an additional database request being involved.  If you still want to have
+PyGreSQL always assume a fixed date style instead, then you can set one with
+this function.  Note that calling this function will *not* alter the date
+style of the database or the current session.  You can do that by calling
+the method :meth:`DB.set_parameter` instead.
 
 .. versionadded:: 5.0
 
@@ -577,6 +613,12 @@ you can set these using the following functions.
     :type typ: str or list
     :param cast: the typecast function to be set for the specified type(s)
     :type typ: str or int
+
+The typecast function must take one string object as argument and return a
+Python object into which the PostgreSQL type shall be casted.  If the function
+takes another parameter named *connection*, then the current database
+connection will also be passed to the typecast function.  This may sometimes
+be necessary to look up certain database settings.
 
 .. versionadded:: 5.0
 
@@ -680,13 +722,19 @@ in order to give PyGreSQL a hint about the type of the parameters.
 
     A wrapper for holding a bytea value
 
+.. versionadded:: 5.0
+
 .. function:: Json(obj)
 
     A wrapper for holding an object serializable to JSON
 
+.. versionadded:: 5.0
+
 .. function:: Literal(sql)
 
     A wrapper for holding a literal SQL string
+
+.. versionadded:: 5.0
 
 Module constants
 ----------------

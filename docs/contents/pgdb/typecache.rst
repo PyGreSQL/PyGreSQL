@@ -58,6 +58,12 @@ the following methods:
     :param cast: the typecast function to be set for the specified type(s)
     :type typ: str or int
 
+The typecast function must take one string object as argument and return a
+Python object into which the PostgreSQL type shall be casted.  If the function
+takes another parameter named *connection*, then the current database
+connection will also be passed to the typecast function.  This may sometimes
+be necessary to look up certain database settings.
+
 .. method:: TypeCache.reset_typecast([typ])
 
     Reset the typecasts for the specified (or all) type(s) to their defaults

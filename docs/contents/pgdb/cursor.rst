@@ -240,7 +240,7 @@ Methods and attributes that are not part of the standard
 
 .. note::
 
-   The following methods and attributes are not part of the DB-API 2 standard.
+    The following methods and attributes are not part of the DB-API 2 standard.
 
 .. method:: Cursor.copy_from(stream, table, [format], [sep], [null], [size], [columns])
 

@@ -39,6 +39,7 @@ Version 5.0
       composite type, it is passed to Python as a named tuple. PyGreSQL uses
       a new fast built-in parser to achieve this. Anonymous composite types are
       also supported, but yield only an ordinary tuple containing text strings.
+    - A new type helper Interval() has been added.
 - Changes in the classic PyGreSQL module (pg):
     - The classic interface got two new methods get_as_list() and get_as_dict()
       returning a database table as a Python list or dict. The amount of data
@@ -92,6 +93,7 @@ Version 5.0
       separately or formatted into the SQL.
     - The methods for adapting and typecasting values pertaining to PostgreSQL
       types have been refactored and swapped out to separate classes.
+    - A new type helper Bytea() has been added.
 - Changes concerning both modules:
     - The modules now provide get_typecast() and set_typecast() methods
       allowing to control the typecasting on the global level.  The connection
@@ -99,11 +101,16 @@ Version 5.0
       over the typecasting on the level of the current connection.
       See the documentation on details about the type cache and the typecast
       mechanisms provided by PyGreSQL.
+    - Dates, times, timestamps and time intervals are now returned as the
+      corresponding Python objects from the datetime module of the standard
+      library.  In earlier versions of PyGreSQL they had been returned as
+      strings.  You can restore the old behavior by deactivating the respective
+      typecast functions, e.g. set_typecast('date', None).
     - PyGreSQL now supports the JSON and JSONB data types, converting such
       columns automatically to and from Python objects. If you want to insert
       Python objects as JSON data using DB-API 2, you should wrap them in the
       new Json() type constructor as a hint to PyGreSQL.
-    - New type helpers Literal(), Json() and Bytea() have been added.
+    - The new type helpers Literal() and Json() have been added.
     - Fast parsers cast_array() and cast_record() for the input and output
       syntax for PostgreSQL arrays and composite types have been added to the
       C extension module. The array parser also allows using multi-dimensional

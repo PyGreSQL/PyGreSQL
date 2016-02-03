@@ -84,9 +84,9 @@ PyGreSQL does not only adapt the basic types like ``int``, ``float``,
 
 Lists are adapted as PostgreSQL arrays::
 
-   >>> params = dict(array=[[1, 2],[3, 4]])
-   >>> cur.execute("SELECT %(array)s", params).fetchone()[0]
-   [[1, 2], [3, 4]]
+    >>> params = dict(array=[[1, 2],[3, 4]])
+    >>> cur.execute("SELECT %(array)s", params).fetchone()[0]
+    [[1, 2], [3, 4]]
 
 Note that the query gives the value back as Python lists again.  This
 is achieved by the typecasting mechanism explained in the next section.
@@ -151,11 +151,11 @@ In Python we can use a named tuple as an equivalent to this PostgreSQL type::
 Using the automatic adaptation of Python tuples, an item can now be
 inserted into the database and then read back as follows::
 
-   >>> cur.execute("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
-   ...     dict(item=inventory_item('fuzzy dice', 42, 1.99), count=1000))
-   >>> cur.execute("SELECT * FROM on_hand").fetchone()
-   Row(item=inventory_item(name='fuzzy dice', supplier_id=42,
-           price=Decimal('1.99')), count=1000)
+    >>> cur.execute("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
+    ...     dict(item=inventory_item('fuzzy dice', 42, 1.99), count=1000))
+    >>> cur.execute("SELECT * FROM on_hand").fetchone()
+    Row(item=inventory_item(name='fuzzy dice', supplier_id=42,
+            price=Decimal('1.99')), count=1000)
 
 However, we may not want to use named tuples, but custom Python classes
 to hold our values, like this one::
@@ -174,9 +174,9 @@ to hold our values, like this one::
 But when we try to insert an instance of this class in the same way, we
 will get an error::
 
-   >>> cur.execute("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
-   ...     dict(item=InventoryItem('fuzzy dice', 42, 1.99), count=1000))
-   InterfaceError: Do not know how to adapt type <class 'InventoryItem'>
+    >>> cur.execute("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
+    ...     dict(item=InventoryItem('fuzzy dice', 42, 1.99), count=1000))
+    InterfaceError: Do not know how to adapt type <class 'InventoryItem'>
 
 While PyGreSQL knows how to adapt tuples, it does not know what to make out
 of our custom class.  To simply convert the object to a string using the
@@ -233,7 +233,7 @@ Note that the connections cache the typecast functions, so you may need to
 reopen the database connection, or reset the cache of the connection to
 make this effective, using the following command::
 
-   >>> con.type_cache.reset_typecast()
+    >>> con.type_cache.reset_typecast()
 
 The :class:`TypeCache` of the connection can also be used to change typecast
 functions locally for one database connection only.

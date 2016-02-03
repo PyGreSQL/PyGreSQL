@@ -120,7 +120,7 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
-        methods = '''cancel close endcopy
+        methods = '''cancel close date_format endcopy
             escape_bytea escape_identifier escape_literal escape_string
             fileno get_cast_hook get_notice_receiver getline getlo getnotify
             inserttable locreate loimport parameter putline query reset
@@ -914,14 +914,18 @@ class TestQueryResultTypes(unittest.TestCase):
         q = 'select $1::%s' % (pgtype,)
         r = self.c.query(q, (value,)).getresult()[0][0]
         self.assertIsInstance(r, pytype)
-        if isinstance(value, (bytes, str)):
-            if not value or '{':
+        if isinstance(value, str):
+            if not value or ' ' in value or '{' in value:
                 value = '"%s"' % value
         value = '{%s}' % value
         r = self.c.query(q + '[]', (value,)).getresult()[0][0]
-        self.assertIsInstance(r, list)
-        self.assertEqual(len(r), 1)
-        self.assertIsInstance(r[0], pytype)
+        if pgtype.startswith(('date', 'time', 'interval')):
+            # arrays of these are casted by the DB wrapper only
+            self.assertEqual(r, value)
+        else:
+            self.assertIsInstance(r, list)
+            self.assertEqual(len(r), 1)
+            self.assertIsInstance(r[0], pytype)
 
     def testInt(self):
         self.assert_proper_cast(0, 'int', int)
@@ -955,11 +959,11 @@ class TestQueryResultTypes(unittest.TestCase):
 
     def testDate(self):
         self.assert_proper_cast('1956-01-31', 'date', str)
-        self.assert_proper_cast('0', 'interval', str)
-        self.assert_proper_cast('08:42', 'time', str)
-        self.assert_proper_cast('08:42', 'timetz', str)
-        self.assert_proper_cast('1956-01-31 08:42', 'timestamp', str)
-        self.assert_proper_cast('1956-01-31 08:42', 'timestamptz', str)
+        self.assert_proper_cast('10:20:30', 'interval', str)
+        self.assert_proper_cast('08:42:15', 'time', str)
+        self.assert_proper_cast('08:42:15+00', 'timetz', str)
+        self.assert_proper_cast('1956-01-31 08:42:15', 'timestamp', str)
+        self.assert_proper_cast('1956-01-31 08:42:15+00', 'timestamptz', str)
 
     def testText(self):
         self.assert_proper_cast('', 'text', str)

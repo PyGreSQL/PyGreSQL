@@ -28,7 +28,12 @@ except (ImportError, ValueError):
     except ImportError:
         pass
 
-from datetime import datetime
+from datetime import date, time, datetime, timedelta
+
+try:
+    from datetime import timezone
+except ImportError:  # Python < 3.2
+    timezone = None
 
 try:
     long
@@ -401,13 +406,14 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         Decimal = pgdb.decimal_type()
         values = ('test', pgdb.Binary(b'\xff\x52\xb2'),
             True, 5, 6, 5.7, Decimal('234.234234'), Decimal('75.45'),
-            '2011-07-17', '15:47:42', '2008-10-20 15:25:35', '15:31:05',
-            7897234)
+            pgdb.Date(2011, 7, 17), pgdb.Time(15, 47, 42),
+            pgdb.Timestamp(2008, 10, 20, 15, 25, 35),
+            pgdb.Interval(15, 31, 5), 7897234)
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
-            cur.execute("set datestyle to 'iso'")
+            cur.execute("set datestyle to iso")
             cur.execute("create table %s ("
                 "stringtest varchar,"
                 "binarytest bytea,"
@@ -443,10 +449,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertIsInstance(row0[5], float)
             self.assertIsInstance(row0[6], Decimal)
             self.assertIsInstance(row0[7], Decimal)
-            self.assertIsInstance(row0[8], str)
-            self.assertIsInstance(row0[9], str)
-            self.assertIsInstance(row0[10], str)
-            self.assertIsInstance(row0[11], str)
+            self.assertIsInstance(row0[8], date)
+            self.assertIsInstance(row0[9], time)
+            self.assertIsInstance(row0[10], datetime)
+            self.assertIsInstance(row0[11], timedelta)
         finally:
             con.close()
 
@@ -503,29 +509,59 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 self.assertEqual(inval, outval)
 
     def test_datetime(self):
-        values = ['2011-07-17 15:47:42', datetime(2016, 1, 20, 20, 15, 51)]
+        dt = datetime(2011, 7, 17, 15, 47, 42, 317509)
+        td = dt - datetime(1970, 1, 1)
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
-            cur.execute("set datestyle to 'iso'")
-            cur.execute(
-                "create table %s (n smallint, ts timestamp)" % table)
-            params = enumerate(values)
-            cur.executemany("insert into %s values (%%d,%%s)" % table, params)
-            cur.execute("select ts from %s order by n" % table)
-            rows = cur.fetchall()
-            self.assertEqual(cur.description[0].type_code, pgdb.DATETIME)
-            self.assertNotEqual(cur.description[0].type_code, pgdb.ARRAY)
-            self.assertNotEqual(cur.description[0].type_code, pgdb.RECORD)
+            cur.execute("set datestyle to iso")
+            cur.execute("set datestyle to iso")
+            cur.execute("create table %s ("
+                "d date, t time,  ts timestamp,"
+                "tz timetz, tsz timestamptz, i interval)" % table)
+            for n in range(3):
+                values = [dt.date(), dt.time(), dt,
+                    dt.time(), dt, td]
+                if timezone:
+                    values[3] = values[3].replace(tzinfo=timezone.utc)
+                    values[4] = values[4].replace(tzinfo=timezone.utc)
+                if n == 0:  # input as objects
+                    params = values
+                if n == 1:  # input as text
+                    params = [v.isoformat() for v in values[:5]]  # as text
+                    params.append('%d days %d seconds %d microseconds '
+                        % (td.days, td.seconds, td.microseconds))
+                elif n == 2:  # input using type helpers
+                    d = (dt.year, dt.month, dt.day)
+                    t = (dt.hour, dt.minute, dt.second, dt.microsecond)
+                    i = (td.days, 0, 0, td.seconds, td.microseconds)
+                    params = [pgdb.Date(*d), pgdb.Time(*t),
+                            pgdb.Timestamp(*(d + t)), pgdb.Time(*t),
+                            pgdb.Timestamp(*(d + t)), pgdb.Interval(*i)]
+                cur.execute("insert into %s"
+                    " values (%%s,%%s,%%s,%%s,%%s,%%s)" % table, params)
+                for datestyle in ('iso', 'postgres, mdy', 'postgres, dmy',
+                        'sql, mdy', 'sql, dmy', 'german'):
+                    cur.execute("set datestyle to %s" % datestyle)
+                    cur.execute("select * from %s" % table)
+                    d = cur.description
+                    for i in range(6):
+                        self.assertEqual(d[i].type_code, pgdb.DATETIME)
+                        self.assertNotEqual(d[i].type_code, pgdb.STRING)
+                        self.assertNotEqual(d[i].type_code, pgdb.ARRAY)
+                        self.assertNotEqual(d[i].type_code, pgdb.RECORD)
+                    self.assertEqual(d[0].type_code, pgdb.DATE)
+                    self.assertEqual(d[1].type_code, pgdb.TIME)
+                    self.assertEqual(d[2].type_code, pgdb.TIMESTAMP)
+                    self.assertEqual(d[3].type_code, pgdb.TIME)
+                    self.assertEqual(d[4].type_code, pgdb.TIMESTAMP)
+                    self.assertEqual(d[5].type_code, pgdb.INTERVAL)
+                    row = cur.fetchone()
+                    self.assertEqual(row, tuple(values))
+                cur.execute("delete from %s" % table)
         finally:
             con.close()
-        self.assertEqual(len(rows), len(values))
-        rows = [row[0] for row in rows]
-        for inval, outval in zip(values, rows):
-            if isinstance(inval, datetime):
-                inval = inval.strftime('%Y-%m-%d %H:%M:%S')
-            self.assertEqual(inval, outval)
 
     def test_insert_array(self):
         values = [(None, None), ([], []), ([None], [[None], ['null']]),

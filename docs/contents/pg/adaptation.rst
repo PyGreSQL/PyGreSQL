@@ -126,9 +126,9 @@ sense of Python lists and tuples.
 
 Lists are adapted as PostgreSQL arrays::
 
-   >>> params = dict(array=[[1, 2],[3, 4]])
-   >>> db.query_formatted("SELECT %(array)s::int[]", params).getresult()[0][0]
-   [[1, 2], [3, 4]]
+    >>> params = dict(array=[[1, 2],[3, 4]])
+    >>> db.query_formatted("SELECT %(array)s::int[]", params).getresult()[0][0]
+    [[1, 2], [3, 4]]
 
 Note that again we only need to cast the array parameter or use inline
 parameters because this simple query does not provide enough context.
@@ -165,11 +165,11 @@ In Python we can use a named tuple as an equivalent to this PostgreSQL type::
 Using the automatic adaptation of Python tuples, an item can now be
 inserted into the database and then read back as follows::
 
-   >>> db.query_formatted("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
-   ...     dict(item=inventory_item('fuzzy dice', 42, 1.99), count=1000))
-   >>> db.query("SELECT * FROM on_hand").getresult()[0][0]
-   Row(item=inventory_item(name='fuzzy dice', supplier_id=42,
-           price=Decimal('1.99')), count=1000)
+    >>> db.query_formatted("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
+    ...     dict(item=inventory_item('fuzzy dice', 42, 1.99), count=1000))
+    >>> db.query("SELECT * FROM on_hand").getresult()[0][0]
+    Row(item=inventory_item(name='fuzzy dice', supplier_id=42,
+            price=Decimal('1.99')), count=1000)
 
 The :meth:`DB.insert` method provides a simpler way to achieve the same::
 

@@ -67,7 +67,7 @@ Attributes that are not part of the standard
 
 .. note::
 
-   The following attributes are not part of the DB-API 2 standard.
+    The following attributes are not part of the DB-API 2 standard.
 
 .. attribute:: Connection.cursor_type
 

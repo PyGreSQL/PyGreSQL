@@ -72,6 +72,12 @@ these up using the following functions.
     :param cast: the typecast function to be set for the specified type(s)
     :type typ: str or int
 
+The typecast function must take one string object as argument and return a
+Python object into which the PostgreSQL type shall be casted.  If the function
+takes another parameter named *connection*, then the current database
+connection will also be passed to the typecast function.  This may sometimes
+be necessary to look up certain database settings.
+
 .. versionadded:: 5.0
 
 .. method:: reset_typecast([typ])
@@ -110,8 +116,8 @@ Module constants
 
 .. data:: paramstyle
 
-   The string constant ``pyformat``, stating that parameters should be passed
-   using Python extended format codes, e.g. ``" ... WHERE name=%(name)s"``.
+    The string constant ``pyformat``, stating that parameters should be passed
+    using Python extended format codes, e.g. ``" ... WHERE name=%(name)s"``.
 
 Errors raised by this module
 ----------------------------

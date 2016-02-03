@@ -20,6 +20,8 @@ import re
 
 import pg  # the module under test
 
+from datetime import timedelta
+
 try:
     long
 except NameError:  # Python >= 3.0
@@ -614,6 +616,179 @@ class TestParseRecord(unittest.TestCase):
                 self.assertEqual(f(string, cast, b';'), expected)
 
 
+class TestCastInterval(unittest.TestCase):
+    """Test the interval typecast function."""
+
+    intervals = [
+        ((0, 0, 0, 1, 0, 0, 0),
+            ('1:00:00', '01:00:00', '@ 1 hour', 'PT1H')),
+        ((0, 0, 0, -1, 0, 0, 0),
+            ('-1:00:00', '-01:00:00', '@ -1 hour', 'PT-1H')),
+        ((0, 0, 0, 1, 0, 0, 0),
+            ('0-0 0 1:00:00', '0 years 0 mons 0 days 01:00:00',
+            '@ 0 years 0 mons 0 days 1 hour', 'P0Y0M0DT1H')),
+        ((0, 0, 0, -1, 0, 0, 0),
+            ('-0-0 -1:00:00', '0 years 0 mons 0 days -01:00:00',
+            '@ 0 years 0 mons 0 days -1 hour', 'P0Y0M0DT-1H')),
+        ((0, 0, 1, 0, 0, 0, 0),
+            ('1 0:00:00', '1 day', '@ 1 day', 'P1D')),
+        ((0, 0, -1, 0, 0, 0, 0),
+            ('-1 0:00:00', '-1 day', '@ -1 day', 'P-1D')),
+        ((0, 1, 0, 0, 0, 0, 0),
+            ('0-1', '1 mon', '@ 1 mon', 'P1M')),
+        ((1, 0, 0, 0, 0, 0, 0),
+            ('1-0', '1 year', '@ 1 year', 'P1Y')),
+        ((0, 0, 0, 2, 0, 0, 0),
+            ('2:00:00', '02:00:00', '@ 2 hours', 'PT2H')),
+        ((0, 0, 2, 0, 0, 0, 0),
+            ('2 0:00:00', '2 days', '@ 2 days', 'P2D')),
+        ((0, 2, 0, 0, 0, 0, 0),
+            ('0-2', '2 mons', '@ 2 mons', 'P2M')),
+        ((2, 0, 0, 0, 0, 0, 0),
+            ('2-0', '2 years', '@ 2 years', 'P2Y')),
+        ((0, 0, 0, -3, 0, 0, 0),
+            ('-3:00:00', '-03:00:00', '@ 3 hours ago', 'PT-3H')),
+        ((0, 0, -3, 0, 0, 0, 0),
+            ('-3 0:00:00', '-3 days', '@ 3 days ago', 'P-3D')),
+        ((0, -3, 0, 0, 0, 0, 0),
+            ('-0-3', '-3 mons', '@ 3 mons ago', 'P-3M')),
+        ((-3, 0, 0, 0, 0, 0, 0),
+            ('-3-0', '-3 years', '@ 3 years ago', 'P-3Y')),
+        ((0, 0, 0, 0, 1, 0, 0),
+            ('0:01:00', '00:01:00', '@ 1 min', 'PT1M')),
+        ((0, 0, 0, 0, 0, 1, 0),
+            ('0:00:01', '00:00:01', '@ 1 sec', 'PT1S')),
+        ((0, 0, 0, 0, 0, 0, 1),
+            ('0:00:00.000001', '00:00:00.000001',
+             '@ 0.000001 secs', 'PT0.000001S')),
+        ((0, 0, 0, 0, 2, 0, 0),
+            ('0:02:00', '00:02:00', '@ 2 mins', 'PT2M')),
+        ((0, 0, 0, 0, 0, 2, 0),
+            ('0:00:02', '00:00:02', '@ 2 secs', 'PT2S')),
+        ((0, 0, 0, 0, 0, 0, 2),
+            ('0:00:00.000002', '00:00:00.000002',
+             '@ 0.000002 secs', 'PT0.000002S')),
+        ((0, 0, 0, 0, -3, 0, 0),
+            ('-0:03:00', '-00:03:00', '@ 3 mins ago', 'PT-3M')),
+        ((0, 0, 0, 0, 0, -3, 0),
+            ('-0:00:03', '-00:00:03', '@ 3 secs ago', 'PT-3S')),
+        ((0, 0, 0, 0, 0, 0, -3),
+            ('-0:00:00.000003', '-00:00:00.000003',
+             '@ 0.000003 secs ago', 'PT-0.000003S')),
+        ((1, 2, 0, 0, 0, 0, 0),
+            ('1-2', '1 year 2 mons', '@ 1 year 2 mons', 'P1Y2M')),
+        ((0, 0, 3, 4, 5, 6, 0),
+            ('3 4:05:06', '3 days 04:05:06',
+             '@ 3 days 4 hours 5 mins 6 secs', 'P3DT4H5M6S')),
+        ((1, 2, 3, 4, 5, 6, 0),
+            ('+1-2 +3 +4:05:06', '1 year 2 mons 3 days 04:05:06',
+             '@ 1 year 2 mons 3 days 4 hours 5 mins 6 secs',
+             'P1Y2M3DT4H5M6S')),
+        ((1, 2, 3, -4, -5, -6, 0),
+            ('+1-2 +3 -4:05:06', '1 year 2 mons 3 days -04:05:06',
+             '@ 1 year 2 mons 3 days -4 hours -5 mins -6 secs',
+             'P1Y2M3DT-4H-5M-6S')),
+        ((1, 2, 3, -4, 5, 6, 0),
+            ('+1-2 +3 -3:54:54', '1 year 2 mons 3 days -03:54:54',
+             '@ 1 year 2 mons 3 days -3 hours -54 mins -54 secs',
+             'P1Y2M3DT-3H-54M-54S')),
+        ((-1, -2, 3, -4, -5, -6, 0),
+            ('-1-2 +3 -4:05:06', '-1 years -2 mons +3 days -04:05:06',
+             '@ 1 year 2 mons -3 days 4 hours 5 mins 6 secs ago',
+             'P-1Y-2M3DT-4H-5M-6S')),
+        ((1, 2, -3, 4, 5, 6, 0),
+            ('+1-2 -3 +4:05:06', '1 year 2 mons -3 days +04:05:06',
+             '@ 1 year 2 mons -3 days 4 hours 5 mins 6 secs',
+             'P1Y2M-3DT4H5M6S')),
+        ((0, 0, 0, 1, 30, 0, 0),
+            ('1:30:00', '01:30:00', '@ 1 hour 30 mins', 'PT1H30M')),
+        ((0, 0, 0, 3, 15, 45, 123456),
+            ('3:15:45.123456', '03:15:45.123456',
+             '@ 3 hours 15 mins 45.123456 secs', 'PT3H15M45.123456S')),
+        ((0, 0, 0, 3, 15, -5, 123),
+            ('3:14:55.000123', '03:14:55.000123',
+             '@ 3 hours 14 mins 55.000123 secs', 'PT3H14M55.000123S')),
+        ((0, 0, 0, 3, -5, 15, -12345),
+            ('2:55:14.987655', '02:55:14.987655',
+             '@ 2 hours 55 mins 14.987655 secs', 'PT2H55M14.987655S')),
+        ((0, 0, 0, 2, -1, 0, 0),
+            ('1:59:00', '01:59:00', '@ 1 hour 59 mins', 'PT1H59M')),
+        ((0, 0, 0, -1, 2, 0, 0),
+            ('-0:58:00', '-00:58:00', '@ 58 mins ago', 'PT-58M')),
+        ((1, 11, 0, 0, 0, 0, 0),
+            ('1-11', '1 year 11 mons', '@ 1 year 11 mons', 'P1Y11M')),
+        ((0, -10, 0, 0, 0, 0, 0),
+            ('-0-10', '-10 mons', '@ 10 mons ago', 'P-10M')),
+        ((0, 0, 2, -1, 0, 0, 0),
+            ('+0-0 +2 -1:00:00', '2 days -01:00:00',
+             '@ 2 days -1 hours', 'P2DT-1H')),
+        ((0, 0, -1, 2, 0, 0, 0),
+            ('+0-0 -1 +2:00:00', '-1 days +02:00:00',
+             '@ 1 day -2 hours ago', 'P-1DT2H')),
+        ((0, 0, 1, 0, 0, 0, 1),
+            ('1 0:00:00.000001', '1 day 00:00:00.000001',
+             '@ 1 day 0.000001 secs', 'P1DT0.000001S')),
+        ((0, 0, 1, 0, 0, 1, 0),
+            ('1 0:00:01', '1 day 00:00:01', '@ 1 day 1 sec', 'P1DT1S')),
+        ((0, 0, 1, 0, 1, 0, 0),
+            ('1 0:01:00', '1 day 00:01:00', '@ 1 day 1 min', 'P1DT1M')),
+        ((0, 0, 0, 0, 1, 0, -1),
+            ('0:00:59.999999', '00:00:59.999999',
+             '@ 59.999999 secs', 'PT59.999999S')),
+        ((0, 0, 0, 0, -1, 0, 1),
+            ('-0:00:59.999999', '-00:00:59.999999',
+             '@ 59.999999 secs ago', 'PT-59.999999S')),
+        ((0, 0, 0, 0, -1, 1, 1),
+            ('-0:00:58.999999', '-00:00:58.999999',
+             '@ 58.999999 secs ago', 'PT-58.999999S')),
+        ((0, 0, 42, 0, 0, 0, 0),
+            ('42 0:00:00', '42 days', '@ 42 days', 'P42D')),
+        ((0, 0, -7, 0, 0, 0, 0),
+            ('-7 0:00:00', '-7 days', '@ 7 days ago', 'P-7D')),
+        ((1, 1, 1, 1, 1, 0, 0),
+            ('+1-1 +1 +1:01:00', '1 year 1 mon 1 day 01:01:00',
+             '@ 1 year 1 mon 1 day 1 hour 1 min', 'P1Y1M1DT1H1M')),
+        ((0, -11, -1, -1, 1, 0, 0),
+            ('-0-11 -1 -0:59:00', '-11 mons -1 days -00:59:00',
+             '@ 11 mons 1 day 59 mins ago', 'P-11M-1DT-59M')),
+        ((-1, -1, -1, -1, -1, 0, 0),
+            ('-1-1 -1 -1:01:00', '-1 years -1 mons -1 days -01:01:00',
+             '@ 1 year 1 mon 1 day 1 hour 1 min ago', 'P-1Y-1M-1DT-1H-1M')),
+        ((-1, 0, -3, 1, 0, 0, 0),
+            ('-1-0 -3 +1:00:00', '-1 years -3 days +01:00:00',
+             '@ 1 year 3 days -1 hours ago', 'P-1Y-3DT1H')),
+        ((1, 0, 0, 0, 0, 0, 1),
+            ('+1-0 +0 +0:00:00.000001', '1 year 00:00:00.000001',
+             '@ 1 year 0.000001 secs', 'P1YT0.000001S')),
+        ((1, 0, 0, 0, 0, 0, -1),
+            ('+1-0 +0 -0:00:00.000001', '1 year -00:00:00.000001',
+             '@ 1 year -0.000001 secs', 'P1YT-0.000001S')),
+        ((1, 2, 3, 4, 5, 6, 7),
+            ('+1-2 +3 +4:05:06.000007',
+             '1 year 2 mons 3 days 04:05:06.000007',
+             '@ 1 year 2 mons 3 days 4 hours 5 mins 6.000007 secs',
+             'P1Y2M3DT4H5M6.000007S')),
+        ((0, 10, 3, -4, 5, -6, 7),
+            ('+0-10 +3 -3:55:05.999993', '10 mons 3 days -03:55:05.999993',
+             '@ 10 mons 3 days -3 hours -55 mins -5.999993 secs',
+             'P10M3DT-3H-55M-5.999993S')),
+        ((0, -10, -3, 4, -5, 6, -7),
+            ('-0-10 -3 +3:55:05.999993',
+             '-10 mons -3 days +03:55:05.999993',
+             '@ 10 mons 3 days -3 hours -55 mins -5.999993 secs ago',
+             'P-10M-3DT3H55M5.999993S'))]
+
+    def testCastInterval(self):
+        for result, values in self.intervals:
+            f = pg.cast_interval
+            years, mons, days, hours, mins, secs, usecs = result
+            days += 365 * years + 30 * mons
+            interval = timedelta(days=days, hours=hours, minutes=mins,
+                seconds=secs, microseconds=usecs)
+            for value in values:
+                self.assertEqual(f(value), interval)
+
+
 class TestEscapeFunctions(unittest.TestCase):
     """Test pg escape and unescape functions.
 
@@ -675,6 +850,29 @@ class TestConfigFunctions(unittest.TestCase):
     needs a database connection.  So we merely test their existence here.
 
     """
+
+    def testGetDatestyle(self):
+        self.assertIsNone(pg.get_datestyle())
+
+    def testGetDatestyle(self):
+        datestyle = pg.get_datestyle()
+        try:
+            pg.set_datestyle('ISO, YMD')
+            self.assertEqual(pg.get_datestyle(), 'ISO, YMD')
+            pg.set_datestyle('Postgres, MDY')
+            self.assertEqual(pg.get_datestyle(), 'Postgres, MDY')
+            pg.set_datestyle('Postgres, DMY')
+            self.assertEqual(pg.get_datestyle(), 'Postgres, DMY')
+            pg.set_datestyle('SQL, MDY')
+            self.assertEqual(pg.get_datestyle(), 'SQL, MDY')
+            pg.set_datestyle('SQL, DMY')
+            self.assertEqual(pg.get_datestyle(), 'SQL, DMY')
+            pg.set_datestyle('German, DMY')
+            self.assertEqual(pg.get_datestyle(), 'German, DMY')
+            pg.set_datestyle(None)
+            self.assertIsNone(pg.get_datestyle())
+        finally:
+            pg.set_datestyle(datestyle)
 
     def testGetDecimalPoint(self):
         r = pg.get_decimal_point()
