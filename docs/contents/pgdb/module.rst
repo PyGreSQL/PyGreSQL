@@ -99,7 +99,6 @@ will not affect other connections or future connections.  In order to be sure
 a global change is picked up by a running connection, you must reopen it or
 call :meth:`TypeCache.reset_typecast` on the :attr:`Connection.type_cache`.
 
-
 Module constants
 ----------------
 

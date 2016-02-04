@@ -715,12 +715,19 @@ Type helpers
 ------------
 
 The module provides the following type helper functions.  You can wrap
-parameters with these functions when passing them to :meth:`DB.query_formatted`
-in order to give PyGreSQL a hint about the type of the parameters.
+parameters with these functions when passing them to :meth:`DB.query`
+or :meth:`DB.query_formatted` in order to give PyGreSQL a hint about the
+type of the parameters, if it cannot be derived from the context.
 
 .. function:: Bytea(bytes)
 
     A wrapper for holding a bytea value
+
+.. versionadded:: 5.0
+
+.. function:: HStore(dict)
+
+    A wrapper for holding an hstore dictionary
 
 .. versionadded:: 5.0
 
@@ -730,11 +737,17 @@ in order to give PyGreSQL a hint about the type of the parameters.
 
 .. versionadded:: 5.0
 
+The following additional type helper is only meaningful when used with
+:meth:`DB.query_formatted`.  It marks a parameter as text that shall be
+literally included into the SQL.  This is useful for passing table names
+for instance.
+
 .. function:: Literal(sql)
 
     A wrapper for holding a literal SQL string
 
 .. versionadded:: 5.0
+
 
 Module constants
 ----------------

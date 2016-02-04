@@ -1076,6 +1076,198 @@ cast_record(char *s, Py_ssize_t size, int encoding,
 	return ret;
 }
 
+/* Cast string s with size and encoding to a Python dictionary.
+   using the input and output syntax for hstore values. */
+
+static PyObject *
+cast_hstore(char *s, Py_ssize_t size, int encoding)
+{
+	PyObject   *result;
+	char	   *end = s + size;
+
+    result = PyDict_New();
+
+	/* everything is set up, start parsing the record */
+	while (s != end)
+	{
+		char	   *key, *val;
+		PyObject   *key_obj, *val_obj;
+		Py_ssize_t	key_esc = 0, val_esc = 0, size;
+		int			quoted;
+
+		while (s != end && *s == ' ') ++s;
+		if (s == end) break;
+		quoted = *s == '"';
+		if (quoted)
+		{
+			key = ++s;
+			while (s != end)
+			{
+				if (*s == '"') break;
+				if (*s == '\\')
+				{
+					if (++s == end) break;
+					++key_esc;
+				}
+				++s;
+			}
+			if (s == end)
+			{
+				PyErr_SetString(PyExc_ValueError, "Unterminated quote");
+				Py_DECREF(result); return NULL;
+			}
+		}
+		else
+		{
+			key = s;
+			while (s != end)
+			{
+				if (*s == '=' || *s == ' ') break;
+				if (*s == '\\')
+				{
+					if (++s == end) break;
+					++key_esc;
+				}
+				++s;
+			}
+			if (s == key)
+			{
+				PyErr_SetString(PyExc_ValueError, "Missing key");
+				Py_DECREF(result); return NULL;
+			}
+		}
+		size = s - key - key_esc;
+		if (key_esc)
+		{
+			char *r = key, *t;
+			key = (char *) PyMem_Malloc(size);
+			if (!key)
+			{
+				Py_DECREF(result); return PyErr_NoMemory();
+			}
+			t = key;
+			while (r != s)
+			{
+				if (*r == '\\')
+				{
+					++r; if (r == s) break;
+				}
+				*t++ = *r++;
+			}
+		}
+		key_obj = cast_sized_text(key, size, encoding, PYGRES_TEXT);
+		if (key_esc) PyMem_Free(key);
+		if (!key_obj)
+		{
+			Py_DECREF(result); return NULL;
+		}
+		if (quoted) ++s;
+		while (s != end && *s == ' ') ++s;
+		if (s == end || *s++ != '=' || s == end || *s++ != '>')
+		{
+			PyErr_SetString(PyExc_ValueError, "Invalid characters after key");
+			Py_DECREF(key_obj); Py_DECREF(result); return NULL;
+		}
+		while (s != end && *s == ' ') ++s;
+		quoted = *s == '"';
+		if (quoted)
+		{
+			val = ++s;
+			while (s != end)
+			{
+				if (*s == '"') break;
+				if (*s == '\\')
+				{
+					if (++s == end) break;
+					++val_esc;
+				}
+				++s;
+			}
+			if (s == end)
+			{
+				PyErr_SetString(PyExc_ValueError, "Unterminated quote");
+				Py_DECREF(result); return NULL;
+			}
+		}
+		else
+		{
+			val = s;
+			while (s != end)
+			{
+				if (*s == ',' || *s == ' ') break;
+				if (*s == '\\')
+				{
+					if (++s == end) break;
+					++val_esc;
+				}
+				++s;
+			}
+			if (s == val)
+			{
+				PyErr_SetString(PyExc_ValueError, "Missing value");
+				Py_DECREF(key_obj); Py_DECREF(result); return NULL;
+			}
+			if (STR_IS_NULL(val, s - val))
+				val = NULL;
+		}
+		if (val)
+		{
+			size = s - val - val_esc;
+			if (val_esc)
+			{
+				char *r = val, *t;
+				val = (char *) PyMem_Malloc(size);
+				if (!val)
+				{
+					Py_DECREF(key_obj); Py_DECREF(result);
+					return PyErr_NoMemory();
+				}
+				t = val;
+				while (r != s)
+				{
+					if (*r == '\\')
+					{
+						++r; if (r == s) break;
+					}
+					*t++ = *r++;
+				}
+			}
+			val_obj = cast_sized_text(val, size, encoding, PYGRES_TEXT);
+			if (val_esc) PyMem_Free(val);
+			if (!val_obj)
+			{
+				Py_DECREF(key_obj); Py_DECREF(result); return NULL;
+			}
+		}
+		else
+		{
+			Py_INCREF(Py_None); val_obj = Py_None;
+		}
+		if (quoted) ++s;
+		while (s != end && *s == ' ') ++s;
+		if (s != end)
+		{
+			if (*s++ != ',')
+			{
+				PyErr_SetString(PyExc_ValueError,
+					"Invalid characters after val");
+				Py_DECREF(key_obj); Py_DECREF(val_obj);
+				Py_DECREF(result); return NULL;
+			}
+			while (s != end && *s == ' ') ++s;
+			if (s == end)
+			{
+				PyErr_SetString(PyExc_ValueError, "Missing entry");
+				Py_DECREF(key_obj); Py_DECREF(val_obj);
+				Py_DECREF(result); return NULL;
+			}
+		}
+		PyDict_SetItem(result, key_obj, val_obj);
+		Py_DECREF(key_obj); Py_DECREF(val_obj);
+	}
+	return result;
+}
+
 /* internal wrapper for the notice receiver callback */
 static void
 notice_receiver(void *arg, const PGresult *res)
@@ -5420,16 +5612,16 @@ pgCastArray(PyObject *self, PyObject *args, PyObject *dict)
 
 	if (PyBytes_Check(string_obj))
 	{
-		encoding = pg_encoding_ascii;
 		PyBytes_AsStringAndSize(string_obj, &string, &size);
 		string_obj = NULL;
+		encoding = pg_encoding_ascii;
 	}
 	else if (PyUnicode_Check(string_obj))
 	{
-		encoding = pg_encoding_utf8;
-		string_obj = get_encoded_string(string_obj, encoding);
+		string_obj = PyUnicode_AsUTF8String(string_obj);
 		if (!string_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(string_obj, &string, &size);
+		encoding = pg_encoding_utf8;
 	}
 	else
 	{
@@ -5478,16 +5670,16 @@ pgCastRecord(PyObject *self, PyObject *args, PyObject *dict)
 
 	if (PyBytes_Check(string_obj))
 	{
-		encoding = pg_encoding_ascii;
 		PyBytes_AsStringAndSize(string_obj, &string, &size);
 		string_obj = NULL;
+		encoding = pg_encoding_ascii;
 	}
 	else if (PyUnicode_Check(string_obj))
 	{
-		encoding = pg_encoding_utf8;
-		string_obj = get_encoded_string(string_obj, encoding);
+		string_obj = PyUnicode_AsUTF8String(string_obj);
 		if (!string_obj) return NULL; /* pass the UnicodeEncodeError */
 		PyBytes_AsStringAndSize(string_obj, &string, &size);
+		encoding = pg_encoding_utf8;
 	}
 	else
 	{
@@ -5527,6 +5719,43 @@ pgCastRecord(PyObject *self, PyObject *args, PyObject *dict)
 	return ret;
 }
 
+/* cast a string with a text representation of an hstore to a dict */
+static char pgCastHStore__doc__[] =
+"cast_hstore(string) -- cast a string as an hstore";
+
+PyObject *
+pgCastHStore(PyObject *self, PyObject *string)
+{
+	PyObject   *tmp_obj = NULL, *ret;
+	char  	   *s;
+	Py_ssize_t	size;
+	int			encoding;
+
+	if (PyBytes_Check(string))
+	{
+		PyBytes_AsStringAndSize(string, &s, &size);
+		encoding = pg_encoding_ascii;
+	}
+	else if (PyUnicode_Check(string))
+	{
+		tmp_obj = PyUnicode_AsUTF8String(string);
+		if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
+		PyBytes_AsStringAndSize(tmp_obj, &s, &size);
+		encoding = pg_encoding_utf8;
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"Function cast_hstore() expects a string as first argument");
+		return NULL;
+	}
+
+	ret = cast_hstore(s, size, encoding);
+
+	Py_XDECREF(tmp_obj);
+
+	return ret;
+}
 
 /* List of functions defined in the module */
 
@@ -5571,6 +5800,7 @@ static struct PyMethodDef pgMethods[] = {
 			pgCastArray__doc__},
 	{"cast_record", (PyCFunction) pgCastRecord, METH_VARARGS|METH_KEYWORDS,
 			pgCastRecord__doc__},
+	{"cast_hstore", (PyCFunction) pgCastHStore, METH_O, pgCastHStore__doc__},
 
 #ifdef DEFAULT_VARS
 	{"get_defhost", pgGetDefHost, METH_NOARGS, pgGetDefHost__doc__},

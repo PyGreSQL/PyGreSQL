@@ -179,7 +179,7 @@ class _SimpleTypes(dict):
             ' abstime reltime',  # these are very old
         'float': 'float4 float8',
         'int': 'cid int2 int4 int8 oid xid',
-        'json': 'json jsonb',
+        'hstore': 'hstore', 'json': 'json jsonb',
         'num': 'numeric',
         'money': 'money',
         'text': 'bpchar char name text varchar'}
@@ -226,8 +226,29 @@ class _ParameterList(list):
         return '$%d' % len(self)
 
 
-class Literal(str):
-    """Wrapper class for marking literal SQL values."""
+class Bytea(bytes):
+    """Wrapper class for marking Bytea values."""
+
+
+class Hstore(dict):
+    """Wrapper class for marking hstore values."""
+
+    _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
+
+    @classmethod
+    def _quote(cls, s):
+        if s is None:
+            return 'NULL'
+        if not s:
+            return '""'
+        s = s.replace('"', '\\"')
+        if cls._re_quote.search(s):
+            s = '"%s"' % s
+        return s
+
+    def __str__(self):
+        q = self._quote
+        return ','.join('%s=>%s' % (q(k), q(v)) for k, v in self.items())
 
 
 class Json:
@@ -237,8 +258,8 @@ class Json:
         self.obj = obj
 
 
-class Bytea(bytes):
-    """Wrapper class for marking Bytea values."""
+class Literal(str):
+    """Wrapper class for marking literal SQL values."""
 
 
 class Adapter:
@@ -835,8 +856,8 @@ class Typecasts(dict):
     defaults = {'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
-        'int2': int, 'int4': int, 'serial': int,
-        'int8': long, 'json': cast_json, 'jsonb': cast_json,
+        'int2': int, 'int4': int, 'serial': int, 'int8': long,
+        'hstore': cast_hstore, 'json': cast_json, 'jsonb': cast_json,
         'oid': long, 'oid8': long,
         'float4': float, 'float8': float,
         'numeric': cast_num, 'money': cast_money,

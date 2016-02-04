@@ -66,6 +66,18 @@ specific data types:
 
 .. versionadded:: 5.0
 
+.. function:: Interval(days, hours=0, minutes=0, seconds=0, microseconds=0)
+
+    Construct an object holding a time interval value
+
+.. versionadded:: 5.0
+
+.. function:: Hstore(dict)
+
+    Construct a wrapper for holding an hstore dictionary
+
+.. versionadded:: 5.0
+
 .. function:: Json(obj, [encode])
 
     Construct a wrapper for holding an object serializable to JSON

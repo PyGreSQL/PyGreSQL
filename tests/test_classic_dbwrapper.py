@@ -3683,6 +3683,23 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r[1], list)
         self.assertEqual(r[1][0], dt[1])
 
+    def testHstore(self):
+        try:
+            self.db.query("select 'k=>v'::hstore")
+        except pg.ProgrammingEror:
+            try:
+                self.db.query("create extension hstore")
+            except pg.ProgrammingError:
+                self.skipTest("hstore extension not enabled")
+        d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
+            '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
+            '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
+            'None': None, 'NULL': 'NULL', 'empty': ''}
+        q = "select $1::hstore"
+        r = self.db.query(q, (pg.Hstore(d),)).getresult()[0][0]
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, d)
+
     def testDbTypesInfo(self):
         dbtypes = self.db.dbtypes
         self.assertIsInstance(dbtypes, dict)

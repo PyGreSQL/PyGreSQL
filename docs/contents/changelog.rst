@@ -6,40 +6,6 @@ Version 5.0
 - This version now runs on both Python 2 and Python 3.
 - The supported versions are Python 2.6 to 2.7, and 3.3 to 3.5.
 - PostgreSQL is supported in all versions from 9.0 to 9.5.
-- Changes in the DB-API 2 module (pgdb):
-    - The DB-API 2 module now always returns result rows as named tuples
-      instead of simply lists as before. The documentation explains how
-      you can restore the old behavior or use custom row objects instead.
-    - The names of the various classes used by the classic and DB-API 2
-      modules have been renamed to become simpler, more intuitive and in
-      line with the names used in the DB-API 2 documentation.
-      Since the API provides only objects of these types through constructor
-      functions, this should not cause any incompatibilities.
-    - The DB-API 2 module now supports the callproc() cursor method. Note
-      that output parameters are currently not replaced in the return value.
-    - The DB-API 2 module now supports copy operations between data streams
-      on the client and database tables via the COPY command of PostgreSQL.
-      The cursor method copy_from() can be used to copy data from the database
-      to the client, and the cursor method copy_to() can be used to copy data
-      from the client to the database.
-    - The 7-tuples returned by the description attribute of a pgdb cursor
-      are now named tuples, i.e. their elements can be also accessed by name.
-      The column names and types can now also be requested through the
-      colnames and coltypes attributes, which are not part of DB-API 2 though.
-      The type_code provided by the description attribute is still equal to
-      the PostgreSQL internal type name, but now carries some more information
-      in additional attributes. The size, precision and scale information that
-      is part of the description is now properly set for numeric types.
-    - If you pass a Python list as one of the parameters to a DB-API 2 cursor,
-      it is now automatically bound using an ARRAY constructor. If you pass a
-      Python tuple, it is bound using a ROW constructor. This is useful for
-      passing records as well as making use of the IN syntax.
-    - Inversely, when a fetch method of a DB-API 2 cursor returns a PostgreSQL
-      array, it is passed to Python as a list, and when it returns a PostgreSQL
-      composite type, it is passed to Python as a named tuple. PyGreSQL uses
-      a new fast built-in parser to achieve this. Anonymous composite types are
-      also supported, but yield only an ordinary tuple containing text strings.
-    - A new type helper Interval() has been added.
 - Changes in the classic PyGreSQL module (pg):
     - The classic interface got two new methods get_as_list() and get_as_dict()
       returning a database table as a Python list or dict. The amount of data
@@ -91,9 +57,41 @@ Version 5.0
       that allows using the format specifications from Python.  A flag "inline"
       can be set to specify whether parameters should be sent to the database
       separately or formatted into the SQL.
-    - The methods for adapting and typecasting values pertaining to PostgreSQL
-      types have been refactored and swapped out to separate classes.
     - A new type helper Bytea() has been added.
+- Changes in the DB-API 2 module (pgdb):
+    - The DB-API 2 module now always returns result rows as named tuples
+      instead of simply lists as before. The documentation explains how
+      you can restore the old behavior or use custom row objects instead.
+    - The names of the various classes used by the classic and DB-API 2
+      modules have been renamed to become simpler, more intuitive and in
+      line with the names used in the DB-API 2 documentation.
+      Since the API provides only objects of these types through constructor
+      functions, this should not cause any incompatibilities.
+    - The DB-API 2 module now supports the callproc() cursor method. Note
+      that output parameters are currently not replaced in the return value.
+    - The DB-API 2 module now supports copy operations between data streams
+      on the client and database tables via the COPY command of PostgreSQL.
+      The cursor method copy_from() can be used to copy data from the database
+      to the client, and the cursor method copy_to() can be used to copy data
+      from the client to the database.
+    - The 7-tuples returned by the description attribute of a pgdb cursor
+      are now named tuples, i.e. their elements can be also accessed by name.
+      The column names and types can now also be requested through the
+      colnames and coltypes attributes, which are not part of DB-API 2 though.
+      The type_code provided by the description attribute is still equal to
+      the PostgreSQL internal type name, but now carries some more information
+      in additional attributes. The size, precision and scale information that
+      is part of the description is now properly set for numeric types.
+    - If you pass a Python list as one of the parameters to a DB-API 2 cursor,
+      it is now automatically bound using an ARRAY constructor. If you pass a
+      Python tuple, it is bound using a ROW constructor. This is useful for
+      passing records as well as making use of the IN syntax.
+    - Inversely, when a fetch method of a DB-API 2 cursor returns a PostgreSQL
+      array, it is passed to Python as a list, and when it returns a PostgreSQL
+      composite type, it is passed to Python as a named tuple. PyGreSQL uses
+      a new fast built-in parser to achieve this. Anonymous composite types are
+      also supported, but yield only an ordinary tuple containing text strings.
+    - A new type helper Interval() has been added.
 - Changes concerning both modules:
     - The modules now provide get_typecast() and set_typecast() methods
       allowing to control the typecasting on the global level.  The connection
@@ -106,15 +104,20 @@ Version 5.0
       library.  In earlier versions of PyGreSQL they had been returned as
       strings.  You can restore the old behavior by deactivating the respective
       typecast functions, e.g. set_typecast('date', None).
-    - PyGreSQL now supports the JSON and JSONB data types, converting such
+    - PyGreSQL now supports the "hstore" data type, converting such columns
+      automatically to and from Python dictionaries.  If you want to insert
+      Python objects as JSON data using DB-API 2, you should wrap them in the
+      new HStore() type constructor as a hint to PyGreSQL.
+    - PyGreSQL now supports the "json" and "jsonb" data types, converting such
       columns automatically to and from Python objects. If you want to insert
       Python objects as JSON data using DB-API 2, you should wrap them in the
       new Json() type constructor as a hint to PyGreSQL.
-    - The new type helpers Literal() and Json() have been added.
-    - Fast parsers cast_array() and cast_record() for the input and output
-      syntax for PostgreSQL arrays and composite types have been added to the
-      C extension module. The array parser also allows using multi-dimensional
-      arrays with PyGreSQL.
+    - A new type helper Literal() for inserting parameters literally as SQL
+      has been added.  This is useful for table names, for instance.
+    - Fast parsers cast_array(), cast_record() and cast_hstore for the input
+      and output syntax for PostgreSQL arrays, composite types and the hstore
+      type have been added to the C extension module. The array parser also
+      allows using multi-dimensional arrays with PyGreSQL.
     - The tty parameter and attribute of database connections has been
       removed since it is not supported any more since PostgreSQL 7.4.
 

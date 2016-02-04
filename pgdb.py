@@ -386,8 +386,8 @@ class Typecasts(dict):
     defaults = {'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
-        'int2': int, 'int4': int, 'serial': int,
-        'int8': long, 'json': jsondecode, 'jsonb': jsondecode,
+        'int2': int, 'int4': int, 'serial': int, 'int8': long,
+        'hstore': cast_hstore, 'json': jsondecode, 'jsonb': jsondecode,
         'oid': long, 'oid8': long,
         'float4': float, 'float8': float,
         'numeric': Decimal, 'money': cast_money,
@@ -730,7 +730,7 @@ class Cursor(object):
         """Quote value depending on its type."""
         if value is None:
             return 'NULL'
-        if isinstance(value, (datetime, date, time, timedelta, Json)):
+        if isinstance(value, (datetime, date, time, timedelta, Hstore, Json)):
             value = str(value)
         if isinstance(value, basestring):
             if isinstance(value, Binary):
@@ -1559,13 +1559,35 @@ class Binary(bytes):
 
 # Additional type helpers for PyGreSQL:
 
+class Bytea(bytes):
+    """Construct an object capable of holding a bytea value."""
+
+
 def Interval(days, hours=0, minutes=0, seconds=0, microseconds=0):
     """Construct an object holding a time inverval value."""
     return timedelta(days, hours=hours, minutes=minutes, seconds=seconds,
         microseconds=microseconds)
 
-class Bytea(bytes):
-    """Construct an object capable of holding a bytea value."""
+
+class Hstore(dict):
+    """Wrapper class for marking hstore values."""
+
+    _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
+
+    @classmethod
+    def _quote(cls, s):
+        if s is None:
+            return 'NULL'
+        if not s:
+            return '""'
+        s = s.replace('"', '\\"')
+        if cls._re_quote.search(s):
+            s = '"%s"' % s
+        return s
+
+    def __str__(self):
+        q = self._quote
+        return ','.join('%s=>%s' % (q(k), q(v)) for k, v in self.items())
 
 
 class Json:
@@ -1581,8 +1603,6 @@ class Json:
             return obj
         return self.encode(obj)
 
-    __pg_repr__ = __str__
-
 
 class Literal:
     """Construct a wrapper for holding a literal SQL string."""
@@ -1594,7 +1614,6 @@ class Literal:
         return self.sql
 
     __pg_repr__ = __str__
-
 
 # If run as script, print some information:
 

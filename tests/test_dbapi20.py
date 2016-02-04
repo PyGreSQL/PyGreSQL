@@ -590,6 +590,32 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_hstore(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select 'k=>v'::hstore")
+        except pgdb.ProgrammingError:
+            try:
+                cur.execute("create extension hstore")
+            except pgdb.ProgrammingError:
+                self.skipTest("hstore extension not enabled")
+        finally:
+            con.close()
+        d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
+            '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
+            '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
+            'None': None, 'NULL': 'NULL', 'empty': ''}
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select %s::hstore", (pgdb.Hstore(d),))
+            result = cur.fetchone()[0]
+        finally:
+            con.close()
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result, d)
+
     def test_insert_array(self):
         values = [(None, None), ([], []), ([None], [[None], ['null']]),
             ([1, 2, 3], [['a', 'b'], ['c', 'd']]),

@@ -616,6 +616,56 @@ class TestParseRecord(unittest.TestCase):
                 self.assertEqual(f(string, cast, b';'), expected)
 
 
+class TestParseHStore(unittest.TestCase):
+    """Test the hstore parser."""
+
+    test_strings = [
+        ('', {}),
+        ('=>', ValueError),
+        ('""=>', ValueError),
+        ('=>""', ValueError),
+        ('""=>""', {'': ''}),
+        ('NULL=>NULL', {'NULL': None}),
+        ('null=>null', {'null': None}),
+        ('NULL=>"NULL"', {'NULL': 'NULL'}),
+        ('null=>"null"', {'null': 'null'}),
+        ('k', ValueError),
+        ('k,', ValueError),
+        ('k=', ValueError),
+        ('k=>', ValueError),
+        ('k=>v', {'k': 'v'}),
+        ('k=>v,', ValueError),
+        (' k => v ', {'k': 'v'}),
+        ('   k   =>   v   ', {'k': 'v'}),
+        ('" k " => " v "', {' k ': ' v '}),
+        ('"k=>v', ValueError),
+        ('k=>"v', ValueError),
+        ('"1-a" => "anything at all"', {'1-a': 'anything at all'}),
+        ('k => v, foo => bar, baz => whatever,'
+                ' "1-a" => "anything at all"',
+            {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
+            '1-a': 'anything at all'}),
+        ('"Hello, World!"=>"Hi!"', {'Hello, World!': 'Hi!'}),
+        ('"Hi!"=>"Hello, World!"', {'Hi!': 'Hello, World!'}),
+        ('"k=>v"=>k\=\>v', {'k=>v': 'k=>v'}),
+        ('k\=\>v=>"k=>v"', {'k=>v': 'k=>v'}),
+        ('a\\,b=>a,b=>a', {'a,b': 'a', 'b': 'a'})]
+
+    def testParser(self):
+        f = pg.cast_hstore
+
+        self.assertRaises(TypeError, f)
+        self.assertRaises(TypeError, f, None)
+        self.assertRaises(TypeError, f, 42)
+        self.assertRaises(TypeError, f, '', None)
+
+        for string, expected in self.test_strings:
+            if expected is ValueError:
+                self.assertRaises(ValueError, f, string)
+            else:
+                self.assertEqual(f(string), expected)
+
+
 class TestCastInterval(unittest.TestCase):
     """Test the interval typecast function."""
 
