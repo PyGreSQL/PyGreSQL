@@ -510,43 +510,37 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def test_datetime(self):
         dt = datetime(2011, 7, 17, 15, 47, 42, 317509)
-        td = dt - datetime(1970, 1, 1)
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
-            cur.execute("set datestyle to iso")
-            cur.execute("set datestyle to iso")
             cur.execute("create table %s ("
                 "d date, t time,  ts timestamp,"
-                "tz timetz, tsz timestamptz, i interval)" % table)
+                "tz timetz, tsz timestamptz)" % table)
             for n in range(3):
                 values = [dt.date(), dt.time(), dt,
-                    dt.time(), dt, td]
+                    dt.time(), dt]
                 if timezone:
                     values[3] = values[3].replace(tzinfo=timezone.utc)
                     values[4] = values[4].replace(tzinfo=timezone.utc)
                 if n == 0:  # input as objects
                     params = values
                 if n == 1:  # input as text
-                    params = [v.isoformat() for v in values[:5]]  # as text
-                    params.append('%d days %d seconds %d microseconds '
-                        % (td.days, td.seconds, td.microseconds))
+                    params = [v.isoformat() for v in values]  # as text
                 elif n == 2:  # input using type helpers
                     d = (dt.year, dt.month, dt.day)
                     t = (dt.hour, dt.minute, dt.second, dt.microsecond)
-                    i = (td.days, 0, 0, td.seconds, td.microseconds)
                     params = [pgdb.Date(*d), pgdb.Time(*t),
                             pgdb.Timestamp(*(d + t)), pgdb.Time(*t),
-                            pgdb.Timestamp(*(d + t)), pgdb.Interval(*i)]
-                cur.execute("insert into %s"
-                    " values (%%s,%%s,%%s,%%s,%%s,%%s)" % table, params)
+                            pgdb.Timestamp(*(d + t))]
                 for datestyle in ('iso', 'postgres, mdy', 'postgres, dmy',
                         'sql, mdy', 'sql, dmy', 'german'):
                     cur.execute("set datestyle to %s" % datestyle)
+                    cur.execute("insert into %s"
+                        " values (%%s,%%s,%%s,%%s,%%s)" % table, params)
                     cur.execute("select * from %s" % table)
                     d = cur.description
-                    for i in range(6):
+                    for i in range(5):
                         self.assertEqual(d[i].type_code, pgdb.DATETIME)
                         self.assertNotEqual(d[i].type_code, pgdb.STRING)
                         self.assertNotEqual(d[i].type_code, pgdb.ARRAY)
@@ -556,10 +550,43 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                     self.assertEqual(d[2].type_code, pgdb.TIMESTAMP)
                     self.assertEqual(d[3].type_code, pgdb.TIME)
                     self.assertEqual(d[4].type_code, pgdb.TIMESTAMP)
-                    self.assertEqual(d[5].type_code, pgdb.INTERVAL)
                     row = cur.fetchone()
                     self.assertEqual(row, tuple(values))
-                cur.execute("delete from %s" % table)
+                    cur.execute("delete from %s" % table)
+        finally:
+            con.close()
+
+    def test_interval(self):
+        td = datetime(2011, 7, 17, 15, 47, 42, 317509) - datetime(1970, 1, 1)
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s (i interval)" % table)
+            for n in range(3):
+                if n == 0:  # input as objects
+                    param = td
+                if n == 1:  # input as text
+                    param = '%d days %d seconds %d microseconds ' % (
+                        td.days, td.seconds, td.microseconds)
+                elif n == 2:  # input using type helpers
+                    param = pgdb.Interval(
+                        td.days, 0, 0, td.seconds, td.microseconds)
+                for intervalstyle in ('sql_standard ', 'postgres',
+                        'postgres_verbose', 'iso_8601'):
+                    cur.execute("set intervalstyle to %s" % intervalstyle)
+                    cur.execute("insert into %s"
+                        " values (%%s)" % table, [param])
+                    cur.execute("select * from %s" % table)
+                    tc = cur.description[0].type_code
+                    self.assertEqual(tc, pgdb.DATETIME)
+                    self.assertNotEqual(tc, pgdb.STRING)
+                    self.assertNotEqual(tc, pgdb.ARRAY)
+                    self.assertNotEqual(tc, pgdb.RECORD)
+                    self.assertEqual(tc, pgdb.INTERVAL)
+                    row = cur.fetchone()
+                    self.assertEqual(row, (td,))
+                    cur.execute("delete from %s" % table)
         finally:
             con.close()
 

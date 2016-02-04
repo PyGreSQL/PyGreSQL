@@ -3527,8 +3527,8 @@ class TestDBClass(unittest.TestCase):
                 'SQL, MDY', 'SQL, DMY', 'German'):
             self.db.set_parameter('datestyle', datestyle)
             d = date(2016, 3, 14)
-            q = "select '2016-03-14'::date"
-            r = query(q).getresult()[0][0]
+            q = "select $1::date"
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, date)
             self.assertEqual(r, d)
             q = "select '10000-08-01'::date, '0099-01-08 BC'::date"
@@ -3547,13 +3547,13 @@ class TestDBClass(unittest.TestCase):
     def testTime(self):
         query = self.db.query
         d = time(15, 9, 26)
-        q = "select '15:09:26'::time"
-        r = query(q).getresult()[0][0]
+        q = "select $1::time"
+        r = query(q, (d,)).getresult()[0][0]
         self.assertIsInstance(r, time)
         self.assertEqual(r, d)
         d = time(15, 9, 26, 535897)
-        q = "select '15:09:26.535897'::time"
-        r = query(q).getresult()[0][0]
+        q = "select $1::time"
+        r = query(q, (d,)).getresult()[0][0]
         self.assertIsInstance(r, time)
         self.assertEqual(r, d)
 
@@ -3568,13 +3568,13 @@ class TestDBClass(unittest.TestCase):
                 tzinfo = None
             self.db.set_parameter('timezone', timezone)
             d = time(15, 9, 26, tzinfo=tzinfo)
-            q = "select '15:09:26'::timetz"
-            r = query(q).getresult()[0][0]
+            q = "select $1::timetz"
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, time)
             self.assertEqual(r, d)
             d = time(15, 9, 26, 535897, tzinfo)
-            q = "select '15:09:26.535897'::timetz"
-            r = query(q).getresult()[0][0]
+            q = "select $1::timetz"
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, time)
             self.assertEqual(r, d)
 
@@ -3584,18 +3584,18 @@ class TestDBClass(unittest.TestCase):
                 'SQL, MDY', 'SQL, DMY', 'German'):
             self.db.set_parameter('datestyle', datestyle)
             d = datetime(2016, 3, 14)
-            q = "select '2016-03-14'::timestamp"
-            r = query(q).getresult()[0][0]
+            q = "select $1::timestamp"
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, datetime)
             self.assertEqual(r, d)
             d = datetime(2016, 3, 14, 15, 9, 26)
-            q = "select '2016-03-14 15:09:26'::timestamp"
-            r = query(q).getresult()[0][0]
+            q = "select $1::timestamp"
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, datetime)
             self.assertEqual(r, d)
             d = datetime(2016, 3, 14, 15, 9, 26, 535897)
-            q = "select '2016-03-14 15:09:26.535897'::timestamp"
-            r = query(q).getresult()[0][0]
+            q = "select $1::timestamp"
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, datetime)
             self.assertEqual(r, d)
             q = ("select '10000-08-01 AD'::timestamp,"
@@ -3626,18 +3626,18 @@ class TestDBClass(unittest.TestCase):
                     'SQL, MDY', 'SQL, DMY', 'German'):
                 self.db.set_parameter('datestyle', datestyle)
                 d = datetime(2016, 3, 14, tzinfo=tzinfo)
-                q = "select '2016-03-14'::timestamptz"
-                r = query(q).getresult()[0][0]
+                q = "select $1::timestamptz"
+                r = query(q, (d,)).getresult()[0][0]
                 self.assertIsInstance(r, datetime)
                 self.assertEqual(r, d)
                 d = datetime(2016, 3, 14, 15, 9, 26, tzinfo=tzinfo)
-                q = "select '2016-03-14 15:09:26'::timestamptz"
-                r = query(q).getresult()[0][0]
+                q = "select $1::timestamptz"
+                r = query(q, (d,)).getresult()[0][0]
                 self.assertIsInstance(r, datetime)
                 self.assertEqual(r, d)
                 d = datetime(2016, 3, 14, 15, 9, 26, 535897, tzinfo)
-                q = "select '2016-03-14 15:09:26.535897'::timestamptz"
-                r = query(q).getresult()[0][0]
+                q = "select $1::timestamptz"
+                r = query(q, (d,)).getresult()[0][0]
                 self.assertIsInstance(r, datetime)
                 self.assertEqual(r, d)
                 q = ("select '10000-08-01 AD'::timestamptz,"
@@ -3659,36 +3659,29 @@ class TestDBClass(unittest.TestCase):
         for intervalstyle in (
                 'sql_standard', 'postgres', 'postgres_verbose', 'iso_8601'):
             self.db.set_parameter('intervalstyle', intervalstyle)
-            q = "select '2016-03-14'::timestamp - '2016-03-11'::timestamp"
-            r = query(q).getresult()[0][0]
-            self.assertIsInstance(r, timedelta)
             d = timedelta(3)
-            self.assertEqual(r, d)
-            q = "select '2016-03-14'::timestamp - '2016-04-13'::timestamp"
-            r = query(q).getresult()[0][0]
+            q = "select $1::interval"
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, timedelta)
+            self.assertEqual(r, d)
             d = timedelta(-30)
-            self.assertEqual(r, d)
-            q = ("select '2016-03-14 15:31:42.5678'::timestamp"
-                 " - '2016-03-14 12:00:00'::timestamp")
-            r = query(q).getresult()[0][0]
+            r = query(q, (d,)).getresult()[0][0]
             self.assertIsInstance(r, timedelta)
+            self.assertEqual(r, d)
             d = timedelta(hours=3, minutes=31, seconds=42, microseconds=5678)
+            q = "select $1::interval"
+            r = query(q, (d,)).getresult()[0][0]
+            self.assertIsInstance(r, timedelta)
             self.assertEqual(r, d)
 
     def testDateAndTimeArrays(self):
-        q = "select ARRAY['2016-03-14'::date], ARRAY['15:09:26'::time]"
-        r = self.db.query(q).getresult()[0]
-        d = r[0]
-        self.assertIsInstance(d, list)
-        d = d[0]
-        self.assertIsInstance(d, date)
-        self.assertEqual(d, date(2016, 3, 14))
-        d = r[1]
-        self.assertIsInstance(d, list)
-        d = d[0]
-        self.assertIsInstance(d, time)
-        self.assertEqual(d, time(15, 9, 26))
+        dt = (date(2016, 3, 14), time(15, 9, 26))
+        q = "select ARRAY[$1::date], ARRAY[$2::time]"
+        r = self.db.query(q, dt).getresult()[0]
+        self.assertIsInstance(r[0], list)
+        self.assertEqual(r[0][0], dt[0])
+        self.assertIsInstance(r[1], list)
+        self.assertEqual(r[1][0], dt[1])
 
     def testDbTypesInfo(self):
         dbtypes = self.db.dbtypes
