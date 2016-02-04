@@ -12,6 +12,40 @@ Python objects.  Here are some explanations about how this works in
 detail in case you want to better understand or change the default
 behavior of PyGreSQL.
 
+Supported data types
+--------------------
+
+The following automatic data type conversions are supported by PyGreSQL
+out of the box.  If you need other automatic type conversions or want to
+change the default conversions, you can achieve this by using the methods
+explained in the next two sections.
+
+================================== ==================
+PostgreSQL                          Python
+================================== ==================
+char, bpchar, name, text, varchar  str
+bool                               bool
+bytea                              bytes
+int2, int4, int8, oid, serial      int [#int8]_
+int2vector                         list of int
+float4, float8                     float
+numeric, money                     Decimal
+date                               datetime.date
+time, timetz                       datetime.time
+timestamp, timestamptz             datetime.datetime
+interval                           datetime.timedelta
+hstore                             dict
+json, jsonb                        list or dict
+array                              list
+record                             tuple
+================================== ==================
+
+.. note::
+
+    Elements of arrays and records will also be converted accordingly.
+
+    .. [#int8] int8 is converted to long in Python 2
+
 Adaptation of parameters
 ------------------------
 When you use the higher level methods of the classic :mod:`pg` module like

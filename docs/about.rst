@@ -28,7 +28,7 @@ even for commercial use.
 
 **PyGreSQL** is a Python module that interfaces to a PostgreSQL database.
 It embeds the PostgreSQL query library to allow easy use of the powerful
-PostgreSQL features from a Python script.
+PostgreSQL features from a Python script or application.
 
 PyGreSQL is developed and tested on a NetBSD system, but it also runs on
 most other platforms where PostgreSQL and Python is running.  It is based
