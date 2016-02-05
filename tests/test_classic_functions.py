@@ -1061,6 +1061,7 @@ class TestModuleConstants(unittest.TestCase):
             $"""
         match = re.match(re_version, v, re.X)
         self.assertIsNotNone(match)
+        self.assertEqual(pg.__version__, v)
 
 
 if __name__ == '__main__':

@@ -67,6 +67,8 @@ from __future__ import print_function
 
 from _pg import *
 
+__version__ = version
+
 from datetime import date, time, datetime, timedelta
 from time import localtime
 from decimal import Decimal

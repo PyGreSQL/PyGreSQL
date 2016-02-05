@@ -31,6 +31,8 @@ from __future__ import print_function
 
 from _pg import *
 
+__version__ = version
+
 import select
 import warnings
 

@@ -84,6 +84,12 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
 
+    def testVersion(self):
+        v = pgdb.version
+        self.assertIsInstance(v, str)
+        self.assertIn('.', v)
+        self.assertEqual(pgdb.__version__, v)
+
     def test_callproc_no_params(self):
         con = self._connect()
         cur = con.cursor()
