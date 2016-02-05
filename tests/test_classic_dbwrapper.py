@@ -1071,9 +1071,8 @@ class TestDBClass(unittest.TestCase):
 
     def testGetAttnamesWithRegtypes(self):
         get_attnames = self.db.get_attnames
-        self.createTable('test_table',
-                         ' n int, alpha smallint, beta bool,'
-                         ' gamma char(5), tau text, v varchar(3)')
+        self.createTable('test_table', 'n int, alpha smallint, beta bool,'
+            ' gamma char(5), tau text, v varchar(3)')
         use_regtypes = self.db.use_regtypes
         regtypes = use_regtypes()
         self.assertEqual(regtypes, self.regtypes)
@@ -1089,9 +1088,8 @@ class TestDBClass(unittest.TestCase):
 
     def testGetAttnamesWithoutRegtypes(self):
         get_attnames = self.db.get_attnames
-        self.createTable('test_table',
-                         ' n int, alpha smallint, beta bool,'
-                         ' gamma char(5), tau text, v varchar(3)')
+        self.createTable('test_table', 'n int, alpha smallint, beta bool,'
+            ' gamma char(5), tau text, v varchar(3)')
         use_regtypes = self.db.use_regtypes
         regtypes = use_regtypes()
         self.assertEqual(regtypes, self.regtypes)
@@ -1150,9 +1148,8 @@ class TestDBClass(unittest.TestCase):
             r = ' '.join(list(r.keys()))
             self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
         table = 'test table for get_attnames'
-        self.createTable(table,
-                         ' n int, alpha smallint, v varchar(3),'
-                         ' gamma char(5), tau text, beta bool')
+        self.createTable(table, 'n int, alpha smallint, v varchar(3),'
+                ' gamma char(5), tau text, beta bool')
         r = get_attnames(table)
         self.assertIsInstance(r, OrderedDict)
         if self.regtypes:
@@ -1189,9 +1186,8 @@ class TestDBClass(unittest.TestCase):
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
         table = 'test table for get_attnames'
-        self.createTable(table,
-                         ' n int, alpha smallint, v varchar(3),'
-                         ' gamma char(5), tau text, beta bool')
+        self.createTable(table, 'n int, alpha smallint, v varchar(3),'
+                ' gamma char(5), tau text, beta bool')
         r = get_attnames(table)
         self.assertIsInstance(r, AttrDict)
         if self.regtypes:
@@ -1215,10 +1211,16 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(can('test', 'insert'), True)
         self.assertEqual(can('test', 'update'), True)
         self.assertEqual(can('test', 'delete'), True)
-        self.assertEqual(can('pg_views', 'select'), True)
-        self.assertEqual(can('pg_views', 'delete'), False)
         self.assertRaises(pg.ProgrammingError, can, 'test', 'foobar')
         self.assertRaises(pg.ProgrammingError, can, 'table_does_not_exist')
+        r = self.db.query('select rolsuper FROM pg_roles'
+            ' where rolname=current_user').getresult()[0][0]
+        if not pg.get_bool():
+            r = r == 't'
+        if r:
+            self.skipTest('must not be superuser')
+        self.assertEqual(can('pg_views', 'select'), True)
+        self.assertEqual(can('pg_views', 'delete'), False)
 
     def testGet(self):
         get = self.db.get

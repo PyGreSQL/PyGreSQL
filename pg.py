@@ -1789,18 +1789,26 @@ class DB:
                 self.dbtypes.clear()
             return regtypes
 
-    def has_table_privilege(self, table, privilege='select'):
-        """Check whether current user has specified table privilege."""
+    def has_table_privilege(self, table, privilege='select', flush=False):
+        """Check whether current user has specified table privilege.
+
+        If flush is set, then the internal cache for table privileges will
+        be flushed. This may be necessary after privileges have been changed.
+        """
+        privileges = self._privileges
+        if flush:
+            privileges.clear()
+            self._do_debug('The privileges cache has been flushed')
         privilege = privilege.lower()
         try:  # ask cache
-            return self._privileges[(table, privilege)]
+            ret = privileges[table, privilege]
         except KeyError:  # cache miss, ask the database
             q = "SELECT has_table_privilege(%s, $2)" % (
                 _quote_if_unqualified('$1', table),)
             q = self.db.query(q, (table, privilege))
             ret = q.getresult()[0][0] == self._make_bool(True)
-            self._privileges[(table, privilege)] = ret  # cache it
-            return ret
+            privileges[table, privilege] = ret  # cache it
+        return ret
 
     def get(self, table, row, keyname=None):
         """Get a row from a database table or view.
