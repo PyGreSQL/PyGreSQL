@@ -104,6 +104,8 @@ Version 5.0
       library.  In earlier versions of PyGreSQL they had been returned as
       strings.  You can restore the old behavior by deactivating the respective
       typecast functions, e.g. set_typecast('date', None).
+    - PyGreSQL now support the "uuid" data type, converting such columns
+      automatically to and from Python uuid.UUID objects.
     - PyGreSQL now supports the "hstore" data type, converting such columns
       automatically to and from Python dictionaries.  If you want to insert
       Python objects as JSON data using DB-API 2, you should wrap them in the

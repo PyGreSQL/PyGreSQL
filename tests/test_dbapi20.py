@@ -29,6 +29,7 @@ except (ImportError, ValueError):
         pass
 
 from datetime import date, time, datetime, timedelta
+from uuid import UUID
 
 try:
     from datetime import timezone
@@ -614,6 +615,18 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
         self.assertIsInstance(result, dict)
+        self.assertEqual(result, d)
+
+    def test_uuid(self):
+        d = UUID('{12345678-1234-5678-1234-567812345678}')
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select %s::uuid", (d,))
+            result = cur.fetchone()[0]
+        finally:
+            con.close()
+        self.assertIsInstance(result, UUID)
         self.assertEqual(result, d)
 
     def test_insert_array(self):

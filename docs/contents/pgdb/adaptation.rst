@@ -36,6 +36,7 @@ timestamp, timestamptz             datetime.datetime
 interval                           datetime.timedelta
 hstore                             dict
 json, jsonb                        list or dict
+uuid                               uuid.UUID
 array                              list
 record                             tuple
 ================================== ==================

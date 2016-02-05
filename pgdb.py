@@ -70,6 +70,7 @@ from _pg import *
 from datetime import date, time, datetime, timedelta
 from time import localtime
 from decimal import Decimal
+from uuid import UUID
 from math import isnan, isinf
 from collections import namedtuple
 from functools import partial
@@ -393,7 +394,7 @@ class Typecasts(dict):
         'date': cast_date, 'interval': cast_interval,
         'time': cast_time, 'timetz': cast_timetz,
         'timestamp': cast_timestamp, 'timestamptz': cast_timestamptz,
-        'int2vector': cast_int2vector,
+        'int2vector': cast_int2vector, 'uuid': UUID,
         'anyarray': cast_array, 'record': cast_record}
 
     connection = None  # will be set in local connection specific instances
@@ -729,7 +730,8 @@ class Cursor(object):
         """Quote value depending on its type."""
         if value is None:
             return 'NULL'
-        if isinstance(value, (datetime, date, time, timedelta, Hstore, Json)):
+        if isinstance(value,
+                (datetime, date, time, timedelta, Hstore, Json, UUID)):
             value = str(value)
         if isinstance(value, basestring):
             if isinstance(value, Binary):

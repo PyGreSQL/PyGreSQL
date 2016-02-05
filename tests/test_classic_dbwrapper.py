@@ -24,6 +24,7 @@ import pg  # the module under test
 
 from decimal import Decimal
 from datetime import date, time, datetime, timedelta
+from uuid import UUID
 from time import strftime
 from operator import itemgetter
 
@@ -3700,6 +3701,13 @@ class TestDBClass(unittest.TestCase):
         q = "select $1::hstore"
         r = self.db.query(q, (pg.Hstore(d),)).getresult()[0][0]
         self.assertIsInstance(r, dict)
+        self.assertEqual(r, d)
+
+    def testUuid(self):
+        d = UUID('{12345678-1234-5678-1234-567812345678}')
+        q = 'select $1::uuid'
+        r = self.db.query(q, (d,)).getresult()[0][0]
+        self.assertIsInstance(r, UUID)
         self.assertEqual(r, d)
 
     def testDbTypesInfo(self):

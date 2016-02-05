@@ -42,6 +42,7 @@ from operator import itemgetter
 from functools import partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
+from uuid import UUID
 
 try:
     long
@@ -179,9 +180,8 @@ class _SimpleTypes(dict):
             ' abstime reltime',  # these are very old
         'float': 'float4 float8',
         'int': 'cid int2 int4 int8 oid xid',
-        'hstore': 'hstore', 'json': 'json jsonb',
-        'num': 'numeric',
-        'money': 'money',
+        'hstore': 'hstore', 'json': 'json jsonb', 'uuid': 'uuid',
+        'num': 'numeric', 'money': 'money',
         'text': 'bpchar char name text varchar'}
 
     def __init__(self):
@@ -863,7 +863,7 @@ class Typecasts(dict):
         'date': cast_date, 'interval': cast_interval,
         'time': cast_time, 'timetz': cast_timetz,
         'timestamp': cast_timestamp, 'timestamptz': cast_timestamptz,
-        'int2vector': cast_int2vector,
+        'int2vector': cast_int2vector, 'uuid': UUID,
         'anyarray': cast_array, 'record': cast_record}
 
     connection = None  # will be set in a connection specific instance
