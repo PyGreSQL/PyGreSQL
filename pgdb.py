@@ -1509,6 +1509,7 @@ DATE = Type('date')
 TIME = Type('time timetz')
 TIMESTAMP = Type('timestamp timestamptz')
 INTERVAL = Type('interval')
+HSTORE = Type('hstore')
 JSON = Type('json jsonb')
 
 # Type object for arrays (also equate to their base types):
@@ -1557,10 +1558,6 @@ class Binary(bytes):
 
 
 # Additional type helpers for PyGreSQL:
-
-class Bytea(bytes):
-    """Construct an object capable of holding a bytea value."""
-
 
 def Interval(days, hours=0, minutes=0, seconds=0, microseconds=0):
     """Construct an object holding a time inverval value."""

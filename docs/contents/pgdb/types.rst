@@ -60,18 +60,6 @@ specific data types:
 
 .. versionadded:: 5.0
 
-.. function:: Bytea(bytes)
-
-    Construct an object capable of holding a bytea value
-
-.. versionadded:: 5.0
-
-.. function:: Interval(days, hours=0, minutes=0, seconds=0, microseconds=0)
-
-    Construct an object holding a time interval value
-
-.. versionadded:: 5.0
-
 .. function:: Hstore(dict)
 
     Construct a wrapper for holding an hstore dictionary
@@ -185,6 +173,12 @@ DB-API 2 standard:
 .. object:: INTERVAL
 
     Used to describe date and time ``interval`` columns
+
+.. object:: HSTORE
+
+    Used to describe ``hstore`` columns
+
+.. versionadded:: 5.0
 
 .. object:: JSON
 
