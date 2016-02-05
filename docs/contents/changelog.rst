@@ -93,6 +93,9 @@ Version 5.0
       also supported, but yield only an ordinary tuple containing text strings.
     - A new type helper Interval() has been added.
 - Changes concerning both modules:
+    - PyGreSQL now tries to raise more specific and appropriate subclasses of
+      DatabaseError than just ProgrammingError. Particularly, when database
+      constraints are violated, it raises an IntegrityError now.
     - The modules now provide get_typecast() and set_typecast() methods
       allowing to control the typecasting on the global level.  The connection
       objects have got type caches with the same methods which give control

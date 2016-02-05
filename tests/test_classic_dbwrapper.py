@@ -306,10 +306,10 @@ class TestDBClassBasic(unittest.TestCase):
     def testMethodQueryEmpty(self):
         self.assertRaises(ValueError, self.db.query, '')
 
-    def testMethodQueryProgrammingError(self):
+    def testMethodQueryDataError(self):
         try:
             self.db.query("select 1/0")
-        except pg.ProgrammingError as error:
+        except pg.DataError as error:
             self.assertEqual(error.sqlstate, '22012')
 
     def testMethodEndcopy(self):
@@ -873,10 +873,10 @@ class TestDBClass(unittest.TestCase):
     def testEmptyQuery(self):
         self.assertRaises(ValueError, self.db.query, '')
 
-    def testQueryProgrammingError(self):
+    def testQueryDataError(self):
         try:
             self.db.query("select 1/0")
-        except pg.ProgrammingError as error:
+        except pg.DataError as error:
             self.assertEqual(error.sqlstate, '22012')
 
     def testQueryFormatted(self):
@@ -1212,7 +1212,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(can('test', 'insert'), True)
         self.assertEqual(can('test', 'update'), True)
         self.assertEqual(can('test', 'delete'), True)
-        self.assertRaises(pg.ProgrammingError, can, 'test', 'foobar')
+        self.assertRaises(pg.DataError, can, 'test', 'foobar')
         self.assertRaises(pg.ProgrammingError, can, 'table_does_not_exist')
         r = self.db.query('select rolsuper FROM pg_roles'
             ' where rolname=current_user').getresult()[0][0]
@@ -1583,9 +1583,9 @@ class TestDBClass(unittest.TestCase):
         r = insert('test_table', dict(n=7))
         self.assertIsInstance(r, dict)
         self.assertEqual(r['n'], 7)
-        self.assertRaises(pg.ProgrammingError, insert, 'test_table', r)
+        self.assertRaises(pg.IntegrityError, insert, 'test_table', r)
         r['n'] = 6
-        self.assertRaises(pg.ProgrammingError, insert, 'test_table', r, n=7)
+        self.assertRaises(pg.IntegrityError, insert, 'test_table', r, n=7)
         self.assertIsInstance(r, dict)
         self.assertEqual(r['n'], 7)
         r['n'] = 6
@@ -1633,7 +1633,7 @@ class TestDBClass(unittest.TestCase):
         r = dict(i4=5678, v4='efgh')
         try:
             insert('test_view', r)
-        except pg.ProgrammingError as error:
+        except pg.NotSupportedError as error:
             if self.db.server_version < 90300:
                 # must setup rules in older PostgreSQL versions
                 self.skipTest('database cannot insert into view')
@@ -2273,9 +2273,9 @@ class TestDBClass(unittest.TestCase):
         q = ("select (select count(*) from test_parent),"
              " (select count(*) from test_child)")
         self.assertEqual(query(q).getresult()[0], (3, 3))
-        self.assertRaises(pg.ProgrammingError,
+        self.assertRaises(pg.IntegrityError,
                           delete, 'test_parent', None, n=2)
-        self.assertRaises(pg.ProgrammingError,
+        self.assertRaises(pg.IntegrityError,
                           delete, 'test_parent *', None, n=2)
         r = delete('test_child', None, n=2)
         self.assertEqual(r, 1)
@@ -2283,9 +2283,9 @@ class TestDBClass(unittest.TestCase):
         r = delete('test_parent', None, n=2)
         self.assertEqual(r, 1)
         self.assertEqual(query(q).getresult()[0], (2, 2))
-        self.assertRaises(pg.ProgrammingError,
+        self.assertRaises(pg.IntegrityError,
                           delete, 'test_parent', dict(n=0))
-        self.assertRaises(pg.ProgrammingError,
+        self.assertRaises(pg.IntegrityError,
                           delete, 'test_parent *', dict(n=0))
         r = delete('test_child', dict(n=0))
         self.assertEqual(r, 1)
@@ -2372,7 +2372,7 @@ class TestDBClass(unittest.TestCase):
              " (select count(*) from test_child)")
         r = query(q).getresult()[0]
         self.assertEqual(r, (3, 3))
-        self.assertRaises(pg.ProgrammingError, truncate, 'test_parent')
+        self.assertRaises(pg.NotSupportedError, truncate, 'test_parent')
         truncate(['test_parent', 'test_child'])
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, 0))
@@ -2392,7 +2392,7 @@ class TestDBClass(unittest.TestCase):
         truncate('test_child')
         r = query(q).getresult()[0]
         self.assertEqual(r, (3, 0))
-        self.assertRaises(pg.ProgrammingError, truncate, 'test_parent')
+        self.assertRaises(pg.NotSupportedError, truncate, 'test_parent')
         truncate('test_parent', cascade=True)
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, 0))
@@ -2777,7 +2777,7 @@ class TestDBClass(unittest.TestCase):
         self.db.savepoint('before8')
         query("insert into test_table values (8)")
         self.db.release('before8')
-        self.assertRaises(pg.ProgrammingError, self.db.rollback, 'before8')
+        self.assertRaises(pg.InternalError, self.db.rollback, 'before8')
         self.db.commit()
         self.db.start()
         query("insert into test_table values (9)")
@@ -2786,11 +2786,11 @@ class TestDBClass(unittest.TestCase):
             "select * from test_table order by 1").getresult()]
         self.assertEqual(r, [1, 2, 5, 7, 9])
         self.db.begin(mode='read only')
-        self.assertRaises(pg.ProgrammingError,
+        self.assertRaises(pg.InternalError,
                           query, "insert into test_table values (0)")
         self.db.rollback()
         self.db.start(mode='Read Only')
-        self.assertRaises(pg.ProgrammingError,
+        self.assertRaises(pg.InternalError,
                           query, "insert into test_table values (0)")
         self.db.abort()
 
@@ -2818,7 +2818,7 @@ class TestDBClass(unittest.TestCase):
             with self.db:
                 query("insert into test_table values (6)")
                 query("insert into test_table values (-1)")
-        except pg.ProgrammingError as error:
+        except pg.IntegrityError as error:
             self.assertTrue('check' in str(error))
         with self.db:
             query("insert into test_table values (7)")
@@ -3166,7 +3166,7 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(r['i'], '{1,2,3}')
             self.assertEqual(r['t'], '{a,b,c}')
         r = dict(i="1, 2, 3", t="'a', 'b', 'c'")
-        self.assertRaises(pg.ProgrammingError, self.db.insert, 'arraytest', r)
+        self.assertRaises(pg.DataError, self.db.insert, 'arraytest', r)
 
     def testArrayOfIds(self):
         array_on = pg.get_array()
@@ -3689,10 +3689,10 @@ class TestDBClass(unittest.TestCase):
     def testHstore(self):
         try:
             self.db.query("select 'k=>v'::hstore")
-        except pg.ProgrammingEror:
+        except pg.DatabaseError:
             try:
                 self.db.query("create extension hstore")
-            except pg.ProgrammingError:
+            except pg.DatabaseError:
                 self.skipTest("hstore extension not enabled")
         d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
             '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',

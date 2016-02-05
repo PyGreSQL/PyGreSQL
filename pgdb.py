@@ -864,7 +864,7 @@ class Cursor(object):
                     self._cnx.source().execute(sql)
                 except DatabaseError:
                     raise  # database provides error message
-                except Exception as err:
+                except Exception:
                     raise _op_error("Can't start transaction")
                 self._dbcnx._tnx = True
             for parameters in seq_of_parameters:

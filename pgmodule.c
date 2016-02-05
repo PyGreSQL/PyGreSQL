@@ -1296,42 +1296,111 @@ notice_receiver(void *arg, const PGresult *res)
 	PyGILState_Release(gstate);
 }
 
+/* gets appropriate error type from sqlstate */
+static PyObject *
+get_error_type(const char *sqlstate)
+{
+	switch (sqlstate[0]) {
+		case '0':
+			switch (sqlstate[1])
+			{
+				case 'A':
+					return NotSupportedError;
+			}
+			break;
+		case '2':
+			switch (sqlstate[1])
+			{
+				case '0':
+				case '1':
+					return ProgrammingError;
+				case '2':
+					return DataError;
+				case '3':
+					return IntegrityError;
+				case '4':
+				case '5':
+					return InternalError;
+				case '6':
+				case '7':
+				case '8':
+					return OperationalError;
+				case 'B':
+				case 'D':
+				case 'F':
+					return InternalError;
+			}
+			break;
+		case '3':
+			switch (sqlstate[1])
+			{
+				case '4':
+					return OperationalError;
+				case '8':
+				case '9':
+				case 'B':
+					return InternalError;
+				case 'D':
+				case 'F':
+					return ProgrammingError;
+			}
+			break;
+		case '4':
+			switch (sqlstate[1])
+			{
+				case '0':
+					return OperationalError;
+				case '2':
+				case '4':
+					return ProgrammingError;
+			}
+			break;
+		case '5':
+		case 'H':
+			return OperationalError;
+		case 'F':
+		case 'P':
+		case 'X':
+			return InternalError;
+	}
+	return DatabaseError;
+}
+
 /* sets database error with sqlstate attribute */
 /* This should be used when raising a subclass of DatabaseError */
 static void
 set_dberror(PyObject *type, const char *msg, PGresult *result)
 {
-	PyObject *err = NULL;
-	PyObject *str;
+	PyObject   *err_obj, *msg_obj, *sql_obj = NULL;
 
-	if (!(str = PyStr_FromString(msg)))
-		err = NULL;
-	else
+	if (result)
 	{
-		err = PyObject_CallFunctionObjArgs(type, str, NULL);
-		Py_DECREF(str);
+		char *sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
+		if (sqlstate)
+		{
+			sql_obj = PyStr_FromStringAndSize(sqlstate, 5);
+			type = get_error_type(sqlstate);
+		}
 	}
-	if (err)
+	if (!sql_obj)
 	{
-		if (result)
-		{
-			char *sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
-			str = sqlstate ? PyStr_FromStringAndSize(sqlstate, 5) : NULL;
-		}
-		else
-			str = NULL;
-		if (!str)
-		{
-			Py_INCREF(Py_None);
-			str = Py_None;
-		}
-		PyObject_SetAttrString(err, "sqlstate", str);
-		Py_DECREF(str);
-		PyErr_SetObject(type, err);
-		Py_DECREF(err);
+		Py_INCREF(Py_None);
+		sql_obj = Py_None;
+	}
+	msg_obj = PyStr_FromString(msg);
+	err_obj = PyObject_CallFunctionObjArgs(type, msg_obj, NULL);
+	if (err_obj)
+	{
+		Py_DECREF(msg_obj);
+		PyObject_SetAttrString(err_obj, "sqlstate", sql_obj);
+		Py_DECREF(sql_obj);
+		PyErr_SetObject(type, err_obj);
+		Py_DECREF(err_obj);
 	}
 	else
+	{
 		PyErr_SetString(type, msg);
+	}
 }
 
 /* checks connection validity */

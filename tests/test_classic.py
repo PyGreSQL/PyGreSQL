@@ -36,6 +36,7 @@ def opendb():
     db.query("SET TIME ZONE 'EST5EDT'")
     db.query("SET DEFAULT_WITH_OIDS=FALSE")
     db.query("SET STANDARD_CONFORMING_STRINGS=FALSE")
+    db.query("SET CLIENT_MIN_MESSAGES=WARNING")
     return db
 
 db = opendb()
@@ -82,7 +83,7 @@ class UtilityTest(unittest.TestCase):
     def test_invalidname(self):
         """Make sure that invalid table names are caught"""
         db = opendb()
-        self.assertRaises(ProgrammingError, db.get_attnames, 'x.y.z')
+        self.assertRaises(NotSupportedError, db.get_attnames, 'x.y.z')
 
     def test_schema(self):
         """Does it differentiate the same table name in different schemas"""
@@ -148,7 +149,7 @@ class UtilityTest(unittest.TestCase):
                 d['_test'] += 1
                 db.insert(t, d)
                 db.insert(t, d)
-        except ProgrammingError:
+        except IntegrityError:
             pass
         with db:
             d['_test'] += 1
@@ -167,8 +168,7 @@ class UtilityTest(unittest.TestCase):
         try:
             db.query("INSERT INTO _test_schema VALUES (1234)")
         except DatabaseError as error:
-            # currently PyGreSQL does not support IntegrityError
-            self.assertTrue(isinstance(error, ProgrammingError))
+            self.assertTrue(isinstance(error, IntegrityError))
             # the SQLSTATE error code for unique violation is 23505
             self.assertEqual(error.sqlstate, '23505')
 

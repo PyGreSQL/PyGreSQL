@@ -463,13 +463,27 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_integrity_error(self):
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("set client_min_messages = warning")
+            cur.execute("create table %s (i int primary key)" % table)
+            cur.execute("insert into %s values (1)" % table)
+            cur.execute("insert into %s values (2)" % table)
+            self.assertRaises(pgdb.IntegrityError, cur.execute,
+                "insert into %s values (1)" % table)
+        finally:
+            con.close()
+
     def test_sqlstate(self):
         con = self._connect()
         cur = con.cursor()
         try:
             cur.execute("select 1/0")
         except pgdb.DatabaseError as error:
-            self.assertTrue(isinstance(error, pgdb.ProgrammingError))
+            self.assertTrue(isinstance(error, pgdb.DataError))
             # the SQLSTATE error code for division by zero is 22012
             self.assertEqual(error.sqlstate, '22012')
 
@@ -602,10 +616,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         try:
             cur = con.cursor()
             cur.execute("select 'k=>v'::hstore")
-        except pgdb.ProgrammingError:
+        except pgdb.DatabaseError:
             try:
                 cur.execute("create extension hstore")
-            except pgdb.ProgrammingError:
+            except pgdb.DatabaseError:
                 self.skipTest("hstore extension not enabled")
         finally:
             con.close()
@@ -997,7 +1011,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute(sql, [(1,), (2,)])  # deprecated use of execute()
             self.assertEqual(cur.fetchone()[0], 3)
             sql = 'select 1/0'  # cannot be executed
-            self.assertRaises(pgdb.ProgrammingError, cur.execute, sql)
+            self.assertRaises(pgdb.DataError, cur.execute, sql)
             cur.close()
             con.rollback()
             if pgdb.shortcutmethods:
@@ -1069,7 +1083,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 with con:
                     cur.execute("insert into %s values (3)" % table)
                     cur.execute("insert into %s values (4)" % table)
-            except con.ProgrammingError as error:
+            except con.IntegrityError as error:
                 self.assertTrue('check' in str(error).lower())
             with con:
                 cur.execute("insert into %s values (5)" % table)

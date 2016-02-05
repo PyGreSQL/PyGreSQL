@@ -139,6 +139,15 @@ class TestCopy(unittest.TestCase):
             "id smallint primary key, name varchar(64))")
         cur.close()
         con.commit()
+        cur = con.cursor()
+        try:
+            cur.execute("set client_encoding=utf8")
+            cur.execute("select 'Plácido and José'").fetchone()
+        except (pgdb.DataError, pgdb.NotSupportedError):
+            cls.data[1] = (1941, 'Plaacido Domingo')
+            cls.data[2] = (1946, 'Josee Carreras')
+            cls.can_encode = False
+        cur.close()
         con.close()
         cls.cls_set_up = True
 
@@ -174,6 +183,8 @@ class TestCopy(unittest.TestCase):
     data = [(1935, 'Luciano Pavarotti'),
             (1941, 'Plácido Domingo'),
             (1946, 'José Carreras')]
+
+    can_encode = True
 
     @property
     def data_text(self):
@@ -265,6 +276,8 @@ class TestCopyFrom(TestCopy):
     else:  # Python < 3.0
 
         def test_input_unicode(self):
+            if not self.can_encode:
+                self.skipTest('database does not support utf8')
             self.copy_from(u'43\tWürstel, Käse!')
             self.assertEqual(self.table_data, [(43, 'Würstel, Käse!')])
             self.truncate_table()
@@ -394,6 +407,7 @@ class TestCopyTo(TestCopy):
         super(TestCopyTo, cls).setUpClass()
         con = cls.connect()
         cur = con.cursor()
+        cur.execute("set client_encoding=utf8")
         cur.execute("insert into copytest values (%d, %s)", cls.data)
         cur.close()
         con.commit()
