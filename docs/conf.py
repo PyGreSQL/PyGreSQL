@@ -18,8 +18,8 @@ import shlex
 # Import Cloud theme (this will also automatically add the theme directory).
 # Note: We add a navigation bar to the cloud them using a custom layout.
 if os.environ.get('READTHEDOCS', None) == 'True':
-    # We cannot use our custom layout her, since RTD overrides layout.html.
-    use_clouse_theme = False
+    # We cannot use our custom layout here, since RTD overrides layout.html.
+    use_cloud_theme = False
 else:
     try:
         import cloud_sptheme
