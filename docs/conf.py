@@ -39,7 +39,7 @@ else:
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.ifconfig']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates'] if use_cloud_theme else []
@@ -53,7 +53,7 @@ source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'index' if use_cloud_theme else 'toc'
+master_doc = 'index'
 
 # General information about the project.
 project = 'PyGreSQL'
@@ -92,12 +92,6 @@ exclude_patterns += [
     'community/mailinglist.rst', 'community/source.rst',
     'community/bugtracker.rst', 'community/support.rst',
     'community/homes.rst']
-if use_cloud_theme:
-    # We use a naviagtion bar instead of the table of contents
-    # and we include the about page on the index page.
-    exclude_patterns += ['toc.rst', 'about.rst']
-else:
-    exclude_patterns += ['index.rst']
 
 # The reST default role (used for this markup: `text`) for all documents.
 #default_role = None
