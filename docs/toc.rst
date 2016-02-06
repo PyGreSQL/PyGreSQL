@@ -4,12 +4,11 @@ Welcome to PyGreSQL
 ===================
 
 .. toctree::
-    :hidden:
+    :maxdepth: 2
 
+    about
     copyright
     announce
     download/index
     contents/index
     community/index
-
-.. include:: about.txt

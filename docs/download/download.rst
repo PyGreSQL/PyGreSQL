@@ -1,5 +1,5 @@
-Download PyGreSQL here:
------------------------
+Current PyGreSQL versions
+-------------------------
 
 You can find PyGreSQL on the **Python Package Index** at
  * http://pypi.python.org/pypi/PyGreSQL/
@@ -18,3 +18,9 @@ A **Win32 package** for various Python versions is available at
   * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.5.exe
   * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.6.exe
   * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.7.exe
+
+Older PyGreSQL versions
+-----------------------
+
+You can look for older PyGreSQL versions at
+  * http://pygresql.org/files/
