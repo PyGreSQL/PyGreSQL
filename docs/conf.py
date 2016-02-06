@@ -17,11 +17,15 @@ import shlex
 
 # Import Cloud theme (this will also automatically add the theme directory).
 # Note: We add a navigation bar to the cloud them using a custom layout.
-try:
-    import cloud_sptheme
-    use_cloud_theme = True
-except ImportError:
-    use_cloud_theme = False
+if os.environ.get('READTHEDOCS', None) == 'True':
+    # We cannot use our custom layout her, since RTD overrides layout.html.
+    use_clouse_theme = False
+else:
+    try:
+        import cloud_sptheme
+        use_cloud_theme = True
+    except ImportError:
+        use_cloud_theme = False
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
