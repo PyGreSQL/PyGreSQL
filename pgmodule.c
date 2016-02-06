@@ -214,7 +214,7 @@ typedef struct
 /* shared function for encoding and decoding strings */
 
 static PyObject *
-get_decoded_string(char *str, Py_ssize_t size, int encoding)
+get_decoded_string(const char *str, Py_ssize_t size, int encoding)
 {
 	if (encoding == pg_encoding_utf8)
 		return PyUnicode_DecodeUTF8(str, size, "strict");
@@ -1366,28 +1366,31 @@ get_error_type(const char *sqlstate)
 	return DatabaseError;
 }
 
-/* sets database error with sqlstate attribute */
-/* This should be used when raising a subclass of DatabaseError */
+/* sets database error message and sqlstate attribute */
 static void
-set_dberror(PyObject *type, const char *msg, PGresult *result)
+set_error_msg_and_state(PyObject *type,
+	const char *msg, int encoding, const char *sqlstate)
 {
 	PyObject   *err_obj, *msg_obj, *sql_obj = NULL;
 
-	if (result)
+#if IS_PY3
+	if (encoding == -1) /* unknown */
 	{
-		char *sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
-		if (sqlstate)
-		{
-			sql_obj = PyStr_FromStringAndSize(sqlstate, 5);
-			type = get_error_type(sqlstate);
-		}
+		msg_obj = PyUnicode_DecodeLocale(msg, NULL);
 	}
-	if (!sql_obj)
+	else
+		msg_obj = get_decoded_string(msg, strlen(msg), encoding);
+	if (!msg_obj) /* cannot decode */
+#endif
+	msg_obj = PyBytes_FromString(msg);
+
+	if (sqlstate)
+		sql_obj = PyStr_FromStringAndSize(sqlstate, 5);
+	else
 	{
-		Py_INCREF(Py_None);
-		sql_obj = Py_None;
+		Py_INCREF(Py_None); sql_obj = Py_None;
 	}
-	msg_obj = PyStr_FromString(msg);
+
 	err_obj = PyObject_CallFunctionObjArgs(type, msg_obj, NULL);
 	if (err_obj)
 	{
@@ -1403,13 +1406,44 @@ set_dberror(PyObject *type, const char *msg, PGresult *result)
 	}
 }
 
+/* sets given database error message */
+static void
+set_error_msg(PyObject *type, const char *msg)
+{
+	set_error_msg_and_state(type, msg, pg_encoding_ascii, NULL);
+}
+
+/* sets database error from connection and/or result */
+static void
+set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
+{
+	char *sqlstate = NULL; int encoding = pg_encoding_ascii;
+
+	if (cnx)
+	{
+		char *err_msg = PQerrorMessage(cnx);
+		if (err_msg)
+		{
+			msg = err_msg;
+			encoding = PQclientEncoding(cnx);
+		}
+	}
+	if (result)
+	{
+		sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
+		if (sqlstate) type = get_error_type(sqlstate);
+	}
+
+	set_error_msg_and_state(type, msg, encoding, sqlstate);
+}
+
 /* checks connection validity */
 static int
 check_cnx_obj(connObject *self)
 {
 	if (!self->valid)
 	{
-		set_dberror(OperationalError, "Connection has been closed", NULL);
+		set_error_msg(OperationalError, "Connection has been closed");
 		return 0;
 	}
 	return 1;
@@ -1583,7 +1617,7 @@ check_lo_obj(largeObject *self, int level)
 
 	if (!self->lo_oid)
 	{
-		set_dberror(IntegrityError, "Object is not valid (null oid)", NULL);
+		set_error_msg(IntegrityError, "Object is not valid (null oid)");
 		return 0;
 	}
 
@@ -2287,8 +2321,8 @@ connQuery(connObject *self, PyObject *args)
 			case PGRES_BAD_RESPONSE:
 			case PGRES_FATAL_ERROR:
 			case PGRES_NONFATAL_ERROR:
-				set_dberror(ProgrammingError,
-					PQerrorMessage(self->cnx), result);
+				set_error(ProgrammingError, "Cannot execute query",
+					self->cnx, result);
 				break;
 			case PGRES_COMMAND_OK:
 				{						/* INSERT, UPDATE, DELETE */
@@ -2315,7 +2349,7 @@ connQuery(connObject *self, PyObject *args)
 				Py_INCREF(Py_None);
 				return Py_None;
 			default:
-				set_dberror(InternalError, "Unknown result status", result);
+				set_error_msg(InternalError, "Unknown result status");
 		}
 
 		PQclear(result);
@@ -3041,7 +3075,7 @@ connCreateLO(connObject *self, PyObject *args)
 	lo_oid = lo_creat(self->cnx, mode);
 	if (lo_oid == 0)
 	{
-		set_dberror(OperationalError, "Can't create large object", NULL);
+		set_error_msg(OperationalError, "Can't create large object");
 		return NULL;
 	}
 
@@ -3105,7 +3139,7 @@ connImportLO(connObject *self, PyObject *args)
 	lo_oid = lo_import(self->cnx, name);
 	if (lo_oid == 0)
 	{
-		set_dberror(OperationalError, "Can't create large object", NULL);
+		set_error_msg(OperationalError, "Can't create large object");
 		return NULL;
 	}
 
@@ -3274,7 +3308,7 @@ connClose(connObject *self, PyObject *noargs)
 	/* connection object cannot already be closed */
 	if (!self->cnx)
 	{
-		set_dberror(InternalError, "Connection already closed", NULL);
+		set_error_msg(InternalError, "Connection already closed");
 		return NULL;
 	}
 
@@ -3521,20 +3555,19 @@ check_source_obj(sourceObject *self, int level)
 {
 	if (!self->valid)
 	{
-		set_dberror(OperationalError, "Object has been closed", NULL);
+		set_error_msg(OperationalError, "Object has been closed");
 		return 0;
 	}
 
 	if ((level & CHECK_RESULT) && !self->result)
 	{
-		set_dberror(DatabaseError, "No result", NULL);
+		set_error_msg(DatabaseError, "No result");
 		return 0;
 	}
 
 	if ((level & CHECK_DQL) && self->result_type != RESULT_DQL)
 	{
-		set_dberror(DatabaseError,
-			"Last query did not return tuples", self->result);
+		set_error_msg(DatabaseError, "Last query did not return tuples");
 		return 0;
 	}
 
@@ -3682,12 +3715,12 @@ sourceExecute(sourceObject *self, PyObject *sql)
 		case PGRES_BAD_RESPONSE:
 		case PGRES_FATAL_ERROR:
 		case PGRES_NONFATAL_ERROR:
-			set_dberror(ProgrammingError,
-				PQerrorMessage(self->pgcnx->cnx), self->result);
+			set_error(ProgrammingError, "Cannot execute command",
+				self->pgcnx->cnx, self->result);
 			break;
 		default:
-			set_dberror(InternalError, "Internal error: "
-				"unknown result status", self->result);
+			set_error_msg(InternalError, "Internal error: "
+				"unknown result status");
 	}
 
 	/* frees result and returns error */
@@ -4425,7 +4458,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 
 	if (!(npgobj = PyObject_NEW(connObject, &connType)))
 	{
-		set_dberror(InternalError, "Can't create new connection object", NULL);
+		set_error_msg(InternalError, "Can't create new connection object");
 		return NULL;
 	}
 
@@ -4448,7 +4481,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 
 	if (PQstatus(npgobj->cnx) == CONNECTION_BAD)
 	{
-		set_dberror(InternalError, PQerrorMessage(npgobj->cnx), NULL);
+		set_error(InternalError, "Cannot connect", npgobj->cnx, NULL);
 		Py_XDECREF(npgobj);
 		return NULL;
 	}

@@ -1374,7 +1374,7 @@ class Connection(object):
 
 ### Module Interface
 
-_connect_ = connect
+_connect = connect
 
 def connect(dsn=None,
         user=None, password=None,
@@ -1419,7 +1419,7 @@ def connect(dsn=None,
         dbuser = None
 
     # open the connection
-    cnx = _connect_(dbbase, dbhost, dbport, dbopt, dbuser, dbpasswd)
+    cnx = _connect(dbbase, dbhost, dbport, dbopt, dbuser, dbpasswd)
     return Connection(cnx)
 
 
