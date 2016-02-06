@@ -15,9 +15,13 @@ import sys
 import os
 import shlex
 
-# import Cloud theme
-# this will also automatically add the theme directory
-import cloud_sptheme
+# Import Cloud theme (this will also automatically add the theme directory).
+# Note: We add a navigation bar to the cloud them using a custom layout.
+try:
+    import cloud_sptheme
+    use_cloud_theme = True
+except ImportError:
+    use_cloud_theme = False
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -34,7 +38,7 @@ import cloud_sptheme
 extensions = ['sphinx.ext.autodoc']
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ['_templates'] if use_cloud_theme else []
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
@@ -45,7 +49,7 @@ source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = 'index' if use_cloud_theme else 'toc'
 
 # General information about the project.
 project = 'PyGreSQL'
@@ -79,11 +83,17 @@ exclude_patterns = ['_build']
 
 # List of pages which are included in other pages and therefore should
 # not appear in the toctree.
-exclude_patterns += ['about.rst',
+exclude_patterns += [
     'download/download.rst', 'download/files.rst',
     'community/mailinglist.rst', 'community/source.rst',
     'community/bugtracker.rst', 'community/support.rst',
     'community/homes.rst']
+if use_cloud_theme:
+    # We use a naviagtion bar instead of the table of contents
+    # and we include the about page on the index page.
+    exclude_patterns += ['toc.rst', 'about.rst']
+else:
+    exclude_patterns += ['index.rst']
 
 # The reST default role (used for this markup: `text`) for all documents.
 #default_role = None
@@ -117,12 +127,12 @@ todo_include_todos = False
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'cloud'
+html_theme = 'cloud' if use_cloud_theme else 'default'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-html_theme_options = {'defaultcollapsed': True}
+html_theme_options = {'defaultcollapsed': True} if use_cloud_theme else {}
 
 # Add any paths that contain custom themes here, relative to this directory.
 html_theme_path = ['_themes']
