@@ -92,12 +92,6 @@ exclude_patterns += [
     'community/mailinglist.rst', 'community/source.rst',
     'community/bugtracker.rst', 'community/support.rst',
     'community/homes.rst']
-if use_cloud_theme:
-    # We use a naviagtion bar instead of the table of contents
-    # and we include the about page on the index page.
-    exclude_patterns += ['toc.rst', 'about.rst']
-else:
-    exclude_patterns += ['index.rst']
 
 # The reST default role (used for this markup: `text`) for all documents.
 #default_role = None

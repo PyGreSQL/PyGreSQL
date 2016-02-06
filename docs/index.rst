@@ -3,13 +3,27 @@
 Welcome to PyGreSQL
 ===================
 
-.. toctree::
-    :hidden:
+.. ifconfig:: html_theme != 'cloud'
 
-    copyright
-    announce
-    download/index
-    contents/index
-    community/index
+    .. toctree::
+        :maxdepth: 2
 
-.. include:: about.txt
+        about
+        copyright
+        announce
+        download/index
+        contents/index
+        community/index
+
+.. ifconfig:: html_theme == 'cloud'
+
+    .. toctree::
+        :hidden:
+
+        copyright
+        announce
+        download/index
+        contents/index
+        community/index
+
+    .. include:: about.txt
