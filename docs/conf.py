@@ -14,6 +14,7 @@
 import sys
 import os
 import shlex
+import shutil
 
 # Import Cloud theme (this will also automatically add the theme directory).
 # Note: We add a navigation bar to the cloud them using a custom layout.
@@ -27,6 +28,8 @@ else:
     except ImportError:
         use_cloud_theme = False
 
+shutil.copyfile('start.txt' if use_cloud_theme else 'toc.txt', 'index.rst')
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -39,7 +42,7 @@ else:
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.ifconfig']
+extensions = ['sphinx.ext.autodoc']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates'] if use_cloud_theme else []
@@ -137,7 +140,9 @@ html_theme_path = ['_themes']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = None if use_cloud_theme else 'PyGreSQL %s' % version
+html_title = 'PyGreSQL %s' % version
+if use_cloud_theme:
+    html_title += ' documentation'
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 #html_short_title = None
