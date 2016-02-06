@@ -1,15 +1,14 @@
-.. PyGreSQL index page without toc (for use with cloud theme)
+.. PyGreSQL index page with toc (for use without cloud theme)
 
 Welcome to PyGreSQL
 ===================
 
 .. toctree::
-    :hidden:
+    :maxdepth: 2
 
+    about
     copyright
     announce
     download/index
     contents/index
     community/index
-
-.. include:: about.txt
