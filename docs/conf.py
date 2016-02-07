@@ -56,11 +56,11 @@ source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'index' if use_cloud_theme else 'toc'
+master_doc = 'index'
 
 # General information about the project.
 project = u'PyGreSQL'
-author = u'The PyGreSQL Team'
+author = u'The PyGreSQL team'
 copyright = u'2016, ' + author
 
 # The version info for the project you're documenting, acts as replacement for
