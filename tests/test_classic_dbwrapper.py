@@ -210,7 +210,10 @@ class TestDBClassBasic(unittest.TestCase):
             'unescape_bytea', 'update', 'upsert',
             'use_regtypes', 'user',
         ]
-        db_attributes = [a for a in dir(self.db)
+        # __dir__ is not called in Python 2.6 for old-style classes
+        db_attributes = dir(self.db) if hasattr(
+            self.db.__class__, '__class__') else self.db.__dir__()
+        db_attributes = [a for a in db_attributes
             if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)
 
@@ -888,6 +891,11 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, (3, 2.5, 'hello', t))
         q = f("select %s, %s, %s, %s", (3, 2.5, 'hello', True), inline=True)
         r = q.getresult()[0]
+        if isinstance(r[1], Decimal):
+            # Python 2.6 cannot compare float and Decimal
+            r = list(r)
+            r[1] = float(r[1])
+            r = tuple(r)
         self.assertEqual(r, (3, 2.5, 'hello', t))
 
     def testPkey(self):

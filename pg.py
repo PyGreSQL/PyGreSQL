@@ -192,8 +192,8 @@ class _SimpleTypes(dict):
                 self[key] = typ
                 self['_%s' % key] = '%s[]' % typ
 
-    @staticmethod
-    def __missing__(key):
+    # this could be a static method in Python > 2.6
+    def __missing__(self, key):
         return 'text'
 
 _simpletypes = _SimpleTypes()
