@@ -95,6 +95,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         cur = con.cursor()
         cur.execute("select %s, 'a %% sign'", ('a % sign',))
         self.assertEqual(cur.fetchone(), ('a % sign', 'a % sign'))
+        cur.execute("select 'a % sign'")
+        self.assertEqual(cur.fetchone(), ('a % sign',))
         cur.execute("select 'a %% sign'")
         self.assertEqual(cur.fetchone(), ('a % sign',))
 

@@ -799,14 +799,16 @@ class Cursor(object):
         The function should be used even when there are no parameters,
         so that we have a consistent behavior regarding percent signs.
         """
-        if parameters:
-            if isinstance(parameters, dict):
-                parameters = _quotedict(parameters)
-                parameters.quote = self._quote
-            else:
-                parameters = tuple(map(self._quote, parameters))
+        if not parameters:
+            try:
+                return string % ()  # unescape literal quotes if possible
+            except (TypeError, ValueError):
+                return string  # silently accept unescaped quotes
+        if isinstance(parameters, dict):
+            parameters = _quotedict(parameters)
+            parameters.quote = self._quote
         else:
-            parameters = {}
+            parameters = tuple(map(self._quote, parameters))
         return string % parameters
 
     def _make_description(self, info):
