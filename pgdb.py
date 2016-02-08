@@ -768,6 +768,8 @@ class Cursor(object):
             # an array and not a string.  One issue with this syntax is that
             # you need to add an explicit typecast when passing empty arrays.
             # The ARRAY keyword is actually only necessary at the top level.
+            if not value:  # exception for empty array
+                return "'{}'"
             q = self._quote
             return 'ARRAY[%s]' % ','.join(str(q(v)) for v in value)
         if isinstance(value, tuple):
@@ -1585,6 +1587,7 @@ class Hstore(dict):
     """Wrapper class for marking hstore values."""
 
     _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
+    _re_escape = regex(r'(["\\])')
 
     @classmethod
     def _quote(cls, s):
@@ -1592,8 +1595,9 @@ class Hstore(dict):
             return 'NULL'
         if not s:
             return '""'
-        s = s.replace('"', '\\"')
-        if cls._re_quote.search(s):
+        quote = cls._re_quote.search(s)
+        s = cls._re_escape.sub(r'\\\1', s)
+        if quote:
             s = '"%s"' % s
         return s
 

@@ -627,7 +627,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 self.skipTest("hstore extension not enabled")
         finally:
             con.close()
-        d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
+        d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever', 'back\\': '\\slash',
             '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
             '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
             'None': None, 'NULL': 'NULL', 'empty': ''}
