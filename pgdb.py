@@ -72,7 +72,7 @@ __version__ = version
 from datetime import date, time, datetime, timedelta
 from time import localtime
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID as Uuid
 from math import isnan, isinf
 from collections import namedtuple
 from functools import partial
@@ -396,7 +396,7 @@ class Typecasts(dict):
         'date': cast_date, 'interval': cast_interval,
         'time': cast_time, 'timetz': cast_timetz,
         'timestamp': cast_timestamp, 'timestamptz': cast_timestamptz,
-        'int2vector': cast_int2vector, 'uuid': UUID,
+        'int2vector': cast_int2vector, 'uuid': Uuid,
         'anyarray': cast_array, 'record': cast_record}
 
     connection = None  # will be set in local connection specific instances
@@ -732,7 +732,7 @@ class Cursor(object):
         """Quote value depending on its type."""
         if value is None:
             return 'NULL'
-        if isinstance(value, (Hstore, Json, UUID)):
+        if isinstance(value, (Hstore, Json)):
             value = str(value)
         if isinstance(value, basestring):
             if isinstance(value, Binary):
@@ -762,6 +762,8 @@ class Cursor(object):
             return "'%s'::time" % value
         if isinstance(value, timedelta):
             return "'%s'::interval" % value
+        if isinstance(value, Uuid):
+            return "'%s'::uuid" % value
         if isinstance(value, list):
             # Quote value as an ARRAY constructor. This is better than using
             # an array literal because it carries the information that this is
@@ -1526,6 +1528,7 @@ DATE = Type('date')
 TIME = Type('time timetz')
 TIMESTAMP = Type('timestamp timestamptz')
 INTERVAL = Type('interval')
+UUID = Type('uuid')
 HSTORE = Type('hstore')
 JSON = Type('json jsonb')
 
@@ -1581,6 +1584,9 @@ def Interval(days, hours=0, minutes=0, seconds=0, microseconds=0):
     """Construct an object holding a time inverval value."""
     return timedelta(days, hours=hours, minutes=minutes, seconds=seconds,
         microseconds=microseconds)
+
+
+Uuid = Uuid  # Construct an object holding a UUID value
 
 
 class Hstore(dict):

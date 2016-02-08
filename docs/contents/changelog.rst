@@ -91,7 +91,7 @@ Version 5.0
       composite type, it is passed to Python as a named tuple. PyGreSQL uses
       a new fast built-in parser to achieve this. Anonymous composite types are
       also supported, but yield only an ordinary tuple containing text strings.
-    - A new type helper Interval() has been added.
+    - New type helpers Interval() and Uuid() have been added.
 - Changes concerning both modules:
     - PyGreSQL now tries to raise more specific and appropriate subclasses of
       DatabaseError than just ProgrammingError. Particularly, when database

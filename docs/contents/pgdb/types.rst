@@ -60,6 +60,12 @@ specific data types:
 
 .. versionadded:: 5.0
 
+.. function:: Uuid([hex], [bytes], [bytes_le], [fields], [int], [version])
+
+    Construct an object holding a UUID value
+
+.. versionadded:: 5.0
+
 .. function:: Hstore(dict)
 
     Construct a wrapper for holding an hstore dictionary
@@ -173,6 +179,10 @@ DB-API 2 standard:
 .. object:: INTERVAL
 
     Used to describe date and time ``interval`` columns
+
+.. object:: UUID
+
+    Used to describe ``uuid`` columns
 
 .. object:: HSTORE
 

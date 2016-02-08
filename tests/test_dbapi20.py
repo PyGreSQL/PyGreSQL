@@ -29,7 +29,7 @@ except (ImportError, ValueError):
         pass
 
 from datetime import date, time, datetime, timedelta
-from uuid import UUID
+from uuid import UUID as Uuid
 
 try:
     from datetime import timezone
@@ -642,7 +642,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(result, d)
 
     def test_uuid(self):
-        d = UUID('{12345678-1234-5678-1234-567812345678}')
+        self.assertIs(Uuid, pgdb.Uuid)
+        d = Uuid('{12345678-1234-5678-1234-567812345678}')
         con = self._connect()
         try:
             cur = con.cursor()
@@ -650,7 +651,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             result = cur.fetchone()[0]
         finally:
             con.close()
-        self.assertIsInstance(result, UUID)
+        self.assertIsInstance(result, Uuid)
         self.assertEqual(result, d)
 
     def test_insert_array(self):
