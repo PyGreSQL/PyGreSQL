@@ -69,6 +69,10 @@ Attributes that are not part of the standard
 
     The following attributes are not part of the DB-API 2 standard.
 
+.. attribute:: Connection.closed
+
+    This is *True* if the connection has been closed or has become invalid
+
 .. attribute:: Connection.cursor_type
 
     The default cursor type used by the connection

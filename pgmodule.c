@@ -1441,7 +1441,7 @@ set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
 static int
 check_cnx_obj(connObject *self)
 {
-	if (!self->valid)
+	if (!self || !self->valid || !self->cnx)
 	{
 		set_error_msg(OperationalError, "Connection has been closed");
 		return 0;
@@ -3629,10 +3629,6 @@ sourceExecute(sourceObject *self, PyObject *sql)
 	if (!check_source_obj(self, CHECK_CNX))
 		return NULL;
 
-	/* make sure that the connection object is valid */
-	if (!self->pgcnx->cnx)
-		return NULL;
-
 	encoding = PQclientEncoding(self->pgcnx->cnx);
 
 	if (PyBytes_Check(sql))
@@ -3771,7 +3767,7 @@ sourceFetch(sourceObject *self, PyObject *args)
 #endif
 
 	/* checks validity */
-	if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL))
+	if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL | CHECK_CNX))
 		return NULL;
 
 	/* checks args */
@@ -3980,7 +3976,6 @@ sourcePutData(sourceObject *self, PyObject *buffer)
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-			!self->pgcnx->cnx ||
 			PQresultStatus(self->result) != PGRES_COPY_IN)
 	{
 		PyErr_SetString(PyExc_IOError,
@@ -4068,7 +4063,6 @@ sourceGetData(sourceObject *self, PyObject *args)
 
 	/* checks validity */
 	if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-			!self->pgcnx->cnx ||
 			PQresultStatus(self->result) != PGRES_COPY_OUT)
 	{
 		PyErr_SetString(PyExc_IOError,

@@ -1341,6 +1341,14 @@ class Connection(object):
         else:
             raise _op_error("Connection has been closed")
 
+    @property
+    def closed(self):
+        """Check whether the connection has been closed or is broken."""
+        try:
+            return not self._cnx or self._cnx.status != 1
+        except TypeError:
+            return True
+
     def commit(self):
         """Commit any pending transaction to the database."""
         if self._cnx:

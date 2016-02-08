@@ -419,6 +419,16 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         cur.execute("select 1 union select 2 union select 3")
         self.assertEqual([r[0] for r in cur], [1, 2, 3])
 
+    def test_cursor_invalidation(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute("select 1 union select 2")
+        self.assertEqual(cur.fetchone(), (1,))
+        self.assertFalse(con.closed)
+        con.close()
+        self.assertTrue(con.closed)
+        self.assertRaises(pgdb.OperationalError, cur.fetchone)
+
     def test_fetch_2_rows(self):
         Decimal = pgdb.decimal_type()
         values = ('test', pgdb.Binary(b'\xff\x52\xb2'),
