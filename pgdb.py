@@ -795,12 +795,18 @@ class Cursor(object):
         """Quote parameters.
 
         This function works for both mappings and sequences.
+
+        The function should be used even when there are no parameters,
+        so that we have a consistent behavior regarding percent signs.
         """
-        if isinstance(parameters, dict):
-            parameters = _quotedict(parameters)
-            parameters.quote = self._quote
+        if parameters:
+            if isinstance(parameters, dict):
+                parameters = _quotedict(parameters)
+                parameters.quote = self._quote
+            else:
+                parameters = tuple(map(self._quote, parameters))
         else:
-            parameters = tuple(map(self._quote, parameters))
+            parameters = {}
         return string % parameters
 
     def _make_description(self, info):
@@ -884,8 +890,7 @@ class Cursor(object):
                 self._dbcnx._tnx = True
             for parameters in seq_of_parameters:
                 sql = operation
-                if parameters:
-                    sql = self._quoteparams(sql, parameters)
+                sql = self._quoteparams(sql, parameters)
                 rows = self._src.execute(sql)
                 if rows:  # true if not DML
                     rowcount += rows

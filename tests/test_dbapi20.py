@@ -90,6 +90,14 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertIn('.', v)
         self.assertEqual(pgdb.__version__, v)
 
+    def test_percent_sign(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute("select %s, 'a %% sign'", ('a % sign',))
+        self.assertEqual(cur.fetchone(), ('a % sign', 'a % sign'))
+        cur.execute("select 'a %% sign'")
+        self.assertEqual(cur.fetchone(), ('a % sign',))
+
     def test_callproc_no_params(self):
         con = self._connect()
         cur = con.cursor()

@@ -92,6 +92,9 @@ Version 5.0
       a new fast built-in parser to achieve this. Anonymous composite types are
       also supported, but yield only an ordinary tuple containing text strings.
     - New type helpers Interval() and Uuid() have been added.
+    - SQL commands are always handled as if they include parameters, i.e.
+      literal percent signs must always be doubled. This consistent behavior
+      is necessary for using pgdb with wrappers like SQLAlchemy.
 - Changes concerning both modules:
     - PyGreSQL now tries to raise more specific and appropriate subclasses of
       DatabaseError than just ProgrammingError. Particularly, when database
