@@ -557,6 +557,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 for datestyle in ('iso', 'postgres, mdy', 'postgres, dmy',
                         'sql, mdy', 'sql, dmy', 'german'):
                     cur.execute("set datestyle to %s" % datestyle)
+                    if n != 1:
+                        cur.execute("select %s,%s,%s,%s,%s", params)
+                        row = cur.fetchone()
+                        self.assertEqual(row, tuple(values))
                     cur.execute("insert into %s"
                         " values (%%s,%%s,%%s,%%s,%%s)" % table, params)
                     cur.execute("select * from %s" % table)

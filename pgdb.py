@@ -732,8 +732,7 @@ class Cursor(object):
         """Quote value depending on its type."""
         if value is None:
             return 'NULL'
-        if isinstance(value,
-                (datetime, date, time, timedelta, Hstore, Json, UUID)):
+        if isinstance(value, (Hstore, Json, UUID)):
             value = str(value)
         if isinstance(value, basestring):
             if isinstance(value, Binary):
@@ -751,6 +750,18 @@ class Cursor(object):
             return value
         if isinstance(value, (int, long, Decimal, Literal)):
             return value
+        if isinstance(value, datetime):
+            if value.tzinfo:
+                return "'%s'::timestamptz" % value
+            return "'%s'::timestamp" % value
+        if isinstance(value, date):
+            return "'%s'::date" % value
+        if isinstance(value, time):
+            if value.tzinfo:
+                return "'%s'::timetz" % value
+            return "'%s'::time" % value
+        if isinstance(value, timedelta):
+            return "'%s'::interval" % value
         if isinstance(value, list):
             # Quote value as an ARRAY constructor. This is better than using
             # an array literal because it carries the information that this is
@@ -1532,14 +1543,15 @@ def Date(year, month, day):
     return date(year, month, day)
 
 
-def Time(hour, minute=0, second=0, microsecond=0):
+def Time(hour, minute=0, second=0, microsecond=0, tzinfo=None):
     """Construct an object holding a time value."""
-    return time(hour, minute, second, microsecond)
+    return time(hour, minute, second, microsecond, tzinfo)
 
 
-def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0):
+def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0,
+        tzinfo=None):
     """Construct an object holding a time stamp value."""
-    return datetime(year, month, day, hour, minute, second, microsecond)
+    return datetime(year, month, day, hour, minute, second, microsecond, tzinfo)
 
 
 def DateFromTicks(ticks):

@@ -27,11 +27,11 @@ the DB-API 2 standard:
 
     Construct an object holding a date value
 
-.. function:: Time(hour, minute=0, second=0, microsecond=0)
+.. function:: Time(hour, [minute], [second], [microsecond], [tzinfo])
 
     Construct an object holding a time value
 
-.. function:: Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0)
+.. function:: Timestamp(year, month, day, [hour], [minute], [second], [microsecond], [tzinfo])
 
     Construct an object holding a time stamp value
 
