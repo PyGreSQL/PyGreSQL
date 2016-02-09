@@ -588,9 +588,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 elif n == 2:  # input using type helpers
                     d = (dt.year, dt.month, dt.day)
                     t = (dt.hour, dt.minute, dt.second, dt.microsecond)
+                    z = (timezone.utc,) if timezone else ()
                     params = [pgdb.Date(*d), pgdb.Time(*t),
-                            pgdb.Timestamp(*(d + t)), pgdb.Time(*t),
-                            pgdb.Timestamp(*(d + t))]
+                            pgdb.Timestamp(*(d + t)), pgdb.Time(*(t + z)),
+                            pgdb.Timestamp(*(d + t + z))]
                 for datestyle in ('iso', 'postgres, mdy', 'postgres, dmy',
                         'sql, mdy', 'sql, dmy', 'german'):
                     cur.execute("set datestyle to %s" % datestyle)
