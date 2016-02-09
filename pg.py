@@ -27,7 +27,7 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 # both that copyright notice and this permission notice appear in
 # supporting documentation.
 
-from __future__ import print_function
+from __future__ import print_function, division
 
 from _pg import *
 
@@ -36,7 +36,7 @@ __version__ = version
 import select
 import warnings
 
-from datetime import date, time, datetime, timedelta
+from datetime import date, time, datetime, timedelta, tzinfo
 from decimal import Decimal
 from math import isnan, isinf
 from collections import namedtuple
@@ -157,15 +157,59 @@ else:
         return list(signature(func).parameters)
 
 try:
-    if datetime.strptime('+0100', '%z') is None:
-        raise ValueError
-except ValueError:  # Python < 3.2
-    timezones = None
+    from datetime import timezone
+except ImportError:  # Python < 3.2
+
+    class timezone(tzinfo):
+        """Simple timezone implementation."""
+
+        def __init__(self, offset, name=None):
+            self.offset = offset
+            if not name:
+                minutes = self.offset.days * 1440 + self.offset.seconds // 60
+                if minutes < 0:
+                    hours, minutes = divmod(-minutes, 60)
+                    hours = -hours
+                else:
+                    hours, minutes = divmod(minutes, 60)
+                name = 'UTC%+03d:%02d' % (hours, minutes)
+            self.name = name
+
+        def utcoffset(self, dt):
+            return self.offset
+
+        def tzname(self, dt):
+            return self.name
+
+        def dst(self, dt):
+            return None
+
+    timezone.utc = timezone(timedelta(0), 'UTC')
+
+    _has_timezone = False
 else:
-    # time zones used in Postgres timestamptz output
-    timezones = dict(CET='+0100', EET='+0200', EST='-0500',
-        GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
-        UCT='+0000', UTC='+0000', WET='+0000')
+    _has_timezone = True
+
+# time zones used in Postgres timestamptz output
+_timezones = dict(CET='+0100', EET='+0200', EST='-0500',
+    GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
+    UCT='+0000', UTC='+0000', WET='+0000')
+
+
+def _timezone_as_offset(tz):
+    if tz.startswith(('+', '-')):
+        if len(tz) < 5:
+            return tz + '00'
+        return tz.replace(':', '')
+    return _timezones.get(tz, '+0000')
+
+
+def _get_timezone(tz):
+    tz = _timezone_as_offset(tz)
+    minutes = 60 * int(tz[1:3]) + int(tz[3:5])
+    if tz[0] == '-':
+        minutes = -minutes
+    return timezone(timedelta(minutes=minutes), tz)
 
 
 def _oid_key(table):
@@ -673,19 +717,12 @@ def cast_timetz(value):
     else:
         tz = '+0000'
     fmt = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
-    if timezones:
-        if tz.startswith(('+', '-')):
-            if len(tz) < 5:
-                tz += '00'
-            else:
-                tz = tz.replace(':', '')
-        elif tz in timezones:
-            tz = timezones[tz]
-        else:
-            tz = '+0000'
-        value += tz
+    if _has_timezone:
+        value += _timezone_as_offset(tz)
         fmt += '%z'
-    return datetime.strptime(value, fmt).timetz()
+        return datetime.strptime(value, fmt).timetz()
+    return datetime.strptime(value, fmt).timetz().replace(
+        tzinfo=_get_timezone(tz))
 
 
 def cast_timestamp(value, connection):
@@ -740,19 +777,13 @@ def cast_timestamptz(value, connection):
         if len(value[0]) > 10:
             return datetime.max
         fmt = [fmt, '%H:%M:%S.%f' if len(value[1]) > 8 else '%H:%M:%S']
-    if timezones:
-        if tz.startswith(('+', '-')):
-            if len(tz) < 5:
-                tz += '00'
-            else:
-                tz = tz.replace(':', '')
-        elif tz in timezones:
-            tz = timezones[tz]
-        else:
-            tz = '+0000'
-        value.append(tz)
+    if _has_timezone:
+        value.append(_timezone_as_offset(tz))
         fmt.append('%z')
-    return datetime.strptime(' '.join(value), ' '.join(fmt))
+        return datetime.strptime(' '.join(value), ' '.join(fmt))
+    return datetime.strptime(' '.join(value), ' '.join(fmt)).replace(
+        tzinfo=_get_timezone(tz))
+
 
 _re_interval_sql_standard = regex(
     '(?:([+-])?([0-9]+)-([0-9]+) ?)?'

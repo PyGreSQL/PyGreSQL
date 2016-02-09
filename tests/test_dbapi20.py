@@ -32,11 +32,6 @@ from datetime import date, time, datetime, timedelta
 from uuid import UUID as Uuid
 
 try:
-    from datetime import timezone
-except ImportError:  # Python < 3.2
-    timezone = None
-
-try:
     long
 except NameError:  # Python >= 3.0
     long = int
@@ -578,9 +573,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             for n in range(3):
                 values = [dt.date(), dt.time(), dt,
                     dt.time(), dt]
-                if timezone:
-                    values[3] = values[3].replace(tzinfo=timezone.utc)
-                    values[4] = values[4].replace(tzinfo=timezone.utc)
+                values[3] = values[3].replace(tzinfo=pgdb.timezone.utc)
+                values[4] = values[4].replace(tzinfo=pgdb.timezone.utc)
                 if n == 0:  # input as objects
                     params = values
                 if n == 1:  # input as text
@@ -588,7 +582,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 elif n == 2:  # input using type helpers
                     d = (dt.year, dt.month, dt.day)
                     t = (dt.hour, dt.minute, dt.second, dt.microsecond)
-                    z = (timezone.utc,) if timezone else ()
+                    z = (pgdb.timezone.utc,)
                     params = [pgdb.Date(*d), pgdb.Time(*t),
                             pgdb.Timestamp(*(d + t)), pgdb.Time(*(t + z)),
                             pgdb.Timestamp(*(d + t + z))]

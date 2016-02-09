@@ -3572,11 +3572,11 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
         for timezone in sorted(timezones):
-            offset = timezones[timezone]
+            tz = '%+03d00' % timezones[timezone]
             try:
-                tzinfo = datetime.strptime('%+03d00' % offset, '%z').tzinfo
-            except ValueError:  # Python < 3.3
-                tzinfo = None
+                tzinfo = datetime.strptime(tz, '%z').tzinfo
+            except ValueError:  # Python < 3.2
+                tzinfo = pg._get_timezone(tz)
             self.db.set_parameter('timezone', timezone)
             d = time(15, 9, 26, tzinfo=tzinfo)
             q = "select $1::timetz"
@@ -3627,11 +3627,11 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
         for timezone in sorted(timezones):
-            offset = timezones[timezone]
+            tz = '%+03d00' % timezones[timezone]
             try:
-                tzinfo = datetime.strptime('%+03d00' % offset, '%z').tzinfo
-            except ValueError:  # Python < 3.3
-                tzinfo = None
+                tzinfo = datetime.strptime(tz, '%z').tzinfo
+            except ValueError:  # Python < 3.2
+                tzinfo = pg._get_timezone(tz)
             self.db.set_parameter('timezone', timezone)
             for datestyle in ('ISO', 'Postgres, MDY', 'Postgres, DMY',
                     'SQL, MDY', 'SQL, DMY', 'German'):
