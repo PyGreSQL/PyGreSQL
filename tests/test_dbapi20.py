@@ -733,6 +733,23 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             con.close()
         self.assertEqual(row, values)
 
+    def test_unicode_list_and_tuple(self):
+        value = (u'Käse', u'Würstchen')
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            try:
+                cur.execute("select %s, %s", value)
+            except pgdb.DatabaseError:
+                self.skipTest('database does not support latin-1')
+            row = cur.fetchone()
+            cur.execute("select %s, %s", (list(value), tuple(value)))
+            as_list, as_tuple = cur.fetchone()
+        finally:
+            con.close()
+        self.assertEqual(as_list, list(row))
+        self.assertEqual(as_tuple, tuple(row))
+
     def test_insert_record(self):
         values = [('John', 61), ('Jane', 63),
                   ('Fred', None), ('Wilma', None),

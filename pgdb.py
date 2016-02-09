@@ -773,7 +773,10 @@ class Cursor(object):
             if not value:  # exception for empty array
                 return "'{}'"
             q = self._quote
-            return 'ARRAY[%s]' % ','.join(str(q(v)) for v in value)
+            try:
+                return 'ARRAY[%s]' % ','.join(str(q(v)) for v in value)
+            except UnicodeEncodeError:  # Python 2 with non-ascii values
+                return u'ARRAY[%s]' % ','.join(unicode(q(v)) for v in value)
         if isinstance(value, tuple):
             # Quote as a ROW constructor.  This is better than using a record
             # literal because it carries the information that this is a record
@@ -781,7 +784,10 @@ class Cursor(object):
             # this usable with the IN syntax as well.  It is only necessary
             # when the records has a single column which is not really useful.
             q = self._quote
-            return '(%s)' % ','.join(str(q(v)) for v in value)
+            try:
+                return '(%s)' % ','.join(str(q(v)) for v in value)
+            except UnicodeEncodeError:  # Python 2 with non-ascii values
+                return u'(%s)' % ','.join(unicode(q(v)) for v in value)
         try:
             value = value.__pg_repr__()
         except AttributeError:
