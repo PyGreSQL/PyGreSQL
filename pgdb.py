@@ -852,9 +852,6 @@ class Cursor(object):
     def close(self):
         """Close the cursor object."""
         self._src.close()
-        self._description = None
-        self.rowcount = -1
-        self.lastrowid = None
 
     def execute(self, operation, parameters=None):
         """Prepare and execute a database operation (query or command)."""

@@ -497,6 +497,23 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_update_rowcount(self):
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create table %s (i int)" % table)
+            cur.execute("insert into %s values (1)" % table)
+            cur.execute("update %s set i=2 where i=2 returning i" % table)
+            self.assertEqual(cur.rowcount, 0)
+            cur.execute("update %s set i=2 where i=1 returning i" % table)
+            self.assertEqual(cur.rowcount, 1)
+            cur.close()
+            # keep rowcount even if cursor is closed (needed by SQLAlchemy)
+            self.assertEqual(cur.rowcount, 1)
+        finally:
+            con.close()
+
     def test_sqlstate(self):
         con = self._connect()
         cur = con.cursor()
