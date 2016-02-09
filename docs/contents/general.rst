@@ -33,3 +33,11 @@ like `PATH` or `LD_LIBRARY_PATH` so that PyGreSQL can find the library.
     Note that PyGreSQL is not thread-safe on the connection level. Therefore
     we recommend using `DBUtils <http://www.webwareforpython.org/DBUtils>`_
     for multi-threaded environments, which supports both PyGreSQL interfaces.
+
+Another option is using PyGreSQL indirectly as a database driver for the
+high-level `SQLAlchemy <http://www.sqlalchemy.org/>`_ SQL toolkit and ORM,
+which supports PyGreSQL starting with SQLAlchemy 1.1 and which provides a
+way to use PyGreSQL in a multi-threaded environment using the concept of
+"thread local storage".  Database URLs for PyGreSQL take this form::
+
+    postgresql+pygresql://username:password@host:port/database

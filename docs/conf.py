@@ -95,6 +95,8 @@ exclude_patterns += [
     'community/mailinglist.rst', 'community/source.rst',
     'community/bugtracker.rst', 'community/support.rst',
     'community/homes.rst']
+if use_cloud_theme:
+    exclude_patterns += ['about.rst']
 
 # The reST default role (used for this markup: `text`) for all documents.
 #default_role = None

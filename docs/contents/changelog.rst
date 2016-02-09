@@ -97,6 +97,7 @@ Version 5.0
     - SQL commands are always handled as if they include parameters, i.e.
       literal percent signs must always be doubled. This consistent behavior
       is necessary for using pgdb with wrappers like SQLAlchemy.
+    - PyGreSQL 5.0 will be supported as a database driver by SQLAlchemy 1.1.
 - Changes concerning both modules:
     - PyGreSQL now tries to raise more specific and appropriate subclasses of
       DatabaseError than just ProgrammingError. Particularly, when database
