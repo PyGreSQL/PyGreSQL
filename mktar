@@ -16,7 +16,7 @@ then
 fi
 FILES="*.c *.h *.py *.cfg *.rst *.txt"
 NUMFILES=`ls $FILES | wc -l`
-if [ "$NUMFILES" != "9" ]
+if [ $NUMFILES != 9 ]
 then
     echo "Hmmm.  The number of top-level files seems to be wrong:"
     ls $FILES
@@ -26,7 +26,7 @@ then
 fi
 FILES="mktar mkdocs docs tests pg.py pgdb.py pgmodule.c setup.cfg"
 PERMS=`stat --printf="%a" $FILES`
-if [ $? -ne 0 -o "$PERMS" != '755755755755644644644644' ]
+if [ $? -eq 0 -a "$PERMS" != '755755755755644644644644' ]
 then
     echo "Hmmm.  File permissions are not set properly."
     echo "Use a filesystem with permissions and do a clean checkout first."
