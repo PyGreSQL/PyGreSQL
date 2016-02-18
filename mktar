@@ -1,6 +1,6 @@
 #! /bin/sh
 
-VERSION=4.2
+VERSION=4.2.1
 DISTDIR=/u/pyg/files
 
 # some safety tests
