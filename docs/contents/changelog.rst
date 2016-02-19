@@ -1,6 +1,11 @@
 ChangeLog
 =========
 
+Version 4.2.1 (2016-02-18)
+--------------------------
+- Fixed a small bug when setting the notice receiver.
+- Some more minor fixes and re-packaging with proper permissions.
+
 Version 4.2 (2016-01-21)
 ------------------------
 - The supported Python versions are 2.4 to 2.7.
