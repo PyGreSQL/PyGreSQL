@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 4.2.2
--------------
+Version 4.2.2 (2016-03-18)
+--------------------------
 - The get_relations() and get_tables() methods now also return system views
   and tables if you set the optional "system" parameter to True.
 - Fixed a regression when using temporary tables with DB wrapper methods
