@@ -132,6 +132,13 @@ Version 5.0
     - The tty parameter and attribute of database connections has been
       removed since it is not supported any more since PostgreSQL 7.4.
 
+Version 4.2.2
+-------------
+- The get_relations() and get_tables() methods now also return system views
+  and tables if you set the optional "system" parameter to True.
+- Fixed a regression when using temporary tables with DB wrapper methods
+  (thanks to Patrick TJ McPhee for reporting).
+
 Version 4.2.1 (2016-02-18)
 --------------------------
 - Fixed a small bug when setting the notice receiver.

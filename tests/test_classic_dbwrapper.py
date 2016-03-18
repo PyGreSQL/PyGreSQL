@@ -989,6 +989,18 @@ class TestDBClass(unittest.TestCase):
         after_tables = get_tables()
         self.assertEqual(after_tables, before_tables)
 
+    def testGetSystemTables(self):
+        get_tables = self.db.get_tables
+        result = get_tables()
+        self.assertNotIn('pg_catalog.pg_class', result)
+        self.assertNotIn('information_schema.tables', result)
+        result = get_tables(system=False)
+        self.assertNotIn('pg_catalog.pg_class', result)
+        self.assertNotIn('information_schema.tables', result)
+        result = get_tables(system=True)
+        self.assertIn('pg_catalog.pg_class', result)
+        self.assertNotIn('information_schema.tables', result)
+
     def testGetRelations(self):
         get_relations = self.db.get_relations
         result = get_relations()
@@ -1006,6 +1018,18 @@ class TestDBClass(unittest.TestCase):
         result = get_relations('cisSt')
         self.assertNotIn('public.test', result)
         self.assertNotIn('public.test_view', result)
+
+    def testGetSystemRelations(self):
+        get_relations = self.db.get_relations
+        result = get_relations()
+        self.assertNotIn('pg_catalog.pg_class', result)
+        self.assertNotIn('information_schema.tables', result)
+        result = get_relations(system=False)
+        self.assertNotIn('pg_catalog.pg_class', result)
+        self.assertNotIn('information_schema.tables', result)
+        result = get_relations(system=True)
+        self.assertIn('pg_catalog.pg_class', result)
+        self.assertIn('information_schema.tables', result)
 
     def testGetAttnames(self):
         get_attnames = self.db.get_attnames
@@ -2307,6 +2331,21 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, 0)
         q = "select n from test_parent natural join test_child limit 2"
         self.assertEqual(query(q).getresult(), [(1,)])
+
+    def testTempCrud(self):
+        table = 'test_temp_table'
+        self.createTable(table, "n int primary key, t varchar", temporary=True)
+        self.db.insert(table, dict(n=1, t='one'))
+        self.db.insert(table, dict(n=2, t='too'))
+        self.db.insert(table, dict(n=3, t='three'))
+        r = self.db.get(table, 2)
+        self.assertEqual(r['t'], 'too')
+        self.db.update(table, dict(n=2, t='two'))
+        r = self.db.get(table, 2)
+        self.assertEqual(r['t'], 'two')
+        self.db.delete(table, r)
+        r = self.db.query('select n, t from %s order by 1' % table).getresult()
+        self.assertEqual(r, [(1, 'one'), (3, 'three')])
 
     def testTruncate(self):
         truncate = self.db.truncate

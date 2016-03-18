@@ -1751,26 +1751,35 @@ class DB:
         return [s[0] for s in
             self.db.query('SELECT datname FROM pg_database').getresult()]
 
-    def get_relations(self, kinds=None):
+    def get_relations(self, kinds=None, system=False):
         """Get list of relations in connected database of specified kinds.
 
         If kinds is None or empty, all kinds of relations are returned.
         Otherwise kinds can be a string or sequence of type letters
         specifying which kind of relations you want to list.
+
+        Set the system flag if you want to get the system relations as well.
         """
-        where = " AND r.relkind IN (%s)" % ','.join(
-            ["'%s'" % k for k in kinds]) if kinds else ''
+        where = []
+        if kinds:
+            where.append("r.relkind IN (%s)" %
+                ','.join("'%s'" % k for k in kinds))
+        if not system:
+            where.append("s.nspname NOT SIMILAR"
+                " TO 'pg/_%|information/_schema' ESCAPE '/'")
+        where = " WHERE %s" % ' AND '.join(where) if where else ''
         q = ("SELECT quote_ident(s.nspname)||'.'||quote_ident(r.relname)"
             " FROM pg_class r"
-            " JOIN pg_namespace s ON s.oid = r.relnamespace"
-            " WHERE s.nspname NOT SIMILAR"
-            " TO 'pg/_%%|information/_schema' ESCAPE '/' %s"
+            " JOIN pg_namespace s ON s.oid = r.relnamespace%s"
             " ORDER BY s.nspname, r.relname") % where
         return [r[0] for r in self.db.query(q).getresult()]
 
-    def get_tables(self):
-        """Return list of tables in connected database."""
-        return self.get_relations('r')
+    def get_tables(self, system=False):
+        """Return list of tables in connected database.
+
+        Set the system flag if you want to get the system tables as well.
+        """
+        return self.get_relations('r', system)
 
     def get_attnames(self, table, with_oid=True, flush=False):
         """Given the name of a table, dig out the set of attribute names.
