@@ -17,7 +17,7 @@ install:
 script: python setup.py test
 
 addons:
-  postgresql: "9.4"
+  postgresql: "9.5"
 
 services:
   - postgresql
