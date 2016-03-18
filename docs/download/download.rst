@@ -14,10 +14,11 @@ A **NetBSD package** is available in their pkgsrc collection
   * ftp://ftp.netbsd.org/pub/NetBSD/packages/pkgsrc/databases/py-postgresql/README.html
 A **FreeBSD package** is available in their ports collection
   * http://www.freebsd.org/cgi/cvsweb.cgi/ports/databases/py-PyGreSQL/
-A **Win32 package** for various Python versions is available at
-  * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.5.exe
-  * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.6.exe
-  * http://pygresql.org/files/PyGreSQL-4.2.win32-py2.7.exe
+An **openSUSE package** is available through their build service at
+  * https://software.opensuse.org/package/PyGreSQL?search_term=pygresql
+A **Win32 installer** for Python 2.6 and 2.7 is available at
+  * http://pygresql.org/files/PyGreSQL-4.2.2.win-amd64-py2.6.exe
+  * http://pygresql.org/files/PyGreSQL-4.2.2.win-amd64-py2.7.exe
 
 Older PyGreSQL versions
 -----------------------
