@@ -735,12 +735,11 @@ class DB(object):
             q = ("SELECT s.nspname, r.relname, a.attname"
                 " FROM pg_class r"
                 " JOIN pg_namespace s ON s.oid = r.relnamespace"
-                " AND s.nspname NOT SIMILAR"
-                " TO 'pg/_%|information/_schema' ESCAPE '/'"
                 " JOIN pg_attribute a ON a.attrelid = r.oid"
                 " AND NOT a.attisdropped"
                 " JOIN pg_index i ON i.indrelid = r.oid"
-                " AND i.indisprimary AND a.attnum " + any_indkey)
+                " AND i.indisprimary AND a.attnum %s"
+                " AND r.relkind IN ('r', 'v')" % any_indkey)
             for r in self.db.query(q).getresult():
                 cl, pkey = _join_parts(r[:2]), r[2]
                 self._pkeys.setdefault(cl, []).append(pkey)
@@ -757,27 +756,35 @@ class DB(object):
         return [s[0] for s in
             self.db.query('SELECT datname FROM pg_database').getresult()]
 
-    def get_relations(self, kinds=None):
+    def get_relations(self, kinds=None, system=False):
         """Get list of relations in connected database of specified kinds.
 
         If kinds is None or empty, all kinds of relations are returned.
         Otherwise kinds can be a string or sequence of type letters
         specifying which kind of relations you want to list.
 
+        Set the system flag if you want to get the system relations as well.
         """
-        where = kinds and " AND r.relkind IN (%s)" % ','.join(
-            ["'%s'" % k for k in kinds]) or ''
+        where = []
+        if kinds:
+            where.append("r.relkind IN (%s)" %
+                ','.join(["'%s'" % k for k in kinds]))
+        if not system:
+            where.append("s.nspname NOT SIMILAR"
+                " TO 'pg/_%|information/_schema' ESCAPE '/'")
+        where = where and " WHERE %s" % ' AND '.join(where) or ''
         q = ("SELECT s.nspname, r.relname"
             " FROM pg_class r"
-            " JOIN pg_namespace s ON s.oid = r.relnamespace"
-            " WHERE s.nspname NOT SIMILAR"
-            " TO 'pg/_%%|information/_schema' ESCAPE '/' %s"
+            " JOIN pg_namespace s ON s.oid = r.relnamespace%s"
             " ORDER BY 1, 2") % where
         return [_join_parts(r) for r in self.db.query(q).getresult()]
 
-    def get_tables(self):
-        """Return list of tables in connected database."""
-        return self.get_relations('r')
+    def get_tables(self, system=False):
+        """Return list of tables in connected database.
+
+        Set the system flag if you want to get the system tables as well.
+        """
+        return self.get_relations('r', system)
 
     def get_attnames(self, cl, newattnames=None):
         """Given the name of a table, digs out the set of attribute names.
@@ -801,8 +808,6 @@ class DB(object):
         # May as well cache them:
         if qcl in self._attnames:
             return self._attnames[qcl]
-        if qcl not in self.get_relations('rv'):
-            raise _prg_error('Class %s does not exist' % qcl)
 
         q = ("SELECT a.attname, t.typname%s"
             " FROM pg_class r"
@@ -810,10 +815,20 @@ class DB(object):
             " JOIN pg_attribute a ON a.attrelid = r.oid"
             " JOIN pg_type t ON t.oid = a.atttypid"
             " WHERE s.nspname = $1 AND r.relname = $2"
+            " AND r.relkind IN ('r', 'v')"
             " AND (a.attnum > 0 OR a.attname = 'oid')"
             " AND NOT a.attisdropped") % (
                 self._regtypes and '::regtype' or '',)
         q = self.db.query(q, cl).getresult()
+        if not q:
+            r = ("SELECT r.relnamespace"
+                 " FROM pg_class r"
+                 " JOIN pg_namespace s ON s.oid = r.relnamespace"
+                 " WHERE s.nspname =$1 AND r.relname = $2"
+                 " AND r.relkind IN ('r', 'v') LIMIT 1")
+            r = self.db.query(r, cl).getresult()
+            if not r:
+                raise _prg_error('Class %s does not exist' % qcl)
 
         if self._regtypes:
             t = dict(q)
