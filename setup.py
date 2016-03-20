@@ -32,7 +32,7 @@ using distutils to install Python programs.
 
 """
 
-version = '5.0b1'
+version = '5.0'
 
 
 import sys
