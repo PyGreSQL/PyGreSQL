@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 5.0
------------
+Version 5.0 (2016-03-20)
+------------------------
 - This version now runs on both Python 2 and Python 3.
 - The supported versions are Python 2.6 to 2.7, and 3.3 to 3.5.
 - PostgreSQL is supported in all versions from 9.0 to 9.5.
