@@ -567,6 +567,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         try:
             cur = con.cursor()
+            cur.execute("set timezone = UTC")
             cur.execute("create table %s ("
                 "d date, t time,  ts timestamp,"
                 "tz timetz, tsz timestamptz)" % table)

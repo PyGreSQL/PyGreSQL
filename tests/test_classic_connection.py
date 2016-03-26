@@ -910,6 +910,7 @@ class TestQueryResultTypes(unittest.TestCase):
         self.c = connect()
         self.c.query('set client_encoding=utf8')
         self.c.query("set datestyle='ISO,YMD'")
+        self.c.query("set timezone='UTC'")
 
     def tearDown(self):
         self.c.close()
