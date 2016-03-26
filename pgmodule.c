@@ -472,7 +472,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 	{
 		case PYGRES_INT:
 			n = sizeof(buf)/sizeof(buf[0]) - 1;
-			if (size < n) n = size;
+			if ((int)size < n) n = (int)size;
 			for (i = 0, t = buf; i < n; ++i) *t++ = *s++;
 			*t = '\0';
 			obj = PyInt_FromString(buf, NULL, 10);
@@ -480,7 +480,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 
 		case PYGRES_LONG:
 			n = sizeof(buf)/sizeof(buf[0]) - 1;
-			if (size < n) n = size;
+			if ((int)size < n) n = (int)size;
 			for (i = 0, t = buf; i < n; ++i) *t++ = *s++;
 			*t = '\0';
 			obj = PyLong_FromString(buf, NULL, 10);
@@ -1460,147 +1460,154 @@ format_result(const PGresult *res)
 {
 	const int n = PQnfields(res);
 
-	if (n <= 0)
-		return PyStr_FromString("(nothing selected)");
-
-	char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
-	int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
-
-	if (!aligns || !sizes)
+	if (n > 0)
 	{
-		PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
-	}
+		char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
+		int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
 
-	const int m = PQntuples(res);
-	int i, j;
-	size_t size;
-	char *buffer;
-
-	/* calculate sizes and alignments */
-	for (j = 0; j < n; ++j)
-	{
-		const char * const s = PQfname(res, j);
-		const int format = PQfformat(res, j);
-
-		sizes[j] = s ? (int)strlen(s) : 0;
-		if (format)
+		if (aligns && sizes)
 		{
-			aligns[j] = '\0';
-			if (m && sizes[j] < 8)
-				/* "<binary>" must fit */
-				sizes[j] = 8;
-		}
-		else
-		{
-			const Oid ftype = PQftype(res, j);
+			const int m = PQntuples(res);
+			int i, j;
+			size_t size;
+			char *buffer;
 
-			switch (ftype)
+			/* calculate sizes and alignments */
+			for (j = 0; j < n; ++j)
 			{
-				case INT2OID:
-				case INT4OID:
-				case INT8OID:
-				case FLOAT4OID:
-				case FLOAT8OID:
-				case NUMERICOID:
-				case OIDOID:
-				case XIDOID:
-				case CIDOID:
-				case CASHOID:
-					aligns[j] = 'r';
-					break;
-				default:
-					aligns[j] = 'l';
+				const char * const s = PQfname(res, j);
+				const int format = PQfformat(res, j);
+
+				sizes[j] = s ? (int)strlen(s) : 0;
+				if (format)
+				{
+					aligns[j] = '\0';
+					if (m && sizes[j] < 8)
+						/* "<binary>" must fit */
+						sizes[j] = 8;
+				}
+				else
+				{
+					const Oid ftype = PQftype(res, j);
+
+					switch (ftype)
+					{
+						case INT2OID:
+						case INT4OID:
+						case INT8OID:
+						case FLOAT4OID:
+						case FLOAT8OID:
+						case NUMERICOID:
+						case OIDOID:
+						case XIDOID:
+						case CIDOID:
+						case CASHOID:
+							aligns[j] = 'r';
+							break;
+						default:
+							aligns[j] = 'l';
+					}
+				}
 			}
-		}
-	}
-	for (i = 0; i < m; ++i)
-	{
-		for (j = 0; j < n; ++j)
-		{
-			if (aligns[j])
+			for (i = 0; i < m; ++i)
 			{
-				const int k = PQgetlength(res, i, j);
+				for (j = 0; j < n; ++j)
+				{
+					if (aligns[j])
+					{
+						const int k = PQgetlength(res, i, j);
 
-				if (sizes[j] < k)
-					/* value must fit */
-					sizes[j] = k;
+						if (sizes[j] < k)
+							/* value must fit */
+							sizes[j] = k;
+					}
+				}
 			}
-		}
-	}
-	size = 0;
-	/* size of one row */
-	for (j = 0; j < n; ++j) size += sizes[j] + 1;
-	/* times number of rows incl. heading */
-	size *= (m + 2);
-	/* plus size of footer */
-	size += 40;
-	/* is the buffer size that needs to be allocated */
-	buffer = (char *) PyMem_Malloc(size);
-	if (!buffer)
-	{
-		PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
-	}
-	char *p = buffer;
-	PyObject *result;
-
-	/* create the header */
-	for (j = 0; j < n; ++j)
-	{
-		const char * const s = PQfname(res, j);
-		const int k = sizes[j];
-		const int h = (k - (int)strlen(s)) / 2;
-
-		sprintf(p, "%*s", h, "");
-		sprintf(p + h, "%-*s", k - h, s);
-		p += k;
-		if (j + 1 < n)
-			*p++ = '|';
-	}
-	*p++ = '\n';
-	for (j = 0; j < n; ++j)
-	{
-		int k = sizes[j];
-
-		while (k--)
-			*p++ = '-';
-		if (j + 1 < n)
-			*p++ = '+';
-	}
-	*p++ = '\n';
-	/* create the body */
-	for (i = 0; i < m; ++i)
-	{
-		for (j = 0; j < n; ++j)
-		{
-			const char align = aligns[j];
-			const int k = sizes[j];
-
-			if (align)
+			size = 0;
+			/* size of one row */
+			for (j = 0; j < n; ++j) size += sizes[j] + 1;
+			/* times number of rows incl. heading */
+			size *= (m + 2);
+			/* plus size of footer */
+			size += 40;
+			/* is the buffer size that needs to be allocated */
+			buffer = (char *) PyMem_Malloc(size);
+			if (buffer)
 			{
-				sprintf(p, align == 'r' ?
-					"%*s" : "%-*s", k,
-					PQgetvalue(res, i, j));
+				char *p = buffer;
+				PyObject *result;
+
+				/* create the header */
+				for (j = 0; j < n; ++j)
+				{
+					const char * const s = PQfname(res, j);
+					const int k = sizes[j];
+					const int h = (k - (int)strlen(s)) / 2;
+
+					sprintf(p, "%*s", h, "");
+					sprintf(p + h, "%-*s", k - h, s);
+					p += k;
+					if (j + 1 < n)
+						*p++ = '|';
+				}
+				*p++ = '\n';
+				for (j = 0; j < n; ++j)
+				{
+					int k = sizes[j];
+
+					while (k--)
+						*p++ = '-';
+					if (j + 1 < n)
+						*p++ = '+';
+				}
+				*p++ = '\n';
+				/* create the body */
+				for (i = 0; i < m; ++i)
+				{
+					for (j = 0; j < n; ++j)
+					{
+						const char align = aligns[j];
+						const int k = sizes[j];
+
+						if (align)
+						{
+							sprintf(p, align == 'r' ?
+								"%*s" : "%-*s", k,
+								PQgetvalue(res, i, j));
+						}
+						else
+						{
+							sprintf(p, "%-*s", k,
+								PQgetisnull(res, i, j) ?
+								"" : "<binary>");
+						}
+						p += k;
+						if (j + 1 < n)
+							*p++ = '|';
+					}
+					*p++ = '\n';
+				}
+				/* free memory */
+				PyMem_Free(aligns); PyMem_Free(sizes);
+				/* create the footer */
+				sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
+				/* return the result */
+				result = PyStr_FromString(buffer);
+				PyMem_Free(buffer);
+				return result;
 			}
 			else
 			{
-				sprintf(p, "%-*s", k,
-					PQgetisnull(res, i, j) ?
-					"" : "<binary>");
+				PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
 			}
-			p += k;
-			if (j + 1 < n)
-				*p++ = '|';
 		}
-		*p++ = '\n';
+		else
+		{
+			PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
+		}
 	}
-	/* free memory */
-	PyMem_Free(aligns); PyMem_Free(sizes);
-	/* create the footer */
-	sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
-	/* return the result */
-	result = PyStr_FromString(buffer);
-	PyMem_Free(buffer);
-	return result;
+	else
+		return PyStr_FromString("(nothing selected)");
 }
 
 /* --------------------------------------------------------------------- */
@@ -2629,17 +2636,20 @@ connInsertTable(connObject *self, PyObject *args)
 					PyMem_Free(buffer);
 					return NULL; /* pass the UnicodeEncodeError */
 				}
-				const char* t = PyBytes_AsString(s);
-				while (*t && bufsiz)
+				else
 				{
-					if (*t == '\\' || *t == '\t' || *t == '\n')
+					const char* t = PyBytes_AsString(s);
+					while (*t && bufsiz)
 					{
-						*bufpt++ = '\\'; --bufsiz;
-						if (!bufsiz) break;
+						if (*t == '\\' || *t == '\t' || *t == '\n')
+						{
+							*bufpt++ = '\\'; --bufsiz;
+							if (!bufsiz) break;
+						}
+						*bufpt++ = *t++; --bufsiz;
 					}
-					*bufpt++ = *t++; --bufsiz;
+					Py_DECREF(s);
 				}
-				Py_DECREF(s);
 			}
 			else if (PyInt_Check(item) || PyLong_Check(item))
 			{

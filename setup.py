@@ -166,7 +166,8 @@ class build_pg_ext(build_ext):
                     define_macros.append(('MS_WIN64', None))
             elif compiler == 'msvc':  # Microsoft Visual C++
                 libraries[0] = 'lib' + libraries[0]
-                extra_compile_args[1:] = ['-J', '-W3', '-WX']
+                extra_compile_args[1:] = ['-J', '-W3', '-WX',
+                    '-Dinline=__inline']  # needed for MSVC 9
 
 
 setup(
