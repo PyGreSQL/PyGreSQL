@@ -363,9 +363,10 @@ update -- update a row in a database table
     :raises pg.ProgrammingError: table has no primary key or missing privilege
     :raises KeyError: missing key value for the row
 
-Similar to insert but updates an existing row.  The update is based on
+Similar to insert, but updates an existing row.  The update is based on
 the primary key of the table or the OID value as munged by :meth:`DB.get`
-or passed as keyword.
+or passed as keyword.  The OID will take precedence if provided, so that it
+is possible to update the primary key itself.
 
 The dictionary is then modified to reflect any changes caused by the
 update due to triggers, rules, default values, etc.
@@ -540,7 +541,7 @@ delete -- delete a row from a database table
 
 This method deletes the row from a table.  It deletes based on the
 primary key of the table or the OID value as munged by :meth:`DB.get`
-or passed as keyword.
+or passed as keyword.  The OID will take precedence if provided.
 
 The return value is the number of deleted rows (i.e. 0 if the row did not
 exist and 1 if the row was deleted).

@@ -1864,7 +1864,7 @@ class DB:
         Otherwise, the row must be a single value or a tuple of values
         corresponding to the passed keyname or primary key.  The fetched row
         from the table will be returned as a new dictionary or used to replace
-        the existing values when row was passed as aa dictionary.
+        the existing values when row was passed as a dictionary.
 
         The OID is also put into the dictionary if the table has one, but
         in order to allow the caller to work with multiple tables, it is
@@ -1976,9 +1976,10 @@ class DB:
     def update(self, table, row=None, **kw):
         """Update an existing row in a database table.
 
-        Similar to insert but updates an existing row.  The update is based
-        on the primary key of the table or the OID value as munged by get
-        or passed as keyword.
+        Similar to insert, but updates an existing row.  The update is based
+        on the primary key of the table or the OID value as munged by get()
+        or passed as keyword.  The OID will take precedence if provided, so
+        that it is possible to update the primary key itself.
 
         The dictionary is then modified to reflect any changes caused by the
         update due to triggers, rules, default values, etc.
@@ -1994,22 +1995,16 @@ class DB:
         row.update(kw)
         if qoid and qoid in row and 'oid' not in row:
             row['oid'] = row[qoid]
-        try:  # try using the primary key
-            keyname = self.pkey(table, True)
-        except KeyError:  # the table has no primary key
-            # try using the oid instead
-            if qoid and 'oid' in row:
-                keyname = ('oid',)
-            else:
+        if qoid and 'oid' in row:  # try using the oid
+            keyname = ('oid',)
+        else:  # try using the primary key
+            try:
+                keyname = self.pkey(table, True)
+            except KeyError:  # the table has no primary key
                 raise _prg_error('Table %s has no primary key' % table)
-        else:  # the table has a primary key
             # check whether all key columns have values
             if not set(keyname).issubset(row):
-                # try using the oid instead
-                if qoid and 'oid' in row:
-                    keyname = ('oid',)
-                else:
-                    raise KeyError('Missing primary key in row')
+                raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
@@ -2065,7 +2060,7 @@ class DB:
         keywords had been passed with the value True.
 
         So if in the case of a conflict you want to update every column that
-        has been passed in the dictionary row , you would call upsert(table, row).
+        has been passed in the dictionary row, you would call upsert(table, row).
         If you don't want to do anything in case of a conflict, i.e. leave
         the existing row as it is, call upsert(table, row, **dict.fromkeys(row)).
 
@@ -2172,7 +2167,7 @@ class DB:
 
         This method deletes the row from a table.  It deletes based on the
         primary key of the table or the OID value as munged by get() or
-        passed as keyword.
+        passed as keyword.  The OID will take precedence if provided.
 
         The return value is the number of deleted rows (i.e. 0 if the row
         did not exist and 1 if the row was deleted).
@@ -2191,22 +2186,16 @@ class DB:
         row.update(kw)
         if qoid and qoid in row and 'oid' not in row:
             row['oid'] = row[qoid]
-        try:  # try using the primary key
-            keyname = self.pkey(table, True)
-        except KeyError:  # the table has no primary key
-            # try using the oid instead
-            if qoid and 'oid' in row:
-                keyname = ('oid',)
-            else:
+        if qoid and 'oid' in row:  # try using the oid
+            keyname = ('oid',)
+        else:  # try using the primary key
+            try:
+                keyname = self.pkey(table, True)
+            except KeyError:  # the table has no primary key
                 raise _prg_error('Table %s has no primary key' % table)
-        else:  # the table has a primary key
             # check whether all key columns have values
             if not set(keyname).issubset(row):
-                # try using the oid instead
-                if qoid and 'oid' in row:
-                    keyname = ('oid',)
-                else:
-                    raise KeyError('Missing primary key in row')
+                raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier

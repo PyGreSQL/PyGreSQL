@@ -1765,6 +1765,13 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['m'], 3)
         r = query(q).getresult()
         self.assertEqual(r, [(1, 3), (5, 9)])
+        s.update(n=4, m=7)
+        r = update('test_table', s, oid=oid)
+        self.assertIs(r, s)
+        self.assertEqual(r['n'], 4)
+        self.assertEqual(r['m'], 7)
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 3), (4, 7)])
 
     def testUpdateWithoutOid(self):
         update = self.db.update
@@ -2244,7 +2251,12 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, 1)
         r = delete('test_table', s, n=5)
         self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (6, 1))
+        s = get('test_table', 6, 'n')
+        self.assertEqual(s['n'], 6)
+        s['n'] = 7
+        r = delete('test_table', s)
+        self.assertEqual(r, 1)
+        self.assertEqual(query(q).getresult()[0], (None, 0))
 
     def testDeleteWithCompositeKey(self):
         query = self.db.query
