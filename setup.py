@@ -32,13 +32,13 @@ using distutils to install Python programs.
 
 """
 
-version = '5.0'
+version = '5.0.1'
 
 
 import sys
 
-if (not (2, 6) <= sys.version_info[:2] <= (2, 7)
-        and not (3, 3) <= sys.version_info[:2] <= (3, 5)):
+if (not (2, 6) <= sys.version_info[:2] < (3, 0)
+        and not (3, 3) <= sys.version_info[:2] < (4, 0)):
     raise Exception("Sorry, PyGreSQL %s"
         " does not support this Python version" % version)
 
