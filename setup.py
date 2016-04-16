@@ -45,6 +45,7 @@ if (not (2, 6) <= sys.version_info[:2] < (3, 0)
 
 import os
 import platform
+import re
 import warnings
 try:
     from setuptools import setup
@@ -78,12 +79,10 @@ def pg_config(s):
 
 def pg_version():
     """Return the PostgreSQL version as a tuple of integers."""
-    parts = []
-    for part in pg_config('version').split()[-1].split('.'):
-        if part.isdigit():
-            part = int(part)
-        parts.append(part)
-    return tuple(parts or [9, 0])
+    match = re.search(r'(\d+)\.(\d+)', pg_config('version'))
+    if match:
+        return tuple(map(int, match.groups()))
+    return (9, 0)
 
 
 pg_version = pg_version()
