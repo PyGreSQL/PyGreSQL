@@ -1442,19 +1442,19 @@ _connect = connect
 
 def connect(dsn=None,
         user=None, password=None,
-        host=None, database=None):
+        host=None, database=None, **kwargs):
     """Connect to a database."""
     # first get params from DSN
     dbport = -1
     dbhost = ""
-    dbbase = ""
+    dbname = ""
     dbuser = ""
     dbpasswd = ""
     dbopt = ""
     try:
         params = dsn.split(":")
         dbhost = params[0]
-        dbbase = params[1]
+        dbname = params[1]
         dbuser = params[2]
         dbpasswd = params[3]
         dbopt = params[4]
@@ -1467,7 +1467,7 @@ def connect(dsn=None,
     if password is not None:
         dbpasswd = password
     if database is not None:
-        dbbase = database
+        dbname = database
     if host is not None:
         try:
             params = host.split(":")
@@ -1482,8 +1482,24 @@ def connect(dsn=None,
     if dbuser == "":
         dbuser = None
 
+    # pass keyword arguments as connection info string
+    if kwargs:
+        kwargs = list(kwargs.items())
+        if '=' in dbname:
+            dbname = [dbname]
+        else:
+            kwargs.insert(0, ('dbname', dbname))
+            dbname = []
+        for kw, value in kwargs:
+            value = str(value)
+            if not value or ' ' in value:
+                value = "'%s'" % value.replace(
+                    "'", "\\'").replace('\\', '\\\\')
+            dbname.append('%s=%s' % (kw, value))
+        dbname = ' '.join(dbname)
+
     # open the connection
-    cnx = _connect(dbbase, dbhost, dbport, dbopt, dbuser, dbpasswd)
+    cnx = _connect(dbname, dbhost, dbport, dbopt, dbuser, dbpasswd)
     return Connection(cnx)
 
 

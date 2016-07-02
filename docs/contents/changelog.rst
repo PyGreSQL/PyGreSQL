@@ -6,7 +6,10 @@ Version 5.0.1
 - The update() and delete() methods of the DB wrapper now use the OID instead
   of the primary key if both are provided. This restores backward compatibility
   with PyGreSQL 4.x and allows updating the primary key itself if an OID exists.
-- Made C extension compatible with MSVC 9 again (needed for Python 2 on Windws).
+- The connect() function of the DB API 2.0 module now accepts additional keyword
+  parameters such as "application_name" which will be passed on to PostgreSQL.
+- Made C extension compatible with MSVC 9 again (this was needed to compile for
+  Python 2 on Windows).
 
 Version 5.0 (2016-03-20)
 ------------------------

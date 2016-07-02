@@ -10,7 +10,7 @@ of the module as well as several exception classes.
 connect -- Open a PostgreSQL connection
 ---------------------------------------
 
-.. function:: connect([dsn], [user], [password], [host], [database])
+.. function:: connect([dsn], [user], [password], [host], [database], [**kwargs])
 
     Return a new connection to the database
 
@@ -19,6 +19,7 @@ connect -- Open a PostgreSQL connection
     :param str password: the database password
     :param str host: the hostname of the database
     :param database: the name of the database
+    :param dict kwargs: other connection parameters
     :returns: a connection object
     :rtype: :class:`Connection`
     :raises pgdb.OperationalError: error connecting to the database
@@ -30,7 +31,8 @@ If specified, the *dsn* parameter must be a string with the format
 are optional. You can also specify the parameters individually using keyword
 arguments, which always take precedence. The *host* can also contain a port
 if specified in the format ``'host:port'``. In the *opt* part of the *dsn*
-you can pass command-line options to the server.
+you can pass command-line options to the server. You can pass additional
+connection parameters using the optional *kwargs* keyword arguments.
 
 Example::
 

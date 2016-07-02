@@ -79,11 +79,20 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def tearDown(self):
         dbapi20.DatabaseAPI20Test.tearDown(self)
 
-    def testVersion(self):
+    def test_version(self):
         v = pgdb.version
         self.assertIsInstance(v, str)
         self.assertIn('.', v)
         self.assertEqual(pgdb.__version__, v)
+
+    def test_connect_kwargs(self):
+        application_name = 'PyGreSQL DB API 2.0 Test'
+        self.connect_kw_args['application_name'] = application_name
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute("select application_name from pg_stat_activity"
+            " where application_name = %s", (application_name,))
+        self.assertEqual(cur.fetchone(), (application_name,))
 
     def test_percent_sign(self):
         con = self._connect()
