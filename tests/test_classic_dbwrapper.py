@@ -417,10 +417,14 @@ class TestDBClass(unittest.TestCase):
             self.db.use_regtypes(self.regtypes)
         query = self.db.query
         query('set client_encoding=utf8')
-        query('set standard_conforming_strings=on')
         query("set lc_monetary='C'")
         query("set datestyle='ISO,YMD'")
-        query('set bytea_output=hex')
+        query('set standard_conforming_strings=on')
+        try:
+            query('set bytea_output=hex')
+        except pg.ProgrammingError:
+            if self.db.server_version >= 90000:
+                raise  # ignore for older server versions
 
     def tearDown(self):
         self.doCleanups()
@@ -721,6 +725,7 @@ class TestDBClass(unittest.TestCase):
         f(set(['default_with_oids', 'standard_conforming_strings']))
         self.assertEqual(g('default_with_oids'), dwi)
         self.assertEqual(g('standard_conforming_strings'), scs)
+        db.close()
 
     def testResetParameterAll(self):
         db = DB()
@@ -741,6 +746,7 @@ class TestDBClass(unittest.TestCase):
         f('all')
         self.assertEqual(g('default_with_oids'), dwi)
         self.assertEqual(g('standard_conforming_strings'), scs)
+        db.close()
 
     def testSetParameterLocal(self):
         f = self.db.set_parameter
@@ -781,6 +787,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, default_datestyle)
         r = self.db.get_parameter('datestyle')
         self.assertEqual(r, default_datestyle)
+        db.close()
 
     def testReopen(self):
         db = DB()
@@ -799,6 +806,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(TypeError, getattr, con, 'query')
         r = self.db.get_parameter('datestyle')
         self.assertEqual(r, default_datestyle)
+        db.close()
 
     def testCreateTable(self):
         table = 'test hello world'
@@ -3954,7 +3962,9 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.set_option('bytea_escaped', not_bytea_escaped)
         cls.set_option('namedresult', None)
         cls.set_option('jsondecode', None)
-        cls.regtypes = not DB().use_regtypes()
+        db = DB()
+        cls.regtypes = not db.use_regtypes()
+        db.close()
         super(TestDBClassNonStdOpts, cls).setUpClass()
 
     @classmethod

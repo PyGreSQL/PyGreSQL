@@ -631,6 +631,15 @@ class TypeCache(dict):
         self._typecasts = LocalTypecasts()
         self._typecasts.get_fields = self.get_fields
         self._typecasts.connection = cnx
+        if cnx.server_version < 80400:
+            # older remote databases (not officially supported)
+            self._query_pg_type = ("SELECT oid, typname,"
+                " typlen, typtype, null as typcategory, typdelim, typrelid"
+                " FROM pg_type WHERE oid=%s")
+        else:
+            self._query_pg_type = ("SELECT oid, typname,"
+                " typlen, typtype, typcategory, typdelim, typrelid"
+                " FROM pg_type WHERE oid=%s")
 
     def __missing__(self, key):
         """Get the type info from the database if it is not cached."""
@@ -638,18 +647,16 @@ class TypeCache(dict):
             oid = key
         else:
             if '.' not in key and '"' not in key:
-                key = '"%s"' % key
-            oid = "'%s'::regtype" % self._escape_string(key)
+                key = '"%s"' % (key,)
+            oid = "'%s'::regtype" % (self._escape_string(key),)
         try:
-            self._src.execute("SELECT oid, typname,"
-                 " typlen, typtype, typcategory, typdelim, typrelid"
-                " FROM pg_type WHERE oid=%s" % oid)
+            self._src.execute(self._query_pg_type % (oid,))
         except ProgrammingError:
             res = None
         else:
             res = self._src.fetch(1)
         if not res:
-            raise KeyError('Type %s could not be found' % key)
+            raise KeyError('Type %s could not be found' % (key,))
         res = res[0]
         type_code = TypeCode.create(int(res[0]), res[1],
             int(res[2]), res[3], res[4], res[5], int(res[6]))
@@ -673,7 +680,7 @@ class TypeCache(dict):
             return None  # this type is not composite
         self._src.execute("SELECT attname, atttypid"
             " FROM pg_attribute WHERE attrelid=%s AND attnum>0"
-            " AND NOT attisdropped ORDER BY attnum" % typ.relid)
+            " AND NOT attisdropped ORDER BY attnum" % (typ.relid,))
         return [FieldInfo(name, self.get(int(oid)))
             for name, oid in self._src.fetch(-1)]
 
@@ -772,7 +779,7 @@ class Cursor(object):
                     value = value.decode('ascii')
             else:
                 value = self._cnx.escape_string(value)
-            return "'%s'" % value
+            return "'%s'" % (value,)
         if isinstance(value, float):
             if isinf(value):
                 return "'-Infinity'" if value < 0 else "'Infinity'"
@@ -783,18 +790,18 @@ class Cursor(object):
             return value
         if isinstance(value, datetime):
             if value.tzinfo:
-                return "'%s'::timestamptz" % value
-            return "'%s'::timestamp" % value
+                return "'%s'::timestamptz" % (value,)
+            return "'%s'::timestamp" % (value,)
         if isinstance(value, date):
-            return "'%s'::date" % value
+            return "'%s'::date" % (value,)
         if isinstance(value, time):
             if value.tzinfo:
-                return "'%s'::timetz" % value
+                return "'%s'::timetz" % (value,)
             return "'%s'::time" % value
         if isinstance(value, timedelta):
-            return "'%s'::interval" % value
+            return "'%s'::interval" % (value,)
         if isinstance(value, Uuid):
-            return "'%s'::uuid" % value
+            return "'%s'::uuid" % (value,)
         if isinstance(value, list):
             # Quote value as an ARRAY constructor. This is better than using
             # an array literal because it carries the information that this is
@@ -805,9 +812,9 @@ class Cursor(object):
                 return "'{}'"
             q = self._quote
             try:
-                return 'ARRAY[%s]' % ','.join(str(q(v)) for v in value)
+                return 'ARRAY[%s]' % (','.join(str(q(v)) for v in value),)
             except UnicodeEncodeError:  # Python 2 with non-ascii values
-                return u'ARRAY[%s]' % ','.join(unicode(q(v)) for v in value)
+                return u'ARRAY[%s]' % (','.join(unicode(q(v)) for v in value),)
         if isinstance(value, tuple):
             # Quote as a ROW constructor.  This is better than using a record
             # literal because it carries the information that this is a record
@@ -816,14 +823,14 @@ class Cursor(object):
             # when the records has a single column which is not really useful.
             q = self._quote
             try:
-                return '(%s)' % ','.join(str(q(v)) for v in value)
+                return '(%s)' % (','.join(str(q(v)) for v in value),)
             except UnicodeEncodeError:  # Python 2 with non-ascii values
-                return u'(%s)' % ','.join(unicode(q(v)) for v in value)
+                return u'(%s)' % (','.join(unicode(q(v)) for v in value),)
         try:
             value = value.__pg_repr__()
         except AttributeError:
             raise InterfaceError(
-                'Do not know how to adapt type %s' % type(value))
+                'Do not know how to adapt type %s' % (type(value),))
         if isinstance(value, (tuple, list)):
             value = self._quote(value)
         return value
@@ -1036,7 +1043,7 @@ class Cursor(object):
 
             if isinstance(stream, basestring):
                 if not isinstance(stream, input_type):
-                    raise ValueError("The input must be %s" % type_name)
+                    raise ValueError("The input must be %s" % (type_name,))
                 if not binary_format:
                     if isinstance(stream, str):
                         if not stream.endswith('\n'):
@@ -1054,7 +1061,8 @@ class Cursor(object):
                     for chunk in stream:
                         if not isinstance(chunk, input_type):
                             raise ValueError(
-                                "Input stream must consist of %s" % type_name)
+                                "Input stream must consist of %s"
+                                % (type_name,))
                         if isinstance(chunk, str):
                             if not chunk.endswith('\n'):
                                 chunk += '\n'
@@ -1121,7 +1129,7 @@ class Cursor(object):
             operation.append('(%s)' % (columns,))
         operation.append("from stdin")
         if options:
-            operation.append('(%s)' % ','.join(options))
+            operation.append('(%s)' % (','.join(options),))
         operation = ' '.join(operation)
 
         putdata = self._src.putdata
@@ -1216,7 +1224,7 @@ class Cursor(object):
 
         operation.append("to stdout")
         if options:
-            operation.append('(%s)' % ','.join(options))
+            operation.append('(%s)' % (','.join(options),))
         operation = ' '.join(operation)
 
         getdata = self._src.getdata
@@ -1304,11 +1312,11 @@ class Cursor(object):
                 try:
                     return namedtuple('Row', colnames, rename=True)._make
                 except TypeError:  # Python 2.6 and 3.0 do not support rename
-                    colnames = [v if v.isalnum() else 'column_%d' % n
+                    colnames = [v if v.isalnum() else 'column_%d' % (n,)
                              for n, v in enumerate(colnames)]
                     return namedtuple('Row', colnames)._make
             except ValueError:  # there is still a problem with the field names
-                colnames = ['column_%d' % n for n in range(len(colnames))]
+                colnames = ['column_%d' % (n,) for n in range(len(colnames))]
                 return namedtuple('Row', colnames)._make
 
 
@@ -1493,8 +1501,8 @@ def connect(dsn=None,
         for kw, value in kwargs:
             value = str(value)
             if not value or ' ' in value:
-                value = "'%s'" % value.replace(
-                    "'", "\\'").replace('\\', '\\\\')
+                value = "'%s'" % (value.replace(
+                    "'", "\\'").replace('\\', '\\\\'),)
             dbname.append('%s=%s' % (kw, value))
         dbname = ' '.join(dbname)
 
@@ -1669,7 +1677,7 @@ class Hstore(dict):
         quote = cls._re_quote.search(s)
         s = cls._re_escape.sub(r'\\\1', s)
         if quote:
-            s = '"%s"' % s
+            s = '"%s"' % (s,)
         return s
 
     def __str__(self):

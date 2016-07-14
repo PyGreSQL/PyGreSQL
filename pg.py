@@ -903,7 +903,7 @@ class Typecasts(dict):
 
     def __missing__(self, typ):
         """Create a cast function if it is not cached.
-        
+
         Note that this class never raises a KeyError,
         but returns None when no special cast function exists.
         """
@@ -1049,7 +1049,7 @@ class DbType(str):
         regtype: the regular type name
         simple: the simple PyGreSQL type name
         typtype: b = base type, c = composite type etc.
-        category: A = Array, b =Boolean, C = Composite etc.
+        category: A = Array, b = Boolean, C = Composite etc.
         delim: delimiter for array types
         relid: corresponding table for composite types
         attnames: attributes for composite types
@@ -1082,6 +1082,17 @@ class DbTypes(dict):
         db = db.db
         self.query = db.query
         self.escape_string = db.escape_string
+        if db.server_version < 80400:
+            # older remote databases (not officially supported)
+            self._query_pg_type = (
+                "SELECT oid, typname, typname::text::regtype,"
+                " typtype, null as typcategory, typdelim, typrelid"
+                " FROM pg_type WHERE oid=%s::regtype")
+        else:
+            self._query_pg_type = (
+                "SELECT oid, typname, typname::regtype,"
+                " typtype, typcategory, typdelim, typrelid"
+                " FROM pg_type WHERE oid=%s::regtype")
 
     def add(self, oid, pgtype, regtype,
                typtype, category, delim, relid):
@@ -1104,10 +1115,8 @@ class DbTypes(dict):
     def __missing__(self, key):
         """Get the type info from the database if it is not cached."""
         try:
-            res = self.query("SELECT oid, typname, typname::regtype,"
-                " typtype, typcategory, typdelim, typrelid"
-                " FROM pg_type WHERE oid=%s::regtype" %
-                (_quote_if_unqualified('$1', key),), (key,)).getresult()
+            q = self._query_pg_type % (_quote_if_unqualified('$1', key),)
+            res = self.query(q, (key,)).getresult()
         except ProgrammingError:
             res = None
         if not res:
@@ -1379,6 +1388,23 @@ class DB:
         self._args = args, kw
         self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
+        if db.server_version < 80400:
+            # support older remote data bases
+            self._query_attnames = (
+                "SELECT a.attname, t.oid, t.typname, t.typname::text::regtype,"
+                " t.typtype, null as typcategory, t.typdelim, t.typrelid"
+                " FROM pg_attribute a"
+                " JOIN pg_type t ON t.oid = a.atttypid"
+                " WHERE a.attrelid = %s::regclass AND %s"
+                " AND NOT a.attisdropped ORDER BY a.attnum")
+        else:
+            self._query_attnames = (
+                "SELECT a.attname, t.oid, t.typname, t.typname::regtype,"
+                " t.typtype, t.typcategory, t.typdelim, t.typrelid"
+                " FROM pg_attribute a"
+                " JOIN pg_type t ON t.oid = a.atttypid"
+                " WHERE a.attrelid = %s::regclass AND %s"
+                " AND NOT a.attisdropped ORDER BY a.attnum")
         db.set_cast_hook(self.dbtypes.typecast)
         self.debug = None  # For debugging scripts, this can be set
             # * to a string format specification (e.g. in CGI set to "%s<BR>"),
@@ -1805,13 +1831,7 @@ class DB:
             q = "a.attnum > 0"
             if with_oid:
                 q = "(%s OR a.attname = 'oid')" % q
-            q = ("SELECT a.attname, t.oid, t.typname, t.typname::regtype,"
-                " t.typtype, t.typcategory, t.typdelim, t.typrelid" 
-                " FROM pg_attribute a"
-                " JOIN pg_type t ON t.oid = a.atttypid"
-                " WHERE a.attrelid = %s::regclass AND %s"
-                " AND NOT a.attisdropped ORDER BY a.attnum") % (
-                    _quote_if_unqualified('$1', table), q)
+            q = self._query_attnames % (_quote_if_unqualified('$1', table), q)
             names = self.db.query(q, (table,)).getresult()
             types = self.dbtypes
             names = ((name[0], types.add(*name[1:])) for name in names)

@@ -1818,10 +1818,16 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        query = connect().query
+        db = connect()
+        query = db.query
         query('set client_encoding=sql_ascii')
         query('set standard_conforming_strings=off')
-        query('set bytea_output=escape')
+        try:
+            query('set bytea_output=escape')
+        except pg.ProgrammingError:
+            if db.server_version >= 90000:
+                raise  # ignore for older server versions
+        db.close()
         cls.cls_set_up = True
 
     def testEscapeString(self):
