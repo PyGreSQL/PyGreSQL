@@ -443,7 +443,7 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
    This needs the character string, size, encoding, the Postgres type
    and the external typecast function to be called. */
 static PyObject *
-cast_other(char *s, Py_ssize_t size, int encoding, int pgtype,
+cast_other(char *s, Py_ssize_t size, int encoding, Oid pgtype,
 	PyObject *cast_hook)
 {
 	PyObject *obj;
@@ -453,7 +453,7 @@ cast_other(char *s, Py_ssize_t size, int encoding, int pgtype,
 	if (cast_hook)
 	{
 		PyObject *tmp_obj = obj;
-		obj = PyObject_CallFunction(cast_hook, "(Oi)", obj, pgtype);
+		obj = PyObject_CallFunction(cast_hook, "(OI)", obj, pgtype);
 		Py_DECREF(tmp_obj);
 	}
 	return obj;

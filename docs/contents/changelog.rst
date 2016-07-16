@@ -8,6 +8,11 @@ Version 5.0.1
   with PyGreSQL 4.x and allows updating the primary key itself if an OID exists.
 - The connect() function of the DB API 2.0 module now accepts additional keyword
   parameters such as "application_name" which will be passed on to PostgreSQL.
+- PyGreSQL now adapts some queries to be able to access older PostgreSQL 8.x
+  databases (as suggested on the mailing list by Andres Mejia). However, these
+  old versions of PostgreSQL are not officially supported and tested any more.
+- Fixed an issue with Postgres types that have an OID >= 0x80000000 (reported
+  on the mailing list by Justin Pryzby).
 - Made C extension compatible with MSVC 9 again (this was needed to compile for
   Python 2 on Windows).
 
