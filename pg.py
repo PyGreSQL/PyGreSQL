@@ -619,8 +619,20 @@ class Adapter:
                 else:
                     for value in values:
                         append(add(value))
-            command = command % tuple(literals)
+            command %= tuple(literals)
         elif isinstance(values, dict):
+            # we want to allow extra keys in the dictionary,
+            # so we first must find the values actually used in the command
+            used_values = {}
+            literals = dict.fromkeys(values, '')
+            for key in literals:
+                del literals[key]
+                try:
+                    command % literals
+                except KeyError:
+                    used_values[key] = values[key]
+                literals[key] = ''
+            values = used_values
             if inline:
                 adapt = self.adapt_inline
                 literals = dict((key, adapt(value))
@@ -629,15 +641,14 @@ class Adapter:
                 add = params.add
                 literals = {}
                 if types:
-                    if (not isinstance(types, dict) or
-                            len(types) < len(values)):
+                    if not isinstance(types, dict):
                         raise TypeError('The values and types do not match')
                     for key in sorted(values):
-                        literals[key] = add(values[key], types[key])
+                        literals[key] = add(values[key], types.get(key))
                 else:
                     for key in sorted(values):
                         literals[key] = add(values[key])
-            command = command % literals
+            command %= literals
         else:
             raise TypeError('The values must be passed as tuple, list or dict')
         return command, params

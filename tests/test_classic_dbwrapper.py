@@ -893,10 +893,12 @@ class TestDBClass(unittest.TestCase):
     def testQueryFormatted(self):
         f = self.db.query_formatted
         t = True if pg.get_bool() else 't'
+        # test with tuple
         q = f("select %s::int, %s::real, %s::text, %s::bool",
               (3, 2.5, 'hello', True))
         r = q.getresult()[0]
         self.assertEqual(r, (3, 2.5, 'hello', t))
+        # test with tuple, inline
         q = f("select %s, %s, %s, %s", (3, 2.5, 'hello', True), inline=True)
         r = q.getresult()[0]
         if isinstance(r[1], Decimal):
@@ -905,6 +907,28 @@ class TestDBClass(unittest.TestCase):
             r[1] = float(r[1])
             r = tuple(r)
         self.assertEqual(r, (3, 2.5, 'hello', t))
+        # test with dict
+        q = f("select %(a)s::int, %(b)s::real, %(c)s::text, %(d)s::bool",
+              dict(a=3, b=2.5, c='hello', d=True))
+        r = q.getresult()[0]
+        self.assertEqual(r, (3, 2.5, 'hello', t))
+        # test with dict, inline
+        q = f("select %(a)s, %(b)s, %(c)s, %(d)s",
+              dict(a=3, b=2.5, c='hello', d=True), inline=True)
+        r = q.getresult()[0]
+        if isinstance(r[1], Decimal):
+            # Python 2.6 cannot compare float and Decimal
+            r = list(r)
+            r[1] = float(r[1])
+            r = tuple(r)
+        self.assertEqual(r, (3, 2.5, 'hello', t))
+        # test with dict and extra values
+        q = f("select %(a)s||%(b)s||%(c)s||%(d)s||'epsilon'",
+              dict(a='alpha', b='beta', c='gamma', d='delta', e='extra'))
+        r = q.getresult()[0][0]
+        self.assertEqual(r, 'alphabetagammadeltaepsilon')
+
+
 
     def testPkey(self):
         query = self.db.query

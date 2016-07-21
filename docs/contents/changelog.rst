@@ -13,6 +13,8 @@ Version 5.0.1
   old versions of PostgreSQL are not officially supported and tested any more.
 - Fixed an issue with Postgres types that have an OID >= 0x80000000 (reported
   on the mailing list by Justin Pryzby).
+- Allow extra values that are not used in the command in the parameter dict
+  passed to the query_formatted() method (as suggested by Justin Pryzby).
 - Made C extension compatible with MSVC 9 again (this was needed to compile for
   Python 2 on Windows).
 
