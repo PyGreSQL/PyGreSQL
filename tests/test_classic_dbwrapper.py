@@ -17,6 +17,7 @@ except ImportError:
 
 import os
 import sys
+import gc
 import json
 import tempfile
 
@@ -4442,6 +4443,38 @@ class TestDebug(unittest.TestCase):
         self.db._do_debug(*args)
         self.assertEqual(output, ['\n'.join(str(arg) for arg in args)])
         self.assertEqual(self.get_output(), "")
+
+
+class TestMemoryLeaks(unittest.TestCase):
+    """Test that the DB class does not leak memory."""
+
+    def getLeaks(self, fut):
+        ids = set()
+        objs = []
+        add_ids = ids.update
+        gc.collect()
+        objs[:] = gc.get_objects()
+        add_ids(id(obj) for obj in objs)
+        fut()
+        gc.collect()
+        objs[:] = gc.get_objects()
+        objs[:] = [obj for obj in objs if id(obj) not in ids]
+        self.assertEqual(len(objs), 0)
+
+    def testLeaksWithClose(self):
+        def fut():
+            db = DB()
+            db.query("select $1::int as r", 42).dictresult()
+            db.close()
+            del db
+        self.getLeaks(fut)
+
+    @unittest.skip("this still needs to be resolved")
+    def testLeaksWithoutClose(self):
+        def fut():
+            db = DB()
+            db.query("select $1::int as r", 42).dictresult()
+        self.getLeaks(fut)
 
 
 if __name__ == '__main__':

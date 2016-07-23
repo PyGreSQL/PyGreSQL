@@ -1440,7 +1440,7 @@ class DB:
     # Context manager methods
 
     def __enter__(self):
-        """Enter the runtime context. This will start a transactio."""
+        """Enter the runtime context. This will start a transaction."""
         self.begin()
         return self
 
@@ -1506,6 +1506,7 @@ class DB:
         # Wraps shared library function so we can track state.
         if self._closeable:
             if self.db:
+                self.db.set_cast_hook(None)
                 self.db.close()
                 self.db = None
             else:
@@ -1534,6 +1535,7 @@ class DB:
         if self._closeable:
             db = connect(*self._args[0], **self._args[1])
             if self.db:
+                self.db.set_cast_hook(None)
                 self.db.close()
             self.db = db
 
