@@ -4466,10 +4466,8 @@ class TestMemoryLeaks(unittest.TestCase):
             db = DB()
             db.query("select $1::int as r", 42).dictresult()
             db.close()
-            del db
         self.getLeaks(fut)
 
-    @unittest.skip("this still needs to be resolved")
     def testLeaksWithoutClose(self):
         def fut():
             db = DB()
