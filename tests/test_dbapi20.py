@@ -28,6 +28,9 @@ except (ImportError, ValueError):
     except ImportError:
         pass
 
+import gc
+import sys
+
 from datetime import date, time, datetime, timedelta
 from uuid import UUID as Uuid
 
@@ -1215,6 +1218,31 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertNotEqual(pgdb.RECORD, pgdb.ARRAY)
         self.assertEqual('record', pgdb.RECORD)
         self.assertNotEqual('_record', pgdb.RECORD)
+
+    def test_no_close(self):
+        data = ('hello', 'world')
+        con = self._connect()
+        cur = con.cursor()
+        cur.build_row_factory = lambda: tuple
+        cur.execute("select %s, %s", data)
+        row = cur.fetchone()
+        self.assertEqual(row, data)
+
+    def test_memory_leaks(self):
+        ids = set()
+        objs = []
+        add_ids = ids.update
+        gc.collect()
+        objs[:] = gc.get_objects()
+        add_ids(id(obj) for obj in objs)
+        self.test_no_close()
+        gc.collect()
+        objs[:] = gc.get_objects()
+        objs[:] = [obj for obj in objs if id(obj) not in ids]
+        if objs and sys.version_info[:3] in ((3, 5, 0), (3, 5, 1)):
+            # workaround for Python issue 26811
+            objs[:] = [obj for obj in objs if repr(obj) != '(<NULL>,)']
+        self.assertEqual(len(objs), 0)
 
 
 if __name__ == '__main__':

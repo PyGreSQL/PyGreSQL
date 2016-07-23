@@ -925,7 +925,7 @@ class Cursor(object):
         try:
             if not self._dbcnx._tnx:
                 try:
-                    self._cnx.source().execute(sql)
+                    self._src.execute(sql)
                 except DatabaseError:
                     raise  # database provides error message
                 except Exception:

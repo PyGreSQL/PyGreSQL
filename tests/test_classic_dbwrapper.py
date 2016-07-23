@@ -929,8 +929,6 @@ class TestDBClass(unittest.TestCase):
         r = q.getresult()[0][0]
         self.assertEqual(r, 'alphabetagammadeltaepsilon')
 
-
-
     def testPkey(self):
         query = self.db.query
         pkey = self.db.pkey
@@ -4459,6 +4457,9 @@ class TestMemoryLeaks(unittest.TestCase):
         gc.collect()
         objs[:] = gc.get_objects()
         objs[:] = [obj for obj in objs if id(obj) not in ids]
+        if objs and sys.version_info[:3] in ((3, 5, 0), (3, 5, 1)):
+            # workaround for Python issue 26811
+            objs[:] = [obj for obj in objs if repr(obj) != '(<NULL>,)']
         self.assertEqual(len(objs), 0)
 
     def testLeaksWithClose(self):
