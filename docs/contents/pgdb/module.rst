@@ -38,6 +38,9 @@ Example::
 
     con = connect(dsn='myhost:mydb', user='guido', password='234$')
 
+.. versionchanged:: 5.0.1
+
+    Support for additional parameters passed as *kwargs*.
 
 get/set/reset_typecast -- Control the global typecast functions
 ---------------------------------------------------------------

@@ -2,11 +2,11 @@
 PyGreSQL Announcements
 ======================
 
--------------------------------
-Release of PyGreSQL version 5.0
--------------------------------
+---------------------------------
+Release of PyGreSQL version 5.0.1
+---------------------------------
 
-Release 5.0 of PyGreSQL.
+Release 5.0.1 of PyGreSQL.
 
 It is available at: http://pygresql.org/files/PyGreSQL-5.0.tar.gz.
 
