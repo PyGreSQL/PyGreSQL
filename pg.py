@@ -517,7 +517,7 @@ class Adapter:
         if isinstance(value, (date, time, datetime, timedelta)):
             return 'date'
         if isinstance(value, list):
-            return '%s[]' % cls.guess_simple_base_type(value)
+            return '%s[]' % (cls.guess_simple_base_type(value) or 'text',)
         if isinstance(value, tuple):
             simple_type = cls.simple_type
             typ = simple_type('record')

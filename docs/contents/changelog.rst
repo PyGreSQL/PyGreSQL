@@ -15,6 +15,7 @@ Version 5.0.1
   on the mailing list by Justin Pryzby).
 - Allow extra values that are not used in the command in the parameter dict
   passed to the query_formatted() method (as suggested by Justin Pryzby).
+- Improved handling of empty arrays in the classic module.
 - Unused classic connections were not properly garbage collected which could
   cause memory leaks (reported by Justin Pryzby).
 - Made C extension compatible with MSVC 9 again (this was needed to compile for

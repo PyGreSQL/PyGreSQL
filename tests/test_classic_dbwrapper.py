@@ -929,6 +929,18 @@ class TestDBClass(unittest.TestCase):
         r = q.getresult()[0][0]
         self.assertEqual(r, 'alphabetagammadeltaepsilon')
 
+    def testQueryFormattedWithAny(self):
+        f = self.db.query_formatted
+        q = "select 2 = any(%s)"
+        r = f(q, [[1, 3]]).getresult()[0][0]
+        self.assertEqual(r, False if pg.get_bool() else 'f')
+        r = f(q, [[1, 2, 3]]).getresult()[0][0]
+        self.assertEqual(r, True if pg.get_bool() else 't')
+        r = f(q, [[]]).getresult()[0][0]
+        self.assertEqual(r, False if pg.get_bool() else 'f')
+        r = f(q, [[None]]).getresult()[0][0]
+        self.assertIsNone(r)
+
     def testPkey(self):
         query = self.db.query
         pkey = self.db.pkey
