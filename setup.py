@@ -1,7 +1,7 @@
 #! /usr/bin/python
 # $Id$
 
-"""Setup script for PyGreSQL version 5.0
+"""Setup script for PyGreSQL version 5.0.1
 
 PyGreSQL is an open-source Python module that interfaces to a
 PostgreSQL database. It embeds the PostgreSQL query library to allow

@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 5.0.1
--------------
+Version 5.0.1 (2016-08-18)
+--------------------------
 - The update() and delete() methods of the DB wrapper now use the OID instead
   of the primary key if both are provided. This restores backward compatibility
   with PyGreSQL 4.x and allows updating the primary key itself if an OID exists.
