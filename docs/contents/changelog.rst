@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+Version 5.0.2 (2016-09-08)
+--------------------------
+- Fixed an infinite recursion problem in the DB wrapper class of the classic
+  module that could occur when the underlying connection could not be properly
+  opened (bug report by Justin Pryzby).
+
 Version 5.0.1 (2016-08-18)
 --------------------------
 - The update() and delete() methods of the DB wrapper now use the OID instead

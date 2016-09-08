@@ -166,6 +166,19 @@ class TestAttrDict(unittest.TestCase):
             self.assertRaises(TypeError, method, a)
 
 
+class TestDBClassInit(unittest.TestCase):
+    """Test proper handling of errors when creating DB instances."""
+
+    def testBadParams(self):
+        self.assertRaises(TypeError, pg.DB, invalid=True)
+
+    def testDeleteDb(self):
+        db = DB()
+        del db.db
+        self.assertRaises(pg.InternalError, db.close)
+        del db
+
+
 class TestDBClassBasic(unittest.TestCase):
     """Test existence of the DB class wrapped pg connection methods."""
 

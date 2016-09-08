@@ -1358,6 +1358,8 @@ def pgnotify(*args, **kw):
 class DB:
     """Wrapper class for the _pg connection type."""
 
+    db = None  # invalid fallback for underlying connection
+
     def __init__(self, *args, **kw):
         """Create a new connection
 
