@@ -138,7 +138,7 @@ Version 5.0 (2016-03-20)
       corresponding Python objects from the datetime module of the standard
       library.  In earlier versions of PyGreSQL they had been returned as
       strings.  You can restore the old behavior by deactivating the respective
-      typecast functions, e.g. set_typecast('date', None).
+      typecast functions, e.g. set_typecast('date', str).
     - PyGreSQL now support the "uuid" data type, converting such columns
       automatically to and from Python uuid.UUID objects.
     - PyGreSQL now supports the "hstore" data type, converting such columns
