@@ -1,6 +1,6 @@
 #! /bin/sh
 
-VERSION=5.0.1
+VERSION=5.0.2
 DISTDIR=/u/WEB/pyg/files
 
 # some safety tests
