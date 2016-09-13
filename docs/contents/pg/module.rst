@@ -679,7 +679,7 @@ then a comma will be used by default.
 
 .. function::  cast_record(string, [cast], [delim])
 
-    Cast a string representing a PostgreSQL record to a Python list
+    Cast a string representing a PostgreSQL record to a Python tuple
 
     :param str string: the string with the text representation of the record
     :param cast: typecast function(s) for the elements of the record
