@@ -517,12 +517,14 @@ class Typecasts(dict):
 
     def create_array_cast(self, basecast):
         """Create an array typecast for the given base cast."""
+        cast_array = self['anyarray']
         def cast(v):
             return cast_array(v, basecast)
         return cast
 
     def create_record_cast(self, name, fields, casts):
         """Create a named record typecast for the given fields and casts."""
+        cast_record = self['record']
         record = namedtuple(name, fields)
         def cast(v):
             return record(*cast_record(v, casts))

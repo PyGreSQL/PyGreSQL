@@ -1,7 +1,13 @@
 ChangeLog
 =========
 
-Version 5.0.2 (2016-09-08)
+Version 5.0.3 (2016-09-21)
+--------------------------
+- It is now possible to use a custom array cast method for the pgdb module,
+  e.g. pgdb.set_typecast('anyarray', lambda v, basecast: v) will cause arrays
+  to be always returned as strings instead of lists.
+
+Version 5.0.2 (2016-09-13)
 --------------------------
 - Fixed an infinite recursion problem in the DB wrapper class of the classic
   module that could occur when the underlying connection could not be properly

@@ -930,6 +930,34 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(i4, 4)
         self.assertEqual(i8, 8)
 
+    def test_set_typecast_for_arrays(self):
+        query = 'select ARRAY[1,2,3]'
+        try:
+            con = self._connect()
+            try:
+                r = con.cursor().execute(query).fetchone()[0]
+            finally:
+                con.close()
+            self.assertIsInstance(r, list)
+            self.assertEqual(r, [1, 2, 3])
+            pgdb.set_typecast('anyarray', lambda v, basecast: v)
+            con = self._connect()
+            try:
+                r = con.cursor().execute(query).fetchone()[0]
+            finally:
+                con.close()
+            self.assertIsInstance(r, str)
+            self.assertEqual(r, '{1,2,3}')
+        finally:
+            pgdb.reset_typecast()
+        con = self._connect()
+        try:
+            r = con.cursor().execute(query).fetchone()[0]
+        finally:
+            con.close()
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, [1, 2, 3])
+
     def test_unicode_with_utf8(self):
         table = self.table_prefix + 'booze'
         input = u"He wes Leovenaðes sone — liðe him be Drihten"

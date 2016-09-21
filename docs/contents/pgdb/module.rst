@@ -85,6 +85,13 @@ be necessary to look up certain database settings.
 
 .. versionadded:: 5.0
 
+As of version 5.0.3 you can also use this method to change the typecasting
+of PostgreSQL array types. You must run ``set_typecast('anyarray', cast)``
+in order to do this. The ``cast`` method must take a string value and a cast
+function for the base type and return the array converted to a Python object.
+For instance, run ``set_typecast('anyarray', lambda v, c: v)`` to switch off
+the casting of arrays completely, and always return them encoded as strings.
+
 .. method:: reset_typecast([typ])
 
     Reset the typecasts for the specified (or all) type(s) to their defaults
