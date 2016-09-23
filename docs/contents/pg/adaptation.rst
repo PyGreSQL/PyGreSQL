@@ -37,7 +37,7 @@ interval                           datetime.timedelta
 hstore                             dict
 json, jsonb                        list or dict
 uuid                               uuid.UUID
-array                              list
+array                              list [#array]_
 record                             tuple
 ================================== ==================
 
@@ -46,6 +46,15 @@ record                             tuple
     Elements of arrays and records will also be converted accordingly.
 
     .. [#int8] int8 is converted to long in Python 2
+
+    .. [#array] The first element of the array will always be the first element
+       of the Python list, no matter what the lower bound of the PostgreSQL
+       array is. The information about the start index of the array (which is
+       usually 1 in PostgreSQL, but can also be different from 1) is ignored
+       and gets lost in the conversion to the Python list. If you need that
+       information, you can request it separately with the `array_lower()`
+       function provided by PostgreSQL.
+
 
 Adaptation of parameters
 ------------------------

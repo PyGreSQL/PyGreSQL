@@ -321,7 +321,7 @@ in order to allow the caller to work with multiple tables, it is
 munged as ``oid(table)`` using the actual name of the table.
 
 Note that since PyGreSQL 5.0 this will return the value of an array
-type column as a Python list.
+type column as a Python list by default.
 
 insert -- insert a row into a database table
 --------------------------------------------
