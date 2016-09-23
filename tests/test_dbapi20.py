@@ -1055,7 +1055,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             con.close()
         self.assertEqual(row, (value, 'hello'))
 
-
     def test_json(self):
         inval = {"employees":
             [{"firstName": "John", "lastName": "Doe", "age": 61}]}
@@ -1255,6 +1254,33 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         cur.execute("select %s, %s", data)
         row = cur.fetchone()
         self.assertEqual(row, data)
+
+    def test_set_row_factory_size(self):
+        try:
+            from functools import lru_cache
+        except ImportError:  # Python < 3.2
+            lru_cache = None
+        queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
+        con = self._connect()
+        cur = con.cursor()
+        for maxsize in (None, 0, 1, 2, 3, 10, 1024):
+            pgdb.set_row_factory_size(maxsize)
+            for i in range(3):
+                for q in queries:
+                    cur.execute(q)
+                    r = cur.fetchone()
+                    if q.endswith('abc'):
+                        self.assertEqual(r, (123,))
+                        self.assertEqual(r._fields, ('abc',))
+                    else:
+                        self.assertEqual(r, (1, 2, 3))
+                        self.assertEqual(r._fields, ('a', 'b', 'c'))
+            if lru_cache:
+                info = pgdb._row_factory.cache_info()
+                self.assertEqual(info.maxsize, maxsize)
+                self.assertEqual(info.hits + info.misses, 6)
+                self.assertEqual(info.hits,
+                    0 if maxsize is not None and maxsize < 2 else 4)
 
     def test_memory_leaks(self):
         ids = set()

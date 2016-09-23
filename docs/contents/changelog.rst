@@ -1,11 +1,18 @@
 ChangeLog
 =========
 
-Version 5.0.3 (2016-09-21)
+Version 5.0.3 (2016-09-23)
 --------------------------
-- It is now possible to use a custom array cast method for the pgdb module,
-  e.g. pgdb.set_typecast('anyarray', lambda v, basecast: v) will cause arrays
-  to be always returned as strings instead of lists.
+- It is now possible to use a custom array cast function by changing
+  the type caster for the 'anyarray' type.  For instance, by calling
+  set_typecast('anyarray', lambda v, c: v) you can have arrays returned
+  as strings instead of lists.  Note that in the pg module, you can also
+  call set_array(False) in order to return arrays as strings.
+- The namedtuple classes used for the rows of query results are now cached
+  and reused internally, since creating namedtuples classes in Python is a
+  somewhat expensive operation.  By default the cache has a size of 1024
+  entries, but this can be changed with the set_row_factory_size() function.
+  In certain cases this change can notably improve the performance.
 
 Version 5.0.2 (2016-09-13)
 --------------------------

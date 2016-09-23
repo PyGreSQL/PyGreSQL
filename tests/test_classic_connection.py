@@ -491,6 +491,7 @@ class TestSimpleQueries(unittest.TestCase):
             ' 0 as a_long_name_with_underscores,'
             ' 0 as "A long name with Blanks"')
         r = self.c.query(q).listfields()
+        self.assertIsInstance(r, tuple)
         result = ('a', 'b', 'c', 'c', 'b', 'a',
             'lowercase', 'uppercase', 'mixedcase', 'MixedCase',
             'a_long_name_with_underscores',
@@ -1802,6 +1803,31 @@ class TestConfigFunctions(unittest.TestCase):
 
         r = pg.get_namedresult()
         self.assertIs(r, namedresult)
+
+    def testSetRowFactorySize(self):
+        try:
+            from functools import lru_cache
+        except ImportError:  # Python < 3.2
+            lru_cache = None
+        queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
+        query = self.c.query
+        for maxsize in (None, 0, 1, 2, 3, 10, 1024):
+            pg.set_row_factory_size(maxsize)
+            for i in range(3):
+                for q in queries:
+                    r = query(q).namedresult()[0]
+                    if q.endswith('abc'):
+                        self.assertEqual(r, (123,))
+                        self.assertEqual(r._fields, ('abc',))
+                    else:
+                        self.assertEqual(r, (1, 2, 3))
+                        self.assertEqual(r._fields, ('a', 'b', 'c'))
+            if lru_cache:
+                info = pg._row_factory.cache_info()
+                self.assertEqual(info.maxsize, maxsize)
+                self.assertEqual(info.hits + info.misses, 6)
+                self.assertEqual(info.hits,
+                    0 if maxsize is not None and maxsize < 2 else 4)
 
 
 class TestStandaloneEscapeFunctions(unittest.TestCase):

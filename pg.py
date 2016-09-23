@@ -57,6 +57,89 @@ try:
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
 
+try:
+    from functools import lru_cache
+except ImportError:  # Python < 3.2
+    from functools import update_wrapper
+    try:
+        from _thread import RLock
+    except ImportError:
+        class RLock:  # for builds without threads
+            def __enter__(self): pass
+
+            def __exit__(self, exctype, excinst, exctb): pass
+
+    def lru_cache(maxsize=128):
+        """Simplified functools.lru_cache decorator for one argument."""
+
+        def decorator(function):
+            sentinel = object()
+            cache = {}
+            get = cache.get
+            lock = RLock()
+            root = []
+            root_full = [root, False]
+            root[:] = [root, root, None, None]
+
+            if maxsize == 0:
+
+                def wrapper(arg):
+                    res = function(arg)
+                    return res
+
+            elif maxsize is None:
+
+                def wrapper(arg):
+                    res = get(arg, sentinel)
+                    if res is not sentinel:
+                        return res
+                    res = function(arg)
+                    cache[arg] = res
+                    return res
+
+            else:
+
+                def wrapper(arg):
+                    with lock:
+                        link = get(arg)
+                        if link is not None:
+                            root = root_full[0]
+                            prev, next, _arg, res = link
+                            prev[1] = next
+                            next[0] = prev
+                            last = root[0]
+                            last[1] = root[0] = link
+                            link[0] = last
+                            link[1] = root
+                            return res
+                    res = function(arg)
+                    with lock:
+                        root, full = root_full
+                        if arg in cache:
+                            pass
+                        elif full:
+                            oldroot = root
+                            oldroot[2] = arg
+                            oldroot[3] = res
+                            root = root_full[0] = oldroot[1]
+                            oldarg = root[2]
+                            oldres = root[3]  # keep reference
+                            root[2] = root[3] = None
+                            del cache[oldarg]
+                            cache[arg] = oldroot
+                        else:
+                            last = root[0]
+                            link = [last, root, arg, res]
+                            last[1] = root[0] = cache[arg] = link
+                            if len(cache) >= maxsize:
+                                root_full[1] = True
+                    return res
+
+            wrapper.__wrapped__ = function
+            return update_wrapper(wrapper, function)
+
+        return decorator
+
 
 # Auxiliary classes and functions that are independent from a DB connection:
 
@@ -1021,12 +1104,14 @@ class Typecasts(dict):
 
     def create_array_cast(self, basecast):
         """Create an array typecast for the given base cast."""
+        cast_array = self['anyarray']
         def cast(v):
             return cast_array(v, basecast)
         return cast
 
     def create_record_cast(self, name, fields, casts):
         """Create a named record typecast for the given fields and casts."""
+        cast_record = self['record']
         record = namedtuple(name, fields)
         def cast(v):
             return record(*cast_record(v, casts))
@@ -1176,10 +1261,38 @@ class DbTypes(dict):
         return cast(value)
 
 
+# The result rows for database operations are returned as named tuples
+# by default. Since creating namedtuple classes is a somewhat expensive
+# operation, we cache up to 1024 of these classes by default.
+
+@lru_cache(maxsize=1024)
+def _row_factory(names):
+    """Get a namedtuple factory for row results with the given names."""
+    try:
+        try:
+            return namedtuple('Row', names, rename=True)._make
+        except TypeError:  # Python 2.6 and 3.0 do not support rename
+            names = [v if v.isalnum() else 'column_%d' % (n,)
+                     for n, v in enumerate(names)]
+            return namedtuple('Row', names)._make
+    except ValueError:  # there is still a problem with the field names
+        names = ['column_%d' % (n,) for n in range(len(names))]
+        return namedtuple('Row', names)._make
+
+
+def set_row_factory_size(maxsize):
+    """Change the size of the namedtuple factory cache.
+
+    If maxsize is set to None, the cache can grow without bound.
+    """
+    global _row_factory
+    _row_factory = lru_cache(maxsize)(_row_factory.__wrapped__)
+
+
 def _namedresult(q):
     """Get query result as named tuples."""
-    row = namedtuple('Row', q.listfields())
-    return [row(*r) for r in q.getresult()]
+    row = _row_factory(q.listfields())
+    return [row(r) for r in q.getresult()]
 
 
 class _MemoryQuery:
@@ -1188,7 +1301,7 @@ class _MemoryQuery:
     def __init__(self, result, fields):
         """Create query from given result rows and field names."""
         self.result = result
-        self.fields = fields
+        self.fields = tuple(fields)
 
     def listfields(self):
         """Return the stored field names of this query."""
