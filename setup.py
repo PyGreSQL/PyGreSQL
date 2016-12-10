@@ -178,7 +178,7 @@ setup(
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",
     url="http://www.pygresql.org",
-    download_url="ftp://ftp.pygresql.org/pub/distrib/",
+    download_url="http://www.pygresql.org/download/",
     platforms=["any"],
     license="Python",
     py_modules=py_modules,
