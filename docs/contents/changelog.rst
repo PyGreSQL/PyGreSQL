@@ -1,7 +1,7 @@
 ChangeLog
 =========
 
-Version 5.0.3 (2016-09-23)
+Version 5.0.3 (2016-12-10)
 --------------------------
 - It is now possible to use a custom array cast function by changing
   the type caster for the 'anyarray' type.  For instance, by calling

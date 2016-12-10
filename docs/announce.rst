@@ -3,12 +3,12 @@ PyGreSQL Announcements
 ======================
 
 ---------------------------------
-Release of PyGreSQL version 5.0.2
+Release of PyGreSQL version 5.0.3
 ---------------------------------
 
-Release 5.0.2 of PyGreSQL.
+Release 5.0.3 of PyGreSQL.
 
-It is available at: http://pygresql.org/files/PyGreSQL-5.0.2.tar.gz.
+It is available at: http://pygresql.org/files/PyGreSQL-5.0.3.tar.gz.
 
 If you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.
