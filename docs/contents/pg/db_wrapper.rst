@@ -466,7 +466,7 @@ Example::
 query_formatted -- execute a formatted SQL command string
 ---------------------------------------------------------
 
-.. method:: DB.query_formatted(command, parameters, [types], [inline])
+.. method:: DB.query_formatted(command, [parameters], [types], [inline])
 
     Execute a formatted SQL command string
 

@@ -1,6 +1,10 @@
 ChangeLog
 =========
 
+Version 5.0.4 (to be released)
+------------------------------
+- query_formatted() can now be used without parameters.
+
 Version 5.0.3 (2016-12-10)
 --------------------------
 - It is now possible to use a custom array cast function by changing

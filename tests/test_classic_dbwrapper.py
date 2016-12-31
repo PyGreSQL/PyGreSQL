@@ -954,6 +954,18 @@ class TestDBClass(unittest.TestCase):
         r = f(q, [[None]]).getresult()[0][0]
         self.assertIsNone(r)
 
+    def testQueryFormattedWithoutParams(self):
+        f = self.db.query_formatted
+        q = "select 42"
+        r = f(q).getresult()[0][0]
+        self.assertEqual(r, 42)
+        r = f(q, None).getresult()[0][0]
+        self.assertEqual(r, 42)
+        r = f(q, []).getresult()[0][0]
+        self.assertEqual(r, 42)
+        r = f(q, {}).getresult()[0][0]
+        self.assertEqual(r, 42)
+
     def testPkey(self):
         query = self.db.query
         pkey = self.db.pkey

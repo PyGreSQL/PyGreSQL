@@ -677,8 +677,10 @@ class Adapter:
         params.adapt = self.adapt
         return params
 
-    def format_query(self, command, values, types=None, inline=False):
+    def format_query(self, command, values=None, types=None, inline=False):
         """Format a database query using the given values and types."""
+        if not values:
+            return command, []
         if inline and types:
             raise ValueError('Typed parameters must be sent separately')
         params = self.parameter_list()
@@ -1847,7 +1849,8 @@ class DB:
         self._do_debug(command)
         return self.db.query(command)
 
-    def query_formatted(self, command, parameters, types=None, inline=False):
+    def query_formatted(self, command,
+            parameters=None, types=None, inline=False):
         """Execute a formatted SQL command string.
 
         Similar to query, but using Python format placeholders of the form
