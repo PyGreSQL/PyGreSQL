@@ -3,6 +3,7 @@ ChangeLog
 
 Version 5.0.4 (to be released)
 ------------------------------
+- This version officially supports the new Python 3.6 and PostgreSQL 9.6.
 - query_formatted() can now be used without parameters.
 - The automatic renaming of columns that are invalid as field names of
   named tuples now works more accurately in Python 2.6 and 3.0.
