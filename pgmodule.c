@@ -3484,7 +3484,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 	if (!strcmp(name, "host"))
 	{
 		char *r = PQhost(self->cnx);
-		if (!r)
+		if (!r || r[0] == '/') /* Pg 9.6 can return a Unix socket path */
 			r = "localhost";
 		return PyStr_FromString(r);
 	}
