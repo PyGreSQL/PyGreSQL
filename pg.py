@@ -708,7 +708,7 @@ class Adapter:
             # so we first must find the values actually used in the command
             used_values = {}
             literals = dict.fromkeys(values, '')
-            for key in literals:
+            for key in values:
                 del literals[key]
                 try:
                     command % literals
