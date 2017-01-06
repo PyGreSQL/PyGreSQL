@@ -216,7 +216,8 @@ fetchall -- fetch all rows of the query result
 
 Fetch all (remaining) rows of a query result, returning them as list of
 named tuples. The field names of the named tuple are the same as the column
-names of the database query as long as they are valid Python identifiers.
+names of the database query as long as they are valid as field names for
+named tuples, otherwise they are given positional names.
 
 Note that the cursor's :attr:`arraysize` attribute can affect the performance
 of this operation.

@@ -41,6 +41,7 @@ from datetime import date, time, datetime, timedelta, tzinfo
 from decimal import Decimal
 from math import isnan, isinf
 from collections import namedtuple
+from keyword import iskeyword
 from operator import itemgetter
 from functools import partial
 from re import compile as regex
@@ -1263,6 +1264,8 @@ class DbTypes(dict):
         return cast(value)
 
 
+_re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
+
 # The result rows for database operations are returned as named tuples
 # by default. Since creating namedtuple classes is a somewhat expensive
 # operation, we cache up to 1024 of these classes by default.
@@ -1274,7 +1277,8 @@ def _row_factory(names):
         try:
             return namedtuple('Row', names, rename=True)._make
         except TypeError:  # Python 2.6 and 3.0 do not support rename
-            names = [v if v.isalnum() else 'column_%d' % (n,)
+            names = [v if _re_fieldname.match(v) and not iskeyword(v)
+                        else 'column_%d' % (n,)
                      for n, v in enumerate(names)]
             return namedtuple('Row', names)._make
     except ValueError:  # there is still a problem with the field names

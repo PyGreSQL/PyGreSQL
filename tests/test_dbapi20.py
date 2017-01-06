@@ -259,14 +259,30 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(res._fields, ('one', 'column_1', 'three'))
         else:
             self.assertEqual(res._fields, ('one', '_1', 'three'))
+
+    def test_cursor_with_badly_named_columns(self):
+        con = self._connect()
+        cur = con.cursor()
         cur.execute("select 1 as abc, 2 as def")
         res = cur.fetchone()
         self.assertIsInstance(res, tuple)
         self.assertEqual(res, (1, 2))
+        old_py = OrderedDict is None  # Python 2.6 or 3.0
         if old_py:
-            self.assertEqual(res._fields, ('column_0', 'column_1'))
+            self.assertEqual(res._fields, ('abc', 'column_1'))
         else:
             self.assertEqual(res._fields, ('abc', '_1'))
+        cur.execute('select 1 as snake_case, 2 as "CamelCase",'
+            ' 3 as "kebap-case", 4 as "_bad", 5 as "0bad", 6 as "bad$"')
+        res = cur.fetchone()
+        self.assertIsInstance(res, tuple)
+        self.assertEqual(res, (1, 2, 3, 4, 5, 6))
+        # old Python versions cannot rename tuple fields with underscore
+        self.assertEqual(res._fields[:2], ('snake_case', 'CamelCase'))
+        fields = ('_2', '_3', '_4', '_5')
+        if old_py:
+            fields = tuple('column' + field for field in fields)
+        self.assertEqual(res._fields[2:], fields)
 
     def test_colnames(self):
         con = self._connect()

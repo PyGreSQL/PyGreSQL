@@ -64,6 +64,10 @@ namedresult -- get query values as list of named tuples
 This method returns the list of the values returned by the query
 with each row returned as a named tuple with proper field names.
 
+Column names in the database that are not valid as field names for
+named tuples (particularly, names starting with an underscore) are
+automatically renamed to valid positional names.
+
 Note that since PyGreSQL 5.0 this will return the values of array type
 columns as Python lists.
 

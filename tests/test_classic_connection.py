@@ -18,9 +18,10 @@ import threading
 import time
 import os
 
-import pg  # the module under test
-
+from collections import namedtuple
 from decimal import Decimal
+
+import pg  # the module under test
 
 # We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
 # get our information from that.  Otherwise we use the defaults.
@@ -405,6 +406,30 @@ class TestSimpleQueries(unittest.TestCase):
         v = r[0]
         self.assertEqual(v._fields, ('alias0',))
         self.assertEqual(v.alias0, 0)
+
+    def testNamedresultWithGoodFieldnames(self):
+        q = 'select 1 as snake_case_alias, 2 as "CamelCaseAlias"'
+        result = [(1, 2)]
+        r = self.c.query(q).namedresult()
+        self.assertEqual(r, result)
+        v = r[0]
+        self.assertEqual(v._fields, ('snake_case_alias', 'CamelCaseAlias'))
+
+    def testNamedresultWithBadFieldnames(self):
+        try:
+            r = namedtuple('Bad', ['?'] * 6, rename=True)
+        except TypeError:  # Python 2.6 or 3.0
+            fields = tuple('column_%d' % n for n in range(6))
+        else:
+            fields = r._fields
+        q = ('select 3 as "0alias", 4 as _alias, 5 as "alias$", 6 as "alias?",'
+            ' 7 as "kebap-case-alias", 8 as break, 9 as and_a_good_one')
+        result = [tuple(range(3, 10))]
+        r = self.c.query(q).namedresult()
+        self.assertEqual(r, result)
+        v = r[0]
+        self.assertEqual(v._fields[:6], fields)
+        self.assertEqual(v._fields[6], 'and_a_good_one')
 
     def testGet3Cols(self):
         q = "select 1,2,3"

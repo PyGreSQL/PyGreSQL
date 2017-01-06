@@ -4,6 +4,8 @@ ChangeLog
 Version 5.0.4 (to be released)
 ------------------------------
 - query_formatted() can now be used without parameters.
+- The automatic renaming of columns that are invalid as field names of
+  named tuples now works more accurately in Python 2.6 and 3.0.
 
 Version 5.0.3 (2016-12-10)
 --------------------------
@@ -17,6 +19,8 @@ Version 5.0.3 (2016-12-10)
   somewhat expensive operation.  By default the cache has a size of 1024
   entries, but this can be changed with the set_row_factory_size() function.
   In certain cases this change can notably improve the performance.
+- The namedresult() method in the classic API now also tries to rename
+  columns that would result in invalid field names.
 
 Version 5.0.2 (2016-09-13)
 --------------------------
