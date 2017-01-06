@@ -1733,7 +1733,7 @@ class TestDBClass(unittest.TestCase):
         r = dict(i4=5678, v4='efgh')
         try:
             insert('test_view', r)
-        except pg.NotSupportedError as error:
+        except (pg.OperationalError, pg.NotSupportedError) as error:
             if self.db.server_version < 90300:
                 # must setup rules in older PostgreSQL versions
                 self.skipTest('database cannot insert into view')
