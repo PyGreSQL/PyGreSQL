@@ -272,6 +272,6 @@ Finally, to remove the table from the database and close the connection::
 
     >>> db.execute("drop table fruits")
     >>> cur.close()
-    >>> db.close()
+    >>> con.close()
 
 For more advanced features and details, see the reference: :doc:`pgdb/index`
