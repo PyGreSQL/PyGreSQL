@@ -3099,21 +3099,23 @@ static char connGetLO__doc__[] =
 static PyObject *
 connGetLO(connObject *self, PyObject *args)
 {
-	int			lo_oid;
+	int			oid;
+	Oid			lo_oid;
 
 	/* checks validity */
 	if (!check_cnx_obj(self))
 		return NULL;
 
 	/* gets arguments */
-	if (!PyArg_ParseTuple(args, "i", &lo_oid))
+	if (!PyArg_ParseTuple(args, "i", &oid))
 	{
 		PyErr_SetString(PyExc_TypeError,
 			"Method getlo() takes an integer argument");
 		return NULL;
 	}
 
-	if (!lo_oid)
+	lo_oid = (Oid)oid;
+	if (lo_oid == 0)
 	{
 		PyErr_SetString(PyExc_ValueError, "The object oid can't be null");
 		return NULL;
