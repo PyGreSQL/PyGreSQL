@@ -373,6 +373,15 @@ class TestLargeObjects(unittest.TestCase):
         # unlinking after object has been closed
         unlink()
         self.assertIsNone(self.obj.oid)
+        # unlinking after object has been already unlinked
+        self.assertRaises(pg.IntegrityError, unlink)
+
+    def testUnlinkInexistent(self):
+        unlink = self.obj.unlink
+        self.obj.open(pg.INV_WRITE)
+        self.obj.close()
+        self.pgcnx.query('select lo_unlink(%d)' % self.obj.oid)
+        self.assertRaises(IOError, unlink)
 
     def testSize(self):
         size = self.obj.size
@@ -444,6 +453,15 @@ class TestLargeObjects(unittest.TestCase):
             os.remove(fname)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
+
+    def testExportInExistent(self):
+        export = self.obj.export
+        f = tempfile.NamedTemporaryFile()
+        self.obj.open(pg.INV_WRITE)
+        self.obj.close()
+        self.pgcnx.query('select lo_unlink(%d)' % self.obj.oid)
+        self.assertRaises(IOError, export, f.name)
+        f.close()
 
 
 if __name__ == '__main__':

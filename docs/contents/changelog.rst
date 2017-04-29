@@ -7,6 +7,8 @@ Version 5.0.4 (to be released)
 - query_formatted() can now be used without parameters.
 - The automatic renaming of columns that are invalid as field names of
   named tuples now works more accurately in Python 2.6 and 3.0.
+- Fixed error checks for unlink() and export() methods of large objects
+  (bug report by Justin Pryzby).
 
 Version 5.0.3 (2016-12-10)
 --------------------------

@@ -1701,7 +1701,7 @@ largeOpen(largeObject *self, PyObject *args)
 		return NULL;
 
 	/* opens large object */
-	if ((fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode)) < 0)
+	if ((fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode)) == -1)
 	{
 		PyErr_SetString(PyExc_IOError, "Can't open large object");
 		return NULL;
@@ -1771,7 +1771,7 @@ largeRead(largeObject *self, PyObject *args)
 	buffer = PyBytes_FromStringAndSize((char *) NULL, size);
 
 	if ((size = lo_read(self->pgcnx->cnx, self->lo_fd,
-		PyBytes_AS_STRING((PyBytesObject *)(buffer)), size)) < 0)
+		PyBytes_AS_STRING((PyBytesObject *)(buffer)), size)) == -1)
 	{
 		PyErr_SetString(PyExc_IOError, "Error while reading");
 		Py_XDECREF(buffer);
@@ -1809,7 +1809,7 @@ largeWrite(largeObject *self, PyObject *args)
 
 	/* sends query */
 	if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
-						 bufsize)) < bufsize)
+						 bufsize)) != bufsize)
 	{
 		PyErr_SetString(PyExc_IOError, "Buffer truncated during write");
 		return NULL;
@@ -1947,7 +1947,7 @@ largeExport(largeObject *self, PyObject *args)
 	}
 
 	/* runs command */
-	if (!lo_export(self->pgcnx->cnx, self->lo_oid, name))
+	if (lo_export(self->pgcnx->cnx, self->lo_oid, name) != 1)
 	{
 		PyErr_SetString(PyExc_IOError, "Error while exporting large object");
 		return NULL;
@@ -1970,7 +1970,7 @@ largeUnlink(largeObject *self, PyObject *noargs)
 		return NULL;
 
 	/* deletes the object, invalidate it on success */
-	if (!lo_unlink(self->pgcnx->cnx, self->lo_oid))
+	if (lo_unlink(self->pgcnx->cnx, self->lo_oid) != 1)
 	{
 		PyErr_SetString(PyExc_IOError, "Error while unlinking large object");
 		return NULL;
