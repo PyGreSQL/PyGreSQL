@@ -60,7 +60,7 @@ Version 5.0 (2016-03-20)
     - The classic interface got two new methods get_as_list() and get_as_dict()
       returning a database table as a Python list or dict. The amount of data
       returned can be controlled with various parameters.
-    - A method upsert() has been added to the DB wrapper class that utilitses
+    - A method upsert() has been added to the DB wrapper class that utilizes
       the "upsert" feature that is new in PostgreSQL 9.5. The new method nicely
       complements the existing get/insert/update/delete() methods.
     - When using insert/update/upsert(), you can now pass PostgreSQL arrays as
@@ -349,7 +349,7 @@ Major improvements and clean-up in classic pg module:
 - Fixes to quoting function
 - Add checks for valid database connection to methods
 - Improved namespace support, handle `search_path` correctly
-- Removed old dust and unnessesary imports, added docstrings
+- Removed old dust and unnecessary imports, added docstrings
 - Internal sql statements as one-liners, smoothed out ugly code
 
 Version 3.6.2 (2005-02-23)
