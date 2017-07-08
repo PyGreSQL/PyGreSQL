@@ -9,6 +9,7 @@ Version 5.0.4 (to be released)
   named tuples now works more accurately in Python 2.6 and 3.0.
 - Fixed error checks for unlink() and export() methods of large objects
   (bug report by Justin Pryzby).
+- Fixed a compilation issue under OS X (bug report by Josh Johnston).
 
 Version 5.0.3 (2016-12-10)
 --------------------------

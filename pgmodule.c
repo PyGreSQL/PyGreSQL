@@ -3693,9 +3693,6 @@ sourceExecute(sourceObject *self, PyObject *sql)
 	/* checks result status */
 	switch (PQresultStatus(self->result))
 	{
-		long	num_rows;
-		char   *temp;
-
 		/* query succeeded */
 		case PGRES_TUPLES_OK:	/* DQL: returns None (DB-SIG compliant) */
 			self->result_type = RESULT_DQL;
@@ -3706,15 +3703,22 @@ sourceExecute(sourceObject *self, PyObject *sql)
 		case PGRES_COMMAND_OK:	/* other requests */
 		case PGRES_COPY_OUT:
 		case PGRES_COPY_IN:
-			self->result_type = RESULT_DDL;
-			temp = PQcmdTuples(self->result);
-			num_rows = -1;
-			if (temp[0])
 			{
-				self->result_type = RESULT_DML;
-				num_rows = atol(temp);
+				long	num_rows;
+				char   *temp;
+				temp = PQcmdTuples(self->result);
+				if (temp[0])
+				{
+					self->result_type = RESULT_DML;
+					num_rows = atol(temp);
+				}
+				else
+				{
+					self->result_type = RESULT_DDL;
+					num_rows = -1;
+				}
+				return PyInt_FromLong(num_rows);
 			}
-			return PyInt_FromLong(num_rows);
 
 		/* query failed */
 		case PGRES_EMPTY_QUERY:
