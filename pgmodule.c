@@ -4146,7 +4146,7 @@ sourceFieldindex(sourceObject *self, PyObject *param, const char *usage)
 	if (PyStr_Check(param))
 		num = PQfnumber(self->result, PyBytes_AsString(param));
 	else if (PyInt_Check(param))
-		num = PyInt_AsLong(param);
+		num = (int)PyInt_AsLong(param);
 	else
 	{
 		PyErr_SetString(PyExc_TypeError, usage);
@@ -4451,7 +4451,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 		pghost = PyBytes_AsString(pg_default_host);
 
 	if ((pgport == -1) && (pg_default_port != Py_None))
-		pgport = PyInt_AsLong(pg_default_port);
+		pgport = (int)PyInt_AsLong(pg_default_port);
 
 	if ((!pgopt) && (pg_default_opt != Py_None))
 		pgopt = PyBytes_AsString(pg_default_opt);
