@@ -1,0 +1,17 @@
+#! /bin/sh
+
+MAKE=make
+which gmake && MAKE=gmake
+
+# small safety test
+if [ ! -f pgmodule.c ]
+then
+	echo "Hmmm.  Are you sure you are in the right directory?"
+	exit 1
+fi
+
+echo "Making Sphinx docs..."
+
+cd docs
+${MAKE} clean
+${MAKE} html

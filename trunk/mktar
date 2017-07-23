@@ -1,0 +1,92 @@
+#! /bin/sh
+
+VERSION=5.0.4
+DISTDIR=/u/WEB/pyg/files
+
+# some safety tests
+if [ ! -d $DISTDIR ]
+then
+	echo "Hmmm.  Are you sure you are on the right server?"
+	exit 1
+fi
+if [ ! -f setup.py -o ! -f pgmodule.c -o ! -d tests -o ! -d docs ]
+then
+	echo "Hmmm.  Are you sure you are in the right directory?"
+	exit 1
+fi
+FILES="*.c *.h *.py *.cfg *.rst *.txt"
+NUMFILES=`ls $FILES | wc -l`
+if [ $NUMFILES != 9 ]
+then
+    echo "Hmmm.  The number of top-level files seems to be wrong:"
+    ls $FILES
+    echo "Maybe you should do a clean checkout first."
+    echo "If something has changed, edit MANIFEST.in and mktar."
+    exit 1
+fi
+FILES="mktar mkdocs docs tests pg.py pgdb.py pgmodule.c setup.cfg"
+PERMS=`stat --printf="%a" $FILES`
+if [ $? -eq 0 -a "$PERMS" != '755755755755644644644644' ]
+then
+    echo "Hmmm.  File permissions are not set properly."
+    echo "Use a filesystem with permissions and do a clean checkout first."
+    exit 1
+fi
+
+if [ -f BETA ]
+then
+	VERSION=$VERSION-pre`date +"%y%m%d"`
+	PACKAGE=pygresql.pkg-beta
+	SYMLINK=PyGreSQL-beta.tar.gz
+else
+	PACKAGE=pygresql.pkg
+	SYMLINK=PyGreSQL.tar.gz
+fi
+
+# Package up as a source tarball in the distribution directory.
+
+echo "Making source tarball..."
+echo
+
+umask 0022
+
+# Make sure that the documentation has been built.
+
+if ! ./mkdocs
+then
+	echo "Hmmm.  The documentation could not be built."
+	exit 1
+fi
+
+# Package as source distribution.
+
+rm -rf build dist
+
+if ! python3 setup.py sdist
+then
+	echo "Hmmm.  The source distribution could not be created."
+	exit 1
+fi
+
+DF=`ls dist`
+if [ $? -ne 0 -o -z "$DF" ]
+then
+	echo "Hmmm.  The source distribution could not be found."
+	exit 1
+fi
+
+TF=$DISTDIR/$DF
+
+if ! cp dist/$DF $TF
+then
+	echo "Hmmm.  The source distribution could not be copied."
+	exit 1
+fi
+
+chmod 644 $TF
+
+rm -f $DISTDIR/$SYMLINK
+ln -s $DF $DISTDIR/$SYMLINK
+
+echo
+echo "$TF has been built."
