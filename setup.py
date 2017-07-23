@@ -13,7 +13,7 @@ Authors and history:
 * setup script created 2000 by Mark Alexander <mwa@gate.net>
 * improved 2000 by Jeremy Hylton <jeremy@cnri.reston.va.us>
 * improved 2001 by Gerhard Haering <gerhard@bigfoot.de>
-* improved 2006 and 2016 by Christoph Zwerschke <cito@online.de>
+* improved 2006 to 2017 by Christoph Zwerschke <cito@online.de>
 
 Prerequisites to be installed:
 * Python including devel package (header files and distutils)
