@@ -1,7 +1,7 @@
 ChangeLog
 =========
 
-Version 5.0.4 (to be released)
+Version 5.0.4 (2017-07-23)
 ------------------------------
 - This version officially supports the new Python 3.6 and PostgreSQL 9.6.
 - query_formatted() can now be used without parameters.
