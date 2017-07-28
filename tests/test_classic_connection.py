@@ -139,9 +139,12 @@ class TestConnectObject(unittest.TestCase):
 
     @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
     def testAttributeHost(self):
-        def_host = 'localhost'
+        if dbhost and not dbhost.startswith('/'):
+            host = dbhost
+        else:
+            host = 'localhost'
         self.assertIsInstance(self.connection.host, str)
-        self.assertEqual(self.connection.host, dbhost or def_host)
+        self.assertEqual(self.connection.host, host)
 
     def testAttributeOptions(self):
         no_options = ''
