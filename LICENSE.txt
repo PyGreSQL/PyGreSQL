@@ -7,6 +7,9 @@ Copyright (c) 1995, Pascal Andre
 Further modifications copyright (c) 1997-2008 by D'Arcy J.M. Cain
 (darcy@PyGreSQL.org)
 
+PyGreSQL is released under the PostgreSQL License, a liberal Open Source
+license, similar to the BSD or MIT licenses:
+
 Further modifications copyright (c) 2009-2017 by the PyGreSQL team.
 
 Permission to use, copy, modify, and distribute this software and its

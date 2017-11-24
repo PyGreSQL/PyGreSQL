@@ -180,7 +180,7 @@ setup(
     url="http://www.pygresql.org",
     download_url="http://www.pygresql.org/download/",
     platforms=["any"],
-    license="Python",
+    license="PostgreSQL",
     py_modules=py_modules,
     ext_modules=[Extension('_pg', c_sources,
         include_dirs=include_dirs, library_dirs=library_dirs,
@@ -192,7 +192,7 @@ setup(
     classifiers=[
         "Development Status :: 6 - Mature",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: Python Software Foundation License",
+        "License :: OSI Approved :: The PostgreSQL License",
         "Operating System :: OS Independent",
         "Programming Language :: C",
         'Programming Language :: Python',
