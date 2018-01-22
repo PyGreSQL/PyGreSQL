@@ -14,7 +14,7 @@ This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
 """
 
-# Copyright (c) 1997-2017 by D'Arcy J.M. Cain.
+# Copyright (c) 1997-2018 by D'Arcy J.M. Cain.
 #
 # Contributions made by Ch. Zwerschke and others.
 #

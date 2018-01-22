@@ -17,11 +17,11 @@ A **FreeBSD package** is available in their ports collection
 An **openSUSE package** is available through their build service at
   * https://software.opensuse.org/package/PyGreSQL?search_term=pygresql
 A **Win32 installer** for various Python versions is available at
-  * http://pygresql.org/files/PyGreSQL-5.0.4.win-amd64-py2.6.exe
-  * http://pygresql.org/files/PyGreSQL-5.0.4.win-amd64-py2.7.exe
-  * http://pygresql.org/files/PyGreSQL-5.0.4.win-amd64-py3.4.exe
-  * http://pygresql.org/files/PyGreSQL-5.0.4.win-amd64-py3.5.exe
-  * http://pygresql.org/files/PyGreSQL-5.0.4.win-amd64-py3.6.exe
+  * http://pygresql.org/files/PyGreSQL-5.0.5.win-amd64-py2.6.exe
+  * http://pygresql.org/files/PyGreSQL-5.0.5.win-amd64-py2.7.exe
+  * http://pygresql.org/files/PyGreSQL-5.0.5.win-amd64-py3.4.exe
+  * http://pygresql.org/files/PyGreSQL-5.0.5.win-amd64-py3.5.exe
+  * http://pygresql.org/files/PyGreSQL-5.0.5.win-amd64-py3.6.exe
 
 Older PyGreSQL versions
 -----------------------

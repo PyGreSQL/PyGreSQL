@@ -363,8 +363,8 @@ With PostgreSQL we can easily calculate that these two circles overlap::
     True
 
 However, calculating the intersection points between the two circles using the
-``#`` operator does not work (at least not as of PostgreSQL version 9.6).
-So let' resort to SymPy to find out.  To ease importing circles from
+``#`` operator does not work (at least not as of PostgreSQL version 10).
+So let's resort to SymPy to find out.  To ease importing circles from
 PostgreSQL to SymPy, we create and register the following typecast function::
 
     >>> from sympy import Point, Circle
