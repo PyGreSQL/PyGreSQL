@@ -2338,11 +2338,13 @@ connQuery(connObject *self, PyObject *args)
 					{
 						char	*ret = PQcmdTuples(result);
 
-						PQclear(result);
 						if (ret[0])		/* return number of rows affected */
 						{
-							return PyStr_FromString(ret);
+							PyObject *obj = PyStr_FromString(ret);
+							PQclear(result);
+							return obj;
 						}
+						PQclear(result);
 						Py_INCREF(Py_None);
 						return Py_None;
 					}
