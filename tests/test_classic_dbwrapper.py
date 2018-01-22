@@ -244,11 +244,13 @@ class TestDBClassBasic(unittest.TestCase):
 
     @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
     def testAttributeHost(self):
-        def_host = 'localhost'
-        host = self.db.host
-        self.assertIsInstance(host, str)
-        self.assertEqual(host, dbhost or def_host)
-        self.assertEqual(host, self.db.db.host)
+        if dbhost and not dbhost.startswith('/'):
+            host = dbhost
+        else:
+            host = 'localhost'
+        self.assertIsInstance(self.db.host, str)
+        self.assertEqual(self.db.host, host)
+        self.assertEqual(self.db.db.host, host)
 
     def testAttributeOptions(self):
         no_options = ''
