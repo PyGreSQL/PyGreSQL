@@ -5,7 +5,7 @@ PostgreSQL features from a Python script.
 
     | This software is copyright © 1995, Pascal Andre.
     | Further modifications are copyright © 1997-2008 by D'Arcy J.M. Cain.
-    | Further modifications are copyright © 2009-2017 by the PyGreSQL team.
+    | Further modifications are copyright © 2009-2018 by the PyGreSQL team.
     | For licensing details, see the full :doc:`copyright`.
 
 **PostgreSQL** is a highly scalable, SQL compliant, open source
@@ -36,6 +36,7 @@ on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.fr).
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL 5.0.4 needs PostgreSQL 9.0 or newer and Python 2.6,
-2.7 or 3.3 to 3.5. If you need to support older PostgreSQL versions or older
-Python 2.x versions, you can resort to PyGreSQL 4.x that still supports them.
+The current version PyGreSQL 5.0.5 needs PostgreSQL 9.0 to 9.6 or 10, and
+Python 2.6, 2.7 or 3.3 to 3.6. If you need to support older PostgreSQL versions
+or older Python 2.x versions, you can resort to the PyGreSQL 4.x versions that
+still support them.

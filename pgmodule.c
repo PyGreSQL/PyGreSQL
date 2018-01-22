@@ -22,7 +22,7 @@
  * AUTHOR HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES,
  * ENHANCEMENTS, OR MODIFICATIONS.
  *
- * Further modifications copyright 1997 to 2017 by D'Arcy J.M. Cain
+ * Further modifications copyright 1997 to 2018 by D'Arcy J.M. Cain
  * (darcy@PyGreSQL.org) subject to the same terms and conditions as above.
  *
  */
@@ -3488,7 +3488,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
 	if (!strcmp(name, "host"))
 	{
 		char *r = PQhost(self->cnx);
-		if (!r || r[0] == '/') /* Pg 9.6 can return a Unix socket path */
+		if (!r || r[0] == '/') /* Pg >= 9.6 can return a Unix socket path */
 			r = "localhost";
 		return PyStr_FromString(r);
 	}

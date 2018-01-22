@@ -3,6 +3,7 @@ ChangeLog
 
 Version 5.0.5 (to be released)
 ------------------------------
+- This version officially supports the new PostgreSQL 10.
 - The memory for the string with the number of rows affected by a classic pg
   module query() was already freed (bug report and fix by Peifeng Qiu).
 
