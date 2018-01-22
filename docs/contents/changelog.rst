@@ -1,8 +1,13 @@
 ChangeLog
 =========
 
-Version 5.0.4 (2017-07-23)
+Version 5.0.5 (to be released)
 ------------------------------
+- The memory for the string with the number of rows affected by a classic pg
+  module query() was already freed (bug report and fix by Peifeng Qiu).
+
+Version 5.0.4 (2017-07-23)
+--------------------------
 - This version officially supports the new Python 3.6 and PostgreSQL 9.6.
 - query_formatted() can now be used without parameters.
 - The automatic renaming of columns that are invalid as field names of
