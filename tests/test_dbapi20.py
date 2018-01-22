@@ -439,7 +439,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     def test_cursor_iteration(self):
         con = self._connect()
         cur = con.cursor()
-        cur.execute("select 1 union select 2 union select 3")
+        cur.execute("select 1 union select 2 union select 3 order by 1")
         self.assertEqual([r[0] for r in cur], [1, 2, 3])
 
     def test_cursor_invalidation(self):
