@@ -2224,14 +2224,14 @@ connQuery(connObject *self, PyObject *args)
 	{
 		/* prepare arguments */
 		PyObject	**str, **s;
-		char		**parms, **p;
+		const char	**parms, **p;
 		register int i;
 
 		str = (PyObject **)PyMem_Malloc(nparms * sizeof(*str));
-		parms = (char **)PyMem_Malloc(nparms * sizeof(*parms));
+		parms = (const char **)PyMem_Malloc(nparms * sizeof(*parms));
 		if (!str || !parms)
 		{
-			PyMem_Free(parms); PyMem_Free(str);
+			PyMem_Free((void *)parms); PyMem_Free(str);
 			Py_XDECREF(query_obj); Py_XDECREF(param_obj);
 			return PyErr_NoMemory();
 		}
@@ -2256,7 +2256,7 @@ connQuery(connObject *self, PyObject *args)
 				PyObject *str_obj = get_encoded_string(obj, encoding);
 				if (!str_obj)
 				{
-					PyMem_Free(parms);
+					PyMem_Free((void *)parms);
 					while (s != str) { s--; Py_DECREF(*s); }
 					PyMem_Free(str);
 					Py_XDECREF(query_obj);
@@ -2272,7 +2272,7 @@ connQuery(connObject *self, PyObject *args)
 				PyObject *str_obj = PyObject_Str(obj);
 				if (!str_obj)
 				{
-					PyMem_Free(parms);
+					PyMem_Free((void *)parms);
 					while (s != str) { s--; Py_DECREF(*s); }
 					PyMem_Free(str);
 					Py_XDECREF(query_obj);
@@ -2288,10 +2288,10 @@ connQuery(connObject *self, PyObject *args)
 
 		Py_BEGIN_ALLOW_THREADS
 		result = PQexecParams(self->cnx, query, nparms,
-			NULL, (const char * const *)parms, NULL, NULL, 0);
+			NULL, parms, NULL, NULL, 0);
 		Py_END_ALLOW_THREADS
 
-		PyMem_Free(parms);
+		PyMem_Free((void *)parms);
 		while (s != str) { s--; Py_DECREF(*s); }
 		PyMem_Free(str);
 	}
