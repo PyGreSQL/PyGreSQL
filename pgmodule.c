@@ -2282,7 +2282,7 @@ connQuery(connObject *self, PyObject *args)
 					return NULL;
 				}
 				*s++ = str_obj;
-				*p = PyStr_AsString(str_obj);
+				*p = (char *)PyStr_AsString(str_obj);
 			}
 		}
 
