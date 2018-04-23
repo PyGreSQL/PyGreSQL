@@ -55,7 +55,7 @@ rowcount -- number of rows of the result
     :meth:`Cursor.execute` or :meth:`Cursor.executemany` call produced
     (for DQL statements like SELECT) or affected (for DML statements like
     UPDATE or INSERT). It is also set by the :meth:`Cursor.copy_from` and
-    :meth':`Cursor.copy_to` methods. The attribute is -1 in case no such
+    :meth:`Cursor.copy_to` methods. The attribute is -1 in case no such
     method call has been performed on the cursor or the rowcount of the
     last operation cannot be determined by the interface.
 
