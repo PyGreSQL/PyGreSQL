@@ -1,7 +1,7 @@
 ChangeLog
 =========
 
-Version 5.0.5 (to be released)
+Version 5.0.5 (2018-04-25)
 ------------------------------
 - This version officially supports the new PostgreSQL 10.
 - The memory for the string with the number of rows affected by a classic pg
