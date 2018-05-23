@@ -193,7 +193,7 @@ setup(
     classifiers=[
         "Development Status :: 6 - Mature",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: The PostgreSQL License",
+        "License :: OSI Approved :: PostgreSQL License",
         "Operating System :: OS Independent",
         "Programming Language :: C",
         'Programming Language :: Python',
