@@ -1,8 +1,13 @@
 ChangeLog
 =========
 
+Vesion 5.0.6 (to be released)
+-----------------------------
+- This version officially supports the new Python 3.7.
+- Correct trove classifier for the PostgreSQL License.
+
 Version 5.0.5 (2018-04-25)
-------------------------------
+--------------------------
 - This version officially supports the new PostgreSQL 10.
 - The memory for the string with the number of rows affected by a classic pg
   module query() was already freed (bug report and fix by Peifeng Qiu).
