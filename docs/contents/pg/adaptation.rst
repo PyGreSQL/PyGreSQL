@@ -307,7 +307,7 @@ We can set a different typecast function for ``int4``, but it will not
 become effective, the C module continues to use its internal typecasting.
 
 However, we can add new typecast functions for the database types that are
-not supported by the C modul. Fore example, we can create a typecast function
+not supported by the C module. For example, we can create a typecast function
 that casts items of the composite PostgreSQL type used as example in the
 previous section to instances of the corresponding Python class.
 
