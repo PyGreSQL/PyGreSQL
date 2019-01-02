@@ -1,8 +1,12 @@
 ChangeLog
 =========
 
-Vesion 5.0.6 (to be released)
------------------------------
+Vesion 5.0.7 (2019-mm-dd)
+-------------------------
+- Fixed a bug in parsing array subscript ranges (reported by Justin Pryzby).
+
+Vesion 5.0.6 (2018-07-29)
+-------------------------
 - This version officially supports the new Python 3.7.
 - Correct trove classifier for the PostgreSQL License.
 

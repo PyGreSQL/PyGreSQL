@@ -493,8 +493,8 @@ class Typecasts(dict):
 
     The cast functions get passed the string representation of a value in
     the database which they need to convert to a Python object.  The
-    passed string will never be None since NULL values are already be
-    handled before the cast function is called.
+    passed string will never be None since NULL values are already handled
+    before the cast function is called.
     """
 
     # the default cast functions

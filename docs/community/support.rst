@@ -8,7 +8,7 @@ Support
   see http://www.postgresql.org/support/
 
 **PyGreSQL**:
-  Join `the PyGreSQL mailing list <https://mail.vex.net/mailman/listinfo.cgi/pygresql>`_
+  Join `the PyGreSQL mailing list <https://mail.vex.net/mailman/listinfo/pygresql>`_
   if you need help regarding PyGreSQL.
 
   Please also send context diffs there, if you would like to proposes changes.
