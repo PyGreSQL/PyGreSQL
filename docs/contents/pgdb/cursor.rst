@@ -117,7 +117,7 @@ executemany -- execute many similar database operations
 Prepare a database operation (query or command) and then execute it against
 all parameter tuples or mappings found in the sequence *seq_of_parameters*.
 
-Parameters are bounded to the query using Python extended format codes,
+Parameters are bound to the query using Python extended format codes,
 e.g. ``" ... WHERE name=%(name)s"``.
 
 callproc -- Call a stored procedure
