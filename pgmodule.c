@@ -664,11 +664,11 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 			if (s == end || *s++ != '[') break;
 			while (s != end && *s == ' ') ++s;
 			if (s != end && (*s == '+' || *s == '-')) ++s;
-			if (s == end || *s <= '0' || *s >= '9') break;
+			if (s == end || *s < '0' || *s > '9') break;
 			while (s != end && *s >= '0' && *s <= '9') ++s;
 			if (s == end || *s++ != ':') break;
 			if (s != end && (*s == '+' || *s == '-')) ++s;
-			if (s == end || *s <= '0' || *s >= '9') break;
+			if (s == end || *s < '0' || *s > '9') break;
 			while (s != end && *s >= '0' && *s <= '9') ++s;
 			if (s == end || *s++ != ']') break;
 			while (s != end && *s == ' ') ++s;
