@@ -61,7 +61,7 @@ master_doc = 'index'
 # General information about the project.
 project = 'PyGreSQL'
 author = 'The PyGreSQL team'
-copyright = '2018, ' + author
+copyright = '2019, ' + author
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
