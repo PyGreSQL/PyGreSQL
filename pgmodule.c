@@ -323,7 +323,7 @@ get_type(Oid pgtype)
 			t = array_as_text ? PYGRES_TEXT : (PYGRES_DECIMAL | PYGRES_ARRAY);
 			break;
 
-		case CASHARRAYOID:
+		case MONEYARRAYOID:
 			t = array_as_text ? PYGRES_TEXT : ((decimal_point ?
 				PYGRES_MONEY : PYGRES_TEXT) | PYGRES_ARRAY);
 			break;
