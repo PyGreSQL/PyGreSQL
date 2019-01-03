@@ -1869,6 +1869,57 @@ class DB:
         return self.query(*self.adapter.format_query(
             command, parameters, types, inline))
 
+    def query_prepared(self, name, *args):
+        """Execute a prepared SQL statement.
+
+        This works like the query() method, but you need to pass the name of
+        a prepared statement that you have already created with prepare().
+        """
+        if not self.db:
+            raise _int_error('Connection is not valid')
+        if args:
+            self._do_debug('EXECUTE', name, args)
+            return self.db.query_prepared(name, args)
+        self._do_debug('EXECUTE', name)
+        return self.db.query_prepared(name)
+
+    def prepare(self, name, command):
+        """Create a prepared SQL statement.
+
+        This creates a prepared statement with the given name for the given
+        command for later execution with the query_prepared() method.
+        The name can be "" to create an unnamed statement, in which case any
+        pre-existing unnamed statement is automatically replaced; otherwise
+        it is an error if the statement name is already defined in the current
+        database session.
+
+        If any parameters are used, they can be referred to in the query as
+        numbered parameters of the form $1.
+        """
+        if not self.db:
+            raise _int_error('Connection is not valid')
+        self._do_debug('prepare', name, command)
+        return self.db.prepare(name, command)
+
+    def describe_prepared(self, name):
+        """Describe a prepared SQL statement.
+
+        This method returns a Query object describing the result columns of
+        the prepared statement with the given name.
+        """
+        return self.db.describe_prepared(name)
+
+    def delete_prepared(self, name=None):
+        """Delete a prepared SQL statement
+
+        This deallocates a previously prepared SQL statement with the given
+        name, or deallocates all prepared statements. Prepared statements are
+        also deallocated automatically when the current session ends.
+        """
+        q = "DEALLOCATE %s" % (name or 'ALL',)
+        self._do_debug(q)
+        return self.db.query(q)
+
     def pkey(self, table, composite=False, flush=False):
         """Get or set the primary key of a table.
 

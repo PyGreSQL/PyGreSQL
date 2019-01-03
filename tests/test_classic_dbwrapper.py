@@ -198,6 +198,7 @@ class TestDBClassBasic(unittest.TestCase):
             'cancel', 'clear', 'close', 'commit',
             'date_format', 'db', 'dbname', 'dbtypes',
             'debug', 'decode_json', 'delete',
+            'delete_prepared', 'describe_prepared',
             'encode_json', 'end', 'endcopy', 'error',
             'escape_bytea', 'escape_identifier',
             'escape_literal', 'escape_string',
@@ -213,8 +214,8 @@ class TestDBClassBasic(unittest.TestCase):
             'notification_handler',
             'options',
             'parameter', 'pkey', 'port',
-            'protocol_version', 'putline',
-            'query', 'query_formatted',
+            'prepare', 'protocol_version', 'putline',
+            'query', 'query_formatted', 'query_prepared',
             'release', 'reopen', 'reset', 'rollback',
             'savepoint', 'server_version',
             'set_cast_hook', 'set_notice_receiver',
@@ -967,6 +968,58 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, 42)
         r = f(q, {}).getresult()[0][0]
         self.assertEqual(r, 42)
+
+    def testQueryPreparedWithoutParams(self):
+        p = self.db.prepare
+        p('q1', "select 17")
+        p('q2', "select 42")
+        f = self.db.query_prepared
+        r = f('q1').getresult()[0][0]
+        self.assertEqual(r, 17)
+        r = f('q2').getresult()[0][0]
+        self.assertEqual(r, 42)
+
+    def testQueryPreparedWithParams(self):
+        p = self.db.prepare
+        p('sum', "select 1 + $1 + $2 + $3")
+        p('cat', "select initcap($1) || ', ' || $2 || '!'")
+        f = self.db.query_prepared
+        r = f('sum', 2, 3, 5).getresult()[0][0]
+        self.assertEqual(r, 11)
+        r = f('cat', 'hello', 'world').getresult()[0][0]
+        self.assertEqual(r, 'Hello, world!')
+
+    def testPrepare(self):
+        p = self.db.prepare
+        self.assertIsNone(p('',  "select null"))
+        self.assertIsNone(p('myquery', "select 'hello'"))
+        self.assertIsNone(p('myquery2', "select 'world'"))
+        self.assertRaises(pg.ProgrammingError,
+            p, 'myquery', "select 'hello, too'")
+
+    def testDescribePrepared(self):
+        self.db.prepare('count', 'select 1 as first, 2 as second')
+        f = self.db.describe_prepared
+        r = f('count').listfields()
+        self.assertEqual(r, ('first', 'second'))
+
+    def testDeletePrepared(self):
+        f = self.db.delete_prepared
+        f()
+        e = pg.OperationalError
+        self.assertRaises(e, f, 'myquery')
+        p = self.db.prepare
+        p('q1', "select 1")
+        p('q2', "select 2")
+        f('q1')
+        f('q2')
+        self.assertRaises(e, f, 'q1')
+        self.assertRaises(e, f, 'q2')
+        p('q1', "select 1")
+        p('q2', "select 2")
+        f()
+        self.assertRaises(e, f, 'q1')
+        self.assertRaises(e, f, 'q2')
 
     def testPkey(self):
         query = self.db.query

@@ -121,10 +121,11 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
-        methods = '''cancel close date_format endcopy
+        methods = '''cancel close date_format describe_prepared endcopy
             escape_bytea escape_identifier escape_literal escape_string
             fileno get_cast_hook get_notice_receiver getline getlo getnotify
-            inserttable locreate loimport parameter putline query reset
+            inserttable locreate loimport parameter
+            prepare putline query query_prepared reset
             set_cast_hook set_notice_receiver source transaction'''.split()
         connection_methods = [a for a in dir(self.connection)
             if not a.startswith('__') and self.is_method(a)]
@@ -930,6 +931,82 @@ class TestParamQueries(unittest.TestCase):
         garbage = r"'\{}+()-#[]oo324"
         self.assertEqual(self.c.query("select $1::text AS garbage", (garbage,)
             ).dictresult(), [{'garbage': garbage}])
+
+
+class TestPreparedQueries(unittest.TestCase):
+    """Test prepared queries via a basic pg connection."""
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query('set client_encoding=utf8')
+
+    def tearDown(self):
+        self.c.close()
+
+    def testEmptyPreparedStatement(self):
+        self.c.prepare('', '')
+        self.assertRaises(ValueError, self.c.query_prepared, '')
+
+    def testInvalidPreparedStatement(self):
+        self.assertRaises(pg.ProgrammingError, self.c.prepare, '', 'bad')
+
+    def testNonExistentPreparedStatement(self):
+        self.assertRaises(pg.OperationalError,
+            self.c.query_prepared, 'does-not-exist')
+
+    def testAnonymousQueryWithoutParams(self):
+        self.assertIsNone(self.c.prepare('', "select 'anon'"))
+        self.assertEqual(self.c.query_prepared('').getresult(), [('anon',)])
+
+    def testNamedQueryWithoutParams(self):
+        self.assertIsNone(self.c.prepare('hello', "select 'world'"))
+        self.assertEqual(self.c.query_prepared('hello').getresult(),
+            [('world',)])
+
+    def testMultipleNamedQueriesWithoutParams(self):
+        self.assertIsNone(self.c.prepare('query17', "select 17"))
+        self.assertIsNone(self.c.prepare('query42', "select 42"))
+        self.assertEqual(self.c.query_prepared('query17').getresult(), [(17,)])
+        self.assertEqual(self.c.query_prepared('query42').getresult(), [(42,)])
+
+    def testAnonymousQueryWithParams(self):
+        self.assertIsNone(self.c.prepare('', "select $1 || ', ' || $2"))
+        self.assertEqual(
+            self.c.query_prepared('', ['hello', 'world']).getresult(),
+            [('hello, world',)])
+        self.assertIsNone(self.c.prepare('', "select 1+ $1 + $2 + $3"))
+        self.assertEqual(
+            self.c.query_prepared('', [17, -5, 29]).getresult(), [(42,)])
+
+    def testMultipleNamedQueriesWithParams(self):
+        self.assertIsNone(self.c.prepare('q1', "select $1 || '!'"))
+        self.assertIsNone(self.c.prepare('q2', "select $1 || '-' || $2"))
+        self.assertEqual(self.c.query_prepared('q1', ['hello']).getresult(),
+            [('hello!',)])
+        self.assertEqual(self.c.query_prepared('q2', ['he', 'lo']).getresult(),
+            [('he-lo',)])
+
+    def testDescribeNonExistentQuery(self):
+        self.assertRaises(pg.OperationalError,
+            self.c.describe_prepared, 'does-not-exist')
+
+    def testDescribeAnonymousQuery(self):
+        self.c.prepare('', "select 1::int, 'a'::char")
+        r = self.c.describe_prepared('')
+        self.assertEqual(r.listfields(), ('int4', 'bpchar'))
+
+    def testDescribeNamedQuery(self):
+        self.c.prepare('myquery', "select 1 as first, 2 as second")
+        r = self.c.describe_prepared('myquery')
+        self.assertEqual(r.listfields(), ('first', 'second'))
+
+    def testDescribeMultipleNamedQueries(self):
+        self.c.prepare('query1', "select 1::int")
+        self.c.prepare('query2', "select 1::int, 2::int")
+        r = self.c.describe_prepared('query1')
+        self.assertEqual(r.listfields(), ('int4',))
+        r = self.c.describe_prepared('query2')
+        self.assertEqual(r.listfields(), ('int4', 'int4'))
 
 
 class TestQueryResultTypes(unittest.TestCase):

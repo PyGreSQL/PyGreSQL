@@ -2141,13 +2141,10 @@ connSource(connObject *self, PyObject *noargs)
 }
 
 /* database query */
-static char connQuery__doc__[] =
-"query(sql, [arg]) -- create a new query object for this connection\n\n"
-"You must pass the SQL (string) request and you can optionally pass\n"
-"a tuple with positional parameters.\n";
 
+/* base method for execution of both unprepared and prepared queries */
 static PyObject *
-connQuery(connObject *self, PyObject *args)
+_connQuery(connObject *self, PyObject *args, int prepared)
 {
 	PyObject	*query_obj;
 	PyObject	*param_obj = NULL;
@@ -2287,8 +2284,11 @@ connQuery(connObject *self, PyObject *args)
 		}
 
 		Py_BEGIN_ALLOW_THREADS
-		result = PQexecParams(self->cnx, query, nparms,
-			NULL, parms, NULL, NULL, 0);
+		result = prepared ?
+			PQexecPrepared(self->cnx, query, nparms,
+				parms, NULL, NULL, 0) :
+			PQexecParams(self->cnx, query, nparms,
+				NULL, parms, NULL, NULL, 0);
 		Py_END_ALLOW_THREADS
 
 		PyMem_Free((void *)parms);
@@ -2298,7 +2298,10 @@ connQuery(connObject *self, PyObject *args)
 	else
 	{
 		Py_BEGIN_ALLOW_THREADS
-		result = PQexec(self->cnx, query);
+		result = prepared ?
+			PQexecPrepared(self->cnx, query, 0,
+				NULL, NULL, NULL, 0) :
+			PQexec(self->cnx, query);
 		Py_END_ALLOW_THREADS
 	}
 
@@ -2374,6 +2377,123 @@ connQuery(connObject *self, PyObject *args)
 	npgobj->result = result;
 	npgobj->encoding = encoding;
 	return (PyObject *) npgobj;
+}
+
+/* database query */
+static char connQuery__doc__[] =
+"query(sql, [arg]) -- create a new query object for this connection\n\n"
+"You must pass the SQL (string) request and you can optionally pass\n"
+"a tuple with positional parameters.\n";
+
+static PyObject *
+connQuery(connObject *self, PyObject *args)
+{
+	return _connQuery(self, args, 0);
+}
+
+/* execute prepared statement */
+static char connQueryPrepared__doc__[] =
+"query_prepared(name, [arg]) -- execute a prepared statement\n\n"
+"You must pass the name (string) of the prepared statement and you can\n"
+"optionally pass a tuple with positional parameters.\n";
+
+static PyObject *
+connQueryPrepared(connObject *self, PyObject *args)
+{
+	return _connQuery(self, args, 1);
+}
+
+/* create prepared statement */
+static char connPrepare__doc__[] =
+"prepare(name, sql) -- create a prepared statement\n\n"
+"You must pass the name (string) of the prepared statement and the\n"
+"SQL (string) request for later execution.\n";
+
+static PyObject *
+connPrepare(connObject *self, PyObject *args)
+{
+	char 		*name, *query;
+	int 		name_length, query_length;
+	PGresult	*result;
+
+	if (!self->cnx)
+	{
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		return NULL;
+	}
+
+	/* reads args */
+	if (!PyArg_ParseTuple(args, "s#s#",
+		&name, &name_length, &query, &query_length))
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"Method prepare() takes two string arguments");
+		return NULL;
+	}
+
+	/* create prepared statement */
+	Py_BEGIN_ALLOW_THREADS
+	result = PQprepare(self->cnx, name, query, 0, NULL);
+	Py_END_ALLOW_THREADS
+	if (result && PQresultStatus(result) == PGRES_COMMAND_OK)
+	{
+		PQclear(result);
+		Py_INCREF(Py_None);
+		return Py_None; /* success */
+	}
+	set_error(ProgrammingError, "Cannot create prepared statement",
+		self->cnx, result);
+	if (result)
+		PQclear(result);
+	return NULL; /* error */
+}
+
+/* describe prepared statement */
+static char connDescribePrepared__doc__[] =
+"describe_prepared(name, sql) -- describe a prepared statement\n\n"
+"You must pass the name (string) of the prepared statement.\n";
+
+static PyObject *
+connDescribePrepared(connObject *self, PyObject *args)
+{
+	char 		*name;
+	int 		name_length;
+	PGresult	*result;
+
+	if (!self->cnx)
+	{
+		PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+		return NULL;
+	}
+
+	/* reads args */
+	if (!PyArg_ParseTuple(args, "s#",
+		&name, &name_length))
+	{
+		PyErr_SetString(PyExc_TypeError,
+			"Method prepare() takes a string argument");
+		return NULL;
+	}
+
+	/* describe prepared statement */
+	Py_BEGIN_ALLOW_THREADS
+	result = PQdescribePrepared(self->cnx, name);
+	Py_END_ALLOW_THREADS
+	if (result && PQresultStatus(result) == PGRES_COMMAND_OK)
+	{
+		queryObject *npgobj = PyObject_NEW(queryObject, &queryType);
+		if (!npgobj)
+			return PyErr_NoMemory();
+		Py_XINCREF(self);
+		npgobj->pgcnx = self;
+		npgobj->result = result;
+		return (PyObject *) npgobj;
+	}
+	set_error(ProgrammingError, "Cannot describe prepared statement",
+		self->cnx, result);
+	if (result)
+		PQclear(result);
+	return NULL; /* error */
 }
 
 #ifdef DIRECT_ACCESS
@@ -3414,6 +3534,11 @@ static struct PyMethodDef connMethods[] = {
 
 	{"source", (PyCFunction) connSource, METH_NOARGS, connSource__doc__},
 	{"query", (PyCFunction) connQuery, METH_VARARGS, connQuery__doc__},
+	{"query_prepared", (PyCFunction) connQueryPrepared, METH_VARARGS,
+			connQueryPrepared__doc__},
+	{"prepare", (PyCFunction) connPrepare, METH_VARARGS, connPrepare__doc__},
+	{"describe_prepared", (PyCFunction) connDescribePrepared, METH_VARARGS,
+			connDescribePrepared__doc__},
 	{"reset", (PyCFunction) connReset, METH_NOARGS, connReset__doc__},
 	{"cancel", (PyCFunction) connCancel, METH_NOARGS, connCancel__doc__},
 	{"close", (PyCFunction) connClose, METH_NOARGS, connClose__doc__},
