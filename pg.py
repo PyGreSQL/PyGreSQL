@@ -1874,8 +1874,8 @@ class DB:
 
         This works like the query() method, but you need to pass the name of
         a prepared statement that you have already created with prepare().
-        If you pass no parameters or pass an empty name, then the last unnamed
-        statement will be executed.
+        If you pass no parameters or pass an empty name, then the unnamed
+        statement will be executed if you created one before.
         """
         if not self.db:
             raise _int_error('Connection is not valid')
@@ -1912,7 +1912,7 @@ class DB:
 
         This method returns a Query object describing the result columns of
         the prepared statement with the given name. If you do not specify a
-        name, then the last unnamed statement will be described.
+        name, then the unnamed statement will be described if you created one.
         """
         if name is None:
             name = ''
