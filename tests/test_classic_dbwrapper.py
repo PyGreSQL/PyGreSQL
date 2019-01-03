@@ -969,10 +969,25 @@ class TestDBClass(unittest.TestCase):
         r = f(q, {}).getresult()[0][0]
         self.assertEqual(r, 42)
 
+    def testPrepare(self):
+        p = self.db.prepare
+        self.assertIsNone(p("select 'hello'", 'my query'))
+        self.assertIsNone(p("select 'world'", 'my other query'))
+        self.assertRaises(pg.ProgrammingError,
+            p, 'my query', "select 'hello, too'")
+
+    def testPrepareUnnamed(self):
+        p = self.db.prepare
+        self.assertIsNone(p("select null"))
+        self.assertIsNone(p("select null", None))
+        self.assertIsNone(p("select null", ''))
+        self.assertIsNone(p("select null", name=None))
+        self.assertIsNone(p("select null", name=''))
+
     def testQueryPreparedWithoutParams(self):
         p = self.db.prepare
-        p('q1', "select 17")
-        p('q2', "select 42")
+        p("select 17", 'q1')
+        p("select 42", 'q2')
         f = self.db.query_prepared
         r = f('q1').getresult()[0][0]
         self.assertEqual(r, 17)
@@ -981,27 +996,49 @@ class TestDBClass(unittest.TestCase):
 
     def testQueryPreparedWithParams(self):
         p = self.db.prepare
-        p('sum', "select 1 + $1 + $2 + $3")
-        p('cat', "select initcap($1) || ', ' || $2 || '!'")
+        p("select 1 + $1 + $2 + $3", 'sum')
+        p("select initcap($1) || ', ' || $2 || '!'", 'cat')
         f = self.db.query_prepared
         r = f('sum', 2, 3, 5).getresult()[0][0]
         self.assertEqual(r, 11)
         r = f('cat', 'hello', 'world').getresult()[0][0]
         self.assertEqual(r, 'Hello, world!')
 
-    def testPrepare(self):
+    def testQueryPreparedUnnamedWithOutParams(self):
         p = self.db.prepare
-        self.assertIsNone(p('',  "select null"))
-        self.assertIsNone(p('myquery', "select 'hello'"))
-        self.assertIsNone(p('myquery2', "select 'world'"))
-        self.assertRaises(pg.ProgrammingError,
-            p, 'myquery', "select 'hello, too'")
+        p("select 'no name'")
+        f = self.db.query_prepared
+        r = f().getresult()[0][0]
+        self.assertEqual(r, 'no name')
+        r = f(None).getresult()[0][0]
+        self.assertEqual(r, 'no name')
+        r = f('').getresult()[0][0]
+        self.assertEqual(r, 'no name')
+
+    def testQueryPreparedUnnamedWithParams(self):
+        p = self.db.prepare
+        p("select 1 + $1 + $2")
+        f = self.db.query_prepared
+        r = f(None, 2, 3).getresult()[0][0]
+        self.assertEqual(r, 6)
+        r = f('', 2, 3).getresult()[0][0]
+        self.assertEqual(r, 6)
 
     def testDescribePrepared(self):
-        self.db.prepare('count', 'select 1 as first, 2 as second')
+        self.db.prepare("select 1 as first, 2 as second", 'count')
         f = self.db.describe_prepared
         r = f('count').listfields()
         self.assertEqual(r, ('first', 'second'))
+
+    def testDescribePreparedUnnamed(self):
+        self.db.prepare("select null as anon")
+        f = self.db.describe_prepared
+        r = f().listfields()
+        self.assertEqual(r, ('anon',))
+        r = f(None).listfields()
+        self.assertEqual(r, ('anon',))
+        r = f('').listfields()
+        self.assertEqual(r, ('anon',))
 
     def testDeletePrepared(self):
         f = self.db.delete_prepared
@@ -1009,14 +1046,14 @@ class TestDBClass(unittest.TestCase):
         e = pg.OperationalError
         self.assertRaises(e, f, 'myquery')
         p = self.db.prepare
-        p('q1', "select 1")
-        p('q2', "select 2")
+        p("select 1", 'q1')
+        p("select 2", 'q2')
         f('q1')
         f('q2')
         self.assertRaises(e, f, 'q1')
         self.assertRaises(e, f, 'q2')
-        p('q1', "select 1")
-        p('q2', "select 2")
+        p("select 1", 'q1')
+        p("select 2", 'q2')
         f()
         self.assertRaises(e, f, 'q1')
         self.assertRaises(e, f, 'q2')
