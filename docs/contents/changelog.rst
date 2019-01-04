@@ -3,6 +3,7 @@ ChangeLog
 
 Vesion 5.0.7 (2019-mm-dd)
 -------------------------
+- This version officially supports the new PostgreSQL 11.
 - Fixed a bug in parsing array subscript ranges (reported by Justin Pryzby).
 
 Vesion 5.0.6 (2018-07-29)

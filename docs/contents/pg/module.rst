@@ -370,7 +370,7 @@ get/set_decimal_point -- decimal mark used for monetary values
 This function returns the decimal mark used by PyGreSQL to interpret
 PostgreSQL monetary values when converting them to decimal numbers.
 The default setting is ``'.'`` as a decimal point. This setting is not
-adapted automatically to the locale used by PostGreSQL, but you can use
+adapted automatically to the locale used by PostgreSQL, but you can use
 :func:`set_decimal()` to set a different decimal mark manually.  A return
 value of ``None`` means monetary values are not interpreted as decimal
 numbers, but returned as strings including the formatting and currency.
@@ -386,7 +386,7 @@ numbers, but returned as strings including the formatting and currency.
 This function can be used to specify the decimal mark used by PyGreSQL
 to interpret PostgreSQL monetary values. The default value is '.' as
 a decimal point. This value is not adapted automatically to the locale
-used by PostGreSQL, so if you are dealing with a database set to a
+used by PostgreSQL, so if you are dealing with a database set to a
 locale that uses a ``','`` instead of ``'.'`` as the decimal point,
 then you need to call ``set_decimal(',')`` to have PyGreSQL interpret
 monetary values correctly. If you don't want money values to be converted

@@ -163,7 +163,7 @@ class TestConnectObject(unittest.TestCase):
     def testAttributeServerVersion(self):
         server_version = self.connection.server_version
         self.assertIsInstance(server_version, int)
-        self.assertTrue(90000 <= server_version < 110000)
+        self.assertTrue(90000 <= server_version < 120000)
 
     def testAttributeStatus(self):
         status_ok = 1
