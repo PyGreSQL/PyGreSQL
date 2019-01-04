@@ -19,9 +19,8 @@ provides some higher-level and PostgreSQL specific convenience methods.
     from Python that has been developed by the Python DB-SIG in 1999.
     The authoritative programming information for the DB-API is :pep:`0249`.
 
-Both Python modules utilize the same lower level C extension module that
-serves as a wrapper for the C API to PostgreSQL that is available in form
-of the so-called "libpq" library.
+Both Python modules utilize the same low-level C extension, which
+serves as a wrapper for the "libpq" library, the C API to PostgreSQL.
 
 This means you must have the libpq library installed as a shared library
 on your client computer, in a version that is supported by PyGreSQL.

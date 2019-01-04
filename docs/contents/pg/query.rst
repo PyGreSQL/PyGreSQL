@@ -21,7 +21,7 @@ getresult -- get query values as list of tuples
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
-This method returns the list of the values returned by the query.
+This method returns query results as a list of tuples.
 More information about this result may be accessed using
 :meth:`Query.listfields`, :meth:`Query.fieldname`
 and :meth:`Query.fieldnum` methods.
@@ -41,9 +41,8 @@ dictresult -- get query values as list of dictionaries
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
-This method returns the list of the values returned by the query
-with each tuple returned as a dictionary with the field names
-used as the dictionary index.
+This method returns query results as a list of dictionaries which have
+the field names as keys.
 
 Note that since PyGreSQL 5.0 this will return the values of array type
 columns as Python lists.
@@ -61,8 +60,8 @@ namedresult -- get query values as list of named tuples
     :raises TypeError: named tuples not supported
     :raises MemoryError: internal memory error
 
-This method returns the list of the values returned by the query
-with each row returned as a named tuple with proper field names.
+This method returns query results as a list of named tuples with
+proper field names.
 
 Column names in the database that are not valid as field names for
 named tuples (particularly, names starting with an underscore) are
@@ -84,7 +83,7 @@ listfields -- list fields names of previous query result
     :rtype: list
     :raises TypeError: too many parameters
 
-This method returns the list of names of the fields defined for the
+This method returns the list of field names defined for the
 query result. The fields are in the same order as the result values.
 
 fieldname, fieldnum -- field name/number conversion
@@ -114,10 +113,10 @@ result values.
     :raises TypeError: invalid connection, bad parameter type, or too many parameters
     :raises ValueError: unknown field name
 
-This method returns a field number from its name. It can be used to
+This method returns a field number given its name. It can be used to
 build a function that converts result list strings to their correct
 type, using a hardcoded table definition. The number returned is the
-field rank in the result values list.
+field rank in the query result.
 
 ntuples -- return number of tuples in query object
 --------------------------------------------------

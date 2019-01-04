@@ -11,7 +11,7 @@ database, as explained in the :doc:`basic`::
 
     >>> from pg import DB
     >>> db = DB()
-    >>> query = query
+    >>> query = db.query
 
 Inheritance
 -----------

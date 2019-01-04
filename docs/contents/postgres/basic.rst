@@ -71,9 +71,9 @@ CREATE TABLE command::
     >>> db.query("""INSERT INTO cities
     ...     VALUES ('San Francisco', '(-194.0, 53.0)')""")
 
-You can also specify what column the values correspond to. The columns can
+You can also specify the columns to which the values correspond. The columns can
 be specified in any order. You may also omit any number of columns,
-unknown precipitation below::
+such as with unknown precipitation, below::
 
     >>> db.query("""INSERT INTO weather (date, city, temp_hi, temp_lo)
     ...     VALUES ('11/29/1994', 'Hayward', 54, 37)""")
@@ -267,8 +267,8 @@ query to achieve that::
     Hayward|     37|     54|San Francisco|     46|     50
     (1 row)
 
-Now let's join two tables. The following joins the "weather" table and the
-"cities" table::
+Now let's join two different tables. The following joins the "weather" table
+and the "cities" table::
 
     >>> print(db.query("""SELECT city, location, prcp, date
     ...     FROM weather, cities

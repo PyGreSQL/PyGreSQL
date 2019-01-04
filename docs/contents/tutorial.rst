@@ -13,8 +13,7 @@ First Steps with the classic PyGreSQL Interface
 
 .. py:currentmodule:: pg
 
-The first thing you need to do anything with your PostgreSQL database is
-to create a database connection.
+Before doing anything else, it's necessary to create a database connection.
 
 To do this, simply import the :class:`DB` wrapper class and create an
 instance of it, passing the necessary connection parameters, like this::
@@ -194,7 +193,7 @@ in the :mod:`pgdb` module, passing the connection parameters::
     >>> con = connect(database='testdb', host='pgserver:5432',
     ...     user='scott', password='tiger')
 
-Note that like in the classic interface, you can omit parameters if they
+As in the classic interface, you can omit parameters if they
 are the default values used by PostgreSQL.
 
 To do anything with the connection, you need to request a cursor object
@@ -203,13 +202,12 @@ cursor. The connection has a method that lets you get a cursor::
 
    >>> cursor = con.cursor()
 
-The cursor now has a method that lets you execute database queries::
+The cursor has a method that lets you execute database queries::
 
    >>> cursor.execute("create table fruits("
    ...     "id serial primary key, name varchar)")
 
-
-To insert data into the table, also can also use this method::
+You can also use this method to insert data into the table::
 
    >>> cursor.execute("insert into fruits (name) values ('apple')")
 
@@ -217,7 +215,7 @@ You can pass parameters in a safe way::
 
    >>> cursor.execute("insert into fruits (name) values (%s)", ('banana',))
 
-For inserting multiple rows at once, you can use the following method::
+To insert multiple rows at once, you can use the following method::
 
    >>> more_fruits = 'cherimaya durian eggfruit fig grapefruit'.split()
    >>> parameters = [(name,) for name in more_fruits]
@@ -231,15 +229,15 @@ provided by PyGreSQL, they are not part of the DB-API 2 standard.
 
 Also note that the DB API 2.0 interface does not have an autocommit as you
 may be used from PostgreSQL. So in order to make these inserts permanent,
-you need to commit them to the database first::
+you need to commit them to the database::
 
    >>> con.commit()
 
 If you end the program without calling the commit method of the connection,
-or if you call the rollback method of the connection, then all the changes
+or if you call the rollback method of the connection, then the changes
 will be discarded.
 
-In a similar way, you can also update or delete rows in the database,
+In a similar way, you can update or delete rows in the database,
 executing UPDATE or DELETE statements instead of INSERT statements.
 
 To fetch rows from the database, execute a SELECT statement first. Then
@@ -251,8 +249,8 @@ instance, to request a single row::
    Row(id=1, name='apple')
 
 The result is a named tuple. This means you can access its elements either
-using an index number like in an ordinary tuple, or using the column name
-like you access object attributes.
+using an index number as for an ordinary tuple, or using the column name
+as for access to object attributes.
 
 To fetch all rows of the query, use this method instead::
 

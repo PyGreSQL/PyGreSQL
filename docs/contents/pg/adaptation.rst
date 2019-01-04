@@ -64,7 +64,7 @@ adaptation of parameters, since all of this is happening automatically behind
 the scenes.  You only need to consider this issue when creating SQL commands
 manually and sending them to the database using the :meth:`DB.query` method.
 
-Imagine you have created a user  login form that stores the login name as
+Imagine you have created a user login form that stores the login name as
 *login* and the password as *passwd* and you now want to get the user
 data for that user.  You may be tempted to execute a query like this::
 
@@ -74,12 +74,12 @@ data for that user.  You may be tempted to execute a query like this::
 
 This seems to work at a first glance, but you will notice an error as soon as
 you try to use a login name containing a single quote.  Even worse, this error
-can be exploited through a so called "SQL injection", where an attacker inserts
+can be exploited through so-called "SQL injection", where an attacker inserts
 malicious SQL statements into the query that you never intended to be executed.
-For instance, with a login name something like ``' OR ''='`` the user could
+For instance, with a login name something like ``' OR ''='`` the attacker could
 easily log in and see the user data of another user in the database.
 
-One solution for this problem would be to clean your input from "dangerous"
+One solution for this problem would be to cleanse your input of "dangerous"
 characters like the single quote, but this is tedious and it is likely that
 you overlook something or break the application e.g. for users with names
 like "D'Arcy".  A better solution is to use the escaping functions provided
@@ -164,7 +164,7 @@ In real world examples you will rarely have to cast your parameters like that,
 since in an INSERT statement or a WHERE clause comparing the parameter to a
 table column the data type will be clear from the context.
 
-When binding the parameters to a query, PyGreSQL does not only adapt the basic
+When binding the parameters to a query, PyGreSQL not only adapts the basic
 types like ``int``, ``float``, ``bool`` and ``str``, but also tries to make
 sense of Python lists and tuples.
 
@@ -222,8 +222,8 @@ The :meth:`DB.insert` method provides a simpler way to achieve the same::
     {'count': 1000,  'item': inventory_item(name='fuzzy dice',
             supplier_id=42, price=Decimal('1.99'))}
 
-However, we may not want to use named tuples, but custom Python classes
-to hold our values, like this one::
+Perhaps we want to use custom Python classes instead of named tuples to hold
+our values::
 
     >>> class InventoryItem:
     ...

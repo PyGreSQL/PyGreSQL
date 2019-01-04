@@ -4,32 +4,33 @@ Installation
 General
 -------
 
-You must first have installed Python and PostgreSQL on your system.
-If you want to access remote database only, you don't need to install
-the full PostgreSQL server, but only the C interface (libpq). If you
-are on Windows, make sure that the directory with libpq.dll is in your
-``PATH`` environment variable.
+You must first install Python and PostgreSQL on your system.
+If you want to access remote databases only, you don't need to install
+the full PostgreSQL server, but only the libpq C-interface library.
+If you are on Windows, make sure that the directory that contains
+libpq.dll is part of your ``PATH`` environment variable.
 
 The current version of PyGreSQL has been tested with Python versions
 2.6, 2.7 and 3.3 to 3.7, and PostgreSQL versions 9.0 to 9.6 and 10 or 11.
 
-PyGreSQL will be installed as three modules, a dynamic module called
-_pg.pyd, and two pure Python wrapper modules called pg.py and pgdb.py.
+PyGreSQL will be installed as three modules, a shared library called
+_pg.so (on Linux) or a DLL called _pg.pyd (on Windows), and two pure
+Python wrapper modules called pg.py and pgdb.py.
 All three files will be installed directly into the Python site-packages
-directory. To uninstall PyGreSQL, simply remove these three files again.
+directory. To uninstall PyGreSQL, simply remove these three files.
 
 
 Installing with Pip
 -------------------
 
-This is the most easy way to install PyGreSQL if you have "pip" installed
-on your computer. Just run the following command in your terminal::
+This is the most easy way to install PyGreSQL if you have "pip" installed.
+Just run the following command in your terminal::
 
   pip install PyGreSQL
 
 This will automatically try to find and download a distribution on the
 `Python Package Index <https://pypi.python.org/>`_ that matches your operating
-system and Python version and install it on your computer.
+system and Python version and install it.
 
 
 Installing from a Binary Distribution
@@ -40,7 +41,7 @@ distribution for your computer, you can also try to manually download
 and install a distribution.
 
 When you download the source distribution, you will need to compile the
-C extensions, for which you need a C compiler installed on your computer.
+C extension, for which you need a C compiler installed.
 If you don't want to install a C compiler or avoid possible problems
 with the compilation, you can search for a pre-compiled binary distribution
 of PyGreSQL on the Python Package Index or the PyGreSQL homepage.
@@ -86,7 +87,7 @@ Now you should be ready to use PyGreSQL.
 Compiling Manually
 ~~~~~~~~~~~~~~~~~~
 
-The source file for compiling the dynamic module is called pgmodule.c.
+The source file for compiling the C extension module is pgmodule.c.
 You have two options. You can compile PyGreSQL as a stand-alone module
 or you can build it into the Python interpreter.
 

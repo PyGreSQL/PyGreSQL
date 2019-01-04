@@ -22,7 +22,7 @@ Let's create a simple SQL function that takes no arguments and returns 1::
     >>> query("""CREATE FUNCTION one() RETURNS int4
     ...     AS 'SELECT 1 as ONE' LANGUAGE SQL""")
 
-Functions can be used in any expressions (eg. in the target"list or
+Functions can be used in any expressions (eg. in the target list or
 qualifications)::
 
     >>> print(db.query("SELECT one() AS answer"))
@@ -89,7 +89,7 @@ expressions in the target list are in the same order as the columns of EMP::
     ...         'None'::varchar(16) AS dept
     ...     $$ LANGUAGE SQL""")
 
-You can then project a column out of resulting the tuple by using the
+You can then extract a column out of the resulting tuple by using the
 "function notation" for projection columns (i.e. ``bar(foo)`` is equivalent
 to ``foo.bar``). Note that ``new_emp().name`` isn't supported::
 
@@ -131,7 +131,7 @@ that removes employees with negative salaries::
     Ginger|  4800| 30|candy
     (5 rows)
     >>> query("""CREATE FUNCTION clean_EMP () RETURNS int4 AS
-    ...         'DELETE FROM EMP WHERE EMP.salary <= 0;
+    ...         'DELETE FROM EMP WHERE EMP.salary < 0;
     ...          SELECT 1 AS ignore_this'
     ...     LANGUAGE SQL""")
     >>> query("SELECT clean_EMP()")

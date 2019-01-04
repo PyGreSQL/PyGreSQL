@@ -134,7 +134,7 @@ the values are the names of the attributes' types) with the column names
 in the proper order if you iterate over it.
 
 By default, only a limited number of simple types will be returned.
-You can get the regular types after enabling this by calling the
+You can get the regular types instead, if you enable this by calling the
 :meth:`DB.use_regtypes` method.
 
 has_table_privilege -- check table privilege
@@ -182,8 +182,8 @@ By passing the special name ``'all'`` as the parameter, you can get a dict
 of all existing configuration parameters.
 
 Note that you can request most of the important parameters also using
-:meth:`Connection.parameter()` which does not involve a database query
-like it is the case for :meth:`DB.get_parameter` and :meth:`DB.set_parameter`.
+:meth:`Connection.parameter()` which does not involve a database query,
+unlike :meth:`DB.get_parameter` and :meth:`DB.set_parameter`.
 
 .. versionadded:: 4.2
 
@@ -314,7 +314,7 @@ If *row* is a dictionary, then the value for the key is taken from it.
 Otherwise, the row must be a single value or a tuple of values
 corresponding to the passed *keyname* or primary key.  The fetched row
 from the table will be returned as a new dictionary or used to replace
-the existing values when row was passed as aa dictionary.
+the existing values if the row was passed as a dictionary.
 
 The OID is also put into the dictionary if the table has one, but
 in order to allow the caller to work with multiple tables, it is
@@ -346,7 +346,7 @@ The dictionary is then reloaded with the values actually inserted in order
 to pick up values modified by rules, triggers, etc.
 
 Note that since PyGreSQL 5.0 it is possible to insert a value for an
-array type column by passing it as Python list.
+array type column by passing it as a Python list.
 
 update -- update a row in a database table
 ------------------------------------------
@@ -372,9 +372,10 @@ The dictionary is then modified to reflect any changes caused by the
 update due to triggers, rules, default values, etc.
 
 Like insert, the dictionary is optional and updates will be performed
-on the fields in the keywords.  There must be an OID or primary key
-either in the dictionary where the OID must be munged, or in the keywords
-where it can be simply the string ``'oid'``.
+on the fields in the keywords.  There must be an OID or primary key either
+specified using the ``'oid'`` keyword or in the dictionary, in which case the
+OID must be munged.
+
 
 upsert -- insert a row with conflict resolution
 -----------------------------------------------
@@ -391,8 +392,8 @@ upsert -- insert a row with conflict resolution
     :raises pg.ProgrammingError: table has no primary key or missing privilege
 
 This method inserts a row into a table, but instead of raising a
-ProgrammingError exception in case a row with the same primary key already
-exists, an update will be executed instead.  This will be performed as a
+ProgrammingError exception in case of violating a constraint or unique index,
+an update will be executed instead.  This will be performed as a
 single atomic operation on the database, so race conditions can be avoided.
 
 Like the insert method, the first parameter is the name of the table and the
@@ -524,12 +525,12 @@ query_prepared -- execute a prepared statement
     :raises pg.OperationalError: prepared statement does not exist
 
 This methods works like the :meth:`DB.query` method, except that instead of
-passing the SQL command, you pass the name of a prepared statement.  If you
-pass an empty name, the unnamed statement will be executed.
+passing the SQL command, you pass the name of an prepared statement that you
+have created previously using the :meth:`DB.prepare` method.
 
-You must have created the corresponding named or unnamed statement with
-the :meth:`DB.prepare` method before, otherwise an :exc:`pg.OperationalError`
-will be raised.
+Passing an empty string or *None* as the name will execute the unnamed
+statement (see warning about the limited lifetime of the unnamed statement
+in :meth:`DB.prepare`).
 
 .. versionadded:: 5.1
 
@@ -547,8 +548,8 @@ prepare -- create a prepared statement
     :raises TypeError: invalid connection
     :raises pg.ProgrammingError: error in query or duplicate query
 
-This method creates a prepared statement for the given command with the
-given name for later execution with the :meth:`DB.query_prepared` method.
+This method creates a prepared statement with the given name for the given
+command for later execution with the :meth:`DB.query_prepared` method.
 The name can be empty to create an unnamed statement, in which case any
 pre-existing unnamed statement is automatically replaced; otherwise a
 :exc:`pg.ProgrammingError` is raised if the statement name is already
@@ -806,9 +807,9 @@ from being interpreted specially by the SQL parser.
 
 This method escapes a string for use as an SQL identifier, such as a table,
 column, or function name. This is useful when a user-supplied identifier
-might contain special characters that would otherwise not be interpreted
-as part of the identifier by the SQL parser, or when the identifier might
-contain upper case characters whose case should be preserved.
+might contain special characters that would otherwise be misinterpreted
+by the SQL parser, or when the identifier might contain upper case characters
+whose case should be preserved.
 
 .. versionadded:: 4.1
 
@@ -890,7 +891,7 @@ JSON data is automatically decoded by PyGreSQL.  If you don't want the data
 to be decoded, then you can cast ``json`` or ``jsonb`` columns to ``text``
 in PostgreSQL or you can set the decoding function to *None* or a different
 function using :func:`pg.set_jsondecode`.  By default this is the same as
-the :func:`json.dumps` function from the standard library.
+the :func:`json.loads` function from the standard library.
 
 .. versionadded:: 5.0
 
@@ -909,7 +910,7 @@ type names (the default) or more specific "regular" type names. Which kind
 of type names is used can be changed by calling :meth:`DB.get_regtypes`.
 If you pass a boolean, it sets whether regular type names shall be used.
 The method can also be used to check through its return value whether
-currently regular type names are used.
+regular type names are currently used.
 
 .. versionadded:: 4.1
 

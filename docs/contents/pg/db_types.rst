@@ -89,6 +89,6 @@ be necessary to look up certain database settings.
     objects of the running connections.
 
     Also note that the typecasting for all of the basic types happens already
-    in the C extension module.  The typecast functions that can be set with
-    the above methods are only called for the types that are not already
-    supported by the C extension module.
+    in the C low-level extension module.  The typecast functions that can be
+    set with the above methods are only called for the types that are not
+    already supported by the C extension.

@@ -43,20 +43,21 @@ query -- execute a SQL command string
     :raises pg.InternalError: error during query processing
 
 This method simply sends a SQL query to the database. If the query is an
-insert statement that inserted exactly one row into a table that has OIDs, the
-return value is the OID of the newly inserted row. If the query is an update
-or delete statement, or an insert statement that did not insert exactly one
-row in a table with OIDs, then the number of rows affected is returned as a
-string. If it is a statement that returns rows as a result (usually a select
-statement, but maybe also an ``"insert/update ... returning"`` statement),
-this method returns a :class:`Query` that can be accessed via the
+insert statement that inserted exactly one row into a table that has OIDs,
+the return value is the OID of the newly inserted row as an integer.
+If the query is an update or delete statement, or an insert statement that
+did not insert exactly one row, or on a table without OIDs, then the number
+of rows affected is returned as a string. If it is a statement that returns
+rows as a result (usually a select statement, but maybe also an
+``"insert/update ... returning"`` statement), this method returns
+a :class:`Query` that can be accessed via the
 :meth:`Query.getresult`, :meth:`Query.dictresult` or
 :meth:`Query.namedresult` methods or simply printed.
 Otherwise, it returns ``None``.
 
 The SQL command may optionally contain positional parameters of the form
 ``$1``, ``$2``, etc instead of literal data, in which case the values
-have to be supplied separately as a tuple.  The values are substituted by
+must be supplied separately as a tuple.  The values are substituted by
 the database in such a way that they don't need to be escaped, making this
 an effective way to pass arbitrary or unknown data without worrying about
 SQL injection or syntax errors.
@@ -91,9 +92,9 @@ query_prepared -- execute a prepared statement
 
 This method works exactly like :meth:`Connection.query` except that instead
 of passing the command itself, you pass the name of a prepared statement.
-An empty name corresponds to the unnamed statement.  You must have created
-the corresponding named or unnamed statement with :meth:`Connection.prepare`
-before, or an :exc:`pg.OperationalError` will be raised.
+An empty name corresponds to the unnamed statement.  You must have previously
+created the corresponding named or unnamed statement with
+:meth:`Connection.prepare`, or an :exc:`pg.OperationalError` will be raised.
 
 .. versionadded:: 5.1
 
@@ -111,8 +112,8 @@ prepare -- create a prepared statement
     :raises TypeError: invalid connection
     :raises pg.ProgrammingError: error in query or duplicate query
 
-This method creates a prepared statement for the given command with the
-given name for later execution with the :meth:`Connection.query_prepared`
+This method creates a prepared statement with the specified name for the
+given command for later execution with the :meth:`Connection.query_prepared`
 method. The name can be empty to create an unnamed statement, in which case
 any pre-existing unnamed statement is automatically replaced; otherwise a
 :exc:`pg.ProgrammingError` is raised if the statement name is already defined
@@ -317,7 +318,7 @@ values may contain string, integer, long or double (real) values.
 .. warning::
 
     This method doesn't type check the fields according to the table definition;
-    it just look whether or not it knows how to handle such types.
+    it just looks whether or not it knows how to handle such types.
 
 get/set_notice_receiver -- custom notice receiver
 -------------------------------------------------
@@ -451,8 +452,8 @@ getlo -- build a large object from given oid [LO]
     :raises TypeError:  invalid connection, bad parameter type, or too many parameters
     :raises ValueError: bad OID value (0 is invalid_oid)
 
-This method allows to reuse a formerly created large object through the
-:class:`LargeObject` interface, providing the user have its OID.
+This method allows reusing a previously created large object through the
+:class:`LargeObject` interface, provided the user has its OID.
 
 loimport -- import a file to a large object [LO]
 ------------------------------------------------

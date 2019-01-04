@@ -7,9 +7,9 @@ The system catalogs are regular tables where PostgreSQL stores schema metadata,
 such as information about tables and columns, and internal bookkeeping
 information. You can drop and recreate the tables, add columns, insert and
 update values, and severely mess up your system that way. Normally, one
-should not change the system catalogs by hand, there are always SQL commands
-to do that. For example, CREATE DATABASE inserts a row into the *pg_database*
-catalog — and actually creates the database on disk.
+should not change the system catalogs by hand: there are SQL commands
+to make all supported changes.  For example, CREATE DATABASE inserts a row
+into the *pg_database* catalog — and actually creates the database on disk.
 
 It this section we want to show examples for how to parse some of the system
 catalogs, making queries with the classic PyGreSQL interface.
@@ -19,7 +19,8 @@ database, as explained in the :doc:`basic`::
 
     >>> from pg import DB
     >>> db = DB()
-    >>> query = query
+    >>> query = db.query
+
 
 Lists indices
 -------------
@@ -31,23 +32,26 @@ This query lists all simple indices in the database::
         FROM pg_class bc, pg_class ic, pg_index i, pg_attribute a
         WHERE i.indrelid = bc.oid AND i.indexrelid = ic.oid
             AND i.indkey[0] = a.attnum AND a.attrelid = bc.oid
-            AND NOT a.attisdropped
+            AND NOT a.attisdropped AND a.attnum>0
         ORDER BY class_name, index_name, attname"""))
 
 
 List user defined attributes
 ----------------------------
 
-This query lists all user defined attributes and their type
-in user-defined classes::
+This query lists all user-defined attributes and their types
+in user-defined tables::
 
-    print(query("""SELECT c.relname, a.attname, t.typname
-        FROM pg_class c, pg_attribute a, pg_type t
-        WHERE c.relkind = 'r' and c.relname !~ '^pg_'
-            AND c.relname !~ '^Inv' and a.attnum > 0
-            AND a.attrelid = c.oid and a.atttypid = t.oid
+    print(query("""SELECT c.relname, a.attname,
+            format_type(a.atttypid, a.atttypmod)
+        FROM pg_class c, pg_attribute a
+        WHERE c.relkind = 'r' AND c.relnamespace!=ALL(ARRAY[
+            'pg_catalog','pg_toast', 'information_schema']::regnamespace[])
+            AND a.attnum > 0
+            AND a.attrelid = c.oid
             AND NOT a.attisdropped
         ORDER BY relname, attname"""))
+
 
 List user defined base types
 ----------------------------
@@ -62,8 +66,8 @@ This query lists all user defined base types::
         ORDER BY rolname, typname"""))
 
 
-List  operators
----------------
+List operators
+--------------
 
 This query lists all right-unary operators::
 
@@ -120,6 +124,7 @@ they can be applied::
         WHERE a.aggfnoid = p.oid
             and p.proargtypes[0] = t.oid
         ORDER BY proname, typname"""))
+
 
 List operator families
 ----------------------
