@@ -450,7 +450,7 @@ class TestDBClass(unittest.TestCase):
     def createTable(self, table, definition,
                     temporary=True, oids=None, values=None):
         query = self.db.query
-        if not '"' in table or '.' in table:
+        if '"' not in table or '.' in table:
             table = '"%s"' % table
         if not temporary:
             q = 'drop table if exists %s cascade' % table
@@ -1009,7 +1009,9 @@ class TestDBClass(unittest.TestCase):
         f = self.db.query_prepared
         self.assertRaises(pg.OperationalError, f)
         p = self.db.prepare
-        p("select 'no name'")
+        # make sure all types are known so that we will not
+        # generate other anonymous queries in the background
+        p("select 'no name'::varchar")
         r = f().getresult()[0][0]
         self.assertEqual(r, 'no name')
         r = f(name=None).getresult()[0][0]

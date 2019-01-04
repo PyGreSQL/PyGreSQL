@@ -572,6 +572,12 @@ Example::
         rows = db.query_prepared(ein, phone,
             name='update employees).getresult()[0][0]
 
+.. note::
+
+    The DB wrapper sometimes issues parameterized queries behind the scenes
+    (for instance to find unknown database types) which could replace the
+    unnamed statement. So we advice to always name prepared statements.
+
 .. versionadded:: 5.1
 
 describe_prepared -- describe a prepared statement

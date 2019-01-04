@@ -958,8 +958,9 @@ class TestPreparedQueries(unittest.TestCase):
         self.assertRaises(pg.OperationalError,
             self.c.query_prepared, 'does-not-exist')
 
-    def testAnonymousQueryWithoutParams(self):
+    def testUnnamedQueryWithoutParams(self):
         self.assertIsNone(self.c.prepare('', "select 'anon'"))
+        self.assertEqual(self.c.query_prepared('').getresult(), [('anon',)])
         self.assertEqual(self.c.query_prepared('').getresult(), [('anon',)])
 
     def testNamedQueryWithoutParams(self):
@@ -973,7 +974,7 @@ class TestPreparedQueries(unittest.TestCase):
         self.assertEqual(self.c.query_prepared('query17').getresult(), [(17,)])
         self.assertEqual(self.c.query_prepared('query42').getresult(), [(42,)])
 
-    def testAnonymousQueryWithParams(self):
+    def testUnnamedQueryWithParams(self):
         self.assertIsNone(self.c.prepare('', "select $1 || ', ' || $2"))
         self.assertEqual(
             self.c.query_prepared('', ['hello', 'world']).getresult(),
@@ -994,7 +995,7 @@ class TestPreparedQueries(unittest.TestCase):
         self.assertRaises(pg.OperationalError,
             self.c.describe_prepared, 'does-not-exist')
 
-    def testDescribeAnonymousQuery(self):
+    def testDescribeUnnamedQuery(self):
         self.c.prepare('', "select 1::int, 'a'::char")
         r = self.c.describe_prepared('')
         self.assertEqual(r.listfields(), ('int4', 'bpchar'))
