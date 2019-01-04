@@ -274,19 +274,19 @@ class TestConnectObject(unittest.TestCase):
         self.assertRaises(TypeError, parameter)
         r = parameter('this server setting does not exist')
         self.assertIsNone(r)
-        s = query('show server_version').getresult()[0][0].upper()
+        s = query('show server_version').getresult()[0][0]
         self.assertIsNotNone(s)
         r = parameter('server_version')
         self.assertEqual(r, s)
-        s = query('show server_encoding').getresult()[0][0].upper()
+        s = query('show server_encoding').getresult()[0][0]
         self.assertIsNotNone(s)
         r = parameter('server_encoding')
         self.assertEqual(r, s)
-        s = query('show client_encoding').getresult()[0][0].upper()
+        s = query('show client_encoding').getresult()[0][0]
         self.assertIsNotNone(s)
         r = parameter('client_encoding')
         self.assertEqual(r, s)
-        s = query('show server_encoding').getresult()[0][0].upper()
+        s = query('show server_encoding').getresult()[0][0]
         self.assertIsNotNone(s)
         r = parameter('server_encoding')
         self.assertEqual(r, s)
