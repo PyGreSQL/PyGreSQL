@@ -428,7 +428,7 @@ locreate -- create a large object in the database [LO]
     Create a large object in the database
 
     :param int mode: large object create mode
-    :returns: object handling the PostGreSQL large object
+    :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
     :raises TypeError: invalid connection, bad parameter type, or too many parameters
     :raises pg.OperationalError: creation error
@@ -446,7 +446,7 @@ getlo -- build a large object from given oid [LO]
     Create a large object in the database
 
     :param int oid: OID of the existing large object
-    :returns: object handling the PostGreSQL large object
+    :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
     :raises TypeError:  invalid connection, bad parameter type, or too many parameters
     :raises ValueError: bad OID value (0 is invalid_oid)
@@ -462,7 +462,7 @@ loimport -- import a file to a large object [LO]
     Import a file to a large object
 
     :param str name: the name of the file to be imported
-    :returns: object handling the PostGreSQL large object
+    :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises pg.OperationalError: error during file import

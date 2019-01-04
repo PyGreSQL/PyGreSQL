@@ -1472,7 +1472,7 @@ def pgnotify(*args, **kw):
     return NotificationHandler(*args, **kw)
 
 
-# The actual PostGreSQL database connection interface:
+# The actual PostgreSQL database connection interface:
 
 class DB:
     """Wrapper class for the _pg connection type."""
