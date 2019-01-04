@@ -22,7 +22,7 @@ Let's create a simple SQL function that takes no arguments and returns 1::
     >>> query("""CREATE FUNCTION one() RETURNS int4
     ...     AS 'SELECT 1 as ONE' LANGUAGE SQL""")
 
-Functions can be used in any expressions (eg. in the target"list or
+Functions can be used in any expressions (eg. in the target list or
 qualifications)::
 
     >>> print(db.query("SELECT one() AS answer"))

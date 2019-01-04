@@ -19,7 +19,8 @@ database, as explained in the :doc:`basic`::
 
     >>> from pg import DB
     >>> db = DB()
-    >>> query = query
+    >>> query = db.query
+
 
 Lists indices
 -------------
@@ -49,6 +50,7 @@ in user-defined classes::
             AND NOT a.attisdropped
         ORDER BY relname, attname"""))
 
+
 List user defined base types
 ----------------------------
 
@@ -62,8 +64,8 @@ This query lists all user defined base types::
         ORDER BY rolname, typname"""))
 
 
-List  operators
----------------
+List operators
+--------------
 
 This query lists all right-unary operators::
 
@@ -120,6 +122,7 @@ they can be applied::
         WHERE a.aggfnoid = p.oid
             and p.proargtypes[0] = t.oid
         ORDER BY proname, typname"""))
+
 
 List operator families
 ----------------------

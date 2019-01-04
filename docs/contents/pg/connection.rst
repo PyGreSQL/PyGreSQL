@@ -241,7 +241,7 @@ values may contain string, integer, long or double (real) values.
 .. warning::
 
     This method doesn't type check the fields according to the table definition;
-    it just look whether or not it knows how to handle such types.
+    it just looks whether or not it knows how to handle such types.
 
 get/set_notice_receiver -- custom notice receiver
 -------------------------------------------------

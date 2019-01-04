@@ -314,7 +314,7 @@ If *row* is a dictionary, then the value for the key is taken from it.
 Otherwise, the row must be a single value or a tuple of values
 corresponding to the passed *keyname* or primary key.  The fetched row
 from the table will be returned as a new dictionary or used to replace
-the existing values when row was passed as aa dictionary.
+the existing values when row was passed as a dictionary.
 
 The OID is also put into the dictionary if the table has one, but
 in order to allow the caller to work with multiple tables, it is
@@ -775,7 +775,7 @@ JSON data is automatically decoded by PyGreSQL.  If you don't want the data
 to be decoded, then you can cast ``json`` or ``jsonb`` columns to ``text``
 in PostgreSQL or you can set the decoding function to *None* or a different
 function using :func:`pg.set_jsondecode`.  By default this is the same as
-the :func:`json.dumps` function from the standard library.
+the :func:`json.loads` function from the standard library.
 
 .. versionadded:: 5.0
 

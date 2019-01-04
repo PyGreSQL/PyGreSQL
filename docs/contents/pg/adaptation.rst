@@ -64,7 +64,7 @@ adaptation of parameters, since all of this is happening automatically behind
 the scenes.  You only need to consider this issue when creating SQL commands
 manually and sending them to the database using the :meth:`DB.query` method.
 
-Imagine you have created a user  login form that stores the login name as
+Imagine you have created a user login form that stores the login name as
 *login* and the password as *passwd* and you now want to get the user
 data for that user.  You may be tempted to execute a query like this::
 

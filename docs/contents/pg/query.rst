@@ -42,7 +42,7 @@ dictresult -- get query values as list of dictionaries
     :raises MemoryError: internal memory error
 
 This method returns the list of the values returned by the query
-with each tuple returned as a dictionary with the field names
+with each row returned as a dictionary with the field names
 used as the dictionary index.
 
 Note that since PyGreSQL 5.0 this will return the values of array type
