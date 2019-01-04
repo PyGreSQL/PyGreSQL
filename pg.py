@@ -1869,18 +1869,15 @@ class DB:
         return self.query(*self.adapter.format_query(
             command, parameters, types, inline))
 
-    def query_prepared(self, *args, **kwargs):
+    def query_prepared(self, name, *args):
         """Execute a prepared SQL statement.
 
         This works like the query() method, except that instead of passing
-        the SQL command, you pass the name of a prepared statement via
-        the keyword-only argument `name`.  If you don't pass a name, the
-        unnamed statement will be executed, if you created one before.
+        the SQL command, you pass the name of a prepared statement.  If you
+        pass an empty name, the unnamed statement will be executed.
         """
         if not self.db:
             raise _int_error('Connection is not valid')
-        # use kwargs because Python 2 does not support keyword-only arguments
-        name = kwargs.get('name')
         if name is None:
             name = ''
         if args:
@@ -1889,18 +1886,18 @@ class DB:
         self._do_debug('EXECUTE', name)
         return self.db.query_prepared(name)
 
-    def prepare(self, command, name=None):
+    def prepare(self, name, command):
         """Create a prepared SQL statement.
 
         This creates a prepared statement for the given command with the
         the given name for later execution with the query_prepared() method.
-        The name can be empty or left out to create an unnamed statement,
-        in which case any pre-existing unnamed statement is automatically
-        replaced; otherwise it is an error if the statement name is already
-        defined in the current database session.
 
-        If any parameters are used, they can be referred to in the query as
-        numbered parameters of the form $1.
+        The name can be empty to create an unnamed statement, in which case
+        any pre-existing unnamed statement is automatically replaced;
+        otherwise it is an error if the statement name is already
+        defined in the current database session. We recommend always using
+        named queries, since unnamed queries have a limited lifetime and
+        can be automatically replaced or destroyed by various operations.
         """
         if not self.db:
             raise _int_error('Connection is not valid')

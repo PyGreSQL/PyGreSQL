@@ -508,7 +508,7 @@ Example::
 query_prepared -- execute a prepared statement
 ----------------------------------------------
 
-.. method:: DB.query_prepared([arg1, [arg2, ...]], [name=...])
+.. method:: DB.query_prepared(name, [arg1, [arg2, ...]])
 
     Execute a prepared statement
 
@@ -524,9 +524,8 @@ query_prepared -- execute a prepared statement
     :raises pg.OperationalError: prepared statement does not exist
 
 This methods works like the :meth:`DB.query` method, except that instead of
-passing the SQL command, you pass the name of a prepared statement via the
-keyword-only argument *name*.  If you don't pass a name, the unnamed
-statement will be executed, if you created one before.
+passing the SQL command, you pass the name of a prepared statement.  If you
+pass an empty name, the unnamed statement will be executed.
 
 You must have created the corresponding named or unnamed statement with
 the :meth:`DB.prepare` method before, otherwise an :exc:`pg.OperationalError`
@@ -537,7 +536,7 @@ will be raised.
 prepare -- create a prepared statement
 --------------------------------------
 
-.. method:: DB.prepare(command, [name])
+.. method:: DB.prepare(name, command)
 
     Create a prepared statement
 
@@ -550,10 +549,10 @@ prepare -- create a prepared statement
 
 This method creates a prepared statement for the given command with the
 given name for later execution with the :meth:`DB.query_prepared` method.
-The name can be empty or left out to create an unnamed statement, in which
-case any pre-existing unnamed statement is automatically replaced;
-otherwise a :exc:`pg.ProgrammingError` is raised if the statement name is
-already defined in the current database session.
+The name can be empty to create an unnamed statement, in which case any
+pre-existing unnamed statement is automatically replaced; otherwise a
+:exc:`pg.ProgrammingError` is raised if the statement name is already
+defined in the current database session.
 
 The SQL command may optionally contain positional parameters of the form
 ``$1``, ``$2``, etc instead of literal data.  The corresponding values
@@ -562,21 +561,20 @@ as positional arguments.
 
 Example::
 
-    db.prepare("update employees set phone=$2 where ein=$1",
-        name='update employees')
+    db.prepare('change phone',
+        "update employees set phone=$2 where ein=$1",
     while True:
         ein = input("Employee ID? ")
         if not ein:
             break
         phone = input("Phone? ")
-        rows = db.query_prepared(ein, phone,
-            name='update employees).getresult()[0][0]
+        db.query_prepared('change phone', ein, phone)
 
 .. note::
 
-    The DB wrapper sometimes issues parameterized queries behind the scenes
-    (for instance to find unknown database types) which could replace the
-    unnamed statement. So we advice to always name prepared statements.
+     We recommend always using named queries, since unnamed queries have a
+     limited lifetime and can be automatically replaced or destroyed by
+     various operations on the database.
 
 .. versionadded:: 5.1
 
