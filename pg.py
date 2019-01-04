@@ -1869,16 +1869,18 @@ class DB:
         return self.query(*self.adapter.format_query(
             command, parameters, types, inline))
 
-    def query_prepared(self, name=None, *args):
+    def query_prepared(self, *args, **kwargs):
         """Execute a prepared SQL statement.
 
-        This works like the query() method, but you need to pass the name of
-        a prepared statement that you have already created with prepare().
-        If you pass no parameters or pass an empty name, then the unnamed
-        statement will be executed if you created one before.
+        This works like the query() method, except that instead of passing
+        the SQL command, you pass the name of a prepared statement via
+        the keyword-only argument `name`.  If you don't pass a name, the
+        unnamed statement will be executed, if you created one before.
         """
         if not self.db:
             raise _int_error('Connection is not valid')
+        # use kwargs because Python 2 does not support keyword-only arguments
+        name = kwargs.get('name')
         if name is None:
             name = ''
         if args:
@@ -1911,8 +1913,8 @@ class DB:
         """Describe a prepared SQL statement.
 
         This method returns a Query object describing the result columns of
-        the prepared statement with the given name. If you do not specify a
-        name, then the unnamed statement will be described if you created one.
+        the prepared statement with the given name. If you omit the name,
+        the unnamed statement will be described if you created one before.
         """
         if name is None:
             name = ''

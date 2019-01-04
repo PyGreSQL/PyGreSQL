@@ -985,43 +985,47 @@ class TestDBClass(unittest.TestCase):
         self.assertIsNone(p("select null", name=''))
 
     def testQueryPreparedWithoutParams(self):
-        p = self.db.prepare
-        p("select 17", 'q1')
-        p("select 42", 'q2')
         f = self.db.query_prepared
-        r = f('q1').getresult()[0][0]
+        self.assertRaises(pg.OperationalError, f, 'q')
+        p = self.db.prepare
+        p("select 17", name='q1')
+        p("select 42", name='q2')
+        r = f(name='q1').getresult()[0][0]
         self.assertEqual(r, 17)
-        r = f('q2').getresult()[0][0]
+        r = f(name='q2').getresult()[0][0]
         self.assertEqual(r, 42)
 
     def testQueryPreparedWithParams(self):
         p = self.db.prepare
-        p("select 1 + $1 + $2 + $3", 'sum')
-        p("select initcap($1) || ', ' || $2 || '!'", 'cat')
+        p("select 1 + $1 + $2 + $3", name='sum')
+        p("select initcap($1) || ', ' || $2 || '!'", name='cat')
         f = self.db.query_prepared
-        r = f('sum', 2, 3, 5).getresult()[0][0]
+        r = f(2, 3, 5, name='sum').getresult()[0][0]
         self.assertEqual(r, 11)
-        r = f('cat', 'hello', 'world').getresult()[0][0]
+        r = f('hello', 'world', name='cat').getresult()[0][0]
         self.assertEqual(r, 'Hello, world!')
 
     def testQueryPreparedUnnamedWithOutParams(self):
+        f = self.db.query_prepared
+        self.assertRaises(pg.OperationalError, f)
         p = self.db.prepare
         p("select 'no name'")
-        f = self.db.query_prepared
         r = f().getresult()[0][0]
         self.assertEqual(r, 'no name')
-        r = f(None).getresult()[0][0]
+        r = f(name=None).getresult()[0][0]
         self.assertEqual(r, 'no name')
-        r = f('').getresult()[0][0]
+        r = f(name='').getresult()[0][0]
         self.assertEqual(r, 'no name')
 
     def testQueryPreparedUnnamedWithParams(self):
         p = self.db.prepare
         p("select 1 + $1 + $2")
         f = self.db.query_prepared
-        r = f(None, 2, 3).getresult()[0][0]
+        r = f(2, 3).getresult()[0][0]
         self.assertEqual(r, 6)
-        r = f('', 2, 3).getresult()[0][0]
+        r = f(2, 3, name=None).getresult()[0][0]
+        self.assertEqual(r, 6)
+        r = f(2, 3, name='').getresult()[0][0]
         self.assertEqual(r, 6)
 
     def testDescribePrepared(self):
