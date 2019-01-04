@@ -2450,7 +2450,7 @@ connPrepare(connObject *self, PyObject *args)
 
 /* describe prepared statement */
 static char connDescribePrepared__doc__[] =
-"describe_prepared(name, sql) -- describe a prepared statement\n\n"
+"describe_prepared(name) -- describe a prepared statement\n\n"
 "You must pass the name (string) of the prepared statement.\n";
 
 static PyObject *

@@ -950,6 +950,10 @@ class TestPreparedQueries(unittest.TestCase):
     def testInvalidPreparedStatement(self):
         self.assertRaises(pg.ProgrammingError, self.c.prepare, '', 'bad')
 
+    def testDuplicatePreparedStatement(self):
+        self.assertIsNone(self.c.prepare('q', 'select 1'))
+        self.assertRaises(pg.ProgrammingError, self.c.prepare, 'q', 'select 2')
+
     def testNonExistentPreparedStatement(self):
         self.assertRaises(pg.OperationalError,
             self.c.query_prepared, 'does-not-exist')

@@ -33,7 +33,7 @@ query -- execute a SQL command string
     Execute a SQL command string
 
     :param str command: SQL command
-    :param args: optional positional arguments
+    :param args: optional parameter values
     :returns: result values
     :rtype: :class:`Query`, None
     :raises TypeError: bad argument type, or too many arguments
@@ -54,11 +54,12 @@ this method returns a :class:`Query` that can be accessed via the
 :meth:`Query.namedresult` methods or simply printed.
 Otherwise, it returns ``None``.
 
-The query may optionally contain positional parameters of the form ``$1``,
-``$2``, etc instead of literal data, and the values supplied as a tuple.
-The values are substituted by the database in such a way that they don't
-need to be escaped, making this an effective way to pass arbitrary or
-unknown data without worrying about SQL injection or syntax errors.
+The SQL command may optionally contain positional parameters of the form
+``$1``, ``$2``, etc instead of literal data, in which case the values
+have to be supplied separately as a tuple.  The values are substituted by
+the database in such a way that they don't need to be escaped, making this
+an effective way to pass arbitrary or unknown data without worrying about
+SQL injection or syntax errors.
 
 When the database could not process the query, a :exc:`pg.ProgrammingError` or
 a :exc:`pg.InternalError` is raised. You can check the ``SQLSTATE`` error code
@@ -70,13 +71,88 @@ Example::
     phone = con.query("select phone from employees where name=$1",
         (name,)).getresult()
 
+query_prepared -- execute a prepared statement
+----------------------------------------------
+
+.. method:: Connection.query_prepared(name, [args])
+
+    Execute a prepared statement
+
+    :param str name: name of the prepared statement
+    :param args: optional parameter values
+    :returns: result values
+    :rtype: :class:`Query`, None
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises ValueError: empty SQL query or lost connection
+    :raises pg.ProgrammingError: error in query
+    :raises pg.InternalError: error during query processing
+    :raises pg.OperationalError: prepared statement does not exist
+
+This method works exactly like :meth:`Connection.query` except that instead
+of passing the command itself, you pass the name of a prepared statement.
+An empty name corresponds to the unnamed statement.  You must have created
+the corresponding named or unnamed statement with :meth:`Connection.prepare`
+before, or an :exc:`pg.OperationalError` will be raised.
+
+.. versionadded:: 5.1
+
+prepare -- create a prepared statement
+--------------------------------------
+
+.. method:: Connection.prepare(name, command)
+
+    Create a prepared statement
+
+    :param str name: name of the prepared statement
+    :param str command: SQL command
+    :rtype: None
+    :raises TypeError: bad argument types, or wrong number of arguments
+    :raises TypeError: invalid connection
+    :raises pg.ProgrammingError: error in query or duplicate query
+
+This method creates a prepared statement for the given command with the
+given name for later execution with the :meth:`Connection.query_prepared`
+method. The name can be empty to create an unnamed statement, in which case
+any pre-existing unnamed statement is automatically replaced; otherwise a
+:exc:`pg.ProgrammingError` is raised if the statement name is already defined
+in the current database session.
+
+The SQL command may optionally contain positional parameters of the form
+``$1``, ``$2``, etc instead of literal data.  The corresponding values
+must then later be passed to the :meth:`Connection.query_prepared` method
+separately as a tuple.
+
+.. versionadded:: 5.1
+
+describe_prepared -- describe a prepared statement
+--------------------------------------------------
+
+.. method:: Connection.describe_prepared(name)
+
+    Describe a prepared statement
+
+    :param str name: name of the prepared statement
+    :rtype: :class:`Query`
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises pg.OperationalError: prepared statement does not exist
+
+This method returns a :class:`Query` object describing the prepared
+statement with the given name.  You can also pass an empty name in order
+to describe the unnamed statement.  Information on the fields of the
+corresponding query can be obtained through the :meth:`Query.listfields`,
+:meth:`Query.fieldname` and :meth:`Query.fieldnum` methods.
+
+.. versionadded:: 5.1
+
 reset -- reset the connection
 -----------------------------
 
 .. method:: Connection.reset()
 
     Reset the :mod:`pg` connection
-    
+
     :rtype: None
     :raises TypeError: too many (any) arguments
     :raises TypeError: invalid connection
@@ -101,7 +177,7 @@ close -- close the database connection
 .. method:: Connection.close()
 
     Close the :mod:`pg` connection
-    
+
     :rtype: None
     :raises TypeError: too many (any) arguments
 

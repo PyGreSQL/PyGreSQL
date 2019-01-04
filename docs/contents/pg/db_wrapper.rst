@@ -451,17 +451,18 @@ query -- execute a SQL command string
 
 Similar to the :class:`Connection` function with the same name, except that
 positional arguments can be passed either as a single list or tuple, or as
-individual positional arguments.
+individual positional arguments.  These arguments will then be used as
+parameter values of parameterized queries.
 
 Example::
 
     name = input("Name? ")
     phone = input("Phone? ")
     rows = db.query("update employees set phone=$2 where name=$1",
-        (name, phone)).getresult()[0][0]
+        name, phone).getresult()[0][0]
     # or
     rows = db.query("update employees set phone=$2 where name=$1",
-         name, phone).getresult()[0][0]
+        (name, phone)).getresult()[0][0]
 
 query_formatted -- execute a formatted SQL command string
 ---------------------------------------------------------
@@ -503,6 +504,116 @@ Example::
     rows = db.query_formatted(
         "update employees set phone=%(phone)s where name=%(name)s",
         dict(name=name, phone=phone)).getresult()[0][0]
+
+query_prepared -- execute a prepared statement
+----------------------------------------------
+
+.. method:: DB.query_prepared([arg1, [arg2, ...]], [name=...])
+
+    Execute a prepared statement
+
+    :param str name: name of the prepared statement
+    :param arg*: optional positional arguments
+    :returns: result values
+    :rtype: :class:`Query`, None
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises ValueError: empty SQL query or lost connection
+    :raises pg.ProgrammingError: error in query
+    :raises pg.InternalError: error during query processing
+    :raises pg.OperationalError: prepared statement does not exist
+
+This methods works like the :meth:`DB.query` method, except that instead of
+passing the SQL command, you pass the name of a prepared statement via the
+keyword-only argument *name*.  If you don't pass a name, the unnamed
+statement will be executed, if you created one before.
+
+You must have created the corresponding named or unnamed statement with
+the :meth:`DB.prepare` method before, otherwise an :exc:`pg.OperationalError`
+will be raised.
+
+.. versionadded:: 5.1
+
+prepare -- create a prepared statement
+--------------------------------------
+
+.. method:: DB.prepare(command, [name])
+
+    Create a prepared statement
+
+    :param str command: SQL command
+    :param str name: name of the prepared statement
+    :rtype: None
+    :raises TypeError: bad argument types, or wrong number of arguments
+    :raises TypeError: invalid connection
+    :raises pg.ProgrammingError: error in query or duplicate query
+
+This method creates a prepared statement for the given command with the
+given name for later execution with the :meth:`DB.query_prepared` method.
+The name can be empty or left out to create an unnamed statement, in which
+case any pre-existing unnamed statement is automatically replaced;
+otherwise a :exc:`pg.ProgrammingError` is raised if the statement name is
+already defined in the current database session.
+
+The SQL command may optionally contain positional parameters of the form
+``$1``, ``$2``, etc instead of literal data.  The corresponding values
+must then later be passed to the :meth:`Connection.query_prepared` method
+as positional arguments.
+
+Example::
+
+    db.prepare("update employees set phone=$2 where ein=$1",
+        name='update employees')
+    while True:
+        ein = input("Employee ID? ")
+        if not ein:
+            break
+        phone = input("Phone? ")
+        rows = db.query_prepared(ein, phone,
+            name='update employees).getresult()[0][0]
+
+.. versionadded:: 5.1
+
+describe_prepared -- describe a prepared statement
+--------------------------------------------------
+
+.. method:: DB.describe_prepared([name])
+
+    Describe a prepared statement
+
+    :param str name: name of the prepared statement
+    :rtype: :class:`Query`
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises pg.OperationalError: prepared statement does not exist
+
+This method returns a :class:`Query` object describing the prepared
+statement with the given name.  You can also pass an empty name in order
+to describe the unnamed statement.  Information on the fields of the
+corresponding query can be obtained through the :meth:`Query.listfields`,
+:meth:`Query.fieldname` and :meth:`Query.fieldnum` methods.
+
+.. versionadded:: 5.1
+
+delete_prepared -- delete a prepared statement
+----------------------------------------------
+
+.. method:: DB.delete_prepared([name])
+
+    Delete a prepared statement
+
+    :param str name: name of the prepared statement
+    :rtype: None
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises pg.OperationalError: prepared statement does not exist
+
+This method deallocates a previously prepared SQL statement with the given
+name, or deallocates all prepared statements if you do not specify a name.
+Note that prepared statements are also deallocated automatically when the
+current session ends.
+
+.. versionadded:: 5.1
 
 clear -- clear row values in memory
 -----------------------------------
