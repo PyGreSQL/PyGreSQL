@@ -129,4 +129,4 @@ ntuples -- return number of tuples in query object
     :rtype: int
     :raises TypeError: Too many arguments.
 
-This method returns the number of tuples found in a query.
+This method returns the number of tuples in the query result.

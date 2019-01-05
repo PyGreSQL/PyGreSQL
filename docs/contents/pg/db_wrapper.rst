@@ -134,7 +134,7 @@ the values are the names of the attributes' types) with the column names
 in the proper order if you iterate over it.
 
 By default, only a limited number of simple types will be returned.
-You can get the regular types instead, if you enable this by calling the
+You can get the regular types instead, if enabled by calling the
 :meth:`DB.use_regtypes` method.
 
 has_table_privilege -- check table privilege
@@ -245,9 +245,15 @@ begin/commit/rollback/savepoint/release -- transaction handling
 
     Commit a transaction
 
-    This commits the current transaction. All changes made by the
-    transaction become visible to others and are guaranteed to be
-    durable if a crash occurs.
+    This commits the current transaction.
+
+All changes made by the transaction become visible to others.
+=> Don't say this, since it's not true eg. in repeatable_read xtn
+After returning, the changes are guaranteed to be durable, even if a crash occurs.
+=> Don't say this since it's postgres job to document DB behavior,
+kernel and library folks job to do their part, and DBA+sysadmin job to
+implement it on site, not pygres or the developer's job
+(with my developer's hat off and sysadmin hat on).
 
 .. method:: DB.end()
 
@@ -261,8 +267,7 @@ begin/commit/rollback/savepoint/release -- transaction handling
 
     :param str name: optionally, roll back to the specified savepoint
 
-    This rolls back the current transaction and causes all the updates
-    made by the transaction to be discarded.
+    This rolls back the current transaction, discarding all its changes.
 
 .. method:: DB.abort()
 
@@ -525,12 +530,16 @@ query_prepared -- execute a prepared statement
     :raises pg.OperationalError: prepared statement does not exist
 
 This methods works like the :meth:`DB.query` method, except that instead of
-passing the SQL command, you pass the name of an prepared statement that you
-have created previously using the :meth:`DB.prepare` method.
+passing the SQL command, you pass the name of a prepared statement
+created previously using the :meth:`DB.prepare` method.
 
 Passing an empty string or *None* as the name will execute the unnamed
 statement (see warning about the limited lifetime of the unnamed statement
 in :meth:`DB.prepare`).
+
+The functionality of this method is equivalent to that of the SQL ``EXECUTE``
+command.  Note that calling EXECUTE would require parameters to be sent
+inline, and be properly sanitized (escaped, quoted).
 
 .. versionadded:: 5.1
 
@@ -548,22 +557,27 @@ prepare -- create a prepared statement
     :raises TypeError: invalid connection
     :raises pg.ProgrammingError: error in query or duplicate query
 
-This method creates a prepared statement with the given name for the given
-command for later execution with the :meth:`DB.query_prepared` method.
-The name can be empty to create an unnamed statement, in which case any
-pre-existing unnamed statement is automatically replaced; otherwise a
-:exc:`pg.ProgrammingError` is raised if the statement name is already
-defined in the current database session.
+This method creates a prepared statement with the specified name for later
+execution of the given command with the :meth:`DB.query_prepared` method.
+
+If the name is empty or *None*, the unnamed prepared statement is used,
+in which case any pre-existing unnamed statement is replaced.
+
+Otherwise, if a prepared statement with the specified name is already defined
+in the current database session, a :exc:`pg.ProgrammingError` is raised.
 
 The SQL command may optionally contain positional parameters of the form
 ``$1``, ``$2``, etc instead of literal data.  The corresponding values
-must then later be passed to the :meth:`Connection.query_prepared` method
+must then be passed to the :meth:`Connection.query_prepared` method
 as positional arguments.
+
+The functionality of this method is equivalent to that of the SQL ``PREPARE``
+command.
 
 Example::
 
     db.prepare('change phone',
-        "update employees set phone=$2 where ein=$1",
+        "update employees set phone=$2 where ein=$1")
     while True:
         ein = input("Employee ID? ")
         if not ein:
@@ -615,7 +629,7 @@ delete_prepared -- delete a prepared statement
 
 This method deallocates a previously prepared SQL statement with the given
 name, or deallocates all prepared statements if you do not specify a name.
-Note that prepared statements are also deallocated automatically when the
+Note that prepared statements are always deallocated automatically when the
 current session ends.
 
 .. versionadded:: 5.1
