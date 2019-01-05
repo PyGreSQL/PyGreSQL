@@ -524,29 +524,6 @@ the automatic deserialization of JSON strings will be deactivated.
 .. versionchanged:: 5.0
     JSON data had been always returned as text strings in earlier versions.
 
-get/set_cast_hook -- fallback typecast function
------------------------------------------------
-
-.. function:: get_cast_hook()
-
-    Get the function that handles all external typecasting
-
-This returns the callback function used by PyGreSQL to provide plug-in
-Python typecast functions.
-
-.. function:: set_cast_hook(func)
-
-    Set a function that will handle all external typecasting
-
-    :param func: the function to be used as a callback
-
-If you set this function to *None*, then only the typecast functions
-implemented in the C extension module are enabled.  You normally would
-not want to change this.  Instead, you can use :func:`get_typecast` and
-:func:`set_typecast` to add or change the plug-in Python typecast functions.
-
-.. versionadded:: 5.0
-
 get/set_datestyle -- assume a fixed date style
 ----------------------------------------------
 
