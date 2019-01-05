@@ -15,7 +15,10 @@ try:
 except ImportError:
     import unittest
 
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:  # Python < 3.3
+    from collections import Iterable
 
 import pgdb  # the module under test
 

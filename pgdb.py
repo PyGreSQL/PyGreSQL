@@ -74,7 +74,11 @@ from time import localtime
 from decimal import Decimal
 from uuid import UUID as Uuid
 from math import isnan, isinf
-from collections import namedtuple, Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:  # Python < 3.3
+    from collections import Iterable
+from collections import namedtuple
 from keyword import iskeyword
 from functools import partial
 from re import compile as regex
