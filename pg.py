@@ -1572,9 +1572,15 @@ class DB:
         except AttributeError:
             db = None
         if db:
-            db.set_cast_hook(None)
+            try:
+                db.set_cast_hook(None)
+            except TypeError:
+                pass  # probably already closed
             if self._closeable:
-                db.close()
+                try:
+                    db.close()
+                except InternalError:
+                    pass  # probably already closed
 
     # Auxiliary methods
 
@@ -1631,7 +1637,10 @@ class DB:
         # Wraps shared library function so we can track state.
         if self._closeable:
             if self.db:
-                self.db.set_cast_hook(None)
+                try:
+                    self.db.set_cast_hook(None)
+                except TypeError:
+                    pass  # probably already closed
                 self.db.close()
                 self.db = None
             else:
@@ -1662,6 +1671,7 @@ class DB:
             if self.db:
                 self.db.set_cast_hook(None)
                 self.db.close()
+            db.set_cast_hook(self.dbtypes.typecast)
             self.db = db
 
     def begin(self, mode=None):

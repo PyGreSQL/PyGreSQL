@@ -374,26 +374,42 @@ class TestDBClassBasic(unittest.TestCase):
 
     def testExistingConnection(self):
         db = pg.DB(self.db.db)
+        self.assertIsNotNone(db.db)
         self.assertEqual(self.db.db, db.db)
-        self.assertTrue(db.db)
         db.close()
-        self.assertTrue(db.db)
+        self.assertIsNotNone(db.db)
+        self.assertIsNotNone(self.db.db)
         db.reopen()
-        self.assertTrue(db.db)
+        self.assertIsNotNone(db.db)
+        self.assertEqual(self.db.db, db.db)
         db.close()
-        self.assertTrue(db.db)
+        self.assertIsNotNone(db.db)
         db = pg.DB(self.db)
         self.assertEqual(self.db.db, db.db)
         db = pg.DB(db=self.db.db)
         self.assertEqual(self.db.db, db.db)
 
-        class DB2:
-            pass
+    def testExistingDbApi2Connection(self):
 
-        db2 = DB2()
-        db2._cnx = self.db.db
+        class DBApi2Con:
+
+            def __init__(self, cnx):
+                self._cnx = cnx
+
+            def close(self):
+                self._cnx.close()
+
+        db2 = DBApi2Con(self.db.db)
         db = pg.DB(db2)
         self.assertEqual(self.db.db, db.db)
+        db.close()
+        self.assertIsNotNone(db.db)
+        db.reopen()
+        self.assertIsNotNone(db.db)
+        self.assertEqual(self.db.db, db.db)
+        db.close()
+        self.assertIsNotNone(db.db)
+        db2.close()
 
 
 class TestDBClass(unittest.TestCase):
