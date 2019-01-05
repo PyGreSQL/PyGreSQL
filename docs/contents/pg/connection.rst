@@ -320,6 +320,39 @@ values may contain string, integer, long or double (real) values.
     This method doesn't type check the fields according to the table definition;
     it just looks whether or not it knows how to handle such types.
 
+get/set_cast_hook -- fallback typecast function
+-----------------------------------------------
+
+.. method:: Connection.get_cast_hook()
+
+    Get the function that handles all external typecasting
+
+    :returns: the current external typecast function
+    :rtype: callable, None
+    :raises TypeError: too many (any) arguments
+
+This returns the callback function used by PyGreSQL to provide plug-in
+Python typecast functions for the connection.
+
+.. versionadded:: 5.0
+
+.. method:: Connection.set_cast_hook(func)
+
+    Set a function that will handle all external typecasting
+
+    :param func: the function to be used as a callback
+    :rtype: None
+    :raises TypeError: the specified notice receiver is not callable
+
+This methods allows setting a custom fallback function for providing
+Python typecast functions for the connection to supplement the C
+extension module.  If you set this function to *None*, then only the typecast
+functions implemented in the C extension module are enabled.  You normally
+would not want to change this.  Instead, you can use :func:`get_typecast` and
+:func:`set_typecast` to add or change the plug-in Python typecast functions.
+
+.. versionadded:: 5.0
+
 get/set_notice_receiver -- custom notice receiver
 -------------------------------------------------
 
