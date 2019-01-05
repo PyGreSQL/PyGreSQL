@@ -3,12 +3,15 @@ ChangeLog
 
 Version 5.1 (2019-mm-dd)
 ------------------------
-- ...
+- DB wrapper objects based on existing connections can not be closed and
+  reopened properly (but the underlying connection will not be affected).
 
 Vesion 5.0.7 (2019-mm-dd)
 -------------------------
 - This version officially supports the new PostgreSQL 11.
 - Fixed a bug in parsing array subscript ranges (reported by Justin Pryzby).
+- Fixed an issue when deleting a DB wrapper object with the underlying
+  connection already closed (bug report by Jacob Champion).
 
 Vesion 5.0.6 (2018-07-29)
 -------------------------

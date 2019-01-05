@@ -1502,8 +1502,10 @@ class DB:
                     pass
         if not db or not hasattr(db, 'db') or not hasattr(db, 'query'):
             db = connect(*args, **kw)
+            self._db_args = args, kw
             self._closeable = True
         else:
+            self._db_args = db
             self._closeable = False
         self.db = db
         self.dbname = db.db
@@ -1511,7 +1513,6 @@ class DB:
         self._attnames = {}
         self._pkeys = {}
         self._privileges = {}
-        self._args = args, kw
         self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
         if db.server_version < 80400:
@@ -1572,9 +1573,15 @@ class DB:
         except AttributeError:
             db = None
         if db:
-            db.set_cast_hook(None)
+            try:
+                db.set_cast_hook(None)
+            except TypeError:
+                pass  # probably already closed
             if self._closeable:
-                db.close()
+                try:
+                    db.close()
+                except InternalError:
+                    pass  # probably already closed
 
     # Auxiliary methods
 
@@ -1629,13 +1636,17 @@ class DB:
     def close(self):
         """Close the database connection."""
         # Wraps shared library function so we can track state.
-        if self._closeable:
-            if self.db:
-                self.db.set_cast_hook(None)
-                self.db.close()
-                self.db = None
-            else:
-                raise _int_error('Connection already closed')
+        db = self.db
+        if db:
+            try:
+                db.set_cast_hook(None)
+            except TypeError:
+                pass  # probably already closed
+            if self._closeable:
+                db.close()
+            self.db = None
+        else:
+            raise _int_error('Connection already closed')
 
     def reset(self):
         """Reset connection with current parameters.
@@ -1658,11 +1669,14 @@ class DB:
         """
         # There is no such shared library function.
         if self._closeable:
-            db = connect(*self._args[0], **self._args[1])
+            db = connect(*self._db_args[0], **self._db_args[1])
             if self.db:
                 self.db.set_cast_hook(None)
                 self.db.close()
+            db.set_cast_hook(self.dbtypes.typecast)
             self.db = db
+        else:
+            self.db = self._db_args
 
     def begin(self, mode=None):
         """Begin a transaction."""
