@@ -4,7 +4,7 @@ ChangeLog
 Version 5.1 (2019-mm-dd)
 ------------------------
 - Support for prepared statements has been added to the classic API.
-- DB wrapper objects based on existing connections can not be closed and
+- DB wrapper objects based on existing connections can now be closed and
   reopened properly (but the underlying connection will not be affected).
 
 Vesion 5.0.7 (2019-mm-dd)

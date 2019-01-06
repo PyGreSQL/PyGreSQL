@@ -247,14 +247,6 @@ begin/commit/rollback/savepoint/release -- transaction handling
 
     This commits the current transaction.
 
-All changes made by the transaction become visible to others.
-=> Don't say this, since it's not true eg. in repeatable_read xtn
-After returning, the changes are guaranteed to be durable, even if a crash occurs.
-=> Don't say this since it's postgres job to document DB behavior,
-kernel and library folks job to do their part, and DBA+sysadmin job to
-implement it on site, not pygres or the developer's job
-(with my developer's hat off and sysadmin hat on).
-
 .. method:: DB.end()
 
     This is the same as the :meth:`DB.commit` method.
