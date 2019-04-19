@@ -491,6 +491,18 @@ parameters properly in case there is ambiguity.
 If you set *inline* to True, the parameters will be sent to the database
 embedded in the SQL command, otherwise they will be sent separately.
 
+If you set *inline* to True or don't pass any parameters, the command string
+can also include multiple SQL commands (separated by semicolons). You will
+only get the return value for the last command in this case.
+
+Note that the adaption and conversion of the parameters causes a certain
+performance overhead. Depending on the type of values, the overhead can be
+smaller for *inline* queries or if you pass the types of the parameters,
+so that they don't need to be guessed from the values. For best performance,
+we recommend using a raw :meth:`DB.query` or :meth:`DB.query_prepared` if you
+are executing many of the same operations with different parameters.
+
+
 Example::
 
     name = input("Name? ")

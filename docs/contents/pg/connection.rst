@@ -62,6 +62,10 @@ the database in such a way that they don't need to be escaped, making this
 an effective way to pass arbitrary or unknown data without worrying about
 SQL injection or syntax errors.
 
+If you don't pass any parameters, the command string can also include
+multiple SQL commands (separated by semicolons). You will only get the
+return value for the last command in this case.
+
 When the database could not process the query, a :exc:`pg.ProgrammingError` or
 a :exc:`pg.InternalError` is raised. You can check the ``SQLSTATE`` error code
 of this error by reading its :attr:`sqlstate` attribute.
