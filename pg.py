@@ -544,10 +544,9 @@ class Adapter:
                 simple = self.get_simple_name(typ)
             else:
                 typ = simple = self.guess_simple_type(value) or 'text'
-            try:
-                value = value.__pg_str__(typ)
-            except AttributeError:
-                pass
+            pg_str = getattr(value, '__pg_str__', None)
+            if pg_str:
+                value = pg_str(typ)
             if simple == 'text':
                 pass
             elif simple == 'record':
@@ -659,11 +658,11 @@ class Adapter:
         if isinstance(value, tuple):
             q = self.adapt_inline
             return '(%s)' % ','.join(str(q(v)) for v in value)
-        try:
-            value = value.__pg_repr__()
-        except AttributeError:
+        pg_repr = getattr(value, '__pg_repr__', None)
+        if not pg_repr:
             raise InterfaceError(
                 'Do not know how to adapt type %s' % type(value))
+        value = pg_repr()
         if isinstance(value, (tuple, list)):
             value = self.adapt_inline(value)
         return value
