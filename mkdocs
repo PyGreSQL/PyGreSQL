@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 MAKE=make
 which gmake && MAKE=gmake

@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/python
 ''' Python DB API 2.0 driver compliance unit test suite.
 
     This software is Public Domain and may be used without restrictions.

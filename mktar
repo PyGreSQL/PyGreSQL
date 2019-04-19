@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 VERSION=5.1
 DISTDIR=/u/WEB/pyg/files

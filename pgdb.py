@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/python
 #
 # pgdb.py
 #
@@ -1822,6 +1822,7 @@ class Literal:
         return self.sql
 
     __pg_repr__ = __str__
+
 
 # If run as script, print some information:
 
