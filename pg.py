@@ -691,17 +691,14 @@ class Adapter:
                 literals = [adapt(value) for value in values]
             else:
                 add = params.add
-                literals = []
-                append = literals.append
                 if types:
                     if (not isinstance(types, (list, tuple)) or
                             len(types) != len(values)):
                         raise TypeError('The values and types do not match')
-                    for value, typ in zip(values, types):
-                        append(add(value, typ))
+                    literals = [add(value, typ)
+                        for value, typ in zip(values, types)]
                 else:
-                    for value in values:
-                        append(add(value))
+                    literals = [add(value) for value in values]
             command %= tuple(literals)
         elif isinstance(values, dict):
             # we want to allow extra keys in the dictionary,
@@ -722,15 +719,14 @@ class Adapter:
                     for key, value in values.items())
             else:
                 add = params.add
-                literals = {}
                 if types:
                     if not isinstance(types, dict):
                         raise TypeError('The values and types do not match')
-                    for key in sorted(values):
-                        literals[key] = add(values[key], types.get(key))
+                    literals = dict((key, add(values[key], types.get(key)))
+                        for key in sorted(values))
                 else:
-                    for key in sorted(values):
-                        literals[key] = add(values[key])
+                    literals = dict((key, add(values[key]))
+                        for key in sorted(values))
             command %= literals
         else:
             raise TypeError('The values must be passed as tuple, list or dict')
