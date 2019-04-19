@@ -582,9 +582,28 @@ class Adapter:
             return typ.attnames
         return {}
 
+    _simple_types = {
+        Bytea: 'bytea',
+        str: 'text',
+        bytes: 'text',
+        bool: 'bool',
+        int: 'int',
+        long: 'int',
+        float: 'float',
+        Decimal: 'num',
+        date: 'date',
+        time: 'date',
+        datetime: 'date',
+        timedelta: 'date'
+    }
+
     @classmethod
     def guess_simple_type(cls, value):
         """Try to guess which database type the given value has."""
+        # optimize for most frequent types
+        simple_type = cls._simple_types.get(type(value))
+        if simple_type:
+            return simple_type
         if isinstance(value, Bytea):
             return 'bytea'
         if isinstance(value, basestring):
@@ -603,11 +622,13 @@ class Adapter:
             return '%s[]' % (cls.guess_simple_base_type(value) or 'text',)
         if isinstance(value, tuple):
             simple_type = cls.simple_type
-            typ = simple_type('record')
             guess = cls.guess_simple_type
+
             def get_attnames(self):
                 return AttrDict((str(n + 1), simple_type(guess(v)))
                     for n, v in enumerate(value))
+
+            typ = simple_type('record')
             typ._get_attnames = get_attnames
             return typ
 
