@@ -582,7 +582,7 @@ class Adapter:
             return typ.attnames
         return {}
 
-    _simple_types = {
+    _frequent_simple_types = {
         Bytea: 'bytea',
         str: 'text',
         bytes: 'text',
@@ -601,7 +601,7 @@ class Adapter:
     def guess_simple_type(cls, value):
         """Try to guess which database type the given value has."""
         # optimize for most frequent types
-        simple_type = cls._simple_types.get(type(value))
+        simple_type = cls._frequent_simple_types.get(type(value))
         if simple_type:
             return simple_type
         if isinstance(value, Bytea):
