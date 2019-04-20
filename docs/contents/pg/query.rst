@@ -26,8 +26,8 @@ More information about this result may be accessed using
 :meth:`Query.listfields`, :meth:`Query.fieldname`
 and :meth:`Query.fieldnum` methods.
 
-Note that since PyGreSQL 5.0 this will return the values of array type
-columns as Python lists.
+Note that since PyGreSQL 5.0 this method will return the values of array
+type columns as Python lists.
 
 dictresult -- get query values as list of dictionaries
 ------------------------------------------------------
@@ -44,8 +44,11 @@ dictresult -- get query values as list of dictionaries
 This method returns query results as a list of dictionaries which have
 the field names as keys.
 
-Note that since PyGreSQL 5.0 this will return the values of array type
-columns as Python lists.
+If the query has duplicate field names, you will get the value for the
+field with the highest index in the query.
+
+Note that since PyGreSQL 5.0 this method will return the values of array
+type columns as Python lists.
 
 namedresult -- get query values as list of named tuples
 -------------------------------------------------------
@@ -67,8 +70,8 @@ Column names in the database that are not valid as field names for
 named tuples (particularly, names starting with an underscore) are
 automatically renamed to valid positional names.
 
-Note that since PyGreSQL 5.0 this will return the values of array type
-columns as Python lists.
+Note that since PyGreSQL 5.0 this method will return the values of array
+type columns as Python lists.
 
 .. versionadded:: 4.1
 
