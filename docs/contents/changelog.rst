@@ -121,13 +121,14 @@ Version 5.0 (2016-03-20)
       and use less memory. Also, overhead for quoting values in the DB wrapper
       methods has been reduced and security has been improved by passing the
       values to libpq separately as parameters instead of inline.
-    - It is now possible to use regular type names instead of the simpler
-      type names that are used by default in PyGreSQL, without breaking any
-      of the mechanisms for quoting and typecasting, which rely on the type
-      information. This is achieved while maintaining simplicity and backward
-      compatibility by augmenting the type name string objects with all the
-      necessary information under the cover. To switch regular type names on
-      or off (this is the default), call the DB wrapper method use_regtypes().
+    - It is now possible to use the registered type names instead of the
+      more coarse-grained type names that are used by default in PyGreSQL,
+      without breaking any of the mechanisms for quoting and typecasting,
+      which rely on the type information. This is achieved while maintaining
+      simplicity and backward compatibility by augmenting the type name string
+      objects with all the necessary information under the cover. To switch
+      registered type names on or off (this is the default), call the DB
+      wrapper method use_regtypes().
     - A new method query_formatted() has been added to the DB wrapper class
       that allows using the format specifications from Python.  A flag "inline"
       can be set to specify whether parameters should be sent to the database
@@ -283,7 +284,7 @@ Version 4.1 (2013-01-01)
 - Connections and cursors can now be used with the "with" statement
   (as suggested by Peter Harris, see #46).
 - New method use_regtypes() that can be called to let getattnames()
-  return regular type names instead of the simplified classic types (#44).
+  return registered type names instead of the simplified classic types (#44).
 
 Version 4.0 (2009-01-01)
 ------------------------

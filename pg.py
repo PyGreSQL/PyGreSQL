@@ -1157,9 +1157,9 @@ class DbType(str):
     The following additional information is provided:
 
         oid: the PostgreSQL type OID
-        pgtype: the PostgreSQL type name
-        regtype: the regular type name
-        simple: the simple PyGreSQL type name
+        pgtype: the internal PostgreSQL data type name
+        regtype: the registered PostgreSQL data type name
+        simple: the more coarse-grained PyGreSQL type name
         typtype: b = base type, c = composite type etc.
         category: A = Array, b = Boolean, C = Composite etc.
         delim: delimiter for array types
@@ -2048,7 +2048,7 @@ class DB:
         the search path has been changed.
 
         By default, only a limited number of simple types will be returned.
-        You can get the regular types after calling use_regtypes(True).
+        You can get the registered types after calling use_regtypes(True).
         """
         attnames = self._attnames
         if flush:
@@ -2069,7 +2069,7 @@ class DB:
         return names
 
     def use_regtypes(self, regtypes=None):
-        """Use regular type names instead of simplified type names."""
+        """Use registered type names instead of simplified type names."""
         if regtypes is None:
             return self.dbtypes._regtypes
         else:

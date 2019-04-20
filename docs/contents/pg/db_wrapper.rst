@@ -134,7 +134,7 @@ the values are the names of the attributes' types) with the column names
 in the proper order if you iterate over it.
 
 By default, only a limited number of simple types will be returned.
-You can get the regular types instead, if enabled by calling the
+You can get the registered types instead, if enabled by calling the
 :meth:`DB.use_regtypes` method.
 
 has_table_privilege -- check table privilege
@@ -913,22 +913,22 @@ the :func:`json.loads` function from the standard library.
 
 .. versionadded:: 5.0
 
-use_regtypes -- determine use of regular type names
----------------------------------------------------
+use_regtypes -- choose usage of registered type names
+-----------------------------------------------------
 
 .. method:: DB.use_regtypes([regtypes])
 
-    Determine whether regular type names shall be used
+    Determine whether registered type names shall be used
 
-    :param bool regtypes: if passed, set whether regular type names shall be used
-    :returns: whether regular type names are used
+    :param bool regtypes: if passed, set whether registered type names shall be used
+    :returns: whether registered type names are used
 
 The :meth:`DB.get_attnames` method can return either simplified "classic"
-type names (the default) or more specific "regular" type names. Which kind
-of type names is used can be changed by calling :meth:`DB.get_regtypes`.
-If you pass a boolean, it sets whether regular type names shall be used.
-The method can also be used to check through its return value whether
-regular type names are currently used.
+type names (the default) or more fine-grained "registered" type names.
+Which kind of type names is used can be changed by calling
+:meth:`DB.get_regtypes`. If you pass a boolean, it sets whether registered
+type names shall be used. The method can also be used to check through its
+return value whether registered type names are currently used.
 
 .. versionadded:: 4.1
 

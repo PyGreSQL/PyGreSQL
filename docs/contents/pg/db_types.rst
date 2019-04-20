@@ -11,15 +11,16 @@ The :class:`DbTypes` object is essentially a dictionary mapping PostgreSQL
 internal type names and type OIDs to PyGreSQL "type names" (which are also
 returned by :meth:`DB.get_attnames` as dictionary values).
 
-These type names are strings which are equal to the simple PyGreSQL name or
-to regular type names if these have been enabled with :meth:`DB.use_regtypes`.
-Besides being strings, they are also carrying additional information about the
-associated PostgreSQL type in the following attributes:
+These type names are strings which are equal to either the simple PyGreSQL
+names or to the more fine-grained registered PostgreSQL type names if these
+have been enabled with :meth:`DB.use_regtypes`. Besides being strings, they
+carry additional information about the associated PostgreSQL type in the
+following attributes:
 
         - *oid* -- the PostgreSQL type OID
-        - *pgtype* -- the PostgreSQL type name
-        - *regtype* -- the regular type name
-        - *simple* -- the simple PyGreSQL type name
+        - *pgtype* -- the internal PostgreSQL data type name
+        - *regtype* -- the registered PostgreSQL data type name
+        - *simple* -- the more coarse-grained PyGreSQL type name
         - *typtype* -- `b` = base type, `c` = composite type etc.
         - *category* -- `A` = Array, `b` =Boolean, `C` = Composite etc.
         - *delim* -- delimiter for array types
