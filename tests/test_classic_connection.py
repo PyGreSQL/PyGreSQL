@@ -18,7 +18,7 @@ import threading
 import time
 import os
 
-from collections import namedtuple
+from collections import namedtuple, Iterable
 from decimal import Decimal
 
 import pg  # the module under test
@@ -549,7 +549,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 3)
 
-    def testNtuples(self):
+    def testNtuples(self):  # deprecated
         q = "select 1 where false"
         r = self.c.query(q).ntuples()
         self.assertIsInstance(r, int)
@@ -564,6 +564,16 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).ntuples()
         self.assertIsInstance(r, int)
         self.assertEqual(r, 6)
+
+    def testLen(self):
+        q = "select 1 where false"
+        self.assertEqual(len(self.c.query(q)), 0)
+        q = ("select 1 as a, 2 as b, 3 as c, 4 as d"
+            " union select 5 as a, 6 as b, 7 as c, 8 as d")
+        self.assertEqual(len(self.c.query(q)), 2)
+        q = ("select 1 union select 2 union select 3"
+            " union select 4 union select 5 union select 6")
+        self.assertEqual(len(self.c.query(q)), 6)
 
     def testQuery(self):
         query = self.c.query
@@ -1098,6 +1108,127 @@ class TestQueryResultTypes(unittest.TestCase):
         self.assert_proper_cast('{}', 'json', dict)
 
 
+class TestQueryIterator(unittest.TestCase):
+    """Test the query operating as an iterator."""
+
+    def setUp(self):
+        self.c = connect()
+
+    def tearDown(self):
+        self.c.close()
+
+    def testLen(self):
+        r = self.c.query("select generate_series(3,7)")
+        self.assertEqual(len(r), 5)
+
+    def testGetItem(self):
+        r = self.c.query("select generate_series(7,9)")
+        self.assertEqual(r[0], (7,))
+        self.assertEqual(r[1], (8,))
+        self.assertEqual(r[2], (9,))
+
+    def testGetItemWithNegativeIndex(self):
+        r = self.c.query("select generate_series(7,9)")
+        self.assertEqual(r[-1], (9,))
+        self.assertEqual(r[-2], (8,))
+        self.assertEqual(r[-3], (7,))
+
+    def testGetItemOutOfRange(self):
+        r = self.c.query("select generate_series(7,9)")
+        self.assertRaises(IndexError, r.__getitem__, 3)
+
+    def testIterate(self):
+        r = self.c.query("select generate_series(3,5)")
+        self.assertNotIsInstance(r, (list, tuple))
+        self.assertIsInstance(r, Iterable)
+        self.assertEqual(list(r), [(3,), (4,), (5,)])
+        self.assertIsInstance(r[1], tuple)
+
+    def testIterateTwice(self):
+        r = self.c.query("select generate_series(3,5)")
+        for i in range(2):
+            self.assertEqual(list(r), [(3,), (4,), (5,)])
+
+    def testIterateTwoColumns(self):
+        r = self.c.query("select 1,2 union select 3,4")
+        self.assertIsInstance(r, Iterable)
+        self.assertEqual(list(r), [(1, 2), (3, 4)])
+
+    def testNext(self):
+        r = self.c.query("select generate_series(7,9)")
+        self.assertEqual(next(r), (7,))
+        self.assertEqual(next(r), (8,))
+        self.assertEqual(next(r), (9,))
+        self.assertRaises(StopIteration, next, r)
+
+    def testContains(self):
+        r = self.c.query("select generate_series(7,9)")
+        self.assertIn((8,), r)
+        self.assertNotIn((5,), r)
+
+    def testNamedIterate(self):
+        r = self.c.query("select generate_series(3,5) as number").namediter()
+        self.assertNotIsInstance(r, (list, tuple))
+        self.assertIsInstance(r, Iterable)
+        r = list(r)
+        self.assertEqual(r, [(3,), (4,), (5,)])
+        self.assertIsInstance(r[1], tuple)
+        self.assertEqual(r[1]._fields, ('number',))
+        self.assertEqual(r[1].number, 4)
+
+    def testNamedIterateTwoColumns(self):
+        r = self.c.query("select 1 as one, 2 as two"
+            " union select 3 as one, 4 as two").namediter()
+        self.assertIsInstance(r, Iterable)
+        r = list(r)
+        self.assertEqual(r, [(1, 2), (3, 4)])
+        self.assertEqual(r[0]._fields, ('one', 'two'))
+        self.assertEqual(r[0].one, 1)
+        self.assertEqual(r[1]._fields, ('one', 'two'))
+        self.assertEqual(r[1].two, 4)
+
+    def testNamedNext(self):
+        r = self.c.query("select generate_series(7,9) as number").namediter()
+        self.assertEqual(next(r), (7,))
+        self.assertEqual(next(r), (8,))
+        n = next(r)
+        self.assertEqual(n._fields, ('number',))
+        self.assertEqual(n.number, 9)
+        self.assertRaises(StopIteration, next, r)
+
+    def testNamedContains(self):
+        r = self.c.query("select generate_series(7,9)").namediter()
+        self.assertIn((8,), r)
+        self.assertNotIn((5,), r)
+
+    def testDictIterate(self):
+        r = self.c.query("select generate_series(3,5) as n").dictiter()
+        self.assertNotIsInstance(r, (list, tuple))
+        self.assertIsInstance(r, Iterable)
+        r = list(r)
+        self.assertEqual(r, [dict(n=3), dict(n=4), dict(n=5)])
+        self.assertIsInstance(r[1], dict)
+
+    def testDictIterateTwoColumns(self):
+        r = self.c.query("select 1 as one, 2 as two"
+            " union select 3 as one, 4 as two").dictiter()
+        self.assertIsInstance(r, Iterable)
+        r = list(r)
+        self.assertEqual(r, [dict(one=1, two=2), dict(one=3, two=4)])
+
+    def testDictNext(self):
+        r = self.c.query("select generate_series(7,9) as n").dictiter()
+        self.assertEqual(next(r), dict(n=7))
+        self.assertEqual(next(r), dict(n=8))
+        self.assertEqual(next(r), dict(n=9))
+        self.assertRaises(StopIteration, next, r)
+
+    def testNamedContains(self):
+        r = self.c.query("select generate_series(7,9) as n").dictiter()
+        self.assertIn(dict(n=8), r)
+        self.assertNotIn(dict(n=5), r)
+
+
 class TestInserttable(unittest.TestCase):
     """Test inserttable method."""
 
@@ -1614,46 +1745,42 @@ class TestConfigFunctions(unittest.TestCase):
         else:
             self.skipTest("cannot set English money locale")
         try:
-            r = query(select_money)
+            query(select_money)
         except pg.DataError:
             # this can happen if the currency signs cannot be
             # converted using the encoding of the test database
             self.skipTest("database does not support English money")
         pg.set_decimal_point(None)
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, str)
         self.assertIn(r, en_money)
-        r = query(select_money)
         pg.set_decimal_point('')
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, str)
         self.assertIn(r, en_money)
-        r = query(select_money)
         pg.set_decimal_point('.')
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
         self.assertEqual(r, proper_money)
-        r = query(select_money)
         pg.set_decimal_point(',')
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
         self.assertEqual(r, bad_money)
-        r = query(select_money)
         pg.set_decimal_point("'")
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
@@ -1670,43 +1797,39 @@ class TestConfigFunctions(unittest.TestCase):
             self.skipTest("cannot set German money locale")
         select_money = select_money.replace('.', ',')
         try:
-            r = query(select_money)
+            query(select_money)
         except pg.DataError:
             self.skipTest("database does not support English money")
         pg.set_decimal_point(None)
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, str)
         self.assertIn(r, de_money)
-        r = query(select_money)
         pg.set_decimal_point('')
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, str)
         self.assertIn(r, de_money)
-        r = query(select_money)
         pg.set_decimal_point(',')
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertIsInstance(r, d)
         self.assertEqual(r, proper_money)
-        r = query(select_money)
         pg.set_decimal_point('.')
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertEqual(r, bad_money)
-        r = query(select_money)
         pg.set_decimal_point("'")
         try:
-            r = r.getresult()[0][0]
+            r = query(select_money).getresult()[0][0]
         finally:
             pg.set_decimal_point(point)
         self.assertEqual(r, bad_money)
@@ -1794,18 +1917,16 @@ class TestConfigFunctions(unittest.TestCase):
         r = r.getresult()[0][0]
         self.assertIsInstance(r, bool)
         self.assertEqual(r, True)
-        r = query("select true::bool")
         pg.set_bool(False)
         try:
-            r = r.getresult()[0][0]
+            r = query("select true::bool").getresult()[0][0]
         finally:
             pg.set_bool(use_bool)
         self.assertIsInstance(r, str)
         self.assertIs(r, 't')
-        r = query("select true::bool")
         pg.set_bool(True)
         try:
-            r = r.getresult()[0][0]
+            r = query("select true::bool").getresult()[0][0]
         finally:
             pg.set_bool(use_bool)
         self.assertIsInstance(r, bool)
@@ -1858,30 +1979,127 @@ class TestConfigFunctions(unittest.TestCase):
         r = r.getresult()[0][0]
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'data')
-        r = query("select 'data'::bytea")
         pg.set_bytea_escaped(True)
         try:
-            r = r.getresult()[0][0]
+            r = query("select 'data'::bytea").getresult()[0][0]
         finally:
             pg.set_bytea_escaped(bytea_escaped)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '\\x64617461')
-        r = query("select 'data'::bytea")
         pg.set_bytea_escaped(False)
         try:
-            r = r.getresult()[0][0]
+            r = query("select 'data'::bytea").getresult()[0][0]
         finally:
             pg.set_bytea_escaped(bytea_escaped)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'data')
 
-    def testGetNamedresult(self):
+    def testGetDictditer(self):
+        dictiter = pg.get_dictiter()
+        # error if a parameter is passed
+        self.assertRaises(TypeError, pg.get_dictiter, dictiter)
+        self.assertIs(dictiter, pg._dictiter)  # the default setting
+
+    def testSetDictiter(self):
+        dictiter = pg.get_dictiter()
+        self.assertTrue(callable(dictiter))
+
+        query = self.c.query
+
+        r = query("select 1 as x, 2 as y").dictiter()
+        self.assertNotIsInstance(r, list)
+        r = next(r)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(x=1, y=2))
+
+        def listiter(q):
+            for row in q:
+                yield list(row)
+
+        pg.set_dictiter(listiter)
+        try:
+            r = pg.get_dictiter()
+            self.assertIs(r, listiter)
+            r = query("select 1 as x, 2 as y").dictiter()
+            self.assertNotIsInstance(r, list)
+            r = next(r)
+            self.assertIsInstance(r, list)
+            self.assertEqual(r, [1, 2])
+            self.assertNotIsInstance(r, dict)
+        finally:
+            pg.set_dictiter(dictiter)
+
+        r = pg.get_dictiter()
+        self.assertIs(r, dictiter)
+
+    def testGetNamediter(self):
+        namediter = pg.get_namediter()
+        # error if a parameter is passed
+        self.assertRaises(TypeError, pg.get_namediter, namediter)
+        self.assertIs(namediter, pg._namediter)  # the default setting
+
+    def testSetNamediter(self):
+        namediter = pg.get_namediter()
+        self.assertTrue(callable(namediter))
+
+        query = self.c.query
+
+        r = query("select 1 as x, 2 as y").namediter()
+        self.assertNotIsInstance(r, list)
+        r = next(r)
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(r, (1, 2))
+        self.assertIsNot(type(r), tuple)
+        self.assertEqual(r._fields, ('x', 'y'))
+        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
+        self.assertEqual(r.__class__.__name__, 'Row')
+        r = query("select 1 as x, 2 as y").namedresult()
+        self.assertIsInstance(r, list)
+        r = r[0]
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(r, (1, 2))
+        self.assertIsNot(type(r), tuple)
+        self.assertEqual(r._fields, ('x', 'y'))
+        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
+        self.assertEqual(r.__class__.__name__, 'Row')
+
+        def listiter(q):
+            for row in q:
+                yield list(row)
+
+        pg.set_namediter(listiter)
+        try:
+            r = pg.get_namediter()
+            self.assertIs(r, listiter)
+            r = query("select 1 as x, 2 as y").namediter()
+            self.assertNotIsInstance(r, list)
+            r = next(r)
+            self.assertIsInstance(r, list)
+            self.assertEqual(r, [1, 2])
+            self.assertIsNot(type(r), tuple)
+            self.assertFalse(hasattr(r, '_fields'))
+            self.assertNotEqual(r.__class__.__name__, 'Row')
+            r = query("select 1 as x, 2 as y").namedresult()
+            self.assertIsInstance(r, list)
+            r = r[0]
+            self.assertIsInstance(r, list)
+            self.assertEqual(r, [1, 2])
+            self.assertIsNot(type(r), tuple)
+            self.assertFalse(hasattr(r, '_fields'))
+            self.assertNotEqual(r.__class__.__name__, 'Row')
+        finally:
+            pg.set_namediter(namediter)
+
+        r = pg.get_namediter()
+        self.assertIs(r, namediter)
+
+    def testGetNamedresult(self):  # deprecated
         namedresult = pg.get_namedresult()
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_namedresult, namedresult)
-        self.assertIs(namedresult, pg._namedresult)  # the default setting
+        self.assertIs(namedresult, pg._namediter)  # the default setting
 
-    def testSetNamedresult(self):
+    def testSetNamedresult(self):  # deprecated
         namedresult = pg.get_namedresult()
         self.assertTrue(callable(namedresult))
 

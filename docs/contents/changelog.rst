@@ -6,6 +6,15 @@ Version 5.1 (2019-mm-dd)
 - Support for prepared statements has been added to the classic API.
 - DB wrapper objects based on existing connections can now be closed and
   reopened properly (but the underlying connection will not be affected).
+- The query objects in the classic API can now be used as iterators
+  and will then yield the rows as tuples, similar to query.getresult().
+  Thanks to Justin Pryzby for the proposal and most of the implementation.
+- Added methods query.dictiter() and query.namediter() to the classic API
+  which work like query.dictresult() and query.namedresult() except that
+  they return iterators instead of lists.
+- Deprecated query.ntuples() in the classic API, since len(query) can now
+  be used and returns the same number.
+- Added pg.get/set_namediter and deprecated pg.get/set_namedresult.
 
 Vesion 5.0.7 (2019-mm-dd)
 -------------------------

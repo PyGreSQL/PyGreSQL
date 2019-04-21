@@ -50,10 +50,15 @@ did not insert exactly one row, or on a table without OIDs, then the number
 of rows affected is returned as a string. If it is a statement that returns
 rows as a result (usually a select statement, but maybe also an
 ``"insert/update ... returning"`` statement), this method returns
-a :class:`Query` that can be accessed via the
-:meth:`Query.getresult`, :meth:`Query.dictresult` or
-:meth:`Query.namedresult` methods or simply printed.
-Otherwise, it returns ``None``.
+a :class:`Query`. Otherwise, it returns ``None``.
+
+You can use the :class:`Query` object as an iterator that yields all results
+as tuples, or call :meth:`Query.getresult` to get the result as a list
+of tuples. Alternatively, you can call :meth:`Query.dictresult` or
+:meth:`Query.dictiter` if you want to get the rows as dictionaries,
+or :meth:`Query.namedresult` or :meth:`Query.namediter` if you want to
+get the rows as named tuples. You can also simply print the :class:`Query`
+object to show the query results on the console.
 
 The SQL command may optionally contain positional parameters of the form
 ``$1``, ``$2``, etc instead of literal data, in which case the values

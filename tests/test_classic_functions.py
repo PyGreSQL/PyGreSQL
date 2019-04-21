@@ -1005,12 +1005,54 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, bytea_escaped)
 
-    def testGetNamedresult(self):
+    def testGetDictiter(self):
+        r = pg.get_dictiter()
+        self.assertTrue(callable(r))
+        self.assertIs(r, pg._dictiter)
+
+    def testSetDictiter(self):
+        dictiter = pg.get_dictiter()
+        try:
+            pg.set_dictiter(None)
+            r = pg.get_dictiter()
+            self.assertIsNone(r)
+            f = lambda q: q
+            pg.set_dictiter(f)
+            r = pg.get_dictiter()
+            self.assertIs(r, f)
+            self.assertRaises(TypeError, pg.set_dictiter, 'invalid')
+        finally:
+            pg.set_dictiter(dictiter)
+        r = pg.get_dictiter()
+        self.assertIs(r, dictiter)
+
+    def testGetNamediter(self):
+        r = pg.get_namediter()
+        self.assertTrue(callable(r))
+        self.assertIs(r, pg._namediter)
+
+    def testSetNamediter(self):
+        namediter = pg.get_namediter()
+        try:
+            pg.set_namediter(None)
+            r = pg.get_namediter()
+            self.assertIsNone(r)
+            f = lambda q: q
+            pg.set_namediter(f)
+            r = pg.get_namediter()
+            self.assertIs(r, f)
+            self.assertRaises(TypeError, pg.set_namediter, 'invalid')
+        finally:
+            pg.set_namediter(namediter)
+        r = pg.get_namediter()
+        self.assertIs(r, namediter)
+
+    def testGetNamedresult(self):  # deprecated
         r = pg.get_namedresult()
         self.assertTrue(callable(r))
-        self.assertIs(r, pg._namedresult)
+        self.assertIs(r, pg._namediter)
 
-    def testSetNamedresult(self):
+    def testSetNamedresult(self):  # deprecated
         namedresult = pg.get_namedresult()
         try:
             pg.set_namedresult(None)

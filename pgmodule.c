@@ -89,7 +89,8 @@ static PyObject *pg_default_passwd;	/* default password */
 #endif	/* DEFAULT_VARS */
 
 static PyObject *decimal = NULL, /* decimal type */
-				*namedresult = NULL, /* function for getting named results */
+				*dictiter = NULL, /* function for getting named results */
+				*namediter = NULL, /* function for getting named results */
 				*jsondecode = NULL; /* function for decoding json strings */
 static const char *date_format = NULL; /* date format that is always assumed */
 static char decimal_point = '.'; /* decimal point used in money values */
@@ -156,7 +157,7 @@ typedef struct
 	int			encoding; 		/* client encoding */
 	int			result_type;	/* result type (DDL/DML/DQL) */
 	long		arraysize;		/* array size for fetch method */
-	int			current_row;	/* current selected row */
+	int			current_row;	/* currently selected row */
 	int			max_row;		/* number of rows in the result */
 	int			num_fields;		/* number of fields in each row */
 }	sourceObject;
@@ -176,6 +177,10 @@ typedef struct
 	connObject *pgcnx;			/* parent connection object */
 	PGresult   *result;			/* result content */
 	int			encoding; 		/* client encoding */
+	int			current_row;	/* currently selected row */
+	int			max_row;		/* number of rows in the result */
+	int			num_fields;		/* number of fields in each row */
+	int		   *col_types;		/* PyGreSQL column types */
 }	queryObject;
 #define is_queryObject(v) (PyType(v) == &queryType)
 
@@ -931,7 +936,7 @@ cast_record(char *s, Py_ssize_t size, int encoding,
 		{
 			char	   *estr;
 			Py_ssize_t	esize;
-			int quoted = 0, escaped =0;
+			int quoted = 0, escaped = 0;
 
 			estr = s;
 			quoted = *s == '"';
@@ -1653,17 +1658,17 @@ check_lo_obj(largeObject *self, int level)
 static largeObject *
 largeNew(connObject *pgcnx, Oid oid)
 {
-	largeObject *npglo;
+	largeObject *large_obj;
 
-	if (!(npglo = PyObject_NEW(largeObject, &largeType)))
+	if (!(large_obj = PyObject_NEW(largeObject, &largeType)))
 		return NULL;
 
 	Py_XINCREF(pgcnx);
-	npglo->pgcnx = pgcnx;
-	npglo->lo_fd = -1;
-	npglo->lo_oid = oid;
+	large_obj->pgcnx = pgcnx;
+	large_obj->lo_fd = -1;
+	large_obj->lo_oid = oid;
 
-	return npglo;
+	return large_obj;
 }
 
 /* destructor */
@@ -2120,24 +2125,24 @@ static char connSource__doc__[] =
 static PyObject *
 connSource(connObject *self, PyObject *noargs)
 {
-	sourceObject *npgobj;
+	sourceObject *source_obj;
 
 	/* checks validity */
 	if (!check_cnx_obj(self))
 		return NULL;
 
 	/* allocates new query object */
-	if (!(npgobj = PyObject_NEW(sourceObject, &sourceType)))
+	if (!(source_obj = PyObject_NEW(sourceObject, &sourceType)))
 		return NULL;
 
 	/* initializes internal parameters */
 	Py_XINCREF(self);
-	npgobj->pgcnx = self;
-	npgobj->result = NULL;
-	npgobj->valid = 1;
-	npgobj->arraysize = PG_ARRAYSIZE;
+	source_obj->pgcnx = self;
+	source_obj->result = NULL;
+	source_obj->valid = 1;
+	source_obj->arraysize = PG_ARRAYSIZE;
 
-	return (PyObject *) npgobj;
+	return (PyObject *) source_obj;
 }
 
 /* database query */
@@ -2146,11 +2151,11 @@ connSource(connObject *self, PyObject *noargs)
 static PyObject *
 _connQuery(connObject *self, PyObject *args, int prepared)
 {
-	PyObject	*query_obj;
+	PyObject	*query_str_obj;
 	PyObject	*param_obj = NULL;
 	char		*query;
 	PGresult	*result;
-	queryObject *npgobj;
+	queryObject *query_obj;
 	int			encoding,
 				status,
 				nparms = 0;
@@ -2162,23 +2167,23 @@ _connQuery(connObject *self, PyObject *args, int prepared)
 	}
 
 	/* get query args */
-	if (!PyArg_ParseTuple(args, "O|O", &query_obj, &param_obj))
+	if (!PyArg_ParseTuple(args, "O|O", &query_str_obj, &param_obj))
 	{
 		return NULL;
 	}
 
 	encoding = PQclientEncoding(self->cnx);
 
-	if (PyBytes_Check(query_obj))
+	if (PyBytes_Check(query_str_obj))
 	{
-		query = PyBytes_AsString(query_obj);
-		query_obj = NULL;
+		query = PyBytes_AsString(query_str_obj);
+		query_str_obj = NULL;
 	}
-	else if (PyUnicode_Check(query_obj))
+	else if (PyUnicode_Check(query_str_obj))
 	{
-		query_obj = get_encoded_string(query_obj, encoding);
-		if (!query_obj) return NULL; /* pass the UnicodeEncodeError */
-		query = PyBytes_AsString(query_obj);
+		query_str_obj = get_encoded_string(query_str_obj, encoding);
+		if (!query_str_obj) return NULL; /* pass the UnicodeEncodeError */
+		query = PyBytes_AsString(query_str_obj);
 	}
 	else
 	{
@@ -2197,7 +2202,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
 			"Method query() expects a sequence as second argument");
 		if (!param_obj)
 		{
-			Py_XDECREF(query_obj);
+			Py_XDECREF(query_str_obj);
 			return NULL;
 		}
 		nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
@@ -2229,7 +2234,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
 		if (!str || !parms)
 		{
 			PyMem_Free((void *)parms); PyMem_Free(str);
-			Py_XDECREF(query_obj); Py_XDECREF(param_obj);
+			Py_XDECREF(query_str_obj); Py_XDECREF(param_obj);
 			return PyErr_NoMemory();
 		}
 
@@ -2256,7 +2261,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
 					PyMem_Free((void *)parms);
 					while (s != str) { s--; Py_DECREF(*s); }
 					PyMem_Free(str);
-					Py_XDECREF(query_obj);
+					Py_XDECREF(query_str_obj);
 					Py_XDECREF(param_obj);
 					/* pass the UnicodeEncodeError */
 					return NULL;
@@ -2272,7 +2277,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
 					PyMem_Free((void *)parms);
 					while (s != str) { s--; Py_DECREF(*s); }
 					PyMem_Free(str);
-					Py_XDECREF(query_obj);
+					Py_XDECREF(query_str_obj);
 					Py_XDECREF(param_obj);
 					PyErr_SetString(PyExc_TypeError,
 						"Query parameter has no string representation");
@@ -2306,7 +2311,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
 	}
 
 	/* we don't need the query and its params any more */
-	Py_XDECREF(query_obj);
+	Py_XDECREF(query_str_obj);
 	Py_XDECREF(param_obj);
 
 	/* checks result validity */
@@ -2368,15 +2373,25 @@ _connQuery(connObject *self, PyObject *args, int prepared)
 		return NULL;			/* error detected on query */
 	}
 
-	if (!(npgobj = PyObject_NEW(queryObject, &queryType)))
+	if (!(query_obj = PyObject_NEW(queryObject, &queryType)))
 		return PyErr_NoMemory();
 
 	/* stores result and returns object */
 	Py_XINCREF(self);
-	npgobj->pgcnx = self;
-	npgobj->result = result;
-	npgobj->encoding = encoding;
-	return (PyObject *) npgobj;
+	query_obj->pgcnx = self;
+	query_obj->result = result;
+	query_obj->encoding = encoding;
+	query_obj->current_row = 0;
+	query_obj->max_row = PQntuples(result);
+	query_obj->num_fields = PQnfields(result);
+	query_obj->col_types = get_col_types(result, query_obj->num_fields);
+	if (!query_obj->col_types) {
+		Py_DECREF(query_obj);
+		Py_DECREF(self);
+		return NULL;
+	}
+
+	return (PyObject *) query_obj;
 }
 
 /* database query */
@@ -2481,13 +2496,18 @@ connDescribePrepared(connObject *self, PyObject *args)
 	Py_END_ALLOW_THREADS
 	if (result && PQresultStatus(result) == PGRES_COMMAND_OK)
 	{
-		queryObject *npgobj = PyObject_NEW(queryObject, &queryType);
-		if (!npgobj)
+		queryObject *query_obj = PyObject_NEW(queryObject, &queryType);
+		if (!query_obj)
 			return PyErr_NoMemory();
 		Py_XINCREF(self);
-		npgobj->pgcnx = self;
-		npgobj->result = result;
-		return (PyObject *) npgobj;
+		query_obj->pgcnx = self;
+		query_obj->result = result;
+		query_obj->encoding = PQclientEncoding(self->cnx);
+		query_obj->current_row = 0;
+		query_obj->max_row = PQntuples(result);
+		query_obj->num_fields = PQnfields(result);
+		query_obj->col_types = get_col_types(result, query_obj->num_fields);
+		return (PyObject *) query_obj;
 	}
 	set_error(ProgrammingError, "Cannot describe prepared statement",
 		self->cnx, result);
@@ -4557,7 +4577,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 			   *pgpasswd;
 	int			pgport;
 	char		port_buffer[20];
-	connObject *npgobj;
+	connObject *conn_obj;
 
 	pghost = pgopt = pgdbname = pguser = pgpasswd = NULL;
 	pgport = -1;
@@ -4593,17 +4613,17 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 		pgpasswd = PyBytes_AsString(pg_default_passwd);
 #endif /* DEFAULT_VARS */
 
-	if (!(npgobj = PyObject_NEW(connObject, &connType)))
+	if (!(conn_obj = PyObject_NEW(connObject, &connType)))
 	{
 		set_error_msg(InternalError, "Can't create new connection object");
 		return NULL;
 	}
 
-	npgobj->valid = 1;
-	npgobj->cnx = NULL;
-	npgobj->date_format = date_format;
-	npgobj->cast_hook = NULL;
-	npgobj->notice_receiver = NULL;
+	conn_obj->valid = 1;
+	conn_obj->cnx = NULL;
+	conn_obj->date_format = date_format;
+	conn_obj->cast_hook = NULL;
+	conn_obj->notice_receiver = NULL;
 
 	if (pgport != -1)
 	{
@@ -4612,24 +4632,26 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 	}
 
 	Py_BEGIN_ALLOW_THREADS
-	npgobj->cnx = PQsetdbLogin(pghost, pgport == -1 ? NULL : port_buffer,
+	conn_obj->cnx = PQsetdbLogin(pghost, pgport == -1 ? NULL : port_buffer,
 		pgopt, NULL, pgdbname, pguser, pgpasswd);
 	Py_END_ALLOW_THREADS
 
-	if (PQstatus(npgobj->cnx) == CONNECTION_BAD)
+	if (PQstatus(conn_obj->cnx) == CONNECTION_BAD)
 	{
-		set_error(InternalError, "Cannot connect", npgobj->cnx, NULL);
-		Py_XDECREF(npgobj);
+		set_error(InternalError, "Cannot connect", conn_obj->cnx, NULL);
+		Py_XDECREF(conn_obj);
 		return NULL;
 	}
 
-	return (PyObject *) npgobj;
+	return (PyObject *) conn_obj;
 }
 
 static void
 queryDealloc(queryObject *self)
 {
 	Py_XDECREF(self->pgcnx);
+	if (self->col_types)
+		PyMem_Free(self->col_types);
 	if (self->result)
 		PQclear(self->result);
 
@@ -4637,48 +4659,46 @@ queryDealloc(queryObject *self)
 }
 
 /* get number of rows */
-static char queryNTuples__doc__[] =
+static char queryNtuples__doc__[] =
 "ntuples() -- return number of tuples returned by query";
 
 static PyObject *
-queryNTuples(queryObject *self, PyObject *noargs)
+queryNtuples(queryObject *self, PyObject *noargs)
 {
-	return PyInt_FromLong((long) PQntuples(self->result));
+	return PyInt_FromLong(self->max_row);
 }
 
 /* list fields names from query result */
-static char queryListFields__doc__[] =
+static char queryListfields__doc__[] =
 "listfields() -- List field names from result";
 
 static PyObject *
-queryListFields(queryObject *self, PyObject *noargs)
+queryListfields(queryObject *self, PyObject *noargs)
 {
-	int			i,
-				n;
+	int			i;
 	char	   *name;
 	PyObject   *fieldstuple,
 			   *str;
 
 	/* builds tuple */
-	n = PQnfields(self->result);
-	fieldstuple = PyTuple_New(n);
-
-	for (i = 0; i < n; ++i)
-	{
-		name = PQfname(self->result, i);
-		str = PyStr_FromString(name);
-		PyTuple_SET_ITEM(fieldstuple, i, str);
+	fieldstuple = PyTuple_New(self->num_fields);
+	if (fieldstuple) {
+		for (i = 0; i < self->num_fields; ++i)
+		{
+			name = PQfname(self->result, i);
+			str = PyStr_FromString(name);
+			PyTuple_SET_ITEM(fieldstuple, i, str);
+		}
 	}
-
 	return fieldstuple;
 }
 
 /* get field name from last result */
-static char queryFieldName__doc__[] =
+static char queryFieldname__doc__[] =
 "fieldname(num) -- return name of field from result from its position";
 
 static PyObject *
-queryFieldName(queryObject *self, PyObject *args)
+queryFieldname(queryObject *self, PyObject *args)
 {
 	int		i;
 	char   *name;
@@ -4692,7 +4712,7 @@ queryFieldName(queryObject *self, PyObject *args)
 	}
 
 	/* checks number validity */
-	if (i >= PQnfields(self->result))
+	if (i >= self->num_fields)
 	{
 		PyErr_SetString(PyExc_ValueError, "Invalid field number");
 		return NULL;
@@ -4704,11 +4724,11 @@ queryFieldName(queryObject *self, PyObject *args)
 }
 
 /* gets fields number from name in last result */
-static char queryFieldNumber__doc__[] =
+static char queryFieldnum__doc__[] =
 "fieldnum(name) -- return position in query for field from its name";
 
 static PyObject *
-queryFieldNumber(queryObject *self, PyObject *args)
+queryFieldnum(queryObject *self, PyObject *args)
 {
 	int		num;
 	char   *name;
@@ -4731,206 +4751,269 @@ queryFieldNumber(queryObject *self, PyObject *args)
 	return PyInt_FromLong(num);
 }
 
-/* retrieves last result */
-static char queryGetResult__doc__[] =
+/* The __iter__() method of the queryObject.
+   This returns the default iterator yielding rows as tuples. */
+static PyObject* queryGetIter(queryObject *self)
+{
+	self->current_row = 0;
+	Py_INCREF(self);
+	return (PyObject*)self;
+}
+
+/* Return the value in the given column of the current row. */
+static PyObject *
+getValueInColumn(queryObject *self, int column)
+{
+	if (PQgetisnull(self->result, self->current_row, column))
+	{
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+
+	/* get the string representation of the value */
+	/* note: this is always null-terminated text format */
+	char   *s = PQgetvalue(self->result, self->current_row, column);
+	/* get the PyGreSQL type of the column */
+	int		type = self->col_types[column];
+	/* cast the string representation into a Python object */
+	if (type & PYGRES_ARRAY)
+		return cast_array(s,
+			PQgetlength(self->result, self->current_row, column),
+			self->encoding, type, NULL, 0);
+	if (type == PYGRES_BYTEA)
+		return cast_bytea_text(s);
+	if (type == PYGRES_OTHER)
+		return cast_other(s,
+			PQgetlength(self->result, self->current_row, column),
+			self->encoding,
+			PQftype(self->result, column), self->pgcnx->cast_hook);
+	if (type & PYGRES_TEXT)
+		return cast_sized_text(s,
+			PQgetlength(self->result, self->current_row, column),
+			self->encoding, type);
+	return cast_unsized_simple(s, type);
+}
+
+/* Return the current row as a tuple. */
+static PyObject *
+queryGetRowAsTuple(queryObject *self)
+{
+	PyObject   *row_tuple = NULL;
+	int			j;
+
+	if (!(row_tuple = PyTuple_New(self->num_fields))) return NULL;
+
+	for (j = 0; j < self->num_fields; ++j)
+	{
+		PyObject *val = getValueInColumn(self, j);
+		if (!val)
+		{
+			Py_DECREF(row_tuple); return NULL;
+		}
+		PyTuple_SET_ITEM(row_tuple, j, val);
+	}
+
+	return row_tuple;
+}
+
+/* The __next__() method of the queryObject.
+   Returns the current current row as a tuple and moves to the next one. */
+static PyObject *
+queryNext(queryObject *self, PyObject *noargs)
+{
+	PyObject   *row_tuple = NULL;
+
+	if (self->current_row >= self->max_row) {
+		PyErr_SetNone(PyExc_StopIteration);
+		return NULL;
+	}
+
+	row_tuple = queryGetRowAsTuple(self);
+	if (row_tuple) ++self->current_row;
+    return row_tuple;
+}
+
+/* Retrieves the last query result as a list of tuples. */
+static char queryGetresult__doc__[] =
 "getresult() -- Get the result of a query\n\n"
 "The result is returned as a list of rows, each one a tuple of fields\n"
 "in the order returned by the server.\n";
 
 static PyObject *
-queryGetResult(queryObject *self, PyObject *noargs)
+queryGetresult(queryObject *self, PyObject *noargs)
 {
-	PyObject   *reslist;
-	int			i, m, n, *col_types;
-	int			encoding = self->encoding;
+	PyObject   *result_list;
+	int			i;
 
-	/* stores result in tuple */
-	m = PQntuples(self->result);
-	n = PQnfields(self->result);
-	if (!(reslist = PyList_New(m))) return NULL;
+	if (!(result_list = PyList_New(self->max_row))) return NULL;
 
-	if (!(col_types = get_col_types(self->result, n))) return NULL;
-
-	for (i = 0; i < m; ++i)
+	for (i = self->current_row = 0; i < self->max_row; ++i)
 	{
-		PyObject   *rowtuple;
-		int			j;
-
-		if (!(rowtuple = PyTuple_New(n)))
+		PyObject   *row_tuple = queryNext(self, noargs);
+		if (!row_tuple)
 		{
-			Py_DECREF(reslist);
-			reslist = NULL;
-			goto exit;
+			Py_DECREF(result_list); return NULL;
 		}
-
-		for (j = 0; j < n; ++j)
-		{
-			PyObject * val;
-
-			if (PQgetisnull(self->result, i, j))
-			{
-				Py_INCREF(Py_None);
-				val = Py_None;
-			}
-			else /* not null */
-			{
-				/* get the string representation of the value */
-				/* note: this is always null-terminated text format */
-				char   *s = PQgetvalue(self->result, i, j);
-				/* get the PyGreSQL type of the column */
-				int		type = col_types[j];
-
-				if (type & PYGRES_ARRAY)
-					val = cast_array(s, PQgetlength(self->result, i, j),
-						encoding, type, NULL, 0);
-				else if (type == PYGRES_BYTEA)
-					val = cast_bytea_text(s);
-				else if (type == PYGRES_OTHER)
-					val = cast_other(s,
-						PQgetlength(self->result, i, j), encoding,
-						PQftype(self->result, j), self->pgcnx->cast_hook);
-				else if (type & PYGRES_TEXT)
-					val = cast_sized_text(s, PQgetlength(self->result, i, j),
-						encoding, type);
-				else
-					val = cast_unsized_simple(s, type);
-			}
-
-			if (!val)
-			{
-				Py_DECREF(reslist);
-				Py_DECREF(rowtuple);
-				reslist = NULL;
-				goto exit;
-			}
-
-			PyTuple_SET_ITEM(rowtuple, j, val);
-		}
-
-		PyList_SET_ITEM(reslist, i, rowtuple);
+		PyList_SET_ITEM(result_list, i, row_tuple);
 	}
 
-exit:
-	PyMem_Free(col_types);
-
-	/* returns list */
-	return reslist;
+	return result_list;
 }
 
-/* retrieves last result as a list of dictionaries*/
-static char queryDictResult__doc__[] =
+/* Return the current row as a dict. */
+static PyObject *
+queryGetRowAsDict(queryObject *self)
+{
+	PyObject   *row_dict = NULL;
+	int			j;
+
+	if (!(row_dict = PyDict_New())) return NULL;
+
+	for (j = 0; j < self->num_fields; ++j)
+	{
+		PyObject *val = getValueInColumn(self, j);
+		if (!val)
+		{
+			Py_DECREF(row_dict); return NULL;
+		}
+		PyDict_SetItemString(row_dict, PQfname(self->result, j), val);
+		Py_DECREF(val);
+	}
+
+	return row_dict;
+}
+
+/* Return the current current row as a dict and move to the next one. */
+static PyObject *
+queryNextDict(queryObject *self, PyObject *noargs)
+{
+	PyObject   *row_dict = NULL;
+
+	if (self->current_row >= self->max_row) {
+		PyErr_SetNone(PyExc_StopIteration);
+		return NULL;
+	}
+
+	row_dict = queryGetRowAsDict(self);
+	if (row_dict) ++self->current_row;
+    return row_dict;
+}
+
+/* Retrieve the last query result as a list of dictionaries. */
+static char queryDictresult__doc__[] =
 "dictresult() -- Get the result of a query\n\n"
 "The result is returned as a list of rows, each one a dictionary with\n"
-"the field names used as the labels.\n";
+"the field names used as the keys.\n";
 
 static PyObject *
-queryDictResult(queryObject *self, PyObject *noargs)
+queryDictresult(queryObject *self, PyObject *noargs)
 {
-	PyObject   *reslist;
-	int			i,
-				m,
-				n,
-			   *col_types;
-	int			encoding = self->encoding;
+	PyObject   *result_list;
+	int			i;
 
-	/* stores result in list */
-	m = PQntuples(self->result);
-	n = PQnfields(self->result);
-	if (!(reslist = PyList_New(m))) return NULL;
+	if (!(result_list = PyList_New(self->max_row))) return NULL;
 
-	if (!(col_types = get_col_types(self->result, n))) return NULL;
-
-	for (i = 0; i < m; ++i)
+	for (i = self->current_row = 0; i < self->max_row; ++i)
 	{
-		PyObject   *dict;
-		int			j;
-
-		if (!(dict = PyDict_New()))
+		PyObject   *row_dict = queryNextDict(self, noargs);
+		if (!row_dict)
 		{
-			Py_DECREF(reslist);
-			reslist = NULL;
-			goto exit;
+			Py_DECREF(result_list); return NULL;
 		}
-
-		for (j = 0; j < n; ++j)
-		{
-			PyObject * val;
-
-			if (PQgetisnull(self->result, i, j))
-			{
-				Py_INCREF(Py_None);
-				val = Py_None;
-			}
-			else /* not null */
-			{
-				/* get the string representation of the value */
-				/* note: this is always null-terminated text format */
-				char   *s = PQgetvalue(self->result, i, j);
-				/* get the PyGreSQL type of the column */
-				int		type = col_types[j];
-
-				if (type & PYGRES_ARRAY)
-					val = cast_array(s, PQgetlength(self->result, i, j),
-						encoding, type, NULL, 0);
-				else if (type == PYGRES_BYTEA)
-					val = cast_bytea_text(s);
-				else if (type == PYGRES_OTHER)
-					val = cast_other(s,
-						PQgetlength(self->result, i, j), encoding,
-						PQftype(self->result, j), self->pgcnx->cast_hook);
-				else if (type & PYGRES_TEXT)
-					val = cast_sized_text(s, PQgetlength(self->result, i, j),
-						encoding, type);
-				else
-					val = cast_unsized_simple(s, type);
-			}
-
-			if (!val)
-			{
-				Py_DECREF(dict);
-				Py_DECREF(reslist);
-				reslist = NULL;
-				goto exit;
-			}
-
-			PyDict_SetItemString(dict, PQfname(self->result, j), val);
-			Py_DECREF(val);
-		}
-
-		PyList_SET_ITEM(reslist, i, dict);
+		PyList_SET_ITEM(result_list, i, row_dict);
 	}
 
-exit:
-	PyMem_Free(col_types);
-
-	/* returns list */
-	return reslist;
+	return result_list;
 }
 
-/* retrieves last result as named tuples */
-static char queryNamedResult__doc__[] =
+/* retrieves last result as iterator of dictionaries */
+static char queryDictiter__doc__[] =
+"dictiter() -- Get the result of a query\n\n"
+"The result is returned as an iterator of rows, each one a a dictionary\n"
+"with the field names used as the keys.\n";
+
+static PyObject *
+queryDictiter(queryObject *self, PyObject *noargs)
+{
+	if (dictiter) {
+		return PyObject_CallFunction(dictiter, "(O)", self);
+	}
+	return queryGetIter(self);
+}
+
+
+/* retrieves last result as list of named tuples */
+static char queryNamedresult__doc__[] =
 "namedresult() -- Get the result of a query\n\n"
-"The result is returned as a list of rows, each one a tuple of fields\n"
+"The result is returned as a list of rows, each one a named tuple of fields\n"
 "in the order returned by the server.\n";
 
 static PyObject *
-queryNamedResult(queryObject *self, PyObject *noargs)
+queryNamedresult(queryObject *self, PyObject *noargs)
 {
-	PyObject   *ret;
+	if (namediter) {
+		PyObject* res = PyObject_CallFunction(namediter, "(O)", self);
+		if (res && PyList_Check(res))
+		 	return res;
+		PyObject *res_list = PySequence_List(res);
+		Py_DECREF(res);
+		return res_list;
+	}
+	return queryGetresult(self, noargs);
+}
 
-	if (namedresult)
-	{
-		ret = PyObject_CallFunction(namedresult, "(O)", self);
+/* retrieves last result as iterator of named tuples */
+static char queryNamediter__doc__[] =
+"namediter() -- Get the result of a query\n\n"
+"The result is returned as an iterator of rows, each one a named tuple\n"
+"of fields in the order returned by the server.\n";
 
-		if (ret == NULL)
-			return NULL;
-		}
-	else
-	{
-		ret = queryGetResult(self, NULL);
+static PyObject *
+queryNamediter(queryObject *self, PyObject *noargs)
+{
+	if (namediter) {
+		PyObject* res = PyObject_CallFunction(namediter, "(O)", self);
+		if (res && !PyList_Check(res))
+			return res;
+		PyObject* res_iter = (Py_TYPE(res)->tp_iter)((PyObject *)self);
+		Py_DECREF(res);
+		return res_iter;
+	}
+	return queryGetIter(self);
+}
+
+/* Return length of a query object. */
+static Py_ssize_t
+queryLen(PyObject *self)
+{
+	PyObject   *tmp;
+	long		len;
+
+	tmp = PyLong_FromLong(((queryObject*)self)->max_row);
+	len = PyLong_AsSsize_t(tmp);
+	Py_DECREF(tmp);
+	return len;
+}
+
+/* Return given item from a query object. */
+static PyObject *
+queryGetItem(PyObject *self, Py_ssize_t i)
+{
+	queryObject	   *q = (queryObject *)self;
+	PyObject	   *tmp;
+	long			row;
+
+	tmp = PyLong_FromSize_t(i);
+ 	row = PyLong_AsLong(tmp);
+	Py_DECREF(tmp);
+
+	if (row < 0 || row >= q->max_row) {
+		PyErr_SetNone(PyExc_IndexError);
+		return NULL;
 	}
 
-	return ret;
+	q->current_row = row;
+	return queryGetRowAsTuple(q);
 }
 
 /* gets notice object attributes */
@@ -5051,54 +5134,72 @@ static PyTypeObject noticeType = {
 
 /* query object methods */
 static struct PyMethodDef queryMethods[] = {
-	{"getresult", (PyCFunction) queryGetResult, METH_NOARGS,
-			queryGetResult__doc__},
-	{"dictresult", (PyCFunction) queryDictResult, METH_NOARGS,
-			queryDictResult__doc__},
-	{"namedresult", (PyCFunction) queryNamedResult, METH_NOARGS,
-			queryNamedResult__doc__},
-	{"fieldname", (PyCFunction) queryFieldName, METH_VARARGS,
-			 queryFieldName__doc__},
-	{"fieldnum", (PyCFunction) queryFieldNumber, METH_VARARGS,
-			queryFieldNumber__doc__},
-	{"listfields", (PyCFunction) queryListFields, METH_NOARGS,
-			queryListFields__doc__},
-	{"ntuples", (PyCFunction) queryNTuples, METH_NOARGS,
-			queryNTuples__doc__},
+	{"getresult", (PyCFunction) queryGetresult, METH_NOARGS,
+			queryGetresult__doc__},
+	{"dictresult", (PyCFunction) queryDictresult, METH_NOARGS,
+			queryDictresult__doc__},
+	{"dictiter", (PyCFunction) queryDictiter, METH_NOARGS,
+			queryDictiter__doc__},
+	{"namedresult", (PyCFunction) queryNamedresult, METH_NOARGS,
+			queryNamedresult__doc__},
+	{"namediter", (PyCFunction) queryNamediter, METH_NOARGS,
+			queryNamediter__doc__},
+	{"fieldname", (PyCFunction) queryFieldname, METH_VARARGS,
+			 queryFieldname__doc__},
+	{"fieldnum", (PyCFunction) queryFieldnum, METH_VARARGS,
+			queryFieldnum__doc__},
+	{"listfields", (PyCFunction) queryListfields, METH_NOARGS,
+			queryListfields__doc__},
+	{"ntuples", (PyCFunction) queryNtuples, METH_NOARGS,
+			queryNtuples__doc__},
 	{NULL, NULL}
 };
+
+/* query sequence protocol methods */
+static PySequenceMethods querySequenceMethods = {
+	(lenfunc) queryLen,				/* sq_length */
+	0,								/* sq_concat */
+	0,								/* sq_repeat */
+	(ssizeargfunc) queryGetItem,	/* sq_item */
+	0,								/* sq_ass_item */
+	0,								/* sq_contains */
+	0,								/* sq_inplace_concat */
+	0,								/* sq_inplace_repeat */
+};
+
 
 /* query type definition */
 static PyTypeObject queryType = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"pg.Query",						/* tp_name */
-	sizeof(queryObject),			/* tp_basicsize */
-	0,								/* tp_itemsize */
+	"pg.Query",					/* tp_name */
+	sizeof(queryObject),		/* tp_basicsize */
+	0,							/* tp_itemsize */
 	/* methods */
-	(destructor) queryDealloc,		/* tp_dealloc */
-	0,								/* tp_print */
-	0,								/* tp_getattr */
-	0,								/* tp_setattr */
-	0,								/* tp_compare */
-	0,								/* tp_repr */
-	0,								/* tp_as_number */
-	0,								/* tp_as_sequence */
-	0,								/* tp_as_mapping */
-	0,								/* tp_hash */
-	0,								/* tp_call */
-	(reprfunc) queryStr,			/* tp_str */
-	PyObject_GenericGetAttr,		/* tp_getattro */
-	0,								/* tp_setattro */
-	0,								/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,				/* tp_flags */
-	0,								/* tp_doc */
-	0,								/* tp_traverse */
-	0,								/* tp_clear */
-	0,								/* tp_richcompare */
-	0,								/* tp_weaklistoffset */
-	0,								/* tp_iter */
-	0,								/* tp_iternext */
-	queryMethods,					/* tp_methods */
+	(destructor) queryDealloc,	/* tp_dealloc */
+	0,							/* tp_print */
+	0,							/* tp_getattr */
+	0,							/* tp_setattr */
+	0,							/* tp_compare */
+	0,							/* tp_repr */
+	0,							/* tp_as_number */
+	&querySequenceMethods,		/* tp_as_sequence */
+	0,							/* tp_as_mapping */
+	0,							/* tp_hash */
+	0,							/* tp_call */
+	(reprfunc) queryStr,		/* tp_str */
+	PyObject_GenericGetAttr,	/* tp_getattro */
+	0,							/* tp_setattro */
+	0,							/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT
+		|Py_TPFLAGS_HAVE_ITER,	/* tp_flags */
+	0,							/* tp_doc */
+	0,							/* tp_traverse */
+	0,							/* tp_clear */
+	0,							/* tp_richcompare */
+	0,							/* tp_weaklistoffset */
+	(getiterfunc)queryGetIter,	/* tp_iter */
+	(iternextfunc)queryNext,	/* tp_iternext */
+	queryMethods,				/* tp_methods */
 };
 
 /* --------------------------------------------------------------------- */
@@ -5497,43 +5598,85 @@ pgSetByteaEscaped(PyObject *self, PyObject *args)
 	return ret;
 }
 
-/* get named result factory */
-static char pgGetNamedresult__doc__[] =
-"get_namedresult() -- get the function used for getting named results";
+/* get dict result factory */
+static char pgGetDictiter__doc__[] =
+"get_dictiter() -- get the generator used for getting dict results";
 
 static PyObject *
-pgGetNamedresult(PyObject *self, PyObject *noargs)
+pgGetDictiter(PyObject *self, PyObject *noargs)
 {
 	PyObject *ret;
 
-	ret = namedresult ? namedresult : Py_None;
+	ret = dictiter ? dictiter : Py_None;
+	Py_INCREF(ret);
+
+	return ret;
+}
+
+/* set dict result factory */
+static char pgSetDictiter__doc__[] =
+"set_dictiter(func) -- set a generator to be used for getting dict results";
+
+static PyObject *
+pgSetDictiter(PyObject *self, PyObject *func)
+{
+	PyObject *ret = NULL;
+
+	if (func == Py_None)
+	{
+		Py_XDECREF(dictiter); dictiter = NULL;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	else if (PyCallable_Check(func))
+	{
+		Py_XINCREF(func); Py_XDECREF(dictiter); dictiter = func;
+		Py_INCREF(Py_None); ret = Py_None;
+	}
+	else
+		PyErr_SetString(PyExc_TypeError,
+			"Function set_dictiter() expects"
+			 " a callable or None as argument");
+
+	return ret;
+}
+
+/* get named result factory */
+static char pgGetNamediter__doc__[] =
+"get_namediter() -- get the generator used for getting named results";
+
+static PyObject *
+pgGetNamediter(PyObject *self, PyObject *noargs)
+{
+	PyObject *ret;
+
+	ret = namediter ? namediter : Py_None;
 	Py_INCREF(ret);
 
 	return ret;
 }
 
 /* set named result factory */
-static char pgSetNamedresult__doc__[] =
-"set_namedresult(func) -- set a function to be used for getting named results";
+static char pgSetNamediter__doc__[] =
+"set_namediter(func) -- set a generator to be used for getting named results";
 
 static PyObject *
-pgSetNamedresult(PyObject *self, PyObject *func)
+pgSetNamediter(PyObject *self, PyObject *func)
 {
 	PyObject *ret = NULL;
 
 	if (func == Py_None)
 	{
-		Py_XDECREF(namedresult); namedresult = NULL;
+		Py_XDECREF(namediter); namediter = NULL;
 		Py_INCREF(Py_None); ret = Py_None;
 	}
 	else if (PyCallable_Check(func))
 	{
-		Py_XINCREF(func); Py_XDECREF(namedresult); namedresult = func;
+		Py_XINCREF(func); Py_XDECREF(namediter); namediter = func;
 		Py_INCREF(Py_None); ret = Py_None;
 	}
 	else
 		PyErr_SetString(PyExc_TypeError,
-			"Function set_namedresult() expects"
+			"Function set_namediter() expects"
 			 " a callable or None as argument");
 
 	return ret;
@@ -6027,10 +6170,19 @@ static struct PyMethodDef pgMethods[] = {
 		pgGetByteaEscaped__doc__},
 	{"set_bytea_escaped", (PyCFunction) pgSetByteaEscaped, METH_VARARGS,
 		pgSetByteaEscaped__doc__},
-	{"get_namedresult", (PyCFunction) pgGetNamedresult, METH_NOARGS,
-			pgGetNamedresult__doc__},
-	{"set_namedresult", (PyCFunction) pgSetNamedresult, METH_O,
-			pgSetNamedresult__doc__},
+	{"get_dictiter", (PyCFunction) pgGetDictiter, METH_NOARGS,
+			pgGetDictiter__doc__},
+	{"set_dictiter", (PyCFunction) pgSetDictiter, METH_O,
+			pgSetDictiter__doc__},
+	{"get_namediter", (PyCFunction) pgGetNamediter, METH_NOARGS,
+			pgGetNamediter__doc__},
+	{"set_namediter", (PyCFunction) pgSetNamediter, METH_O,
+			pgSetNamediter__doc__},
+	/* get/set_namedresult is deprecated, use get/set_namediter */
+	{"get_namedresult", (PyCFunction) pgGetNamediter, METH_NOARGS,
+			pgGetNamediter__doc__},
+	{"set_namedresult", (PyCFunction) pgSetNamediter, METH_O,
+			pgSetNamediter__doc__},
 	{"get_jsondecode", (PyCFunction) pgGetJsondecode, METH_NOARGS,
 			pgGetJsondecode__doc__},
 	{"set_jsondecode", (PyCFunction) pgSetJsondecode, METH_O,

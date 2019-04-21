@@ -1311,10 +1311,18 @@ def set_row_factory_size(maxsize):
     _row_factory = lru_cache(maxsize)(_row_factory.__wrapped__)
 
 
-def _namedresult(q):
-    """Get query result as named tuples."""
+def _dictiter(q):
+    """Get query result as an iterator of dictionaries."""
+    fields = q.listfields()
+    for r in q:
+        yield dict(zip(fields, r))
+
+
+def _namediter(q):
+    """Get query result as an iterator of named tuples."""
     row = _row_factory(q.listfields())
-    return [row(r) for r in q.getresult()]
+    for r in q:
+        yield row(r)
 
 
 class _MemoryQuery:
@@ -1332,6 +1340,9 @@ class _MemoryQuery:
     def getresult(self):
         """Return the stored result of this query."""
         return self.result
+
+    def __iter__(self):
+        return iter(self.result)
 
 
 def _db_error(msg, cls=DatabaseError):
@@ -1353,7 +1364,8 @@ def _prg_error(msg):
 
 # Initialize the C module
 
-set_namedresult(_namedresult)
+set_dictiter(_dictiter)
+set_namediter(_namediter)
 set_decimal(Decimal)
 set_jsondecode(jsondecode)
 

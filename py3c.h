@@ -52,6 +52,10 @@
     PyMODINIT_FUNC PyInit_ ## name(void); \
     PyMODINIT_FUNC PyInit_ ## name(void)
 
+/* Other */
+
+#define Py_TPFLAGS_HAVE_ITER 0 // not needed in Python 3
+
 #else
 
 /***** Python 2 *****/
