@@ -621,6 +621,8 @@ If you set the *scalar* option to *True*, then instead of the named tuples
 you will get the first items of these tuples.  This is useful if the result
 has only one column anyway.
 
+.. versionadded:: 5.0
+
 .. method:: DB.get_as_dict(table, [keyname], [what], [where], [order], [limit], [offset], [scalar])
 
     Get a table as a dictionary
@@ -656,6 +658,8 @@ If the Python version supports it, the dictionary will be an *OrderedDict*
 using the order specified with the *order* parameter or the key column(s)
 if not specified.  You can set *order* to *False* if you don't care about the
 ordering.  In this case the returned dictionary will be an ordinary one.
+
+.. versionadded:: 5.0
 
 escape_literal/identifier/string/bytea -- escape for SQL
 --------------------------------------------------------
