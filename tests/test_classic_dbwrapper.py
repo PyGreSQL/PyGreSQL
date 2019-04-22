@@ -4139,7 +4139,6 @@ class TestDBClassNonStdOpts(TestDBClass):
         cls.set_option('array', not_array)
         not_bytea_escaped = not pg.get_bytea_escaped()
         cls.set_option('bytea_escaped', not_bytea_escaped)
-        cls.set_option('namedresult', None)
         cls.set_option('jsondecode', None)
         db = DB()
         cls.regtypes = not db.use_regtypes()
@@ -4150,7 +4149,6 @@ class TestDBClassNonStdOpts(TestDBClass):
     def tearDownClass(cls):
         super(TestDBClassNonStdOpts, cls).tearDownClass()
         cls.reset_option('jsondecode')
-        cls.reset_option('namedresult')
         cls.reset_option('bool')
         cls.reset_option('array')
         cls.reset_option('bytea_escaped')
@@ -4167,7 +4165,7 @@ class TestDBClassNonStdOpts(TestDBClass):
 
 
 class TestDBClassAdapter(unittest.TestCase):
-    """Test the adapter object associatd with the DB class."""
+    """Test the adapter object associated with the DB class."""
 
     def setUp(self):
         self.db = DB()

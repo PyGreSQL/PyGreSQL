@@ -1311,6 +1311,8 @@ def set_row_factory_size(maxsize):
     _row_factory = lru_cache(maxsize)(_row_factory.__wrapped__)
 
 
+# Helper functions used by the query object
+
 def _dictiter(q):
     """Get query result as an iterator of dictionaries."""
     fields = q.listfields()
@@ -1323,6 +1325,17 @@ def _namediter(q):
     row = _row_factory(q.listfields())
     for r in q:
         yield row(r)
+
+
+def _namednext(q):
+    """Get next row from query result as a named tuple."""
+    return _row_factory(q.listfields())(next(q))
+
+
+def _scalariter(q):
+    """Get query result as an iterator of scalar values."""
+    for r in q:
+        yield r[0]
 
 
 class _MemoryQuery:
@@ -1364,10 +1377,9 @@ def _prg_error(msg):
 
 # Initialize the C module
 
-set_dictiter(_dictiter)
-set_namediter(_namediter)
 set_decimal(Decimal)
 set_jsondecode(jsondecode)
+set_query_helpers(_dictiter, _namediter, _namednext, _scalariter)
 
 
 # The notification handler
@@ -2678,13 +2690,11 @@ class DB:
             rowtuple = True
         rows = map(getrow, res)
         if keytuple or rowtuple:
-            namedresult = get_namedresult()
-            if namedresult:
-                if keytuple:
-                    keys = namedresult(_MemoryQuery(keys, keyname))
-                if rowtuple:
-                    fields = [f for f in fields if f not in keyset]
-                    rows = namedresult(_MemoryQuery(rows, fields))
+            if keytuple:
+                keys = _namediter(_MemoryQuery(keys, keyname))
+            if rowtuple:
+                fields = [f for f in fields if f not in keyset]
+                rows = _namediter(_MemoryQuery(rows, fields))
         return cls(zip(keys, rows))
 
     def notification_handler(self,

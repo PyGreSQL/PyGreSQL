@@ -308,49 +308,6 @@ return unescaped byte strings, you normally don't have to use this method.
 Note that there is also a :class:`DB` method with the same name
 which does exactly the same.
 
-get/set_namediter -- conversion to named tuples
------------------------------------------------
-
-.. function:: get_namediter()
-
-    Get the generator that converts to named tuples
-
-This returns the function used by PyGreSQL to construct the result of the
-:meth:`Query.namediter` and :meth:`Query.namedresult` methods.
-
-.. versionadded:: 5.1
-
-.. function:: set_namediter(func)
-
-    Set a generator that will convert to named tuples
-
-    :param func: the generator to be used to convert results to named tuples
-
-You can use this if you want to create different kinds of named tuples
-returned by the :meth:`Query.namediter` and :meth:`Query.namedresult` methods.
-If you set this function to *None*, then normal tuples will be used.
-
-.. versionadded:: 5.1
-
-get/set_namedresult -- conversion to named tuples
--------------------------------------------------
-
-.. function:: get_namedresult()
-
-    Get the generator that converts to named tuples
-
-.. deprecated:: 5.1
-   Use :func:`get_namediter` instead.
-
-.. function:: set_namedresult(func)
-
-    Set a generator that will convert to named tuples
-
-    :param func: the generator to be used to convert results to named tuples
-
-.. deprecated:: 5.1
-   Use :func:`set_namediter` instead.
-
 get/set_decimal -- decimal type to be used for numeric values
 -------------------------------------------------------------
 

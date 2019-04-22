@@ -91,6 +91,8 @@ static PyObject *pg_default_passwd;	/* default password */
 static PyObject *decimal = NULL, /* decimal type */
 				*dictiter = NULL, /* function for getting named results */
 				*namediter = NULL, /* function for getting named results */
+				*namednext = NULL, /* function for getting one named result */
+				*scalariter = NULL, /* function for getting scalar results */
 				*jsondecode = NULL; /* function for decoding json strings */
 static const char *date_format = NULL; /* date format that is always assumed */
 static char decimal_point = '.'; /* decimal point used in money values */
@@ -4830,7 +4832,52 @@ queryNext(queryObject *self, PyObject *noargs)
 
 	row_tuple = queryGetRowAsTuple(self);
 	if (row_tuple) ++self->current_row;
-    return row_tuple;
+	return row_tuple;
+}
+
+/* Retrieves one row from the result as a tuple. */
+static char queryOne__doc__[] =
+"one() -- Get one row from the result of a query\n\n"
+"Only one row from the result is returned as a tuple of fields.\n"
+"This method can be called multiple times to return more rows.\n"
+"It returns None if the result does not contain one more row.\n";
+
+static PyObject *
+queryOne(queryObject *self, PyObject *noargs)
+{
+	PyObject *row_tuple;
+
+	if (self->current_row >= self->max_row) {
+		Py_INCREF(Py_None); return Py_None;
+	}
+
+	row_tuple = queryGetRowAsTuple(self);
+	if (row_tuple) ++self->current_row;
+	return row_tuple;
+}
+
+/* Retrieves the single row from the result as a tuple. */
+static char querySingle__doc__[] =
+"single() -- Get the result of a query as single row\n\n"
+"The single row from the query result is returned as a tuple of fields.\n"
+"This method returns the same single row when called multiple times.\n"
+"It raises a ProgrammingError if the result does not have exactly one row.\n";
+
+static PyObject *
+querySingle(queryObject *self, PyObject *noargs)
+{
+	PyObject *row_tuple;
+
+	if (self->max_row != 1) {
+		set_error_msg(ProgrammingError,
+			self->max_row ? "Multiple results found" : "No result found");
+		return NULL;
+	}
+
+	self->current_row = 0;
+	row_tuple = queryGetRowAsTuple(self);
+	if (row_tuple) ++self->current_row;
+	return row_tuple;
 }
 
 /* Retrieves the last query result as a list of tuples. */
@@ -4899,6 +4946,53 @@ queryNextDict(queryObject *self, PyObject *noargs)
     return row_dict;
 }
 
+/* Retrieve one row from the result as a dictionary. */
+static char queryOnedict__doc__[] =
+"onedict() -- Get one row from the result of a query\n\n"
+"Only one row from the result is returned as a dictionary with\n"
+"the field names used as the keys.\n"
+"This method can be called multiple times to return more rows.\n"
+"It returns None if the result does not contain one more row.\n";
+
+static PyObject *
+queryOnedict(queryObject *self, PyObject *noargs)
+{
+	PyObject *row_dict;
+
+	if (self->current_row >= self->max_row) {
+		Py_INCREF(Py_None); return Py_None;
+	}
+
+	row_dict = queryGetRowAsDict(self);
+	if (row_dict) ++self->current_row;
+	return row_dict;
+}
+
+/* Retrieve the single row from the result as a dictionary. */
+static char querySingledict__doc__[] =
+"singledict() -- Get the result of a query as single row\n\n"
+"The single row from the query result is returned as a dictionary with\n"
+"the field names used as the keys.\n"
+"This method returns the same single row when called multiple times.\n"
+"It raises a ProgrammingError if the result does not have exactly one row.\n";
+
+static PyObject *
+querySingledict(queryObject *self, PyObject *noargs)
+{
+	PyObject *row_dict;
+
+	if (self->max_row != 1) {
+		set_error_msg(ProgrammingError,
+			self->max_row ? "Multiple results found" : "No result found");
+		return NULL;
+	}
+
+	self->current_row = 0;
+	row_dict = queryGetRowAsDict(self);
+	if (row_dict) ++self->current_row;
+	return row_dict;
+}
+
 /* Retrieve the last query result as a list of dictionaries. */
 static char queryDictresult__doc__[] =
 "dictresult() -- Get the result of a query\n\n"
@@ -4926,7 +5020,7 @@ queryDictresult(queryObject *self, PyObject *noargs)
 	return result_list;
 }
 
-/* retrieves last result as iterator of dictionaries */
+/* Retrieve last result as iterator of dictionaries. */
 static char queryDictiter__doc__[] =
 "dictiter() -- Get the result of a query\n\n"
 "The result is returned as an iterator of rows, each one a a dictionary\n"
@@ -4935,14 +5029,56 @@ static char queryDictiter__doc__[] =
 static PyObject *
 queryDictiter(queryObject *self, PyObject *noargs)
 {
-	if (dictiter) {
-		return PyObject_CallFunction(dictiter, "(O)", self);
-	}
-	return queryGetIter(self);
+	if (!dictiter)
+		return queryDictresult(self, noargs);
+
+	return PyObject_CallFunction(dictiter, "(O)", self);
 }
 
+/* Retrieve one row from the result as a named tuple. */
+static char queryOnenamed__doc__[] =
+"onenamed() -- Get one row from the result of a query\n\n"
+"Only one row from the result is returned as a named tuple of fields.\n"
+"This method can be called multiple times to return more rows.\n"
+"It returns None if the result does not contain one more row.\n";
 
-/* retrieves last result as list of named tuples */
+static PyObject *
+queryOnenamed(queryObject *self, PyObject *noargs)
+{
+	if (!namednext)
+		return queryOne(self, noargs);
+
+	if (self->current_row >= self->max_row) {
+		Py_INCREF(Py_None); return Py_None;
+	}
+
+	return PyObject_CallFunction(namednext, "(O)", self);
+}
+
+/* Retrieve the single row from the result as a tuple. */
+static char querySinglenamed__doc__[] =
+"singlenamed() -- Get the result of a query as single row\n\n"
+"The single row from the query result is returned as a named tuple of fields.\n"
+"This method returns the same single row when called multiple times.\n"
+"It raises a ProgrammingError if the result does not have exactly one row.\n";
+
+static PyObject *
+querySinglenamed(queryObject *self, PyObject *noargs)
+{
+	if (!namednext)
+		return querySingle(self, noargs);
+
+	if (self->max_row != 1) {
+		set_error_msg(ProgrammingError,
+			self->max_row ? "Multiple results found" : "No result found");
+		return NULL;
+	}
+
+	self->current_row = 0;
+	return PyObject_CallFunction(namednext, "(O)", self);
+}
+
+/* Retrieve last result as list of named tuples. */
 static char queryNamedresult__doc__[] =
 "namedresult() -- Get the result of a query\n\n"
 "The result is returned as a list of rows, each one a named tuple of fields\n"
@@ -4951,18 +5087,20 @@ static char queryNamedresult__doc__[] =
 static PyObject *
 queryNamedresult(queryObject *self, PyObject *noargs)
 {
-	if (namediter) {
-		PyObject* res = PyObject_CallFunction(namediter, "(O)", self);
-		if (res && PyList_Check(res))
-		 	return res;
-		PyObject *res_list = PySequence_List(res);
-		Py_DECREF(res);
-		return res_list;
-	}
-	return queryGetresult(self, noargs);
+	PyObject   *res, *res_list;
+
+	if (!namediter)
+	 	return queryGetresult(self, noargs);
+
+	res = PyObject_CallFunction(namediter, "(O)", self);
+	if (!res) return NULL;
+	if (PyList_Check(res)) return res;
+	res_list = PySequence_List(res);
+	Py_DECREF(res);
+	return res_list;
 }
 
-/* retrieves last result as iterator of named tuples */
+/* Retrieve last result as iterator of named tuples. */
 static char queryNamediter__doc__[] =
 "namediter() -- Get the result of a query\n\n"
 "The result is returned as an iterator of rows, each one a named tuple\n"
@@ -4971,15 +5109,124 @@ static char queryNamediter__doc__[] =
 static PyObject *
 queryNamediter(queryObject *self, PyObject *noargs)
 {
-	if (namediter) {
-		PyObject* res = PyObject_CallFunction(namediter, "(O)", self);
-		if (res && !PyList_Check(res))
-			return res;
-		PyObject* res_iter = (Py_TYPE(res)->tp_iter)((PyObject *)self);
-		Py_DECREF(res);
-		return res_iter;
+	PyObject   *res, *res_iter;
+
+	if (!namediter)
+		return queryGetIter(self);
+
+	res = PyObject_CallFunction(namediter, "(O)", self);
+	if (!res) return NULL;
+	if (!PyList_Check(res)) return res;
+	res_iter = (Py_TYPE(res)->tp_iter)((PyObject *)self);
+	Py_DECREF(res);
+	return res_iter;
+}
+
+/* Retrieve the last query result as a list of scalar values. */
+static char queryScalarresult__doc__[] =
+"scalarresult() -- Get query result as scalars\n\n"
+"The result is returned as a list of scalar values where the values\n"
+"are the first fields of the rows in the order returned by the server.\n";
+
+static PyObject *
+queryScalarresult(queryObject *self, PyObject *noargs)
+{
+	PyObject   *result_list;
+
+	if (!self->num_fields) {
+		set_error_msg(ProgrammingError, "No fields in result");
+		return NULL;
 	}
-	return queryGetIter(self);
+
+	if (!(result_list = PyList_New(self->max_row))) return NULL;
+
+	for (self->current_row = 0; self->current_row < self->max_row;
+		++self->current_row)
+	{
+		PyObject   *value = getValueInColumn(self, 0);
+		if (!value)
+		{
+			Py_DECREF(result_list); return NULL;
+		}
+		PyList_SET_ITEM(result_list, self->current_row, value);
+	}
+
+	return result_list;
+}
+
+/* Retrieve the last query result as iterator of scalar values. */
+static char queryScalariter__doc__[] =
+"scalariter() -- Get query result as scalars\n\n"
+"The result is returned as an iterator of scalar values where the values\n"
+"are the first fields of the rows in the order returned by the server.\n";
+
+static PyObject *
+queryScalariter(queryObject *self, PyObject *noargs)
+{
+	if (!scalariter)
+		return queryScalarresult(self, noargs);
+
+	if (!self->num_fields) {
+		set_error_msg(ProgrammingError, "No fields in result");
+		return NULL;
+	}
+
+	return PyObject_CallFunction(scalariter, "(O)", self);
+}
+
+/* Retrieve one result as scalar value. */
+static char queryOnescalar__doc__[] =
+"onescalar() -- Get one scalar value from the result of a query\n\n"
+"Returns the first field of the next row from the result as a scalar value.\n"
+"This method can be called multiple times to return more rows as scalars.\n"
+"It returns None if the result does not contain one more row.\n";
+
+static PyObject *
+queryOnescalar(queryObject *self, PyObject *noargs)
+{
+	PyObject *value;
+
+	if (!self->num_fields) {
+		set_error_msg(ProgrammingError, "No fields in result");
+		return NULL;
+	}
+
+	if (self->current_row >= self->max_row) {
+		Py_INCREF(Py_None); return Py_None;
+	}
+
+	value = getValueInColumn(self, 0);
+	if (value) ++self->current_row;
+	return value;
+}
+
+/* Retrieves the single row from the result as a tuple. */
+static char querySinglescalar__doc__[] =
+"singlescalar() -- Get scalar value from single result of a query\n\n"
+"Returns the first field of the next row from the result as a scalar value.\n"
+"This method returns the same single row when called multiple times.\n"
+"It raises a ProgrammingError if the result does not have exactly one row.\n";
+
+static PyObject *
+querySinglescalar(queryObject *self, PyObject *noargs)
+{
+	PyObject *value;
+
+	if (!self->num_fields) {
+		set_error_msg(ProgrammingError, "No fields in result");
+		return NULL;
+	}
+
+	if (self->max_row != 1) {
+		set_error_msg(ProgrammingError,
+			self->max_row ? "Multiple results found" : "No result found");
+		return NULL;
+	}
+
+	self->current_row = 0;
+	value = getValueInColumn(self, 0);
+	if (value) ++self->current_row;
+	return value;
 }
 
 /* Return length of a query object. */
@@ -5144,6 +5391,24 @@ static struct PyMethodDef queryMethods[] = {
 			queryNamedresult__doc__},
 	{"namediter", (PyCFunction) queryNamediter, METH_NOARGS,
 			queryNamediter__doc__},
+	{"one", (PyCFunction) queryOne, METH_NOARGS, queryOne__doc__},
+	{"single", (PyCFunction) querySingle, METH_NOARGS, querySingle__doc__},
+	{"onedict", (PyCFunction) queryOnedict, METH_NOARGS,
+		queryOnedict__doc__},
+	{"singledict", (PyCFunction) querySingledict, METH_NOARGS,
+		querySingledict__doc__},
+	{"onenamed", (PyCFunction) queryOnenamed, METH_NOARGS,
+		queryOnenamed__doc__},
+	{"singlenamed", (PyCFunction) querySinglenamed, METH_NOARGS,
+		querySinglenamed__doc__},
+	{"scalarresult", (PyCFunction) queryScalarresult, METH_NOARGS,
+			queryScalarresult__doc__},
+	{"scalariter", (PyCFunction) queryScalariter, METH_NOARGS,
+			queryScalariter__doc__},
+	{"onescalar", (PyCFunction) queryOnescalar, METH_NOARGS,
+			queryOnescalar__doc__},
+	{"singlescalar", (PyCFunction) querySinglescalar, METH_NOARGS,
+			querySinglescalar__doc__},
 	{"fieldname", (PyCFunction) queryFieldname, METH_VARARGS,
 			 queryFieldname__doc__},
 	{"fieldnum", (PyCFunction) queryFieldnum, METH_VARARGS,
@@ -5598,88 +5863,23 @@ pgSetByteaEscaped(PyObject *self, PyObject *args)
 	return ret;
 }
 
-/* get dict result factory */
-static char pgGetDictiter__doc__[] =
-"get_dictiter() -- get the generator used for getting dict results";
+/* set query helper functions */
+
+static char pgSetQueryHelpers__doc__[] =
+"set_query_helpers(*helpers) -- set internal query helper functions";
 
 static PyObject *
-pgGetDictiter(PyObject *self, PyObject *noargs)
+pgSetQueryHelpers(PyObject *self, PyObject *args)
 {
-	PyObject *ret;
+	/* gets arguments */
+	if (!PyArg_ParseTuple(args, "O!O!O!O!",
+		&PyFunction_Type, &dictiter,
+		&PyFunction_Type, &namediter,
+		&PyFunction_Type, &namednext,
+		&PyFunction_Type, &scalariter)) return NULL;
 
-	ret = dictiter ? dictiter : Py_None;
-	Py_INCREF(ret);
-
-	return ret;
-}
-
-/* set dict result factory */
-static char pgSetDictiter__doc__[] =
-"set_dictiter(func) -- set a generator to be used for getting dict results";
-
-static PyObject *
-pgSetDictiter(PyObject *self, PyObject *func)
-{
-	PyObject *ret = NULL;
-
-	if (func == Py_None)
-	{
-		Py_XDECREF(dictiter); dictiter = NULL;
-		Py_INCREF(Py_None); ret = Py_None;
-	}
-	else if (PyCallable_Check(func))
-	{
-		Py_XINCREF(func); Py_XDECREF(dictiter); dictiter = func;
-		Py_INCREF(Py_None); ret = Py_None;
-	}
-	else
-		PyErr_SetString(PyExc_TypeError,
-			"Function set_dictiter() expects"
-			 " a callable or None as argument");
-
-	return ret;
-}
-
-/* get named result factory */
-static char pgGetNamediter__doc__[] =
-"get_namediter() -- get the generator used for getting named results";
-
-static PyObject *
-pgGetNamediter(PyObject *self, PyObject *noargs)
-{
-	PyObject *ret;
-
-	ret = namediter ? namediter : Py_None;
-	Py_INCREF(ret);
-
-	return ret;
-}
-
-/* set named result factory */
-static char pgSetNamediter__doc__[] =
-"set_namediter(func) -- set a generator to be used for getting named results";
-
-static PyObject *
-pgSetNamediter(PyObject *self, PyObject *func)
-{
-	PyObject *ret = NULL;
-
-	if (func == Py_None)
-	{
-		Py_XDECREF(namediter); namediter = NULL;
-		Py_INCREF(Py_None); ret = Py_None;
-	}
-	else if (PyCallable_Check(func))
-	{
-		Py_XINCREF(func); Py_XDECREF(namediter); namediter = func;
-		Py_INCREF(Py_None); ret = Py_None;
-	}
-	else
-		PyErr_SetString(PyExc_TypeError,
-			"Function set_namediter() expects"
-			 " a callable or None as argument");
-
-	return ret;
+	Py_INCREF(Py_None);
+	return Py_None;
 }
 
 /* get json decode function */
@@ -6166,23 +6366,12 @@ static struct PyMethodDef pgMethods[] = {
 	{"set_bool", (PyCFunction) pgSetBool, METH_VARARGS, pgSetBool__doc__},
 	{"get_array", (PyCFunction) pgGetArray, METH_NOARGS, pgGetArray__doc__},
 	{"set_array", (PyCFunction) pgSetArray, METH_VARARGS, pgSetArray__doc__},
+	{"set_query_helpers", (PyCFunction) pgSetQueryHelpers, METH_VARARGS,
+			pgSetQueryHelpers__doc__},
 	{"get_bytea_escaped", (PyCFunction) pgGetByteaEscaped, METH_NOARGS,
 		pgGetByteaEscaped__doc__},
 	{"set_bytea_escaped", (PyCFunction) pgSetByteaEscaped, METH_VARARGS,
 		pgSetByteaEscaped__doc__},
-	{"get_dictiter", (PyCFunction) pgGetDictiter, METH_NOARGS,
-			pgGetDictiter__doc__},
-	{"set_dictiter", (PyCFunction) pgSetDictiter, METH_O,
-			pgSetDictiter__doc__},
-	{"get_namediter", (PyCFunction) pgGetNamediter, METH_NOARGS,
-			pgGetNamediter__doc__},
-	{"set_namediter", (PyCFunction) pgSetNamediter, METH_O,
-			pgSetNamediter__doc__},
-	/* get/set_namedresult is deprecated, use get/set_namediter */
-	{"get_namedresult", (PyCFunction) pgGetNamediter, METH_NOARGS,
-			pgGetNamediter__doc__},
-	{"set_namedresult", (PyCFunction) pgSetNamediter, METH_O,
-			pgSetNamediter__doc__},
 	{"get_jsondecode", (PyCFunction) pgGetJsondecode, METH_NOARGS,
 			pgGetJsondecode__doc__},
 	{"set_jsondecode", (PyCFunction) pgSetJsondecode, METH_O,

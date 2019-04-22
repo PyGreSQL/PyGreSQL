@@ -107,9 +107,11 @@ You can also return the rows as named tuples::
     'durian'
 
 In PyGreSQL 5.1 and newer, you can also use the :class:`Query` instance
-directly as an iterator that yields the rows as tuples, and you can use
-the methods :meth:`Query.dictiter` or :meth:`Query.namediter` to get
-iterators yielding the rows as dictionaries or named tuples.
+directly as an iterable that yields the rows as tuples, and there are also
+methods that return iterables for rows as dictionaries, named tuples or
+scalar values. Other methods like :meth:`Query.one` or :meth:`Query.onescalar`
+return only one row or only the first field of that row. You can get the
+number of rows with the :func:`len` function.
 
 Using the method :meth:`DB.get_as_dict`, you can easily import the whole table
 into a Python dictionary mapping the primary key *id* to the *name*::

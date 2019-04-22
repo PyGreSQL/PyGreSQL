@@ -1166,6 +1166,33 @@ class TestQueryIterator(unittest.TestCase):
         self.assertIn((8,), r)
         self.assertNotIn((5,), r)
 
+    def testDictIterate(self):
+        r = self.c.query("select generate_series(3,5) as n").dictiter()
+        self.assertNotIsInstance(r, (list, tuple))
+        self.assertIsInstance(r, Iterable)
+        r = list(r)
+        self.assertEqual(r, [dict(n=3), dict(n=4), dict(n=5)])
+        self.assertIsInstance(r[1], dict)
+
+    def testDictIterateTwoColumns(self):
+        r = self.c.query("select 1 as one, 2 as two"
+            " union select 3 as one, 4 as two").dictiter()
+        self.assertIsInstance(r, Iterable)
+        r = list(r)
+        self.assertEqual(r, [dict(one=1, two=2), dict(one=3, two=4)])
+
+    def testDictNext(self):
+        r = self.c.query("select generate_series(7,9) as n").dictiter()
+        self.assertEqual(next(r), dict(n=7))
+        self.assertEqual(next(r), dict(n=8))
+        self.assertEqual(next(r), dict(n=9))
+        self.assertRaises(StopIteration, next, r)
+
+    def testDictContains(self):
+        r = self.c.query("select generate_series(7,9) as n").dictiter()
+        self.assertIn(dict(n=8), r)
+        self.assertNotIn(dict(n=5), r)
+
     def testNamedIterate(self):
         r = self.c.query("select generate_series(3,5) as number").namediter()
         self.assertNotIsInstance(r, (list, tuple))
@@ -1201,32 +1228,255 @@ class TestQueryIterator(unittest.TestCase):
         self.assertIn((8,), r)
         self.assertNotIn((5,), r)
 
-    def testDictIterate(self):
-        r = self.c.query("select generate_series(3,5) as n").dictiter()
+    def testScalarIterate(self):
+        r = self.c.query("select generate_series(3,5)").scalariter()
         self.assertNotIsInstance(r, (list, tuple))
         self.assertIsInstance(r, Iterable)
         r = list(r)
-        self.assertEqual(r, [dict(n=3), dict(n=4), dict(n=5)])
-        self.assertIsInstance(r[1], dict)
+        self.assertEqual(r, [3, 4, 5])
+        self.assertIsInstance(r[1], int)
 
-    def testDictIterateTwoColumns(self):
-        r = self.c.query("select 1 as one, 2 as two"
-            " union select 3 as one, 4 as two").dictiter()
+    def testScalarIterateTwoColumns(self):
+        r = self.c.query("select 1, 2 union select 3, 4").scalariter()
         self.assertIsInstance(r, Iterable)
         r = list(r)
-        self.assertEqual(r, [dict(one=1, two=2), dict(one=3, two=4)])
+        self.assertEqual(r, [1, 3])
 
-    def testDictNext(self):
-        r = self.c.query("select generate_series(7,9) as n").dictiter()
-        self.assertEqual(next(r), dict(n=7))
-        self.assertEqual(next(r), dict(n=8))
-        self.assertEqual(next(r), dict(n=9))
+    def testScalarNext(self):
+        r = self.c.query("select generate_series(7,9)").scalariter()
+        self.assertEqual(next(r), 7)
+        self.assertEqual(next(r), 8)
+        self.assertEqual(next(r), 9)
         self.assertRaises(StopIteration, next, r)
 
-    def testNamedContains(self):
-        r = self.c.query("select generate_series(7,9) as n").dictiter()
-        self.assertIn(dict(n=8), r)
-        self.assertNotIn(dict(n=5), r)
+    def testScalarContains(self):
+        r = self.c.query("select generate_series(7,9)").scalariter()
+        self.assertIn(8, r)
+        self.assertNotIn(5, r)
+
+
+class TestQueryOneSingleScalar(unittest.TestCase):
+    """Test the query methods for getting single rows and columns."""
+
+    def setUp(self):
+        self.c = connect()
+
+    def tearDown(self):
+        self.c.close()
+
+    def testOneWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        self.assertIsNone(q.one())
+
+    def testOneWithSingleRow(self):
+        q = self.c.query("select 1, 2")
+        r = q.one()
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(r, (1, 2))
+        self.assertEqual(q.one(), None)
+
+    def testOneWithTwoRows(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        self.assertEqual(q.one(), (1, 2))
+        self.assertEqual(q.one(), (3, 4))
+        self.assertEqual(q.one(), None)
+
+    def testOneDictWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        self.assertIsNone(q.onedict())
+
+    def testOneDictWithSingleRow(self):
+        q = self.c.query("select 1 as one, 2 as two")
+        r = q.onedict()
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(one=1, two=2))
+        self.assertEqual(q.onedict(), None)
+
+    def testOneDictWithTwoRows(self):
+        q = self.c.query(
+            "select 1 as one, 2 as two union select 3 as one, 4 as two")
+        self.assertEqual(q.onedict(), dict(one=1, two=2))
+        self.assertEqual(q.onedict(), dict(one=3, two=4))
+        self.assertEqual(q.onedict(), None)
+
+    def testOneNamedWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        self.assertIsNone(q.onenamed())
+
+    def testOneNamedWithSingleRow(self):
+        q = self.c.query("select 1 as one, 2 as two")
+        r = q.onenamed()
+        self.assertEqual(r._fields, ('one', 'two'))
+        self.assertEqual(r.one, 1)
+        self.assertEqual(r.two, 2)
+        self.assertEqual(r, (1, 2))
+        self.assertEqual(q.onenamed(), None)
+
+    def testOneNamedWithTwoRows(self):
+        q = self.c.query(
+            "select 1 as one, 2 as two union select 3 as one, 4 as two")
+        r = q.onenamed()
+        self.assertEqual(r._fields, ('one', 'two'))
+        self.assertEqual(r.one, 1)
+        self.assertEqual(r.two, 2)
+        self.assertEqual(r, (1, 2))
+        r = q.onenamed()
+        self.assertEqual(r._fields, ('one', 'two'))
+        self.assertEqual(r.one, 3)
+        self.assertEqual(r.two, 4)
+        self.assertEqual(r, (3, 4))
+        self.assertEqual(q.onenamed(), None)
+
+    def testOneScalarWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        self.assertIsNone(q.onescalar())
+
+    def testOneScalarWithSingleRow(self):
+        q = self.c.query("select 1, 2")
+        r = q.onescalar()
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 1)
+        self.assertEqual(q.onescalar(), None)
+
+    def testOneScalarWithTwoRows(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        self.assertEqual(q.onescalar(), 1)
+        self.assertEqual(q.onescalar(), 3)
+        self.assertEqual(q.onescalar(), None)
+
+    def testSingleWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        try:
+            q.single()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'No result found')
+
+    def testSingleWithSingleRow(self):
+        q = self.c.query("select 1, 2")
+        r = q.single()
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(r, (1, 2))
+        r = q.single()
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(r, (1, 2))
+
+    def testSingleWithTwoRows(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        try:
+            q.single()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'Multiple results found')
+
+    def testSingleDictWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        try:
+            q.singledict()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'No result found')
+
+    def testSingleDictWithSingleRow(self):
+        q = self.c.query("select 1 as one, 2 as two")
+        r = q.singledict()
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(one=1, two=2))
+        r = q.singledict()
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, dict(one=1, two=2))
+
+    def testSingleDictWithTwoRows(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        try:
+            q.singledict()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'Multiple results found')
+
+    def testSingleNamedWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        try:
+            q.singlenamed()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'No result found')
+
+    def testSingleNamedWithSingleRow(self):
+        q = self.c.query("select 1 as one, 2 as two")
+        r = q.singlenamed()
+        self.assertEqual(r._fields, ('one', 'two'))
+        self.assertEqual(r.one, 1)
+        self.assertEqual(r.two, 2)
+        self.assertEqual(r, (1, 2))
+        r = q.singlenamed()
+        self.assertEqual(r._fields, ('one', 'two'))
+        self.assertEqual(r.one, 1)
+        self.assertEqual(r.two, 2)
+        self.assertEqual(r, (1, 2))
+
+    def testSingleNamedWithTwoRows(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        try:
+            q.singlenamed()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'Multiple results found')
+
+    def testSingleScalarWithEmptyQuery(self):
+        q = self.c.query("select 0 where false")
+        try:
+            q.singlescalar()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'No result found')
+
+    def testSingleScalarWithSingleRow(self):
+        q = self.c.query("select 1, 2")
+        r = q.singlescalar()
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 1)
+        r = q.singlescalar()
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 1)
+
+    def testSingleWithTwoRows(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        try:
+            q.singlescalar()
+        except pg.ProgrammingError as e:
+            r = str(e)
+        else:
+            r = None
+        self.assertEqual(r, 'Multiple results found')
+
+    def testScalarResult(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        r = q.scalarresult()
+        self.assertIsInstance(r, list)
+        self.assertEqual(r, [1, 3])
+
+    def testScalarIter(self):
+        q = self.c.query("select 1, 2 union select 3, 4")
+        r = q.scalariter()
+        self.assertNotIsInstance(r, (list, tuple))
+        self.assertIsInstance(r, Iterable)
+        r = list(r)
+        self.assertEqual(r, [1, 3])
 
 
 class TestInserttable(unittest.TestCase):
@@ -1993,144 +2243,6 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_bytea_escaped(bytea_escaped)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'data')
-
-    def testGetDictditer(self):
-        dictiter = pg.get_dictiter()
-        # error if a parameter is passed
-        self.assertRaises(TypeError, pg.get_dictiter, dictiter)
-        self.assertIs(dictiter, pg._dictiter)  # the default setting
-
-    def testSetDictiter(self):
-        dictiter = pg.get_dictiter()
-        self.assertTrue(callable(dictiter))
-
-        query = self.c.query
-
-        r = query("select 1 as x, 2 as y").dictiter()
-        self.assertNotIsInstance(r, list)
-        r = next(r)
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r, dict(x=1, y=2))
-
-        def listiter(q):
-            for row in q:
-                yield list(row)
-
-        pg.set_dictiter(listiter)
-        try:
-            r = pg.get_dictiter()
-            self.assertIs(r, listiter)
-            r = query("select 1 as x, 2 as y").dictiter()
-            self.assertNotIsInstance(r, list)
-            r = next(r)
-            self.assertIsInstance(r, list)
-            self.assertEqual(r, [1, 2])
-            self.assertNotIsInstance(r, dict)
-        finally:
-            pg.set_dictiter(dictiter)
-
-        r = pg.get_dictiter()
-        self.assertIs(r, dictiter)
-
-    def testGetNamediter(self):
-        namediter = pg.get_namediter()
-        # error if a parameter is passed
-        self.assertRaises(TypeError, pg.get_namediter, namediter)
-        self.assertIs(namediter, pg._namediter)  # the default setting
-
-    def testSetNamediter(self):
-        namediter = pg.get_namediter()
-        self.assertTrue(callable(namediter))
-
-        query = self.c.query
-
-        r = query("select 1 as x, 2 as y").namediter()
-        self.assertNotIsInstance(r, list)
-        r = next(r)
-        self.assertIsInstance(r, tuple)
-        self.assertEqual(r, (1, 2))
-        self.assertIsNot(type(r), tuple)
-        self.assertEqual(r._fields, ('x', 'y'))
-        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
-        self.assertEqual(r.__class__.__name__, 'Row')
-        r = query("select 1 as x, 2 as y").namedresult()
-        self.assertIsInstance(r, list)
-        r = r[0]
-        self.assertIsInstance(r, tuple)
-        self.assertEqual(r, (1, 2))
-        self.assertIsNot(type(r), tuple)
-        self.assertEqual(r._fields, ('x', 'y'))
-        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
-        self.assertEqual(r.__class__.__name__, 'Row')
-
-        def listiter(q):
-            for row in q:
-                yield list(row)
-
-        pg.set_namediter(listiter)
-        try:
-            r = pg.get_namediter()
-            self.assertIs(r, listiter)
-            r = query("select 1 as x, 2 as y").namediter()
-            self.assertNotIsInstance(r, list)
-            r = next(r)
-            self.assertIsInstance(r, list)
-            self.assertEqual(r, [1, 2])
-            self.assertIsNot(type(r), tuple)
-            self.assertFalse(hasattr(r, '_fields'))
-            self.assertNotEqual(r.__class__.__name__, 'Row')
-            r = query("select 1 as x, 2 as y").namedresult()
-            self.assertIsInstance(r, list)
-            r = r[0]
-            self.assertIsInstance(r, list)
-            self.assertEqual(r, [1, 2])
-            self.assertIsNot(type(r), tuple)
-            self.assertFalse(hasattr(r, '_fields'))
-            self.assertNotEqual(r.__class__.__name__, 'Row')
-        finally:
-            pg.set_namediter(namediter)
-
-        r = pg.get_namediter()
-        self.assertIs(r, namediter)
-
-    def testGetNamedresult(self):  # deprecated
-        namedresult = pg.get_namedresult()
-        # error if a parameter is passed
-        self.assertRaises(TypeError, pg.get_namedresult, namedresult)
-        self.assertIs(namedresult, pg._namediter)  # the default setting
-
-    def testSetNamedresult(self):  # deprecated
-        namedresult = pg.get_namedresult()
-        self.assertTrue(callable(namedresult))
-
-        query = self.c.query
-
-        r = query("select 1 as x, 2 as y").namedresult()[0]
-        self.assertIsInstance(r, tuple)
-        self.assertEqual(r, (1, 2))
-        self.assertIsNot(type(r), tuple)
-        self.assertEqual(r._fields, ('x', 'y'))
-        self.assertEqual(r._asdict(), {'x': 1, 'y': 2})
-        self.assertEqual(r.__class__.__name__, 'Row')
-
-        def listresult(q):
-            return [list(row) for row in q.getresult()]
-
-        pg.set_namedresult(listresult)
-        try:
-            r = pg.get_namedresult()
-            self.assertIs(r, listresult)
-            r = query("select 1 as x, 2 as y").namedresult()[0]
-            self.assertIsInstance(r, list)
-            self.assertEqual(r, [1, 2])
-            self.assertIsNot(type(r), tuple)
-            self.assertFalse(hasattr(r, '_fields'))
-            self.assertNotEqual(r.__class__.__name__, 'Row')
-        finally:
-            pg.set_namedresult(namedresult)
-
-        r = pg.get_namedresult()
-        self.assertIs(r, namedresult)
 
     def testSetRowFactorySize(self):
         try:

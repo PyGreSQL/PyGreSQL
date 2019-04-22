@@ -3,18 +3,32 @@ ChangeLog
 
 Version 5.1 (2019-mm-dd)
 ------------------------
-- Support for prepared statements has been added to the classic API.
-- DB wrapper objects based on existing connections can now be closed and
-  reopened properly (but the underlying connection will not be affected).
-- The query objects in the classic API can now be used as iterators
-  and will then yield the rows as tuples, similar to query.getresult().
-  Thanks to Justin Pryzby for the proposal and most of the implementation.
-- Added methods query.dictiter() and query.namediter() to the classic API
-  which work like query.dictresult() and query.namedresult() except that
-  they return iterators instead of lists.
-- Deprecated query.ntuples() in the classic API, since len(query) can now
-  be used and returns the same number.
-- Added pg.get/set_namediter and deprecated pg.get/set_namedresult.
+- Changes in the classic PyGreSQL module (pg):
+    - Support for prepared statements.
+    - DB wrapper objects based on existing connections can now be closed and
+      reopened properly (but the underlying connection will not be affected).
+    - The query object can now be used as iterator and will then yield the
+      rows as tuples, similar to query.getresult().
+      Thanks to Justin Pryzby for the proposal and most of the implementation.
+    - Deprecated query.ntuples() in the classic API, since len(query) can now
+      be used and returns the same number.
+    - The i-th row from the result can now be accessed as the `query[i]`.
+    - New method query.scalarresult() that gets only the first field of each
+      row as a list of scalar values.
+    - New methods query.one(), query.onenamed(), query.onedict() and
+      query.onescalar() that fetch only one row from the result or None if
+      there is no more row, similar to cursor.fetchone() method in DB-API 2.
+    - New methods query.single(), query.singlenamed(), query.singledict() and
+      query.singlescalar() that fetch only one row from the result, and raise
+      an error when the result does not have exactly one row.
+    - New methods query.dictiter(), query.namediter() and query.scalariter()
+      returning the same values as query.dictresult(), query.namedresult()
+      and query.salarresult(), but as iterables instead of lists. This avoids
+      creating a Python list of all results and can be slightly more efficient.
+    - Removed pg.get/set_namedresult. You can configure the named tuples
+      factory with the pg.set_row_factory_size() function and change the
+      implementation with pg.set_query_helps(), but this is not recommended
+      and this function is not part of the official API.
 
 Vesion 5.0.7 (2019-mm-dd)
 -------------------------
