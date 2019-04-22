@@ -244,14 +244,16 @@ single/singledict/singlenamed/singlescalar -- get single result of a query
 
     :returns: single row from the query results as a tuple of fields
     :rtype: tuple
-	:raises ProgrammingError: result does not have exactly one row
+	:raises InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
 Returns a single row from the result as a tuple of fields.
 
 This method returns the same single row when called multiple times.
-It raises a ProgrammingError if the result does not have exactly one row.
+It raises an :exc:`pg.InvalidResultError` if the result does not have exactly
+one row. More specifically, this will be of type :exc:`pg.NoResultError` if it
+is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
 
 .. versionadded:: 5.1
 
@@ -261,7 +263,7 @@ It raises a ProgrammingError if the result does not have exactly one row.
 
     :returns: single row from the query results as a dictionary
     :rtype: dict
-	:raises ProgrammingError: result does not have exactly one row
+	:raises InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
@@ -269,7 +271,9 @@ Returns a single row from the result as a dictionary with the field names
 used as the keys.
 
 This method returns the same single row when called multiple times.
-It raises a ProgrammingError if the result does not have exactly one row.
+It raises an :exc:`pg.InvalidResultError` if the result does not have exactly
+one row. More specifically, this will be of type :exc:`pg.NoResultError` if it
+is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
 
 .. versionadded:: 5.1
 
@@ -279,7 +283,7 @@ It raises a ProgrammingError if the result does not have exactly one row.
 
     :returns: single row from the query results as a named tuple
     :rtype: named tuple
-	:raises ProgrammingError: result does not have exactly one row
+	:raises InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
@@ -290,7 +294,9 @@ named tuples (particularly, names starting with an underscore) are
 automatically renamed to valid positional names.
 
 This method returns the same single row when called multiple times.
-It raises a ProgrammingError if the result does not have exactly one row.
+It raises an :exc:`pg.InvalidResultError` if the result does not have exactly
+one row. More specifically, this will be of type :exc:`pg.NoResultError` if it
+is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
 
 .. versionadded:: 5.1
 
@@ -300,14 +306,16 @@ It raises a ProgrammingError if the result does not have exactly one row.
 
     :returns: single row from the query results as a scalar value
     :rtype: type of first field
-	:raises ProgrammingError: result does not have exactly one row
+	:raises InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
 Returns the first field of a single row from the result as a scalar value.
 
 This method returns the same single row as scalar when called multiple times.
-It raises a ProgrammingError if the result does not have exactly one row.
+It raises an :exc:`pg.InvalidResultError` if the result does not have exactly
+one row. More specifically, this will be of type :exc:`pg.NoResultError` if it
+is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
 
 .. versionadded:: 5.1
 

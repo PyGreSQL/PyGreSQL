@@ -1361,11 +1361,12 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         q = self.c.query("select 0 where false")
         try:
             q.single()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'No result found')
+        self.assertIsInstance(r, pg.NoResultError)
+        self.assertEqual(str(r), 'No result found')
 
     def testSingleWithSingleRow(self):
         q = self.c.query("select 1, 2")
@@ -1380,21 +1381,23 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.single()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'Multiple results found')
+        self.assertIsInstance(r, pg.MultipleResultsError)
+        self.assertEqual(str(r), 'Multiple results found')
 
     def testSingleDictWithEmptyQuery(self):
         q = self.c.query("select 0 where false")
         try:
             q.singledict()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'No result found')
+        self.assertIsInstance(r, pg.NoResultError)
+        self.assertEqual(str(r), 'No result found')
 
     def testSingleDictWithSingleRow(self):
         q = self.c.query("select 1 as one, 2 as two")
@@ -1409,21 +1412,23 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.singledict()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'Multiple results found')
+        self.assertIsInstance(r, pg.MultipleResultsError)
+        self.assertEqual(str(r), 'Multiple results found')
 
     def testSingleNamedWithEmptyQuery(self):
         q = self.c.query("select 0 where false")
         try:
             q.singlenamed()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'No result found')
+        self.assertIsInstance(r, pg.NoResultError)
+        self.assertEqual(str(r), 'No result found')
 
     def testSingleNamedWithSingleRow(self):
         q = self.c.query("select 1 as one, 2 as two")
@@ -1442,21 +1447,23 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.singlenamed()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'Multiple results found')
+        self.assertIsInstance(r, pg.MultipleResultsError)
+        self.assertEqual(str(r), 'Multiple results found')
 
     def testSingleScalarWithEmptyQuery(self):
         q = self.c.query("select 0 where false")
         try:
             q.singlescalar()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'No result found')
+        self.assertIsInstance(r, pg.NoResultError)
+        self.assertEqual(str(r), 'No result found')
 
     def testSingleScalarWithSingleRow(self):
         q = self.c.query("select 1, 2")
@@ -1471,11 +1478,12 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.singlescalar()
-        except pg.ProgrammingError as e:
-            r = str(e)
+        except pg.InvalidResultError as e:
+            r = e
         else:
             r = None
-        self.assertEqual(r, 'Multiple results found')
+        self.assertIsInstance(r, pg.MultipleResultsError)
+        self.assertEqual(str(r), 'Multiple results found')
 
     def testScalarResult(self):
         q = self.c.query("select 1, 2 union select 3, 4")

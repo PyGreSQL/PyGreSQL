@@ -42,7 +42,8 @@
 
 static PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
                 *InternalError, *OperationalError, *ProgrammingError,
-                *IntegrityError, *DataError, *NotSupportedError;
+                *IntegrityError, *DataError, *NotSupportedError,
+                *InvalidResultError, *NoResultError, *MultipleResultsError;
 
 #define _TOSTRING(x) #x
 #define TOSTRING(x) _TOSTRING(x)
@@ -4612,7 +4613,8 @@ static char query_single__doc__[] =
 "single() -- Get the result of a query as single row\n\n"
 "The single row from the query result is returned as a tuple of fields.\n"
 "This method returns the same single row when called multiple times.\n"
-"It raises a ProgrammingError if the result does not have exactly one row.\n";
+"It raises an InvalidResultError if the result doesn't have exactly one row,\n"
+"which will be of type NoResultError or MultipleResultsError specifically.\n";
 
 static PyObject *
 query_single(queryObject *self, PyObject *noargs)
@@ -4620,8 +4622,10 @@ query_single(queryObject *self, PyObject *noargs)
     PyObject *row_tuple;
 
     if (self->max_row != 1) {
-        set_error_msg(ProgrammingError,
-            self->max_row ? "Multiple results found" : "No result found");
+        if (self->max_row)
+            set_error_msg(MultipleResultsError, "Multiple results found");
+        else
+            set_error_msg(NoResultError, "No result found");
         return NULL;
     }
 
@@ -4727,7 +4731,8 @@ static char query_singledict__doc__[] =
 "The single row from the query result is returned as a dictionary with\n"
 "the field names used as the keys.\n"
 "This method returns the same single row when called multiple times.\n"
-"It raises a ProgrammingError if the result does not have exactly one row.\n";
+"It raises an InvalidResultError if the result doesn't have exactly one row,\n"
+"which will be of type NoResultError or MultipleResultsError specifically.\n";
 
 static PyObject *
 query_singledict(queryObject *self, PyObject *noargs)
@@ -4735,8 +4740,10 @@ query_singledict(queryObject *self, PyObject *noargs)
     PyObject *row_dict;
 
     if (self->max_row != 1) {
-        set_error_msg(ProgrammingError,
-            self->max_row ? "Multiple results found" : "No result found");
+        if (self->max_row)
+            set_error_msg(MultipleResultsError, "Multiple results found");
+        else
+            set_error_msg(NoResultError, "No result found");
         return NULL;
     }
 
@@ -4816,7 +4823,8 @@ static char query_singlenamed__doc__[] =
 "singlenamed() -- Get the result of a query as single row\n\n"
 "The single row from the query result is returned as named tuple of fields.\n"
 "This method returns the same single row when called multiple times.\n"
-"It raises a ProgrammingError if the result does not have exactly one row.\n";
+"It raises an InvalidResultError if the result doesn't have exactly one row,\n"
+"which will be of type NoResultError or MultipleResultsError specifically.\n";
 
 static PyObject *
 query_singlenamed(queryObject *self, PyObject *noargs)
@@ -4826,8 +4834,10 @@ query_singlenamed(queryObject *self, PyObject *noargs)
     }
 
     if (self->max_row != 1) {
-        set_error_msg(ProgrammingError,
-            self->max_row ? "Multiple results found" : "No result found");
+        if (self->max_row)
+            set_error_msg(MultipleResultsError, "Multiple results found");
+        else
+            set_error_msg(NoResultError, "No result found");
         return NULL;
     }
 
@@ -4968,7 +4978,8 @@ static char query_singlescalar__doc__[] =
 "singlescalar() -- Get scalar value from single result of a query\n\n"
 "Returns the first field of the next row from the result as a scalar value.\n"
 "This method returns the same single row when called multiple times.\n"
-"It raises a ProgrammingError if the result does not have exactly one row.\n";
+"It raises an InvalidResultError if the result doesn't have exactly one row,\n"
+"which will be of type NoResultError or MultipleResultsError specifically.\n";
 
 static PyObject *
 query_singlescalar(queryObject *self, PyObject *noargs)
@@ -4981,8 +4992,10 @@ query_singlescalar(queryObject *self, PyObject *noargs)
     }
 
     if (self->max_row != 1) {
-        set_error_msg(ProgrammingError,
-            self->max_row ? "Multiple results found" : "No result found");
+        if (self->max_row)
+            set_error_msg(MultipleResultsError, "Multiple results found");
+        else
+            set_error_msg(NoResultError, "No result found");
         return NULL;
     }
 
@@ -6200,34 +6213,49 @@ MODULE_INIT_FUNC(_pg)
     Warning = PyErr_NewException("pg.Warning", PyExc_Exception, NULL);
     PyDict_SetItemString(dict, "Warning", Warning);
 
-    InterfaceError = PyErr_NewException("pg.InterfaceError", Error, NULL);
+    InterfaceError = PyErr_NewException(
+        "pg.InterfaceError", Error, NULL);
     PyDict_SetItemString(dict, "InterfaceError", InterfaceError);
 
-    DatabaseError = PyErr_NewException("pg.DatabaseError", Error, NULL);
+    DatabaseError = PyErr_NewException(
+        "pg.DatabaseError", Error, NULL);
     PyDict_SetItemString(dict, "DatabaseError", DatabaseError);
 
-    InternalError =
-        PyErr_NewException("pg.InternalError", DatabaseError, NULL);
+    InternalError = PyErr_NewException(
+        "pg.InternalError", DatabaseError, NULL);
     PyDict_SetItemString(dict, "InternalError", InternalError);
 
-    OperationalError =
-        PyErr_NewException("pg.OperationalError", DatabaseError, NULL);
+    OperationalError = PyErr_NewException(
+        "pg.OperationalError", DatabaseError, NULL);
     PyDict_SetItemString(dict, "OperationalError", OperationalError);
 
-    ProgrammingError =
-        PyErr_NewException("pg.ProgrammingError", DatabaseError, NULL);
+    ProgrammingError = PyErr_NewException(
+        "pg.ProgrammingError", DatabaseError, NULL);
     PyDict_SetItemString(dict, "ProgrammingError", ProgrammingError);
 
-    IntegrityError =
-        PyErr_NewException("pg.IntegrityError", DatabaseError, NULL);
+    IntegrityError = PyErr_NewException(
+        "pg.IntegrityError", DatabaseError, NULL);
     PyDict_SetItemString(dict, "IntegrityError", IntegrityError);
 
-    DataError = PyErr_NewException("pg.DataError", DatabaseError, NULL);
+    DataError = PyErr_NewException(
+        "pg.DataError", DatabaseError, NULL);
     PyDict_SetItemString(dict, "DataError", DataError);
 
-    NotSupportedError =
-        PyErr_NewException("pg.NotSupportedError", DatabaseError, NULL);
+    NotSupportedError = PyErr_NewException(
+        "pg.NotSupportedError", DatabaseError, NULL);
     PyDict_SetItemString(dict, "NotSupportedError", NotSupportedError);
+
+    InvalidResultError = PyErr_NewException(
+        "pg.InvalidResultError", DataError, NULL);
+    PyDict_SetItemString(dict, "InvalidResultError", InvalidResultError);
+
+    NoResultError = PyErr_NewException(
+        "pg.NoResultError", InvalidResultError, NULL);
+    PyDict_SetItemString(dict, "NoResultError", NoResultError);
+
+    MultipleResultsError = PyErr_NewException(
+        "pg.MultipleResultsError", InvalidResultError, NULL);
+    PyDict_SetItemString(dict, "MultipleResultsError", MultipleResultsError);
 
     /* Make the version available */
     s = PyStr_FromString(PyPgVersion);

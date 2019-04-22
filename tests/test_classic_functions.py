@@ -66,6 +66,16 @@ class TestHasConnect(unittest.TestCase):
     def testhasPgNotSupportedError(self):
         self.assertTrue(issubclass(pg.NotSupportedError, pg.DatabaseError))
 
+    def testhasPgInvalidResultError(self):
+        self.assertTrue(issubclass(pg.InvalidResultError, pg.DataError))
+
+    def testhasPgNoResultError(self):
+        self.assertTrue(issubclass(pg.NoResultError, pg.InvalidResultError))
+
+    def testhasPgMultipleResultsError(self):
+        self.assertTrue(
+            issubclass(pg.MultipleResultsError, pg.InvalidResultError))
+
     def testhasConnect(self):
         self.assertTrue(callable(pg.connect))
 
