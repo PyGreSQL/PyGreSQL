@@ -1,11 +1,11 @@
 /*
-	pgtypes - PostgreSQL type definitions
+    pgtypes - PostgreSQL type definitions
 
-	These are the standard PostgreSQL 11.1 built-in types,
-	extracted from src/backend/catalog/pg_type_d.h,
-	because that header file is sometimes not available
-	or needs other header files to get properly included.
-	You can also query pg_type to get this information.
+    These are the standard PostgreSQL 11.1 built-in types,
+    extracted from src/backend/catalog/pg_type_d.h,
+    because that header file is sometimes not available
+    or needs other header files to get properly included.
+    You can also query pg_type to get this information.
 */
 
 #ifndef PG_TYPE_D_H
