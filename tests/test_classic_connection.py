@@ -121,12 +121,14 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(attributes, connection_attributes)
 
     def testAllConnectMethods(self):
-        methods = '''cancel close date_format describe_prepared endcopy
+        methods = '''
+            cancel close date_format describe_prepared endcopy
             escape_bytea escape_identifier escape_literal escape_string
             fileno get_cast_hook get_notice_receiver getline getlo getnotify
             inserttable locreate loimport parameter
             prepare putline query query_prepared reset
-            set_cast_hook set_notice_receiver source transaction'''.split()
+            set_cast_hook set_notice_receiver source transaction
+            '''.split()
         connection_methods = [a for a in dir(self.connection)
             if not a.startswith('__') and self.is_method(a)]
         self.assertEqual(methods, connection_methods)
@@ -187,6 +189,17 @@ class TestConnectObject(unittest.TestCase):
 
     def testMethodQueryEmpty(self):
         self.assertRaises(ValueError, self.connection.query, '')
+
+    def testAllQueryMembers(self):
+        query = self.connection.query("select true where false")
+        members = '''
+            dictiter dictresult fieldname fieldnum getresult listfields
+            namediter namedresult ntuples one onedict onenamed onescalar
+            scalariter scalarresult single singledict singlenamed singlescalar
+            '''.split()
+        query_members = [a for a in dir(query)
+            if not a.startswith('__')]
+        self.assertEqual(members, query_members)
 
     def testMethodEndcopy(self):
         try:
