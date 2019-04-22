@@ -40,9 +40,9 @@
 /* macros for single-source Python 2/3 compatibility */
 #include "py3c.h"
 
-static PyObject *Error, *Warning, *InterfaceError,
-    *DatabaseError, *InternalError, *OperationalError, *ProgrammingError,
-    *IntegrityError, *DataError, *NotSupportedError;
+static PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
+                *InternalError, *OperationalError, *ProgrammingError,
+                *IntegrityError, *DataError, *NotSupportedError;
 
 #define _TOSTRING(x) #x
 #define TOSTRING(x) _TOSTRING(x)
@@ -53,29 +53,29 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #endif
 
 /* default values */
-#define PG_ARRAYSIZE        1
+#define PG_ARRAYSIZE 1
 
 /* flags for object validity checks */
-#define CHECK_OPEN          1
-#define CHECK_CLOSE         2
-#define CHECK_CNX           4
-#define CHECK_RESULT        8
-#define CHECK_DQL           16
+#define CHECK_OPEN   1
+#define CHECK_CLOSE  2
+#define CHECK_CNX    4
+#define CHECK_RESULT 8
+#define CHECK_DQL   16
 
 /* query result types */
-#define RESULT_EMPTY        1
-#define RESULT_DML          2
-#define RESULT_DDL          3
-#define RESULT_DQL          4
+#define RESULT_EMPTY 1
+#define RESULT_DML   2
+#define RESULT_DDL   3
+#define RESULT_DQL   4
 
 /* flags for move methods */
-#define QUERY_MOVEFIRST     1
-#define QUERY_MOVELAST      2
-#define QUERY_MOVENEXT      3
-#define QUERY_MOVEPREV      4
+#define QUERY_MOVEFIRST 1
+#define QUERY_MOVELAST  2
+#define QUERY_MOVENEXT  3
+#define QUERY_MOVEPREV  4
 
-#define MAX_BUFFER_SIZE 8192    /* maximum transaction size */
-#define MAX_ARRAY_DEPTH 16      /* maximum allowed depth of an array */
+#define MAX_BUFFER_SIZE 8192  /* maximum transaction size */
+#define MAX_ARRAY_DEPTH 16    /* maximum allowed depth of an array */
 
 /* MODULE GLOBAL VARIABLES */
 
@@ -88,17 +88,17 @@ static PyObject *pg_default_user;   /* default username */
 static PyObject *pg_default_passwd; /* default password */
 #endif  /* DEFAULT_VARS */
 
-static PyObject *decimal = NULL, /* decimal type */
-                *dictiter = NULL, /* function for getting named results */
-                *namediter = NULL, /* function for getting named results */
-                *namednext = NULL, /* function for getting one named result */
+static PyObject *decimal = NULL,    /* decimal type */
+                *dictiter = NULL,   /* function for getting named results */
+                *namediter = NULL,  /* function for getting named results */
+                *namednext = NULL,  /* function for getting one named result */
                 *scalariter = NULL, /* function for getting scalar results */
                 *jsondecode = NULL; /* function for decoding json strings */
 static const char *date_format = NULL; /* date format that is always assumed */
-static char decimal_point = '.'; /* decimal point used in money values */
-static int bool_as_text = 0; /* whether bool shall be returned as text */
-static int array_as_text = 0; /* whether arrays shall be returned as text */
-static int bytea_escaped = 0; /* whether bytea shall be returned escaped */
+static char decimal_point = '.';    /* decimal point used in money values */
+static int bool_as_text = 0;   /* whether bool shall be returned as text */
+static int array_as_text = 0;  /* whether arrays shall be returned as text */
+static int bytea_escaped = 0;  /* whether bytea shall be returned escaped */
 
 static int pg_encoding_utf8 = 0;
 static int pg_encoding_latin1 = 0;
@@ -142,47 +142,47 @@ static void notice_receiver(void *, const PGresult *);
 typedef struct
 {
     PyObject_HEAD
-    int         valid;              /* validity flag */
-    PGconn     *cnx;                /* Postgres connection handle */
-    const char *date_format;        /* date format derived from datestyle */
-    PyObject   *cast_hook;          /* external typecast method */
-    PyObject   *notice_receiver;    /* current notice receiver */
+    int        valid;             /* validity flag */
+    PGconn     *cnx;              /* Postgres connection handle */
+    const char *date_format;      /* date format derived from datestyle */
+    PyObject   *cast_hook;        /* external typecast method */
+    PyObject   *notice_receiver;  /* current notice receiver */
 }   connObject;
 #define is_connObject(v) (PyType(v) == &connType)
 
 typedef struct
 {
     PyObject_HEAD
-    int         valid;          /* validity flag */
-    connObject *pgcnx;          /* parent connection object */
-    PGresult    *result;        /* result content */
-    int         encoding;       /* client encoding */
-    int         result_type;    /* result type (DDL/DML/DQL) */
-    long        arraysize;      /* array size for fetch method */
-    int         current_row;    /* currently selected row */
-    int         max_row;        /* number of rows in the result */
-    int         num_fields;     /* number of fields in each row */
+    int        valid;        /* validity flag */
+    connObject *pgcnx;       /* parent connection object */
+    PGresult   *result;      /* result content */
+    int        encoding;     /* client encoding */
+    int        result_type;  /* result type (DDL/DML/DQL) */
+    long       arraysize;    /* array size for fetch method */
+    int        current_row;  /* currently selected row */
+    int        max_row;      /* number of rows in the result */
+    int        num_fields;   /* number of fields in each row */
 }   sourceObject;
 #define is_sourceObject(v) (PyType(v) == &sourceType)
 
 typedef struct
 {
     PyObject_HEAD
-    connObject *pgcnx;          /* parent connection object */
-    PGresult    const *res;     /* an error or warning */
+    connObject *pgcnx;    /* parent connection object */
+    PGresult const *res;  /* an error or warning */
 }   noticeObject;
 #define is_noticeObject(v) (PyType(v) == &noticeType)
 
 typedef struct
 {
     PyObject_HEAD
-    connObject *pgcnx;          /* parent connection object */
-    PGresult   *result;         /* result content */
-    int         encoding;       /* client encoding */
-    int         current_row;    /* currently selected row */
-    int         max_row;        /* number of rows in the result */
-    int         num_fields;     /* number of fields in each row */
-    int        *col_types;      /* PyGreSQL column types */
+    connObject *pgcnx;       /* parent connection object */
+    PGresult   *result;      /* result content */
+    int        encoding;     /* client encoding */
+    int        current_row;  /* currently selected row */
+    int        max_row;      /* number of rows in the result */
+    int        num_fields;   /* number of fields in each row */
+    int        *col_types;   /* PyGreSQL column types */
 }   queryObject;
 #define is_queryObject(v) (PyType(v) == &queryType)
 
@@ -190,9 +190,9 @@ typedef struct
 typedef struct
 {
     PyObject_HEAD
-    connObject *pgcnx;          /* parent connection object */
-    Oid         lo_oid;         /* large object oid */
-    int         lo_fd;          /* large object fd */
+    connObject *pgcnx;  /* parent connection object */
+    Oid lo_oid;         /* large object oid */
+    int lo_fd;          /* large object fd */
 }   largeObject;
 #define is_largeObject(v) (PyType(v) == &largeType)
 #endif /* LARGE_OBJECTS */
@@ -256,8 +256,7 @@ get_type(Oid pgtype)
 {
     int t;
 
-    switch (pgtype)
-    {
+    switch (pgtype) {
         /* simple types */
 
         case INT2OID:
@@ -372,11 +371,13 @@ get_col_types(PGresult *result, int nfields)
 {
     int *types, *t, j;
 
-    if (!(types = PyMem_Malloc(sizeof(int) * nfields)))
-        return (int *)PyErr_NoMemory();
+    if (!(types = PyMem_Malloc(sizeof(int) * nfields))) {
+        return (int*) PyErr_NoMemory();
+    }
 
-    for (j = 0, t=types; j < nfields; ++j)
+    for (j = 0, t = types; j < nfields; ++j) {
         *t++ = get_type(PQftype(result, j));
+    }
 
     return types;
 }
@@ -386,15 +387,16 @@ get_col_types(PGresult *result, int nfields)
 static PyObject *
 cast_bytea_text(char *s)
 {
-    PyObject   *obj;
-    char       *tmp_str;
-    size_t      str_len;
+    PyObject *obj;
+    char *tmp_str;
+    size_t str_len;
 
     /* this function should not be called when bytea_escaped is set */
-    tmp_str = (char *)PQunescapeBytea((unsigned char*)s, &str_len);
+    tmp_str = (char *) PQunescapeBytea((unsigned char*) s, &str_len);
     obj = PyBytes_FromStringAndSize(tmp_str, str_len);
-    if (tmp_str)
+    if (tmp_str) {
         PQfreemem(tmp_str);
+    }
     return obj;
 }
 
@@ -403,32 +405,34 @@ cast_bytea_text(char *s)
 static PyObject *
 cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
 {
-    PyObject   *obj, *tmp_obj;
-    char       *tmp_str;
-    size_t      str_len;
+    PyObject *obj, *tmp_obj;
+    char *tmp_str;
+    size_t str_len;
 
-    switch (type) /* this must be the PyGreSQL internal type */
-    {
+    switch (type) { /* this must be the PyGreSQL internal type */
+
         case PYGRES_BYTEA:
             /* this type should not be passed when bytea_escaped is set */
             /* we need to add a null byte */
             tmp_str = (char *) PyMem_Malloc(size + 1);
-            if (!tmp_str) return PyErr_NoMemory();
+            if (!tmp_str) {
+                return PyErr_NoMemory();
+            }
             memcpy(tmp_str, s, size);
             s = tmp_str; *(s + size) = '\0';
-            tmp_str = (char *)PQunescapeBytea((unsigned char*)s, &str_len);
+            tmp_str = (char *) PQunescapeBytea((unsigned char*) s, &str_len);
             PyMem_Free(s);
             if (!tmp_str) return PyErr_NoMemory();
             obj = PyBytes_FromStringAndSize(tmp_str, str_len);
-            if (tmp_str)
+            if (tmp_str) {
                 PQfreemem(tmp_str);
+            }
             break;
 
         case PYGRES_JSON:
             /* this type should only be passed when jsondecode is set */
             obj = get_decoded_string(s, size, encoding);
-            if (obj && jsondecode) /* was able to decode */
-            {
+            if (obj && jsondecode) { /* was able to decode */
                 tmp_obj = Py_BuildValue("(O)", obj);
                 obj = PyObject_CallObject(jsondecode, tmp_obj);
                 Py_DECREF(tmp_obj);
@@ -451,14 +455,13 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
    and the external typecast function to be called. */
 static PyObject *
 cast_other(char *s, Py_ssize_t size, int encoding, Oid pgtype,
-    PyObject *cast_hook)
+           PyObject *cast_hook)
 {
     PyObject *obj;
 
     obj = cast_sized_text(s, size, encoding, PYGRES_TEXT);
 
-    if (cast_hook)
-    {
+    if (cast_hook) {
         PyObject *tmp_obj = obj;
         obj = PyObject_CallFunction(cast_hook, "(OI)", obj, pgtype);
         Py_DECREF(tmp_obj);
@@ -471,24 +474,32 @@ cast_other(char *s, Py_ssize_t size, int encoding, Oid pgtype,
 static PyObject *
 cast_sized_simple(char *s, Py_ssize_t size, int type)
 {
-    PyObject   *obj, *tmp_obj;
-    char        buf[64], *t;
-    int         i, j, n;
+    PyObject *obj, *tmp_obj;
+    char buf[64], *t;
+    int i, j, n;
 
-    switch (type) /* this must be the PyGreSQL internal type */
-    {
+    switch (type) { /* this must be the PyGreSQL internal type */
+
         case PYGRES_INT:
-            n = sizeof(buf)/sizeof(buf[0]) - 1;
-            if ((int)size < n) n = (int)size;
-            for (i = 0, t = buf; i < n; ++i) *t++ = *s++;
+            n = sizeof(buf) / sizeof(buf[0]) - 1;
+            if ((int) size < n) {
+                n = (int) size;
+            }
+            for (i = 0, t = buf; i < n; ++i) {
+                *t++ = *s++;
+            }
             *t = '\0';
             obj = PyInt_FromString(buf, NULL, 10);
             break;
 
         case PYGRES_LONG:
-            n = sizeof(buf)/sizeof(buf[0]) - 1;
-            if ((int)size < n) n = (int)size;
-            for (i = 0, t = buf; i < n; ++i) *t++ = *s++;
+            n = sizeof(buf) / sizeof(buf[0]) - 1;
+            if ((int) size < n) {
+                n = (int) size;
+            }
+            for (i = 0, t = buf; i < n; ++i) {
+                *t++ = *s++;
+            }
             *t = '\0';
             obj = PyLong_FromString(buf, NULL, 10);
             break;
@@ -501,23 +512,23 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 
         case PYGRES_MONEY:
             /* this type should only be passed when decimal_point is set */
-            n = sizeof(buf)/sizeof(buf[0]) - 1;
-            for (i = 0, j = 0; i < size && j < n; ++i, ++s)
-            {
-                if (*s >= '0' && *s <= '9')
+            n = sizeof(buf) / sizeof(buf[0]) - 1;
+            for (i = 0, j = 0; i < size && j < n; ++i, ++s) {
+                if (*s >= '0' && *s <= '9') {
                     buf[j++] = *s;
-                else if (*s == decimal_point)
+                }
+                else if (*s == decimal_point) {
                     buf[j++] = '.';
-                else if (*s == '(' || *s == '-')
+                }
+                else if (*s == '(' || *s == '-') {
                     buf[j++] = '-';
+                }
             }
-            if (decimal)
-            {
+            if (decimal) {
                 buf[j] = '\0';
                 obj = PyObject_CallFunction(decimal, "(s)", buf);
             }
-            else
-            {
+            else {
                 tmp_obj = PyStr_FromString(buf);
                 obj = PyFloat_FromString(tmp_obj);
                 Py_DECREF(tmp_obj);
@@ -534,12 +545,10 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 
         case PYGRES_BOOL:
             /* convert to bool only if bool_as_text is not set */
-            if (bool_as_text)
-            {
+            if (bool_as_text) {
                 obj = PyStr_FromString(*s == 't' ? "t" : "f");
             }
-            else
-            {
+            else {
                 obj = *s == 't' ? Py_True : Py_False;
                 Py_INCREF(obj);
             }
@@ -558,12 +567,12 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 static PyObject *
 cast_unsized_simple(char *s, int type)
 {
-    PyObject   *obj, *tmp_obj;
-    char        buf[64];
-    int         j, n;
+    PyObject *obj, *tmp_obj;
+    char buf[64];
+    int j, n;
 
-    switch (type) /* this must be the PyGreSQL internal type */
-    {
+    switch (type) { /* this must be the PyGreSQL internal type */
+
         case PYGRES_INT:
             obj = PyInt_FromString(s, NULL, 10);
             break;
@@ -580,26 +589,26 @@ cast_unsized_simple(char *s, int type)
 
         case PYGRES_MONEY:
             /* this type should only be passed when decimal_point is set */
-            n = sizeof(buf)/sizeof(buf[0]) - 1;
-            for (j = 0; *s && j < n; ++s)
-            {
-                if (*s >= '0' && *s <= '9')
+            n = sizeof(buf) / sizeof(buf[0]) - 1;
+            for (j = 0; *s && j < n; ++s) {
+                if (*s >= '0' && *s <= '9') {
                     buf[j++] = *s;
-                else if (*s == decimal_point)
+                }
+                else if (*s == decimal_point) {
                     buf[j++] = '.';
-                else if (*s == '(' || *s == '-')
+                }
+                else if (*s == '(' || *s == '-') {
                     buf[j++] = '-';
+                }
             }
             buf[j] = '\0'; s = buf;
             /* FALLTHROUGH */ /* no break here */
 
         case PYGRES_DECIMAL:
-            if (decimal)
-            {
+            if (decimal) {
                 obj = PyObject_CallFunction(decimal, "(s)", s);
             }
-            else
-            {
+            else {
                 tmp_obj = PyStr_FromString(s);
                 obj = PyFloat_FromString(tmp_obj);
                 Py_DECREF(tmp_obj);
@@ -608,12 +617,10 @@ cast_unsized_simple(char *s, int type)
 
         case PYGRES_BOOL:
             /* convert to bool only if bool_as_text is not set */
-            if (bool_as_text)
-            {
+            if (bool_as_text) {
                 obj = PyStr_FromString(*s == 't' ? "t" : "f");
             }
-            else
-            {
+            else {
                 obj = *s == 't' ? Py_True : Py_False;
                 Py_INCREF(obj);
             }
@@ -628,11 +635,11 @@ cast_unsized_simple(char *s, int type)
 }
 
 /* quick case insensitive check if given sized string is null */
-#define STR_IS_NULL(s, n) (n == 4 \
-    && (s[0] == 'n' || s[0] == 'N') \
-    && (s[1] == 'u' || s[1] == 'U') \
-    && (s[2] == 'l' || s[2] == 'L') \
-    && (s[3] == 'l' || s[3] == 'L'))
+#define STR_IS_NULL(s, n) (n == 4 && \
+    (s[0] == 'n' || s[0] == 'N') && \
+    (s[1] == 'u' || s[1] == 'U') && \
+    (s[2] == 'l' || s[2] == 'L') && \
+    (s[3] == 'l' || s[3] == 'L'))
 
 /* Cast string s with size and encoding to a Python list,
    using the input and output syntax for arrays.
@@ -643,31 +650,28 @@ static PyObject *
 cast_array(char *s, Py_ssize_t size, int encoding,
      int type, PyObject *cast, char delim)
 {
-    PyObject   *result, *stack[MAX_ARRAY_DEPTH];
-    char       *end = s + size, *t;
-    int         depth, ranges = 0, level = 0;
+    PyObject *result, *stack[MAX_ARRAY_DEPTH];
+    char *end = s + size, *t;
+    int depth, ranges = 0, level = 0;
 
-    if (type)
-    {
+    if (type) {
         type &= ~PYGRES_ARRAY; /* get the base type */
         if (!type) type = PYGRES_TEXT;
     }
-    if (!delim)
+    if (!delim) {
         delim = ',';
-    else if (delim == '{' || delim =='}' || delim=='\\')
-    {
+    }
+    else if (delim == '{' || delim =='}' || delim=='\\') {
         PyErr_SetString(PyExc_ValueError, "Invalid array delimiter");
         return NULL;
     }
 
     /* strip blanks at the beginning */
     while (s != end && *s == ' ') ++s;
-    if (*s == '[') /* dimension ranges */
-    {
+    if (*s == '[') { /* dimension ranges */
         int valid;
 
-        for (valid = 0; !valid;)
-        {
+        for (valid = 0; !valid;) {
             if (s == end || *s++ != '[') break;
             while (s != end && *s == ' ') ++s;
             if (s != end && (*s == '+' || *s == '-')) ++s;
@@ -680,34 +684,30 @@ cast_array(char *s, Py_ssize_t size, int encoding,
             if (s == end || *s++ != ']') break;
             while (s != end && *s == ' ') ++s;
             ++ranges;
-            if (s != end && *s == '=')
-            {
+            if (s != end && *s == '=') {
                 do ++s; while (s != end && *s == ' ');
                 valid = 1;
             }
         }
-        if (!valid)
-        {
+        if (!valid) {
             PyErr_SetString(PyExc_ValueError, "Invalid array dimensions");
             return NULL;
         }
     }
-    for (t = s, depth = 0; t != end && (*t == '{' || *t == ' '); ++t)
+    for (t = s, depth = 0; t != end && (*t == '{' || *t == ' '); ++t) {
         if (*t == '{') ++depth;
-    if (!depth)
-    {
+    }
+    if (!depth) {
         PyErr_SetString(PyExc_ValueError,
-            "Array must start with a left brace");
+                        "Array must start with a left brace");
         return NULL;
     }
-    if (ranges && depth != ranges)
-    {
+    if (ranges && depth != ranges) {
         PyErr_SetString(PyExc_ValueError,
-            "Array dimensions do not match content");
+                        "Array dimensions do not match content");
         return NULL;
     }
-    if (depth > MAX_ARRAY_DEPTH)
-    {
+    if (depth > MAX_ARRAY_DEPTH) {
         PyErr_SetString(PyExc_ValueError, "Array is too deeply nested");
         return NULL;
     }
@@ -716,54 +716,44 @@ cast_array(char *s, Py_ssize_t size, int encoding,
     if (!result) return NULL;
     do ++s; while (s != end && *s == ' ');
     /* everything is set up, start parsing the array */
-    while (s != end)
-    {
-        if (*s == '}')
-        {
+    while (s != end) {
+        if (*s == '}') {
             PyObject *subresult;
 
             if (!level) break; /* top level array ended */
             do ++s; while (s != end && *s == ' ');
             if (s == end) break; /* error */
-            if (*s == delim)
-            {
+            if (*s == delim) {
                 do ++s; while (s != end && *s == ' ');
                 if (s == end) break; /* error */
-                if (*s != '{')
-                {
+                if (*s != '{') {
                     PyErr_SetString(PyExc_ValueError,
-                        "Subarray expected but not found");
+                                    "Subarray expected but not found");
                     Py_DECREF(result); return NULL;
                 }
             }
             else if (*s != '}') break; /* error */
             subresult = result;
             result = stack[--level];
-            if (PyList_Append(result, subresult))
-            {
+            if (PyList_Append(result, subresult)) {
                 Py_DECREF(result); return NULL;
             }
         }
-        else if (level == depth) /* we expect elements at this level */
-        {
-            PyObject   *element;
-            char       *estr;
-            Py_ssize_t  esize;
+        else if (level == depth) { /* we expect elements at this level */
+            PyObject *element;
+            char *estr;
+            Py_ssize_t esize;
             int escaped = 0;
 
-            if (*s == '{')
-            {
+            if (*s == '{') {
                 PyErr_SetString(PyExc_ValueError,
-                    "Subarray found where not expected");
+                                "Subarray found where not expected");
                 Py_DECREF(result); return NULL;
             }
-            if (*s == '"') /* quoted element */
-            {
+            if (*s == '"') { /* quoted element */
                 estr = ++s;
-                while (s != end && *s != '"')
-                {
-                    if (*s == '\\')
-                    {
+                while (s != end && *s != '"') {
+                    if (*s == '\\') {
                         ++s; if (s == end) break;
                         escaped = 1;
                     }
@@ -772,67 +762,57 @@ cast_array(char *s, Py_ssize_t size, int encoding,
                 esize = s - estr;
                 do ++s; while (s != end && *s == ' ');
             }
-            else /* unquoted element */
-            {
+            else { /* unquoted element */
                 estr = s;
                 /* can contain blanks inside */
                 while (s != end && *s != '"' &&
-                    *s != '{' && *s != '}' && *s != delim)
+                       *s != '{' && *s != '}' && *s != delim)
                 {
-                    if (*s == '\\')
-                    {
+                    if (*s == '\\') {
                         ++s; if (s == end) break;
                         escaped = 1;
                     }
                     ++s;
                 }
                 t = s; while (t > estr && *(t - 1) == ' ') --t;
-                if (!(esize = t - estr))
-                {
+                if (!(esize = t - estr)) {
                     s = end; break; /* error */
                 }
                 if (STR_IS_NULL(estr, esize)) /* NULL gives None */
                     estr = NULL;
             }
             if (s == end) break; /* error */
-            if (estr)
-            {
-                if (escaped)
-                {
-                    char       *r;
-                    Py_ssize_t  i;
+            if (estr) {
+                if (escaped) {
+                    char *r;
+                    Py_ssize_t i;
 
                     /* create unescaped string */
                     t = estr;
                     estr = (char *) PyMem_Malloc(esize);
-                    if (!estr)
-                    {
+                    if (!estr) {
                         Py_DECREF(result); return PyErr_NoMemory();
                     }
-                    for (i = 0, r = estr; i < esize; ++i)
-                    {
+                    for (i = 0, r = estr; i < esize; ++i) {
                         if (*t == '\\') ++t, ++i;
                         *r++ = *t++;
                     }
                     esize = r - estr;
                 }
-                if (type) /* internal casting of base type */
-                {
+                if (type) { /* internal casting of base type */
                     if (type & PYGRES_TEXT)
                         element = cast_sized_text(estr, esize, encoding, type);
                     else
                         element = cast_sized_simple(estr, esize, type);
                 }
-                else /* external casting of base type */
-                {
+                else { /* external casting of base type */
 #if IS_PY3
                     element = encoding == pg_encoding_ascii ? NULL :
                         get_decoded_string(estr, esize, encoding);
                     if (!element) /* no decoding necessary or possible */
 #endif
                     element = PyBytes_FromStringAndSize(estr, esize);
-                    if (element && cast)
-                    {
+                    if (element && cast) {
                         PyObject *tmp = element;
                         element = PyObject_CallFunctionObjArgs(
                             cast, element, NULL);
@@ -840,33 +820,27 @@ cast_array(char *s, Py_ssize_t size, int encoding,
                     }
                 }
                 if (escaped) PyMem_Free(estr);
-                if (!element)
-                {
+                if (!element) {
                     Py_DECREF(result); return NULL;
                 }
             }
-            else
-            {
+            else {
                 Py_INCREF(Py_None); element = Py_None;
             }
-            if (PyList_Append(result, element))
-            {
+            if (PyList_Append(result, element)) {
                 Py_DECREF(element); Py_DECREF(result); return NULL;
             }
             Py_DECREF(element);
-            if (*s == delim)
-            {
+            if (*s == delim) {
                 do ++s; while (s != end && *s == ' ');
                 if (s == end) break; /* error */
             }
             else if (*s != '}') break; /* error */
         }
-        else /* we expect arrays at this level */
-        {
-            if (*s != '{')
-            {
+        else { /* we expect arrays at this level */
+            if (*s != '{') {
                 PyErr_SetString(PyExc_ValueError,
-                    "Subarray must start with a left brace");
+                                "Subarray must start with a left brace");
                 Py_DECREF(result); return NULL;
             }
             do ++s; while (s != end && *s == ' ');
@@ -875,17 +849,15 @@ cast_array(char *s, Py_ssize_t size, int encoding,
             if (!(result = PyList_New(0))) return NULL;
         }
     }
-    if (s == end || *s != '}')
-    {
+    if (s == end || *s != '}') {
         PyErr_SetString(PyExc_ValueError,
-            "Unexpected end of array");
+                        "Unexpected end of array");
         Py_DECREF(result); return NULL;
     }
     do ++s; while (s != end && *s == ' ');
-    if (s != end)
-    {
+    if (s != end) {
         PyErr_SetString(PyExc_ValueError,
-            "Unexpected characters after end of array");
+                        "Unexpected characters after end of array");
         Py_DECREF(result); return NULL;
     }
     return result;
@@ -902,88 +874,75 @@ static PyObject *
 cast_record(char *s, Py_ssize_t size, int encoding,
      int *type, PyObject *cast, Py_ssize_t len, char delim)
 {
-    PyObject   *result, *ret;
-    char       *end = s + size, *t;
-    Py_ssize_t  i;
+    PyObject *result, *ret;
+    char *end = s + size, *t;
+    Py_ssize_t i;
 
-    if (!delim)
+    if (!delim) {
         delim = ',';
-    else if (delim == '(' || delim ==')' || delim=='\\')
-    {
+    }
+    else if (delim == '(' || delim ==')' || delim=='\\') {
         PyErr_SetString(PyExc_ValueError, "Invalid record delimiter");
         return NULL;
     }
 
     /* strip blanks at the beginning */
     while (s != end && *s == ' ') ++s;
-    if (s == end || *s != '(')
-    {
+    if (s == end || *s != '(') {
         PyErr_SetString(PyExc_ValueError,
-            "Record must start with a left parenthesis");
+                        "Record must start with a left parenthesis");
         return NULL;
     }
     result = PyList_New(0);
     if (!result) return NULL;
     i = 0;
     /* everything is set up, start parsing the record */
-    while (++s != end)
-    {
-        PyObject   *element;
+    while (++s != end) {
+        PyObject *element;
 
-        if (*s == ')' || *s == delim)
-        {
+        if (*s == ')' || *s == delim) {
             Py_INCREF(Py_None); element = Py_None;
         }
-        else
-        {
-            char       *estr;
-            Py_ssize_t  esize;
+        else {
+            char *estr;
+            Py_ssize_t esize;
             int quoted = 0, escaped = 0;
 
             estr = s;
             quoted = *s == '"';
             if (quoted) ++s;
             esize = 0;
-            while (s != end)
-            {
+            while (s != end) {
                 if (!quoted && (*s == ')' || *s == delim))
                     break;
-                if (*s == '"')
-                {
+                if (*s == '"') {
                     ++s; if (s == end) break;
-                    if (!(quoted && *s == '"'))
-                    {
+                    if (!(quoted && *s == '"')) {
                         quoted = !quoted; continue;
                     }
                 }
-                if (*s == '\\')
-                {
+                if (*s == '\\') {
                     ++s; if (s == end) break;
                 }
                 ++s, ++esize;
             }
             if (s == end) break; /* error */
-            if (estr + esize != s)
-            {
-                char       *r;
+            if (estr + esize != s) {
+                char *r;
 
                 escaped = 1;
                 /* create unescaped string */
                 t = estr;
                 estr = (char *) PyMem_Malloc(esize);
-                if (!estr)
-                {
+                if (!estr) {
                     Py_DECREF(result); return PyErr_NoMemory();
                 }
                 quoted = 0;
                 r = estr;
-                while (t != s)
-                {
-                    if (*t == '"')
-                    {
+                while (t != s) {
+                    if (*t == '"') {
                         ++t;
-                        if (!(quoted && *t == '"'))
-                        {
+                        if (!(quoted && *t == '"')) {
                             quoted = !quoted; continue;
                         }
                     }
@@ -991,8 +950,7 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                     *r++ = *t++;
                 }
             }
-            if (type) /* internal casting of element type */
-            {
+            if (type) { /* internal casting of element type */
                 int etype = type[i];
 
                 if (etype & PYGRES_ARRAY)
@@ -1003,37 +961,30 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                 else
                     element = cast_sized_simple(estr, esize, etype);
             }
-            else /* external casting of base type */
-            {
+            else { /* external casting of base type */
 #if IS_PY3
                 element = encoding == pg_encoding_ascii ? NULL :
                     get_decoded_string(estr, esize, encoding);
                 if (!element) /* no decoding necessary or possible */
 #endif
                 element = PyBytes_FromStringAndSize(estr, esize);
-                if (element && cast)
-                {
-                    if (len)
-                    {
+                if (element && cast) {
+                    if (len) {
                         PyObject *ecast = PySequence_GetItem(cast, i);
 
-                        if (ecast)
-                        {
-                            if (ecast != Py_None)
-                            {
+                        if (ecast) {
+                            if (ecast != Py_None) {
                                 PyObject *tmp = element;
                                 element = PyObject_CallFunctionObjArgs(
                                     ecast, element, NULL);
                                 Py_DECREF(tmp);
                             }
                         }
-                        else
-                        {
+                        else {
                             Py_DECREF(element); element = NULL;
                         }
                     }
-                    else
-                    {
+                    else {
                         PyObject *tmp = element;
                         element = PyObject_CallFunctionObjArgs(
                             cast, element, NULL);
@@ -1042,38 +993,32 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                 }
             }
             if (escaped) PyMem_Free(estr);
-            if (!element)
-            {
+            if (!element) {
                 Py_DECREF(result); return NULL;
             }
         }
-        if (PyList_Append(result, element))
-        {
+        if (PyList_Append(result, element)) {
             Py_DECREF(element); Py_DECREF(result); return NULL;
         }
         Py_DECREF(element);
         if (len) ++i;
         if (*s != delim) break; /* no next record */
-        if (len && i >= len)
-        {
+        if (len && i >= len) {
             PyErr_SetString(PyExc_ValueError, "Too many columns");
             Py_DECREF(result); return NULL;
         }
     }
-    if (s == end || *s != ')')
-    {
+    if (s == end || *s != ')') {
         PyErr_SetString(PyExc_ValueError, "Unexpected end of record");
         Py_DECREF(result); return NULL;
     }
     do ++s; while (s != end && *s == ' ');
-    if (s != end)
-    {
+    if (s != end) {
         PyErr_SetString(PyExc_ValueError,
-            "Unexpected characters after end of record");
+                        "Unexpected characters after end of record");
         Py_DECREF(result); return NULL;
     }
-    if (len && i < len)
-    {
+    if (len && i < len) {
         PyErr_SetString(PyExc_ValueError, "Too few columns");
         Py_DECREF(result); return NULL;
     }
@@ -1089,74 +1034,61 @@ cast_record(char *s, Py_ssize_t size, int encoding,
 static PyObject *
 cast_hstore(char *s, Py_ssize_t size, int encoding)
 {
-    PyObject   *result;
-    char       *end = s + size;
+    PyObject *result;
+    char *end = s + size;
 
     result = PyDict_New();
 
     /* everything is set up, start parsing the record */
-    while (s != end)
-    {
-        char       *key, *val;
-        PyObject   *key_obj, *val_obj;
-        Py_ssize_t  key_esc = 0, val_esc = 0, size;
-        int         quoted;
+    while (s != end) {
+        char *key, *val;
+        PyObject *key_obj, *val_obj;
+        Py_ssize_t key_esc = 0, val_esc = 0, size;
+        int quoted;
 
         while (s != end && *s == ' ') ++s;
         if (s == end) break;
         quoted = *s == '"';
-        if (quoted)
-        {
+        if (quoted) {
             key = ++s;
-            while (s != end)
-            {
+            while (s != end) {
                 if (*s == '"') break;
-                if (*s == '\\')
-                {
+                if (*s == '\\') {
                     if (++s == end) break;
                     ++key_esc;
                 }
                 ++s;
             }
-            if (s == end)
-            {
+            if (s == end) {
                 PyErr_SetString(PyExc_ValueError, "Unterminated quote");
                 Py_DECREF(result); return NULL;
             }
         }
-        else
-        {
+        else {
             key = s;
-            while (s != end)
-            {
+            while (s != end) {
                 if (*s == '=' || *s == ' ') break;
-                if (*s == '\\')
-                {
+                if (*s == '\\') {
                     if (++s == end) break;
                     ++key_esc;
                 }
                 ++s;
             }
-            if (s == key)
-            {
+            if (s == key) {
                 PyErr_SetString(PyExc_ValueError, "Missing key");
                 Py_DECREF(result); return NULL;
             }
         }
         size = s - key - key_esc;
-        if (key_esc)
-        {
+        if (key_esc) {
             char *r = key, *t;
             key = (char *) PyMem_Malloc(size);
-            if (!key)
-            {
+            if (!key) {
                 Py_DECREF(result); return PyErr_NoMemory();
             }
             t = key;
-            while (r != s)
-            {
-                if (*r == '\\')
-                {
+            while (r != s) {
+                if (*r == '\\') {
                     ++r; if (r == s) break;
                 }
                 *t++ = *r++;
@@ -1164,76 +1096,61 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
         }
         key_obj = cast_sized_text(key, size, encoding, PYGRES_TEXT);
         if (key_esc) PyMem_Free(key);
-        if (!key_obj)
-        {
+        if (!key_obj) {
             Py_DECREF(result); return NULL;
         }
         if (quoted) ++s;
         while (s != end && *s == ' ') ++s;
-        if (s == end || *s++ != '=' || s == end || *s++ != '>')
-        {
+        if (s == end || *s++ != '=' || s == end || *s++ != '>') {
             PyErr_SetString(PyExc_ValueError, "Invalid characters after key");
             Py_DECREF(key_obj); Py_DECREF(result); return NULL;
         }
         while (s != end && *s == ' ') ++s;
         quoted = *s == '"';
-        if (quoted)
-        {
+        if (quoted) {
             val = ++s;
-            while (s != end)
-            {
+            while (s != end) {
                 if (*s == '"') break;
-                if (*s == '\\')
-                {
+                if (*s == '\\') {
                     if (++s == end) break;
                     ++val_esc;
                 }
                 ++s;
             }
-            if (s == end)
-            {
+            if (s == end) {
                 PyErr_SetString(PyExc_ValueError, "Unterminated quote");
                 Py_DECREF(result); return NULL;
             }
         }
-        else
-        {
+        else {
             val = s;
-            while (s != end)
-            {
+            while (s != end) {
                 if (*s == ',' || *s == ' ') break;
-                if (*s == '\\')
-                {
+                if (*s == '\\') {
                     if (++s == end) break;
                     ++val_esc;
                 }
                 ++s;
             }
-            if (s == val)
-            {
+            if (s == val) {
                 PyErr_SetString(PyExc_ValueError, "Missing value");
                 Py_DECREF(key_obj); Py_DECREF(result); return NULL;
             }
             if (STR_IS_NULL(val, s - val))
                 val = NULL;
         }
-        if (val)
-        {
+        if (val) {
             size = s - val - val_esc;
-            if (val_esc)
-            {
+            if (val_esc) {
                 char *r = val, *t;
                 val = (char *) PyMem_Malloc(size);
-                if (!val)
-                {
+                if (!val) {
                     Py_DECREF(key_obj); Py_DECREF(result);
                     return PyErr_NoMemory();
                 }
                 t = val;
-                while (r != s)
-                {
-                    if (*r == '\\')
-                    {
+                while (r != s) {
+                    if (*r == '\\') {
                         ++r; if (r == s) break;
                     }
                     *t++ = *r++;
@@ -1241,29 +1158,24 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             }
             val_obj = cast_sized_text(val, size, encoding, PYGRES_TEXT);
             if (val_esc) PyMem_Free(val);
-            if (!val_obj)
-            {
+            if (!val_obj) {
                 Py_DECREF(key_obj); Py_DECREF(result); return NULL;
             }
         }
-        else
-        {
+        else {
             Py_INCREF(Py_None); val_obj = Py_None;
         }
         if (quoted) ++s;
         while (s != end && *s == ' ') ++s;
-        if (s != end)
-        {
-            if (*s++ != ',')
-            {
+        if (s != end) {
+            if (*s++ != ',') {
                 PyErr_SetString(PyExc_ValueError,
-                    "Invalid characters after val");
+                                "Invalid characters after val");
                 Py_DECREF(key_obj); Py_DECREF(val_obj);
                 Py_DECREF(result); return NULL;
             }
             while (s != end && *s == ' ') ++s;
-            if (s == end)
-            {
+            if (s == end) {
                 PyErr_SetString(PyExc_ValueError, "Missing entry");
                 Py_DECREF(key_obj); Py_DECREF(val_obj);
                 Py_DECREF(result); return NULL;
@@ -1283,19 +1195,16 @@ notice_receiver(void *arg, const PGresult *res)
     connObject *self = (connObject*) arg;
     PyObject *func = self->notice_receiver;
 
-    if (func)
-    {
+    if (func) {
         noticeObject *notice = PyObject_NEW(noticeObject, &noticeType);
         PyObject *ret;
-        if (notice)
-        {
+        if (notice) {
             notice->pgcnx = arg;
             notice->res = res;
         }
-        else
-        {
+        else {
             Py_INCREF(Py_None);
-            notice = (noticeObject *)(void *)Py_None;
+            notice = (noticeObject *)(void *) Py_None;
         }
         ret = PyObject_CallFunction(func, "(O)", notice);
         Py_XDECREF(ret);
@@ -1309,15 +1218,13 @@ get_error_type(const char *sqlstate)
 {
     switch (sqlstate[0]) {
         case '0':
-            switch (sqlstate[1])
-            {
+            switch (sqlstate[1]) {
                 case 'A':
                     return NotSupportedError;
             }
             break;
         case '2':
-            switch (sqlstate[1])
-            {
+            switch (sqlstate[1]) {
                 case '0':
                 case '1':
                     return ProgrammingError;
@@ -1339,8 +1246,7 @@ get_error_type(const char *sqlstate)
             }
             break;
         case '3':
-            switch (sqlstate[1])
-            {
+            switch (sqlstate[1]) {
                 case '4':
                     return OperationalError;
                 case '8':
@@ -1353,8 +1259,7 @@ get_error_type(const char *sqlstate)
             }
             break;
         case '4':
-            switch (sqlstate[1])
-            {
+            switch (sqlstate[1]) {
                 case '0':
                     return OperationalError;
                 case '2':
@@ -1378,37 +1283,33 @@ static void
 set_error_msg_and_state(PyObject *type,
     const char *msg, int encoding, const char *sqlstate)
 {
-    PyObject   *err_obj, *msg_obj, *sql_obj = NULL;
+    PyObject *err_obj, *msg_obj, *sql_obj = NULL;
 
 #if IS_PY3
     if (encoding == -1) /* unknown */
-    {
         msg_obj = PyUnicode_DecodeLocale(msg, NULL);
-    }
     else
         msg_obj = get_decoded_string(msg, strlen(msg), encoding);
     if (!msg_obj) /* cannot decode */
 #endif
     msg_obj = PyBytes_FromString(msg);
 
-    if (sqlstate)
+    if (sqlstate) {
         sql_obj = PyStr_FromStringAndSize(sqlstate, 5);
-    else
-    {
+    }
+    else {
         Py_INCREF(Py_None); sql_obj = Py_None;
     }
 
     err_obj = PyObject_CallFunctionObjArgs(type, msg_obj, NULL);
-    if (err_obj)
-    {
+    if (err_obj) {
         Py_DECREF(msg_obj);
         PyObject_SetAttrString(err_obj, "sqlstate", sql_obj);
         Py_DECREF(sql_obj);
         PyErr_SetObject(type, err_obj);
         Py_DECREF(err_obj);
     }
-    else
-    {
+    else {
         PyErr_SetString(type, msg);
     }
 }
@@ -1424,19 +1325,17 @@ set_error_msg(PyObject *type, const char *msg)
 static void
 set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
 {
-    char *sqlstate = NULL; int encoding = pg_encoding_ascii;
+    char *sqlstate = NULL;
+    int encoding = pg_encoding_ascii;
 
-    if (cnx)
-    {
+    if (cnx) {
         char *err_msg = PQerrorMessage(cnx);
-        if (err_msg)
-        {
+        if (err_msg) {
             msg = err_msg;
             encoding = PQclientEncoding(cnx);
         }
     }
-    if (result)
-    {
+    if (result) {
         sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
         if (sqlstate) type = get_error_type(sqlstate);
     }
@@ -1448,8 +1347,7 @@ set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
 static int
 check_cnx_obj(connObject *self)
 {
-    if (!self || !self->valid || !self->cnx)
-    {
+    if (!self || !self->valid || !self->cnx) {
         set_error_msg(OperationalError, "Connection has been closed");
         return 0;
     }
@@ -1467,38 +1365,32 @@ format_result(const PGresult *res)
 {
     const int n = PQnfields(res);
 
-    if (n > 0)
-    {
+    if (n > 0) {
         char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
         int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
 
-        if (aligns && sizes)
-        {
+        if (aligns && sizes) {
             const int m = PQntuples(res);
             int i, j;
             size_t size;
             char *buffer;
 
             /* calculate sizes and alignments */
-            for (j = 0; j < n; ++j)
-            {
+            for (j = 0; j < n; ++j) {
                 const char * const s = PQfname(res, j);
                 const int format = PQfformat(res, j);
 
-                sizes[j] = s ? (int)strlen(s) : 0;
-                if (format)
-                {
+                sizes[j] = s ? (int) strlen(s) : 0;
+                if (format) {
                     aligns[j] = '\0';
                     if (m && sizes[j] < 8)
                         /* "<binary>" must fit */
                         sizes[j] = 8;
                 }
-                else
-                {
+                else {
                     const Oid ftype = PQftype(res, j);
 
-                    switch (ftype)
-                    {
+                    switch (ftype) {
                         case INT2OID:
                         case INT4OID:
                         case INT8OID:
@@ -1516,12 +1408,9 @@ format_result(const PGresult *res)
                     }
                 }
             }
-            for (i = 0; i < m; ++i)
-            {
-                for (j = 0; j < n; ++j)
-                {
-                    if (aligns[j])
-                    {
+            for (i = 0; i < m; ++i) {
+                for (j = 0; j < n; ++j) {
+                    if (aligns[j]) {
                         const int k = PQgetlength(res, i, j);
 
                         if (sizes[j] < k)
@@ -1539,17 +1428,15 @@ format_result(const PGresult *res)
             size += 40;
             /* is the buffer size that needs to be allocated */
             buffer = (char *) PyMem_Malloc(size);
-            if (buffer)
-            {
+            if (buffer) {
                 char *p = buffer;
                 PyObject *result;
 
                 /* create the header */
-                for (j = 0; j < n; ++j)
-                {
+                for (j = 0; j < n; ++j) {
                     const char * const s = PQfname(res, j);
                     const int k = sizes[j];
-                    const int h = (k - (int)strlen(s)) / 2;
+                    const int h = (k - (int) strlen(s)) / 2;
 
                     sprintf(p, "%*s", h, "");
                     sprintf(p + h, "%-*s", k - h, s);
@@ -1558,8 +1445,7 @@ format_result(const PGresult *res)
                         *p++ = '|';
                 }
                 *p++ = '\n';
-                for (j = 0; j < n; ++j)
-                {
+                for (j = 0; j < n; ++j) {
                     int k = sizes[j];
 
                     while (k--)
@@ -1569,24 +1455,18 @@ format_result(const PGresult *res)
                 }
                 *p++ = '\n';
                 /* create the body */
-                for (i = 0; i < m; ++i)
-                {
-                    for (j = 0; j < n; ++j)
-                    {
+                for (i = 0; i < m; ++i) {
+                    for (j = 0; j < n; ++j) {
                         const char align = aligns[j];
                         const int k = sizes[j];
 
-                        if (align)
-                        {
-                            sprintf(p, align == 'r' ?
-                                "%*s" : "%-*s", k,
-                                PQgetvalue(res, i, j));
+                        if (align) {
+                            sprintf(p, align == 'r' ? "%*s" : "%-*s", k,
+                                    PQgetvalue(res, i, j));
                         }
-                        else
-                        {
+                        else {
                             sprintf(p, "%-*s", k,
-                                PQgetisnull(res, i, j) ?
-                                "" : "<binary>");
+                                    PQgetisnull(res, i, j) ? "" : "<binary>");
                         }
                         p += k;
                         if (j + 1 < n)
@@ -1603,13 +1483,11 @@ format_result(const PGresult *res)
                 PyMem_Free(buffer);
                 return result;
             }
-            else
-            {
+            else {
                 PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
             }
         }
-        else
-        {
+        else {
             PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
         }
     }
@@ -1629,25 +1507,20 @@ check_lo_obj(largeObject *self, int level)
     if (!check_cnx_obj(self->pgcnx))
         return 0;
 
-    if (!self->lo_oid)
-    {
+    if (!self->lo_oid) {
         set_error_msg(IntegrityError, "Object is not valid (null oid)");
         return 0;
     }
 
-    if (level & CHECK_OPEN)
-    {
-        if (self->lo_fd < 0)
-        {
+    if (level & CHECK_OPEN) {
+        if (self->lo_fd < 0) {
             PyErr_SetString(PyExc_IOError, "Object is not opened");
             return 0;
         }
     }
 
-    if (level & CHECK_CLOSE)
-    {
-        if (self->lo_fd >= 0)
-        {
+    if (level & CHECK_CLOSE) {
+        if (self->lo_fd >= 0) {
             PyErr_SetString(PyExc_IOError, "Object is already opened");
             return 0;
         }
@@ -1662,8 +1535,9 @@ largeNew(connObject *pgcnx, Oid oid)
 {
     largeObject *large_obj;
 
-    if (!(large_obj = PyObject_NEW(largeObject, &largeType)))
+    if (!(large_obj = PyObject_NEW(largeObject, &largeType))) {
         return NULL;
+    }
 
     Py_XINCREF(pgcnx);
     large_obj->pgcnx = pgcnx;
@@ -1692,24 +1566,22 @@ static char largeOpen__doc__[] =
 static PyObject *
 largeOpen(largeObject *self, PyObject *args)
 {
-    int         mode,
-                fd;
+    int mode, fd;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "i", &mode))
-    {
+    if (!PyArg_ParseTuple(args, "i", &mode)) {
         PyErr_SetString(PyExc_TypeError,
-            "The open() method takes an integer argument");
+                        "The open() method takes an integer argument");
         return NULL;
     }
 
     /* check validity */
-    if (!check_lo_obj(self, CHECK_CLOSE))
+    if (!check_lo_obj(self, CHECK_CLOSE)) {
         return NULL;
+    }
 
     /* opens large object */
-    if ((fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode)) == -1)
-    {
+    if ((fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode)) == -1) {
         PyErr_SetString(PyExc_IOError, "Can't open large object");
         return NULL;
     }
@@ -1728,12 +1600,12 @@ static PyObject *
 largeClose(largeObject *self, PyObject *noargs)
 {
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_OPEN))
+    if (!check_lo_obj(self, CHECK_OPEN)) {
         return NULL;
+    }
 
     /* closes large object */
-    if (lo_close(self->pgcnx->cnx, self->lo_fd))
-    {
+    if (lo_close(self->pgcnx->cnx, self->lo_fd)) {
         PyErr_SetString(PyExc_IOError, "Error while closing large object fd");
         return NULL;
     }
@@ -1752,33 +1624,32 @@ static char largeRead__doc__[] =
 static PyObject *
 largeRead(largeObject *self, PyObject *args)
 {
-    int         size;
-    PyObject   *buffer;
+    int size;
+    PyObject *buffer;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "i", &size))
-    {
+    if (!PyArg_ParseTuple(args, "i", &size)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method read() takes an integer argument");
+                        "Method read() takes an integer argument");
         return NULL;
     }
 
-    if (size <= 0)
-    {
+    if (size <= 0) {
         PyErr_SetString(PyExc_ValueError,
-            "Method read() takes a positive integer as argument");
+                        "Method read() takes a positive integer as argument");
         return NULL;
     }
 
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_OPEN))
+    if (!check_lo_obj(self, CHECK_OPEN)) {
         return NULL;
+    }
 
     /* allocate buffer and runs read */
     buffer = PyBytes_FromStringAndSize((char *) NULL, size);
 
     if ((size = lo_read(self->pgcnx->cnx, self->lo_fd,
-        PyBytes_AS_STRING((PyBytesObject *)(buffer)), size)) == -1)
+        PyBytes_AS_STRING((PyBytesObject *) (buffer)), size)) == -1)
     {
         PyErr_SetString(PyExc_IOError, "Error while reading");
         Py_XDECREF(buffer);
@@ -1798,21 +1669,20 @@ static char largeWrite__doc__[] =
 static PyObject *
 largeWrite(largeObject *self, PyObject *args)
 {
-    char       *buffer;
-    int         size,
-                bufsize;
+    char *buffer;
+    int size, bufsize;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "s#", &buffer, &bufsize))
-    {
+    if (!PyArg_ParseTuple(args, "s#", &buffer, &bufsize)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method write() expects a sized string as argument");
+                        "Method write() expects a sized string as argument");
         return NULL;
     }
 
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_OPEN))
+    if (!check_lo_obj(self, CHECK_OPEN)) {
         return NULL;
+    }
 
     /* sends query */
     if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
@@ -1837,24 +1707,23 @@ static PyObject *
 largeSeek(largeObject *self, PyObject *args)
 {
     /* offset and whence are initialized to keep compiler happy */
-    int         ret,
-                offset = 0,
-                whence = 0;
+    int ret, offset = 0, whence = 0;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "ii", &offset, &whence))
-    {
+    if (!PyArg_ParseTuple(args, "ii", &offset, &whence)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method lseek() expects two integer arguments");
+                        "Method lseek() expects two integer arguments");
         return NULL;
     }
 
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_OPEN))
+    if (!check_lo_obj(self, CHECK_OPEN)) {
         return NULL;
+    }
 
     /* sends query */
-    if ((ret = lo_lseek(self->pgcnx->cnx, self->lo_fd, offset, whence)) == -1)
+    if ((ret = lo_lseek(
+        self->pgcnx->cnx, self->lo_fd, offset, whence)) == -1)
     {
         PyErr_SetString(PyExc_IOError, "Error while moving cursor");
         return NULL;
@@ -1872,23 +1741,21 @@ static char largeSize__doc__[] =
 static PyObject *
 largeSize(largeObject *self, PyObject *noargs)
 {
-    int         start,
-                end;
+    int start, end;
 
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_OPEN))
+    if (!check_lo_obj(self, CHECK_OPEN)) {
         return NULL;
+    }
 
     /* gets current position */
-    if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1)
-    {
+    if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1) {
         PyErr_SetString(PyExc_IOError, "Error while getting current position");
         return NULL;
     }
 
     /* gets end position */
-    if ((end = lo_lseek(self->pgcnx->cnx, self->lo_fd, 0, SEEK_END)) == -1)
-    {
+    if ((end = lo_lseek(self->pgcnx->cnx, self->lo_fd, 0, SEEK_END)) == -1) {
         PyErr_SetString(PyExc_IOError, "Error while getting end position");
         return NULL;
     }
@@ -1898,7 +1765,7 @@ largeSize(largeObject *self, PyObject *noargs)
         self->pgcnx->cnx, self->lo_fd, start, SEEK_SET)) == -1)
     {
         PyErr_SetString(PyExc_IOError,
-            "Error while moving back to first position");
+                        "Error while moving back to first position");
         return NULL;
     }
 
@@ -1914,15 +1781,15 @@ static char largeTell__doc__[] =
 static PyObject *
 largeTell(largeObject *self, PyObject *noargs)
 {
-    int         start;
+    int start;
 
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_OPEN))
+    if (!check_lo_obj(self, CHECK_OPEN)) {
         return NULL;
+    }
 
     /* gets current position */
-    if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1)
-    {
+    if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1) {
         PyErr_SetString(PyExc_IOError, "Error while getting position");
         return NULL;
     }
@@ -1942,20 +1809,19 @@ largeExport(largeObject *self, PyObject *args)
     char *name;
 
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_CLOSE))
+    if (!check_lo_obj(self, CHECK_CLOSE)) {
         return NULL;
+    }
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "s", &name))
-    {
+    if (!PyArg_ParseTuple(args, "s", &name)) {
         PyErr_SetString(PyExc_TypeError,
-            "The method export() takes a filename as argument");
+                        "The method export() takes a filename as argument");
         return NULL;
     }
 
     /* runs command */
-    if (lo_export(self->pgcnx->cnx, self->lo_oid, name) != 1)
-    {
+    if (lo_export(self->pgcnx->cnx, self->lo_oid, name) != 1) {
         PyErr_SetString(PyExc_IOError, "Error while exporting large object");
         return NULL;
     }
@@ -1973,12 +1839,12 @@ static PyObject *
 largeUnlink(largeObject *self, PyObject *noargs)
 {
     /* checks validity */
-    if (!check_lo_obj(self, CHECK_CLOSE))
+    if (!check_lo_obj(self, CHECK_CLOSE)) {
         return NULL;
+    }
 
     /* deletes the object, invalidate it on success */
-    if (lo_unlink(self->pgcnx->cnx, self->lo_oid) != 1)
-    {
+    if (lo_unlink(self->pgcnx->cnx, self->lo_oid) != 1) {
         PyErr_SetString(PyExc_IOError, "Error while unlinking large object");
         return NULL;
     }
@@ -1994,9 +1860,9 @@ largeDir(largeObject *self, PyObject *noargs)
 {
     PyObject *attrs;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-    PyObject_CallMethod(attrs, "extend", "[sss]",
-        "oid", "pgcnx", "error");
+    attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
+    PyObject_CallMethod(
+        attrs, "extend", "[sss]", "oid", "pgcnx", "error");
 
     return attrs;
 }
@@ -2025,10 +1891,8 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
     /* list postgreSQL large object fields */
 
     /* associated pg connection object */
-    if (!strcmp(name, "pgcnx"))
-    {
-        if (check_lo_obj(self, 0))
-        {
+    if (!strcmp(name, "pgcnx")) {
+        if (check_lo_obj(self, 0)) {
             Py_INCREF(self->pgcnx);
             return (PyObject *) (self->pgcnx);
         }
@@ -2038,8 +1902,7 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
     }
 
     /* large object oid */
-    if (!strcmp(name, "oid"))
-    {
+    if (!strcmp(name, "oid")) {
         if (check_lo_obj(self, 0))
             return PyInt_FromLong(self->lo_oid);
         PyErr_Clear();
@@ -2059,7 +1922,7 @@ largeGetAttr(largeObject *self, PyObject *nameobj)
 static PyObject *
 largeStr(largeObject *self)
 {
-    char        str[80];
+    char str[80];
     sprintf(str, self->lo_fd >= 0 ?
             "Opened large object, oid %ld" :
             "Closed large object, oid %ld", (long) self->lo_oid);
@@ -2109,8 +1972,7 @@ static PyTypeObject largeType = {
 static void
 connDelete(connObject *self)
 {
-    if (self->cnx)
-    {
+    if (self->cnx) {
         Py_BEGIN_ALLOW_THREADS
         PQfinish(self->cnx);
         Py_END_ALLOW_THREADS
@@ -2130,12 +1992,14 @@ connSource(connObject *self, PyObject *noargs)
     sourceObject *source_obj;
 
     /* checks validity */
-    if (!check_cnx_obj(self))
+    if (!check_cnx_obj(self)) {
         return NULL;
+    }
 
     /* allocates new query object */
-    if (!(source_obj = PyObject_NEW(sourceObject, &sourceType)))
+    if (!(source_obj = PyObject_NEW(sourceObject, &sourceType))) {
         return NULL;
+    }
 
     /* initializes internal parameters */
     Py_XINCREF(self);
@@ -2153,44 +2017,36 @@ connSource(connObject *self, PyObject *noargs)
 static PyObject *
 _connQuery(connObject *self, PyObject *args, int prepared)
 {
-    PyObject    *query_str_obj;
-    PyObject    *param_obj = NULL;
-    char        *query;
-    PGresult    *result;
-    queryObject *query_obj;
-    int         encoding,
-                status,
-                nparms = 0;
+    PyObject *query_str_obj, *param_obj = NULL;
+    PGresult* result;
+    queryObject* query_obj;
+    char *query;
+    int encoding, status, nparms = 0;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* get query args */
-    if (!PyArg_ParseTuple(args, "O|O", &query_str_obj, &param_obj))
-    {
+    if (!PyArg_ParseTuple(args, "O|O", &query_str_obj, &param_obj)) {
         return NULL;
     }
 
     encoding = PQclientEncoding(self->cnx);
 
-    if (PyBytes_Check(query_str_obj))
-    {
+    if (PyBytes_Check(query_str_obj)) {
         query = PyBytes_AsString(query_str_obj);
         query_str_obj = NULL;
     }
-    else if (PyUnicode_Check(query_str_obj))
-    {
+    else if (PyUnicode_Check(query_str_obj)) {
         query_str_obj = get_encoded_string(query_str_obj, encoding);
         if (!query_str_obj) return NULL; /* pass the UnicodeEncodeError */
         query = PyBytes_AsString(query_str_obj);
     }
-    else
-    {
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Method query() expects a string as first argument");
+                        "Method query() expects a string as first argument");
         return NULL;
     }
 
@@ -2198,44 +2054,38 @@ _connQuery(connObject *self, PyObject *args, int prepared)
      * an empty tuple the same as no argument since we'll get that when the
      * caller passes no arguments to db.query(), and historic behaviour was
      * to call PQexec() in that case, which can execute multiple commands. */
-    if (param_obj)
-    {
-        param_obj = PySequence_Fast(param_obj,
-            "Method query() expects a sequence as second argument");
-        if (!param_obj)
-        {
+    if (param_obj) {
+        param_obj = PySequence_Fast(
+            param_obj, "Method query() expects a sequence as second argument");
+        if (!param_obj) {
             Py_XDECREF(query_str_obj);
             return NULL;
         }
-        nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
+        nparms = (int) PySequence_Fast_GET_SIZE(param_obj);
 
         /* if there's a single argument and it's a list or tuple, it
          * contains the positional arguments. */
-        if (nparms == 1)
-        {
+        if (nparms == 1) {
             PyObject *first_obj = PySequence_Fast_GET_ITEM(param_obj, 0);
-            if (PyList_Check(first_obj) || PyTuple_Check(first_obj))
-            {
+            if (PyList_Check(first_obj) || PyTuple_Check(first_obj)) {
                 Py_DECREF(param_obj);
                 param_obj = PySequence_Fast(first_obj, NULL);
-                nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
+                nparms = (int) PySequence_Fast_GET_SIZE(param_obj);
             }
         }
     }
 
     /* gets result */
-    if (nparms)
-    {
+    if (nparms) {
         /* prepare arguments */
-        PyObject    **str, **s;
-        const char  **parms, **p;
+        PyObject **str, **s;
+        const char **parms, **p;
         register int i;
 
-        str = (PyObject **)PyMem_Malloc(nparms * sizeof(*str));
-        parms = (const char **)PyMem_Malloc(nparms * sizeof(*parms));
-        if (!str || !parms)
-        {
-            PyMem_Free((void *)parms); PyMem_Free(str);
+        str = (PyObject **) PyMem_Malloc(nparms * sizeof(*str));
+        parms = (const char **) PyMem_Malloc(nparms * sizeof(*parms));
+        if (!str || !parms) {
+            PyMem_Free((void *) parms); PyMem_Free(str);
             Py_XDECREF(query_str_obj); Py_XDECREF(param_obj);
             return PyErr_NoMemory();
         }
@@ -2243,24 +2093,19 @@ _connQuery(connObject *self, PyObject *args, int prepared)
         /* convert optional args to a list of strings -- this allows
          * the caller to pass whatever they like, and prevents us
          * from having to map types to OIDs */
-        for (i = 0, s=str, p=parms; i < nparms; ++i, ++p)
-        {
+        for (i = 0, s = str, p = parms; i < nparms; ++i, ++p) {
             PyObject *obj = PySequence_Fast_GET_ITEM(param_obj, i);
 
-            if (obj == Py_None)
-            {
+            if (obj == Py_None) {
                 *p = NULL;
             }
-            else if (PyBytes_Check(obj))
-            {
+            else if (PyBytes_Check(obj)) {
                 *p = PyBytes_AsString(obj);
             }
-            else if (PyUnicode_Check(obj))
-            {
+            else if (PyUnicode_Check(obj)) {
                 PyObject *str_obj = get_encoded_string(obj, encoding);
-                if (!str_obj)
-                {
-                    PyMem_Free((void *)parms);
+                if (!str_obj) {
+                    PyMem_Free((void *) parms);
                     while (s != str) { s--; Py_DECREF(*s); }
                     PyMem_Free(str);
                     Py_XDECREF(query_str_obj);
@@ -2271,17 +2116,16 @@ _connQuery(connObject *self, PyObject *args, int prepared)
                 *s++ = str_obj;
                 *p = PyBytes_AsString(str_obj);
             }
-            else
-            {
+            else {
                 PyObject *str_obj = PyObject_Str(obj);
-                if (!str_obj)
-                {
-                    PyMem_Free((void *)parms);
+                if (!str_obj) {
+                    PyMem_Free((void *) parms);
                     while (s != str) { s--; Py_DECREF(*s); }
                     PyMem_Free(str);
                     Py_XDECREF(query_str_obj);
                     Py_XDECREF(param_obj);
-                    PyErr_SetString(PyExc_TypeError,
+                    PyErr_SetString(
+                        PyExc_TypeError,
                         "Query parameter has no string representation");
                     return NULL;
                 }
@@ -2298,12 +2142,11 @@ _connQuery(connObject *self, PyObject *args, int prepared)
                 NULL, parms, NULL, NULL, 0);
         Py_END_ALLOW_THREADS
 
-        PyMem_Free((void *)parms);
+        PyMem_Free((void *) parms);
         while (s != str) { s--; Py_DECREF(*s); }
         PyMem_Free(str);
     }
-    else
-    {
+    else {
         Py_BEGIN_ALLOW_THREADS
         result = prepared ?
             PQexecPrepared(self->cnx, query, 0,
@@ -2317,8 +2160,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
     Py_XDECREF(param_obj);
 
     /* checks result validity */
-    if (!result)
-    {
+    if (!result) {
         PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
         return NULL;
     }
@@ -2328,10 +2170,8 @@ _connQuery(connObject *self, PyObject *args, int prepared)
     self->date_format = date_format; /* this is normally NULL */
 
     /* checks result status */
-    if ((status = PQresultStatus(result)) != PGRES_TUPLES_OK)
-    {
-        switch (status)
-        {
+    if ((status = PQresultStatus(result)) != PGRES_TUPLES_OK) {
+        switch (status) {
             case PGRES_EMPTY_QUERY:
                 PyErr_SetString(PyExc_ValueError, "Empty query");
                 break;
@@ -2342,14 +2182,13 @@ _connQuery(connObject *self, PyObject *args, int prepared)
                     self->cnx, result);
                 break;
             case PGRES_COMMAND_OK:
-                {                       /* INSERT, UPDATE, DELETE */
-                    Oid     oid = PQoidValue(result);
-                    if (oid == InvalidOid)  /* not a single insert */
-                    {
-                        char    *ret = PQcmdTuples(result);
+                {   /* INSERT, UPDATE, DELETE */
+                    Oid oid = PQoidValue(result);
 
-                        if (ret[0])     /* return number of rows affected */
-                        {
+                    if (oid == InvalidOid) {  /* not a single insert */
+                        char *ret = PQcmdTuples(result);
+
+                        if (ret[0]) {  /* return number of rows affected */
                             PyObject *obj = PyStr_FromString(ret);
                             PQclear(result);
                             return obj;
@@ -2362,7 +2201,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
                     PQclear(result);
                     return PyInt_FromLong(oid);
                 }
-            case PGRES_COPY_OUT:        /* no data will be received */
+            case PGRES_COPY_OUT: /* no data will be received */
             case PGRES_COPY_IN:
                 PQclear(result);
                 Py_INCREF(Py_None);
@@ -2372,7 +2211,7 @@ _connQuery(connObject *self, PyObject *args, int prepared)
         }
 
         PQclear(result);
-        return NULL;            /* error detected on query */
+        return NULL; /* error detected on query */
     }
 
     if (!(query_obj = PyObject_NEW(queryObject, &queryType)))
@@ -2429,12 +2268,11 @@ static char connPrepare__doc__[] =
 static PyObject *
 connPrepare(connObject *self, PyObject *args)
 {
-    char        *name, *query;
-    int         name_length, query_length;
-    PGresult    *result;
+    char *name, *query;
+    int name_length, query_length;
+    PGresult *result;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
@@ -2444,7 +2282,7 @@ connPrepare(connObject *self, PyObject *args)
         &name, &name_length, &query, &query_length))
     {
         PyErr_SetString(PyExc_TypeError,
-            "Method prepare() takes two string arguments");
+                        "Method prepare() takes two string arguments");
         return NULL;
     }
 
@@ -2452,8 +2290,7 @@ connPrepare(connObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     result = PQprepare(self->cnx, name, query, 0, NULL);
     Py_END_ALLOW_THREADS
-    if (result && PQresultStatus(result) == PGRES_COMMAND_OK)
-    {
+    if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
         PQclear(result);
         Py_INCREF(Py_None);
         return Py_None; /* success */
@@ -2473,22 +2310,19 @@ static char connDescribePrepared__doc__[] =
 static PyObject *
 connDescribePrepared(connObject *self, PyObject *args)
 {
-    char        *name;
-    int         name_length;
-    PGresult    *result;
+    char *name;
+    int name_length;
+    PGresult *result;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* reads args */
-    if (!PyArg_ParseTuple(args, "s#",
-        &name, &name_length))
-    {
+    if (!PyArg_ParseTuple(args, "s#", &name, &name_length)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method prepare() takes a string argument");
+                        "Method prepare() takes a string argument");
         return NULL;
     }
 
@@ -2496,8 +2330,7 @@ connDescribePrepared(connObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     result = PQdescribePrepared(self->cnx, name);
     Py_END_ALLOW_THREADS
-    if (result && PQresultStatus(result) == PGRES_COMMAND_OK)
-    {
+    if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
         queryObject *query_obj = PyObject_NEW(queryObject, &queryType);
         if (!query_obj)
             return PyErr_NoMemory();
@@ -2529,23 +2362,20 @@ connPutLine(connObject *self, PyObject *args)
     char *line;
     int line_length;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* reads args */
-    if (!PyArg_ParseTuple(args, "s#", &line, &line_length))
-    {
+    if (!PyArg_ParseTuple(args, "s#", &line, &line_length)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method putline() takes a string argument");
+                        "Method putline() takes a string argument");
         return NULL;
     }
 
     /* sends line to backend */
-    if (PQputline(self->cnx, line))
-    {
+    if (PQputline(self->cnx, line)) {
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
         return NULL;
     }
@@ -2560,18 +2390,16 @@ static char connGetLine__doc__[] =
 static PyObject *
 connGetLine(connObject *self, PyObject *noargs)
 {
-    char        line[MAX_BUFFER_SIZE];
-    PyObject   *str = NULL;     /* GCC */
+    char line[MAX_BUFFER_SIZE];
+    PyObject *str = NULL;     /* GCC */
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* gets line */
-    switch (PQgetline(self->cnx, line, MAX_BUFFER_SIZE))
-    {
+    switch (PQgetline(self->cnx, line, MAX_BUFFER_SIZE)) {
         case 0:
             str = PyStr_FromString(line);
             break;
@@ -2595,15 +2423,13 @@ static char connEndCopy__doc__[] =
 static PyObject *
 connEndCopy(connObject *self, PyObject *noargs)
 {
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* ends direct copy */
-    if (PQendcopy(self->cnx))
-    {
+    if (PQendcopy(self->cnx)) {
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
         return NULL;
     }
@@ -2627,50 +2453,40 @@ static char connInsertTable__doc__[] =
 static PyObject *
 connInsertTable(connObject *self, PyObject *args)
 {
-    PGresult    *result;
-    char        *table,
-                *buffer,
-                *bufpt;
-    int         encoding;
-    size_t      bufsiz;
-    PyObject    *list,
-                *sublist,
-                *item;
-    PyObject    *(*getitem) (PyObject *, Py_ssize_t);
-    PyObject    *(*getsubitem) (PyObject *, Py_ssize_t);
-    Py_ssize_t  i,
-                j,
-                m,
-                n;
+    PGresult *result;
+    char *table, *buffer, *bufpt;
+    int encoding;
+    size_t bufsiz;
+    PyObject *list, *sublist, *item;
+    PyObject *(*getitem) (PyObject *, Py_ssize_t);
+    PyObject *(*getsubitem) (PyObject *, Py_ssize_t);
+    Py_ssize_t i, j, m, n;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "sO:filter", &table, &list))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    if (!PyArg_ParseTuple(args, "sO:filter", &table, &list)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Method inserttable() expects a string and a list as arguments");
         return NULL;
     }
 
     /* checks list type */
-    if (PyTuple_Check(list))
-    {
+    if (PyTuple_Check(list)) {
         m = PyTuple_Size(list);
         getitem = PyTuple_GetItem;
     }
-    else if (PyList_Check(list))
-    {
+    else if (PyList_Check(list)) {
         m = PyList_Size(list);
         getitem = PyList_GetItem;
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Method inserttable() expects some kind of array"
             " as second argument");
         return NULL;
@@ -2687,8 +2503,7 @@ connInsertTable(connObject *self, PyObject *args)
     result = PQexec(self->cnx, buffer);
     Py_END_ALLOW_THREADS
 
-    if (!result)
-    {
+    if (!result) {
         PyMem_Free(buffer);
         PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
         return NULL;
@@ -2701,37 +2516,32 @@ connInsertTable(connObject *self, PyObject *args)
     n = 0; /* not strictly necessary but avoids warning */
 
     /* feed table */
-    for (i = 0; i < m; ++i)
-    {
+    for (i = 0; i < m; ++i) {
         sublist = getitem(list, i);
-        if (PyTuple_Check(sublist))
-        {
+        if (PyTuple_Check(sublist)) {
             j = PyTuple_Size(sublist);
             getsubitem = PyTuple_GetItem;
         }
-        else if (PyList_Check(sublist))
-        {
+        else if (PyList_Check(sublist)) {
             j = PyList_Size(sublist);
             getsubitem = PyList_GetItem;
         }
-        else
-        {
-            PyErr_SetString(PyExc_TypeError,
+        else {
+            PyErr_SetString(
+                PyExc_TypeError,
                 "Second arg must contain some kind of arrays");
             return NULL;
         }
-        if (i)
-        {
-            if (j != n)
-            {
+        if (i) {
+            if (j != n) {
                 PyMem_Free(buffer);
-                PyErr_SetString(PyExc_TypeError,
+                PyErr_SetString(
+                    PyExc_TypeError,
                     "Arrays contained in second arg must have same size");
                 return NULL;
             }
         }
-        else
-        {
+        else {
             n = j; /* never used before this assignment */
         }
 
@@ -2739,54 +2549,44 @@ connInsertTable(connObject *self, PyObject *args)
         bufpt = buffer;
         bufsiz = MAX_BUFFER_SIZE - 1;
 
-        for (j = 0; j < n; ++j)
-        {
-            if (j)
-            {
+        for (j = 0; j < n; ++j) {
+            if (j) {
                 *bufpt++ = '\t'; --bufsiz;
             }
 
             item = getsubitem(sublist, j);
 
             /* convert item to string and append to buffer */
-            if (item == Py_None)
-            {
-                if (bufsiz > 2)
-                {
+            if (item == Py_None) {
+                if (bufsiz > 2) {
                     *bufpt++ = '\\'; *bufpt++ = 'N';
                     bufsiz -= 2;
                 }
                 else
                     bufsiz = 0;
             }
-            else if (PyBytes_Check(item))
-            {
+            else if (PyBytes_Check(item)) {
                 const char* t = PyBytes_AsString(item);
-                while (*t && bufsiz)
-                {
-                    if (*t == '\\' || *t == '\t' || *t == '\n')
-                    {
+
+                while (*t && bufsiz) {
+                    if (*t == '\\' || *t == '\t' || *t == '\n') {
                         *bufpt++ = '\\'; --bufsiz;
                         if (!bufsiz) break;
                     }
                     *bufpt++ = *t++; --bufsiz;
                 }
             }
-            else if (PyUnicode_Check(item))
-            {
+            else if (PyUnicode_Check(item)) {
                 PyObject *s = get_encoded_string(item, encoding);
-                if (!s)
-                {
+                if (!s) {
                     PyMem_Free(buffer);
                     return NULL; /* pass the UnicodeEncodeError */
                 }
-                else
-                {
+                else {
                     const char* t = PyBytes_AsString(s);
-                    while (*t && bufsiz)
-                    {
-                        if (*t == '\\' || *t == '\t' || *t == '\n')
-                        {
+
+                    while (*t && bufsiz) {
+                        if (*t == '\\' || *t == '\t' || *t == '\n') {
                             *bufpt++ = '\\'; --bufsiz;
                             if (!bufsiz) break;
                         }
@@ -2795,24 +2595,21 @@ connInsertTable(connObject *self, PyObject *args)
                     Py_DECREF(s);
                 }
             }
-            else if (PyInt_Check(item) || PyLong_Check(item))
-            {
+            else if (PyInt_Check(item) || PyLong_Check(item)) {
                 PyObject* s = PyObject_Str(item);
                 const char* t = PyStr_AsString(s);
-                while (*t && bufsiz)
-                {
+
+                while (*t && bufsiz) {
                     *bufpt++ = *t++; --bufsiz;
                 }
                 Py_DECREF(s);
             }
-            else
-            {
+            else {
                 PyObject* s = PyObject_Repr(item);
                 const char* t = PyStr_AsString(s);
-                while (*t && bufsiz)
-                {
-                    if (*t == '\\' || *t == '\t' || *t == '\n')
-                    {
+
+                while (*t && bufsiz) {
+                    if (*t == '\\' || *t == '\t' || *t == '\n') {
                         *bufpt++ = '\\'; --bufsiz;
                         if (!bufsiz) break;
                     }
@@ -2821,8 +2618,7 @@ connInsertTable(connObject *self, PyObject *args)
                 Py_DECREF(s);
             }
 
-            if (bufsiz <= 0)
-            {
+            if (bufsiz <= 0) {
                 PyMem_Free(buffer); return PyErr_NoMemory();
             }
 
@@ -2831,8 +2627,7 @@ connInsertTable(connObject *self, PyObject *args)
         *bufpt++ = '\n'; *bufpt = '\0';
 
         /* sends data */
-        if (PQputline(self->cnx, buffer))
-        {
+        if (PQputline(self->cnx, buffer)) {
             PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
             PQendcopy(self->cnx);
             PyMem_Free(buffer);
@@ -2841,16 +2636,14 @@ connInsertTable(connObject *self, PyObject *args)
     }
 
     /* ends query */
-    if (PQputline(self->cnx, "\\.\n"))
-    {
+    if (PQputline(self->cnx, "\\.\n")) {
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
         PQendcopy(self->cnx);
         PyMem_Free(buffer);
         return NULL;
     }
 
-    if (PQendcopy(self->cnx))
-    {
+    if (PQendcopy(self->cnx)) {
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
         PyMem_Free(buffer);
         return NULL;
@@ -2870,8 +2663,7 @@ static char connTransaction__doc__[] =
 static PyObject *
 connTransaction(connObject *self, PyObject *noargs)
 {
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
@@ -2888,17 +2680,15 @@ connParameter(connObject *self, PyObject *args)
 {
     const char *name;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* get query args */
-    if (!PyArg_ParseTuple(args, "s", &name))
-    {
+    if (!PyArg_ParseTuple(args, "s", &name)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method parameter() takes a string as argument");
+                        "Method parameter() takes a string as argument");
         return NULL;
     }
 
@@ -2916,16 +2706,17 @@ connParameter(connObject *self, PyObject *args)
 static const char *
 date_style_to_format(const char *s)
 {
-    static const char *formats[] = {
-        "%Y-%m-%d",     /* 0 = ISO */
-        "%m-%d-%Y",     /* 1 = Postgres, MDY */
-        "%d-%m-%Y",     /* 2 = Postgres, DMY */
-        "%m/%d/%Y",     /* 3 = SQL, MDY */
-        "%d/%m/%Y",     /* 4 = SQL, DMY */
-        "%d.%m.%Y"};    /* 5 = German */
-
-    switch (s ? *s : 'I')
+    static const char *formats[] =
     {
+        "%Y-%m-%d",  /* 0 = ISO */
+        "%m-%d-%Y",  /* 1 = Postgres, MDY */
+        "%d-%m-%Y",  /* 2 = Postgres, DMY */
+        "%m/%d/%Y",  /* 3 = SQL, MDY */
+        "%d/%m/%Y",  /* 4 = SQL, DMY */
+        "%d.%m.%Y"   /* 5 = German */
+    };
+
+    switch (s ? *s : 'I') {
         case 'P': /* Postgres */
             s = strchr(s + 1, ',');
             if (s) do ++s; while (*s && *s == ' ');
@@ -2945,27 +2736,26 @@ date_style_to_format(const char *s)
 static const char *
 date_format_to_style(const char *s)
 {
-    static const char *datestyle[] = {
+    static const char *datestyle[] =
+    {
         "ISO, YMD",         /* 0 = %Y-%m-%d */
         "Postgres, MDY",    /* 1 = %m-%d-%Y */
         "Postgres, DMY",    /* 2 = %d-%m-%Y */
         "SQL, MDY",         /* 3 = %m/%d/%Y */
         "SQL, DMY",         /* 4 = %d/%m/%Y */
-        "German, DMY"};     /* 5 = %d.%m.%Y */
+        "German, DMY"       /* 5 = %d.%m.%Y */
+    };
 
-    switch (s ? s[1] : 'Y')
-    {
+    switch (s ? s[1] : 'Y') {
         case 'm':
-            switch (s[2])
-            {
+            switch (s[2]) {
                 case '/':
                     return datestyle[3]; /* SQL, MDY */
                 default:
                     return datestyle[1]; /* Postgres, MDY */
             }
         case 'd':
-            switch (s[2])
-            {
+            switch (s[2]) {
                 case '/':
                     return datestyle[4]; /* SQL, DMY */
                 case '.':
@@ -2987,16 +2777,14 @@ connDateFormat(connObject *self, PyObject *noargs)
 {
     const char *fmt;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
     /* check if the date format is cached in the connection */
     fmt = self->date_format;
-    if (!fmt)
-    {
+    if (!fmt) {
         fmt = date_style_to_format(PQparameterStatus(self->cnx, "DateStyle"));
         self->date_format = fmt; /* cache the result */
     }
@@ -3013,33 +2801,31 @@ static char connEscapeLiteral__doc__[] =
 static PyObject *
 connEscapeLiteral(connObject *self, PyObject *string)
 {
-    PyObject   *tmp_obj = NULL, /* auxiliary string object */
-               *to_obj; /* string object to return */
-    char       *from, /* our string argument as encoded string */
-               *to; /* the result as encoded string */
-    Py_ssize_t  from_length; /* length of string */
-    size_t      to_length; /* length of result */
-    int         encoding = -1; /* client encoding */
+    PyObject *tmp_obj = NULL,  /* auxiliary string object */
+             *to_obj;          /* string object to return */
+    char *from,  /* our string argument as encoded string */
+         *to;    /* the result as encoded string */
+    Py_ssize_t from_length;   /* length of string */
+    size_t to_length;         /* length of result */
+    int encoding = -1;        /* client encoding */
 
-    if (PyBytes_Check(string))
-    {
+    if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
-    else if (PyUnicode_Check(string))
-    {
+    else if (PyUnicode_Check(string)) {
         encoding = PQclientEncoding(self->cnx);
         tmp_obj = get_encoded_string(string, encoding);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &from, &from_length);
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Method escape_literal() expects a string as argument");
         return NULL;
     }
 
-    to = PQescapeLiteral(self->cnx, from, (size_t)from_length);
+    to = PQescapeLiteral(self->cnx, from, (size_t) from_length);
     to_length = strlen(to);
 
     Py_XDECREF(tmp_obj);
@@ -3060,33 +2846,31 @@ static char connEscapeIdentifier__doc__[] =
 static PyObject *
 connEscapeIdentifier(connObject *self, PyObject *string)
 {
-    PyObject   *tmp_obj = NULL, /* auxiliary string object */
-               *to_obj; /* string object to return */
-    char       *from, /* our string argument as encoded string */
-               *to; /* the result as encoded string */
-    Py_ssize_t  from_length; /* length of string */
-    size_t      to_length; /* length of result */
-    int         encoding = -1; /* client encoding */
+    PyObject *tmp_obj = NULL,  /* auxiliary string object */
+             *to_obj;          /* string object to return */
+    char *from,  /* our string argument as encoded string */
+         *to;    /* the result as encoded string */
+    Py_ssize_t from_length;   /* length of string */
+    size_t to_length;         /* length of result */
+    int encoding = -1;        /* client encoding */
 
-    if (PyBytes_Check(string))
-    {
+    if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
-    else if (PyUnicode_Check(string))
-    {
+    else if (PyUnicode_Check(string)) {
         encoding = PQclientEncoding(self->cnx);
         tmp_obj = get_encoded_string(string, encoding);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &from, &from_length);
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Method escape_identifier() expects a string as argument");
         return NULL;
     }
 
-    to = PQescapeIdentifier(self->cnx, from, (size_t)from_length);
+    to = PQescapeIdentifier(self->cnx, from, (size_t) from_length);
     to_length = strlen(to);
 
     Py_XDECREF(tmp_obj);
@@ -3100,7 +2884,7 @@ connEscapeIdentifier(connObject *self, PyObject *string)
     return to_obj;
 }
 
-#endif  /* ESCAPING_FUNCS */
+#endif /* ESCAPING_FUNCS */
 
 /* escape string */
 static char connEscapeString__doc__[] =
@@ -3109,41 +2893,38 @@ static char connEscapeString__doc__[] =
 static PyObject *
 connEscapeString(connObject *self, PyObject *string)
 {
-    PyObject   *tmp_obj = NULL, /* auxiliary string object */
-               *to_obj; /* string object to return */
-    char       *from, /* our string argument as encoded string */
-               *to; /* the result as encoded string */
-    Py_ssize_t  from_length; /* length of string */
-    size_t      to_length; /* length of result */
-    int         encoding = -1; /* client encoding */
+    PyObject *tmp_obj = NULL,  /* auxiliary string object */
+             *to_obj;          /* string object to return */
+    char *from,  /* our string argument as encoded string */
+         *to;    /* the result as encoded string */
+    Py_ssize_t from_length;   /* length of string */
+    size_t to_length;         /* length of result */
+    int encoding = -1;        /* client encoding */
 
-    if (PyBytes_Check(string))
-    {
+    if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
-    else if (PyUnicode_Check(string))
-    {
+    else if (PyUnicode_Check(string)) {
         encoding = PQclientEncoding(self->cnx);
         tmp_obj = get_encoded_string(string, encoding);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &from, &from_length);
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Method escape_string() expects a string as argument");
         return NULL;
     }
 
     to_length = 2*from_length + 1;
-    if ((Py_ssize_t)to_length < from_length) /* overflow */
-    {
+    if ((Py_ssize_t) to_length < from_length) { /* overflow */
         to_length = from_length;
         from_length = (from_length - 1)/2;
     }
-    to = (char *)PyMem_Malloc(to_length);
+    to = (char *) PyMem_Malloc(to_length);
     to_length = PQescapeStringConn(self->cnx,
-        to, from, (size_t)from_length, NULL);
+        to, from, (size_t) from_length, NULL);
 
     Py_XDECREF(tmp_obj);
 
@@ -3162,34 +2943,32 @@ static char connEscapeBytea__doc__[] =
 static PyObject *
 connEscapeBytea(connObject *self, PyObject *data)
 {
-    PyObject   *tmp_obj = NULL, /* auxiliary string object */
-               *to_obj; /* string object to return */
-    char       *from, /* our string argument as encoded string */
-               *to; /* the result as encoded string */
-    Py_ssize_t  from_length; /* length of string */
-    size_t      to_length; /* length of result */
-    int         encoding = -1; /* client encoding */
+    PyObject *tmp_obj = NULL,  /* auxiliary string object */
+             *to_obj;          /* string object to return */
+    char *from,  /* our string argument as encoded string */
+         *to;    /* the result as encoded string */
+    Py_ssize_t from_length;    /* length of string */
+    size_t to_length;          /* length of result */
+    int encoding = -1;         /* client encoding */
 
-    if (PyBytes_Check(data))
-    {
+    if (PyBytes_Check(data)) {
         PyBytes_AsStringAndSize(data, &from, &from_length);
     }
-    else if (PyUnicode_Check(data))
-    {
+    else if (PyUnicode_Check(data)) {
         encoding = PQclientEncoding(self->cnx);
         tmp_obj = get_encoded_string(data, encoding);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &from, &from_length);
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Method escape_bytea() expects a string as argument");
         return NULL;
     }
 
-    to = (char *)PQescapeByteaConn(self->cnx,
-        (unsigned char *)from, (size_t)from_length, &to_length);
+    to = (char *) PQescapeByteaConn(self->cnx,
+        (unsigned char *) from, (size_t) from_length, &to_length);
 
     Py_XDECREF(tmp_obj);
 
@@ -3210,25 +2989,24 @@ static char connCreateLO__doc__[] =
 static PyObject *
 connCreateLO(connObject *self, PyObject *args)
 {
-    int         mode;
-    Oid         lo_oid;
+    int mode;
+    Oid lo_oid;
 
     /* checks validity */
-    if (!check_cnx_obj(self))
+    if (!check_cnx_obj(self)) {
         return NULL;
+    }
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "i", &mode))
-    {
+    if (!PyArg_ParseTuple(args, "i", &mode)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method locreate() takes an integer argument");
+                        "Method locreate() takes an integer argument");
         return NULL;
     }
 
     /* creates large object */
     lo_oid = lo_creat(self->cnx, mode);
-    if (lo_oid == 0)
-    {
+    if (lo_oid == 0) {
         set_error_msg(OperationalError, "Can't create large object");
         return NULL;
     }
@@ -3243,24 +3021,23 @@ static char connGetLO__doc__[] =
 static PyObject *
 connGetLO(connObject *self, PyObject *args)
 {
-    int         oid;
-    Oid         lo_oid;
+    int oid;
+    Oid lo_oid;
 
     /* checks validity */
-    if (!check_cnx_obj(self))
-        return NULL;
-
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "i", &oid))
-    {
-        PyErr_SetString(PyExc_TypeError,
-            "Method getlo() takes an integer argument");
+    if (!check_cnx_obj(self)) {
         return NULL;
     }
 
-    lo_oid = (Oid)oid;
-    if (lo_oid == 0)
-    {
+    /* gets arguments */
+    if (!PyArg_ParseTuple(args, "i", &oid)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "Method getlo() takes an integer argument");
+        return NULL;
+    }
+
+    lo_oid = (Oid) oid;
+    if (lo_oid == 0) {
         PyErr_SetString(PyExc_ValueError, "The object oid can't be null");
         return NULL;
     }
@@ -3276,25 +3053,24 @@ static char connImportLO__doc__[] =
 static PyObject *
 connImportLO(connObject *self, PyObject *args)
 {
-    char   *name;
-    Oid     lo_oid;
+    char *name;
+    Oid lo_oid;
 
     /* checks validity */
-    if (!check_cnx_obj(self))
+    if (!check_cnx_obj(self)) {
         return NULL;
+    }
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "s", &name))
-    {
+    if (!PyArg_ParseTuple(args, "s", &name)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method loimport() takes a string argument");
+                        "Method loimport() takes a string argument");
         return NULL;
     }
 
     /* imports file and checks result */
     lo_oid = lo_import(self->cnx, name);
-    if (lo_oid == 0)
-    {
+    if (lo_oid == 0) {
         set_error_msg(OperationalError, "Can't create large object");
         return NULL;
     }
@@ -3312,8 +3088,7 @@ static char connReset__doc__[] =
 static PyObject *
 connReset(connObject *self, PyObject *noargs)
 {
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
@@ -3331,8 +3106,7 @@ static char connCancel__doc__[] =
 static PyObject *
 connCancel(connObject *self, PyObject *noargs)
 {
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
@@ -3348,8 +3122,7 @@ static char connFileno__doc__[] =
 static PyObject *
 connFileno(connObject *self, PyObject *noargs)
 {
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
@@ -3370,22 +3143,21 @@ connSetCastHook(connObject *self, PyObject *func)
 {
     PyObject *ret = NULL;
 
-    if (func == Py_None)
-    {
+    if (func == Py_None) {
         Py_XDECREF(self->cast_hook);
         self->cast_hook = NULL;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else if (PyCallable_Check(func))
-    {
+    else if (PyCallable_Check(func)) {
         Py_XINCREF(func); Py_XDECREF(self->cast_hook);
         self->cast_hook = func;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Method set_cast_hook() expects"
-             " a callable or None as argument");
+                        "Method set_cast_hook() expects"
+                        " a callable or None as argument");
+    }
 
     return ret;
 }
@@ -3415,23 +3187,22 @@ connSetNoticeReceiver(connObject *self, PyObject *func)
 {
     PyObject *ret = NULL;
 
-    if (func == Py_None)
-    {
+    if (func == Py_None) {
         Py_XDECREF(self->notice_receiver);
         self->notice_receiver = NULL;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else if (PyCallable_Check(func))
-    {
+    else if (PyCallable_Check(func)) {
         Py_XINCREF(func); Py_XDECREF(self->notice_receiver);
         self->notice_receiver = func;
         PQsetNoticeReceiver(self->cnx, notice_receiver, self);
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Method set_notice_receiver() expects"
-             " a callable or None as argument");
+                        "Method set_notice_receiver() expects"
+                        " a callable or None as argument");
+    }
 
     return ret;
 }
@@ -3462,8 +3233,7 @@ static PyObject *
 connClose(connObject *self, PyObject *noargs)
 {
     /* connection object cannot already be closed */
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         set_error_msg(InternalError, "Connection already closed");
         return NULL;
     }
@@ -3484,10 +3254,9 @@ static char connGetNotify__doc__[] =
 static PyObject *
 connGetNotify(connObject *self, PyObject *noargs)
 {
-    PGnotify   *notify;
+    PGnotify *notify;
 
-    if (!self->cnx)
-    {
+    if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
@@ -3495,40 +3264,37 @@ connGetNotify(connObject *self, PyObject *noargs)
     /* checks for NOTIFY messages */
     PQconsumeInput(self->cnx);
 
-    if (!(notify = PQnotifies(self->cnx)))
-    {
+    if (!(notify = PQnotifies(self->cnx))) {
         Py_INCREF(Py_None);
         return Py_None;
     }
-    else
-    {
-        PyObject   *notify_result,
-                   *temp;
+    else {
+        PyObject *notify_result, *tmp;
 
-        if (!(temp = PyStr_FromString(notify->relname)))
+        if (!(tmp = PyStr_FromString(notify->relname))) {
             return NULL;
+        }
 
-        if (!(notify_result = PyTuple_New(3)))
+        if (!(notify_result = PyTuple_New(3))) {
             return NULL;
+        }
 
-        PyTuple_SET_ITEM(notify_result, 0, temp);
+        PyTuple_SET_ITEM(notify_result, 0, tmp);
 
-        if (!(temp = PyInt_FromLong(notify->be_pid)))
-        {
+        if (!(tmp = PyInt_FromLong(notify->be_pid))) {
             Py_DECREF(notify_result);
             return NULL;
         }
 
-        PyTuple_SET_ITEM(notify_result, 1, temp);
+        PyTuple_SET_ITEM(notify_result, 1, tmp);
 
         /* extra exists even in old versions that did not support it */
-        if (!(temp = PyStr_FromString(notify->extra)))
-        {
+        if (!(tmp = PyStr_FromString(notify->extra))) {
             Py_DECREF(notify_result);
             return NULL;
         }
 
-        PyTuple_SET_ITEM(notify_result, 2, temp);
+        PyTuple_SET_ITEM(notify_result, 2, tmp);
 
         PQfreemem(notify);
 
@@ -3542,8 +3308,9 @@ connDir(connObject *self, PyObject *noargs)
 {
     PyObject *attrs;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-    PyObject_CallMethod(attrs, "extend", "[sssssssss]",
+    attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
+    PyObject_CallMethod(
+        attrs, "extend", "[sssssssss]",
         "host", "port", "db", "options", "error", "status", "user",
         "protocol_version", "server_version");
 
@@ -3589,7 +3356,7 @@ static struct PyMethodDef connMethods[] = {
             connEscapeLiteral__doc__},
     {"escape_identifier", (PyCFunction) connEscapeIdentifier, METH_O,
             connEscapeIdentifier__doc__},
-#endif  /* ESCAPING_FUNCS */
+#endif /* ESCAPING_FUNCS */
     {"escape_string", (PyCFunction) connEscapeString, METH_O,
             connEscapeString__doc__},
     {"escape_bytea", (PyCFunction) connEscapeBytea, METH_O,
@@ -3623,8 +3390,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
      */
 
     /* first exception - close which returns a different error */
-    if (strcmp(name, "close") && !self->cnx)
-    {
+    if (strcmp(name, "close") && !self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
@@ -3632,8 +3398,7 @@ connGetAttr(connObject *self, PyObject *nameobj)
     /* list PostgreSQL connection fields */
 
     /* postmaster host */
-    if (!strcmp(name, "host"))
-    {
+    if (!strcmp(name, "host")) {
         char *r = PQhost(self->cnx);
         if (!r || r[0] == '/') /* Pg >= 9.6 can return a Unix socket path */
             r = "localhost";
@@ -3714,26 +3479,24 @@ static PyTypeObject connType = {
 static int
 check_source_obj(sourceObject *self, int level)
 {
-    if (!self->valid)
-    {
+    if (!self->valid) {
         set_error_msg(OperationalError, "Object has been closed");
         return 0;
     }
 
-    if ((level & CHECK_RESULT) && !self->result)
-    {
+    if ((level & CHECK_RESULT) && !self->result) {
         set_error_msg(DatabaseError, "No result");
         return 0;
     }
 
-    if ((level & CHECK_DQL) && self->result_type != RESULT_DQL)
-    {
+    if ((level & CHECK_DQL) && self->result_type != RESULT_DQL) {
         set_error_msg(DatabaseError, "Last query did not return tuples");
         return 0;
     }
 
-    if ((level & CHECK_CNX) && !check_cnx_obj(self->pgcnx))
+    if ((level & CHECK_CNX) && !check_cnx_obj(self->pgcnx)) {
         return 0;
+    }
 
     return 1;
 }
@@ -3758,8 +3521,7 @@ static PyObject *
 sourceClose(sourceObject *self, PyObject *noargs)
 {
     /* frees result if necessary and invalidates object */
-    if (self->result)
-    {
+    if (self->result) {
         PQclear(self->result);
         self->result_type = RESULT_EMPTY;
         self->result = NULL;
@@ -3782,36 +3544,33 @@ static char sourceExecute__doc__[] =
 static PyObject *
 sourceExecute(sourceObject *self, PyObject *sql)
 {
-    PyObject   *tmp_obj = NULL; /* auxiliary string object */
-    char       *query;
-    int         encoding;
+    PyObject *tmp_obj = NULL;  /* auxiliary string object */
+    char *query;
+    int encoding;
 
     /* checks validity */
-    if (!check_source_obj(self, CHECK_CNX))
+    if (!check_source_obj(self, CHECK_CNX)) {
         return NULL;
+    }
 
     encoding = PQclientEncoding(self->pgcnx->cnx);
 
-    if (PyBytes_Check(sql))
-    {
+    if (PyBytes_Check(sql)) {
         query = PyBytes_AsString(sql);
     }
-    else if (PyUnicode_Check(sql))
-    {
+    else if (PyUnicode_Check(sql)) {
         tmp_obj = get_encoded_string(sql, encoding);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         query = PyBytes_AsString(tmp_obj);
     }
-    else
-    {
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Method execute() expects a string as argument");
+                        "Method execute() expects a string as argument");
         return NULL;
     }
 
     /* frees previous result */
-    if (self->result)
-    {
+    if (self->result) {
         PQclear(self->result);
         self->result = NULL;
     }
@@ -3829,8 +3588,7 @@ sourceExecute(sourceObject *self, PyObject *sql)
     Py_XDECREF(tmp_obj);
 
     /* checks result validity */
-    if (!self->result)
-    {
+    if (!self->result) {
         PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->pgcnx->cnx));
         return NULL;
     }
@@ -3840,8 +3598,7 @@ sourceExecute(sourceObject *self, PyObject *sql)
     self->pgcnx->date_format = date_format; /* this is normally NULL */
 
     /* checks result status */
-    switch (PQresultStatus(self->result))
-    {
+    switch (PQresultStatus(self->result)) {
         /* query succeeded */
         case PGRES_TUPLES_OK:   /* DQL: returns None (DB-SIG compliant) */
             self->result_type = RESULT_DQL;
@@ -3853,16 +3610,15 @@ sourceExecute(sourceObject *self, PyObject *sql)
         case PGRES_COPY_OUT:
         case PGRES_COPY_IN:
             {
-                long    num_rows;
-                char   *temp;
-                temp = PQcmdTuples(self->result);
-                if (temp[0])
-                {
+                long num_rows;
+                char *tmp;
+
+                tmp = PQcmdTuples(self->result);
+                if (tmp[0]) {
                     self->result_type = RESULT_DML;
-                    num_rows = atol(temp);
+                    num_rows = atol(tmp);
                 }
-                else
-                {
+                else {
                     self->result_type = RESULT_DDL;
                     num_rows = -1;
                 }
@@ -3880,8 +3636,8 @@ sourceExecute(sourceObject *self, PyObject *sql)
                 self->pgcnx->cnx, self->result);
             break;
         default:
-            set_error_msg(InternalError, "Internal error: "
-                "unknown result status");
+            set_error_msg(InternalError,
+                          "Internal error: unknown result status");
     }
 
     /* frees result and returns error */
@@ -3898,15 +3654,15 @@ static char sourceStatusOID__doc__[] =
 static PyObject *
 sourceStatusOID(sourceObject *self, PyObject *noargs)
 {
-    Oid         oid;
+    Oid oid;
 
     /* checks validity */
-    if (!check_source_obj(self, CHECK_RESULT))
+    if (!check_source_obj(self, CHECK_RESULT)) {
         return NULL;
+    }
 
     /* retrieves oid status */
-    if ((oid = PQoidValue(self->result)) == InvalidOid)
-    {
+    if ((oid = PQoidValue(self->result)) == InvalidOid) {
         Py_INCREF(Py_None);
         return Py_None;
     }
@@ -3923,31 +3679,31 @@ static char sourceFetch__doc__[] =
 static PyObject *
 sourceFetch(sourceObject *self, PyObject *args)
 {
-    PyObject   *reslist;
-    int         i,
-                k;
-    long        size;
+    PyObject *reslist;
+    int i, k;
+    long size;
 #if IS_PY3
-    int         encoding;
+    int encoding;
 #endif
 
     /* checks validity */
-    if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL | CHECK_CNX))
+    if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL | CHECK_CNX)) {
         return NULL;
+    }
 
     /* checks args */
     size = self->arraysize;
-    if (!PyArg_ParseTuple(args, "|l", &size))
-    {
+    if (!PyArg_ParseTuple(args, "|l", &size)) {
         PyErr_SetString(PyExc_TypeError,
-            "fetch(num), with num (integer, optional)");
+                        "fetch(num), with num (integer, optional)");
         return NULL;
     }
 
     /* seeks last line */
     /* limit size to be within the amount of data we actually have */
-    if (size == -1 || (self->max_row - self->current_row) < size)
+    if (size == -1 || (self->max_row - self->current_row) < size) {
         size = self->max_row - self->current_row;
+    }
 
     /* allocate list for result */
     if (!(reslist = PyList_New(0))) return NULL;
@@ -3957,32 +3713,26 @@ sourceFetch(sourceObject *self, PyObject *args)
 #endif
 
     /* builds result */
-    for (i = 0, k = self->current_row; i < size; ++i, ++k)
-    {
-        PyObject   *rowtuple;
-        int         j;
+    for (i = 0, k = self->current_row; i < size; ++i, ++k) {
+        PyObject *rowtuple;
+        int j;
 
-        if (!(rowtuple = PyTuple_New(self->num_fields)))
-        {
+        if (!(rowtuple = PyTuple_New(self->num_fields))) {
             Py_DECREF(reslist); return NULL;
         }
 
-        for (j = 0; j < self->num_fields; ++j)
-        {
-            PyObject   *str;
+        for (j = 0; j < self->num_fields; ++j) {
+            PyObject *str;
 
-            if (PQgetisnull(self->result, k, j))
-            {
+            if (PQgetisnull(self->result, k, j)) {
                 Py_INCREF(Py_None);
                 str = Py_None;
             }
-            else
-            {
+            else {
                 char *s = PQgetvalue(self->result, k, j);
                 Py_ssize_t size = PQgetlength(self->result, k, j);
 #if IS_PY3
-                if (PQfformat(self->result, j) == 0) /* textual format */
-                {
+                if (PQfformat(self->result, j) == 0) { /* textual format */
                     str = get_decoded_string(s, size, encoding);
                     if (!str) /* cannot decode */
                         str = PyBytes_FromStringAndSize(s, size);
@@ -3994,8 +3744,7 @@ sourceFetch(sourceObject *self, PyObject *args)
             PyTuple_SET_ITEM(rowtuple, j, str);
         }
 
-        if (PyList_Append(reslist, rowtuple))
-        {
+        if (PyList_Append(reslist, rowtuple)) {
             Py_DECREF(rowtuple); Py_DECREF(reslist); return NULL;
         }
         Py_DECREF(rowtuple);
@@ -4010,12 +3759,12 @@ static PyObject *
 pgsource_move(sourceObject *self, int move)
 {
     /* checks validity */
-    if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL))
+    if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL)) {
         return NULL;
+    }
 
     /* changes the current row */
-    switch (move)
-    {
+    switch (move) {
         case QUERY_MOVEFIRST:
             self->current_row = 0;
             break;
@@ -4083,46 +3832,44 @@ static char sourcePutData__doc__[] =
 static PyObject *
 sourcePutData(sourceObject *self, PyObject *buffer)
 {
-    PyObject   *tmp_obj = NULL; /* an auxiliary object */
-    char       *buf; /* the buffer as encoded string */
-    Py_ssize_t  nbytes; /* length of string */
-    char       *errormsg = NULL; /* error message */
-    int         res; /* direct result of the operation */
-    PyObject   *ret; /* return value */
+    PyObject *tmp_obj = NULL;  /* an auxiliary object */
+    char *buf;                 /* the buffer as encoded string */
+    Py_ssize_t nbytes;         /* length of string */
+    char *errormsg = NULL;     /* error message */
+    int res;                   /* direct result of the operation */
+    PyObject *ret;             /* return value */
 
     /* checks validity */
-    if (!check_source_obj(self, CHECK_CNX))
+    if (!check_source_obj(self, CHECK_CNX)) {
         return NULL;
+    }
 
     /* make sure that the connection object is valid */
-    if (!self->pgcnx->cnx)
+    if (!self->pgcnx->cnx) {
         return NULL;
+    }
 
-    if (buffer == Py_None)
-    {
+    if (buffer == Py_None) {
         /* pass None for terminating the operation */
         buf = errormsg = NULL;
     }
-    else if (PyBytes_Check(buffer))
-    {
+    else if (PyBytes_Check(buffer)) {
         /* or pass a byte string */
         PyBytes_AsStringAndSize(buffer, &buf, &nbytes);
     }
-    else if (PyUnicode_Check(buffer))
-    {
+    else if (PyUnicode_Check(buffer)) {
         /* or pass a unicode string */
         tmp_obj = get_encoded_string(
             buffer, PQclientEncoding(self->pgcnx->cnx));
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &buf, &nbytes);
     }
-    else if (PyErr_GivenExceptionMatches(buffer, PyExc_BaseException))
-    {
+    else if (PyErr_GivenExceptionMatches(buffer, PyExc_BaseException)) {
         /* or pass a Python exception for sending an error message */
         tmp_obj = PyObject_Str(buffer);
-        if (PyUnicode_Check(tmp_obj))
-        {
+        if (PyUnicode_Check(tmp_obj)) {
             PyObject *obj = tmp_obj;
+
             tmp_obj = get_encoded_string(
                 obj, PQclientEncoding(self->pgcnx->cnx));
             Py_DECREF(obj);
@@ -4131,65 +3878,57 @@ sourcePutData(sourceObject *self, PyObject *buffer)
         errormsg = PyBytes_AsString(tmp_obj);
         buf = NULL;
     }
-    else
-    {
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Method putdata() expects a buffer, None"
-             " or an exception as argument");
+                        "Method putdata() expects a buffer, None"
+                        " or an exception as argument");
         return NULL;
     }
 
     /* checks validity */
     if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-            PQresultStatus(self->result) != PGRES_COPY_IN)
+        PQresultStatus(self->result) != PGRES_COPY_IN)
     {
         PyErr_SetString(PyExc_IOError,
-            "Connection is invalid or not in copy_in state");
+                        "Connection is invalid or not in copy_in state");
         Py_XDECREF(tmp_obj);
         return NULL;
     }
 
-    if (buf)
-    {
-        res = nbytes ? PQputCopyData(self->pgcnx->cnx, buf, (int)nbytes) : 1;
+    if (buf) {
+        res = nbytes ? PQputCopyData(self->pgcnx->cnx, buf, (int) nbytes) : 1;
     }
-    else
-    {
+    else {
         res = PQputCopyEnd(self->pgcnx->cnx, errormsg);
     }
 
     Py_XDECREF(tmp_obj);
 
-    if (res != 1)
-    {
+    if (res != 1) {
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
         return NULL;
     }
 
-    if (buf) /* buffer has been sent */
-    {
+    if (buf) { /* buffer has been sent */
         ret = Py_None;
         Py_INCREF(ret);
     }
-    else /* copy is done */
-    {
-        PGresult   *result; /* final result of the operation */
+    else { /* copy is done */
+        PGresult *result; /* final result of the operation */
 
         Py_BEGIN_ALLOW_THREADS;
         result = PQgetResult(self->pgcnx->cnx);
         Py_END_ALLOW_THREADS;
 
-        if (PQresultStatus(result) == PGRES_COMMAND_OK)
-        {
-            char   *temp;
-            long    num_rows;
+        if (PQresultStatus(result) == PGRES_COMMAND_OK) {
+            char *tmp;
+            long num_rows;
 
-            temp = PQcmdTuples(result);
-            num_rows = temp[0] ? atol(temp) : -1;
+            tmp = PQcmdTuples(result);
+            num_rows = tmp[0] ? atol(tmp) : -1;
             ret = PyInt_FromLong(num_rows);
         }
-        else
-        {
+        else {
             if (!errormsg) errormsg = PQerrorMessage(self->pgcnx->cnx);
             PyErr_SetString(PyExc_IOError, errormsg);
             ret = NULL;
@@ -4210,58 +3949,57 @@ static char sourceGetData__doc__[] =
 static PyObject *
 sourceGetData(sourceObject *self, PyObject *args)
 {
-    int        *decode = 0; /* decode flag */
-    char       *buffer; /* the copied buffer as encoded byte string */
-    Py_ssize_t  nbytes; /* length of the byte string */
-    PyObject   *ret; /* return value */
+    int *decode = 0;    /* decode flag */
+    char *buffer;       /* the copied buffer as encoded byte string */
+    Py_ssize_t nbytes;  /* length of the byte string */
+    PyObject *ret;      /* return value */
 
     /* checks validity */
-    if (!check_source_obj(self, CHECK_CNX))
+    if (!check_source_obj(self, CHECK_CNX)) {
         return NULL;
+    }
 
     /* make sure that the connection object is valid */
-    if (!self->pgcnx->cnx)
+    if (!self->pgcnx->cnx) {
         return NULL;
+    }
 
-    if (!PyArg_ParseTuple(args, "|i", &decode))
+    if (!PyArg_ParseTuple(args, "|i", &decode)) {
         return NULL;
+    }
 
     /* checks validity */
     if (!check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-            PQresultStatus(self->result) != PGRES_COPY_OUT)
+        PQresultStatus(self->result) != PGRES_COPY_OUT)
     {
         PyErr_SetString(PyExc_IOError,
-            "Connection is invalid or not in copy_out state");
+                        "Connection is invalid or not in copy_out state");
         return NULL;
     }
 
     nbytes = PQgetCopyData(self->pgcnx->cnx, &buffer, 0);
 
-    if (!nbytes || nbytes < -1) /* an error occurred */
-    {
+    if (!nbytes || nbytes < -1) { /* an error occurred */
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
         return NULL;
     }
 
-    if (nbytes == -1) /* copy is done */
-    {
-        PGresult   *result; /* final result of the operation */
+    if (nbytes == -1) { /* copy is done */
+        PGresult *result; /* final result of the operation */
 
         Py_BEGIN_ALLOW_THREADS;
         result = PQgetResult(self->pgcnx->cnx);
         Py_END_ALLOW_THREADS;
 
-        if (PQresultStatus(result) == PGRES_COMMAND_OK)
-        {
-            char   *temp;
-            long    num_rows;
+        if (PQresultStatus(result) == PGRES_COMMAND_OK) {
+            char *tmp;
+            long num_rows;
 
-            temp = PQcmdTuples(result);
-            num_rows = temp[0] ? atol(temp) : -1;
+            tmp = PQcmdTuples(result);
+            num_rows = tmp[0] ? atol(tmp) : -1;
             ret = PyInt_FromLong(num_rows);
         }
-        else
-        {
+        else {
             PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
             ret = NULL;
         }
@@ -4270,8 +4008,7 @@ sourceGetData(sourceObject *self, PyObject *args)
         self->result = NULL;
         self->result_type = RESULT_EMPTY;
     }
-    else /* a row has been returned */
-    {
+    else { /* a row has been returned */
         ret = decode ? get_decoded_string(
                 buffer, nbytes, PQclientEncoding(self->pgcnx->cnx)) :
             PyBytes_FromStringAndSize(buffer, nbytes);
@@ -4285,26 +4022,26 @@ sourceGetData(sourceObject *self, PyObject *args)
 static int
 sourceFieldindex(sourceObject *self, PyObject *param, const char *usage)
 {
-    int         num;
+    int num;
 
     /* checks validity */
     if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL))
         return -1;
 
     /* gets field number */
-    if (PyStr_Check(param))
+    if (PyStr_Check(param)) {
         num = PQfnumber(self->result, PyBytes_AsString(param));
-    else if (PyInt_Check(param))
-        num = (int)PyInt_AsLong(param);
-    else
-    {
+    }
+    else if (PyInt_Check(param)) {
+        num = (int) PyInt_AsLong(param);
+    }
+    else {
         PyErr_SetString(PyExc_TypeError, usage);
         return -1;
     }
 
     /* checks field validity */
-    if (num < 0 || num >= self->num_fields)
-    {
+    if (num < 0 || num >= self->num_fields) {
         PyErr_SetString(PyExc_ValueError, "Unknown field");
         return -1;
     }
@@ -4320,8 +4057,9 @@ pgsource_buildinfo(sourceObject *self, int num)
 
     /* allocates tuple */
     result = PyTuple_New(5);
-    if (!result)
+    if (!result) {
         return NULL;
+    }
 
     /* affects field information */
     PyTuple_SET_ITEM(result, 0, PyInt_FromLong(num));
@@ -4344,23 +4082,22 @@ static char sourceListInfo__doc__[] =
 static PyObject *
 sourceListInfo(sourceObject *self, PyObject *noargs)
 {
-    int         i;
-    PyObject   *result,
-               *info;
+    PyObject *result, *info;
+    int i;
 
     /* checks validity */
-    if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL))
+    if (!check_source_obj(self, CHECK_RESULT | CHECK_DQL)) {
         return NULL;
+    }
 
     /* builds result */
-    if (!(result = PyTuple_New(self->num_fields)))
+    if (!(result = PyTuple_New(self->num_fields))) {
         return NULL;
+    }
 
-    for (i = 0; i < self->num_fields; ++i)
-    {
+    for (i = 0; i < self->num_fields; ++i) {
         info = pgsource_buildinfo(self, i);
-        if (!info)
-        {
+        if (!info) {
             Py_DECREF(result);
             return NULL;
         }
@@ -4378,12 +4115,15 @@ static char sourceFieldInfo__doc__[] =
 static PyObject *
 sourceFieldInfo(sourceObject *self, PyObject *desc)
 {
-    int         num;
+    int num;
 
     /* checks args and validity */
-    if ((num = sourceFieldindex(self, desc,
-            "Method fieldinfo() needs a string or integer as argument")) == -1)
+    if ((num = sourceFieldindex(
+        self, desc,
+        "Method fieldinfo() needs a string or integer as argument")) == -1)
+    {
         return NULL;
+    }
 
     /* returns result */
     return pgsource_buildinfo(self, num);
@@ -4396,12 +4136,15 @@ static char sourceField__doc__[] =
 static PyObject *
 sourceField(sourceObject *self, PyObject *desc)
 {
-    int         num;
+    int num;
 
     /* checks args and validity */
-    if ((num = sourceFieldindex(self, desc,
-            "Method field() needs a string or integer as argument")) == -1)
+    if ((num = sourceFieldindex(
+        self, desc,
+        "Method field() needs a string or integer as argument")) == -1)
+    {
         return NULL;
+    }
 
     return PyStr_FromString(
         PQgetvalue(self->result, self->current_row, num));
@@ -4413,8 +4156,9 @@ sourceDir(connObject *self, PyObject *noargs)
 {
     PyObject *attrs;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-    PyObject_CallMethod(attrs, "extend", "[sssss]",
+    attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
+    PyObject_CallMethod(
+        attrs, "extend", "[sssss]",
         "pgcnx", "arraysize", "resulttype", "ntuples", "nfields");
 
     return attrs;
@@ -4456,10 +4200,8 @@ sourceGetAttr(sourceObject *self, PyObject *nameobj)
     const char *name = PyStr_AsString(nameobj);
 
     /* pg connection object */
-    if (!strcmp(name, "pgcnx"))
-    {
-        if (check_source_obj(self, 0))
-        {
+    if (!strcmp(name, "pgcnx")) {
+        if (check_source_obj(self, 0)) {
             Py_INCREF(self->pgcnx);
             return (PyObject *) (self->pgcnx);
         }
@@ -4492,10 +4234,8 @@ static int
 sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 {
     /* arraysize */
-    if (!strcmp(name, "arraysize"))
-    {
-        if (!PyInt_Check(v))
-        {
+    if (!strcmp(name, "arraysize")) {
+        if (!PyInt_Check(v)) {
             PyErr_SetString(PyExc_TypeError, "arraysize must be integer");
             return -1;
         }
@@ -4513,8 +4253,7 @@ sourceSetAttr(sourceObject *self, char *name, PyObject *v)
 static PyObject *
 sourceStr(sourceObject *self)
 {
-    switch (self->result_type)
-    {
+    switch (self->result_type) {
         case RESULT_DQL:
             return format_result(self->result);
         case RESULT_DDL:
@@ -4569,16 +4308,14 @@ static char pgConnect__doc__[] =
 static PyObject *
 pgConnect(PyObject *self, PyObject *args, PyObject *dict)
 {
-    static const char *kwlist[] = {"dbname", "host", "port", "opt",
-    "user", "passwd", NULL};
+    static const char *kwlist[] =
+    {
+        "dbname", "host", "port", "opt", "user", "passwd", NULL
+    };
 
-    char       *pghost,
-               *pgopt,
-               *pgdbname,
-               *pguser,
-               *pgpasswd;
-    int         pgport;
-    char        port_buffer[20];
+    char *pghost, *pgopt, *pgdbname, *pguser, *pgpasswd;
+    int pgport;
+    char port_buffer[20];
     connObject *conn_obj;
 
     pghost = pgopt = pgdbname = pguser = pgpasswd = NULL;
@@ -4590,9 +4327,12 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
      * don't declare kwlist as const char *kwlist[] then it complains when
      * I try to assign all those constant strings to it.
      */
-    if (!PyArg_ParseTupleAndKeywords(args, dict, "|zzizzz", (char **) kwlist,
+    if (!PyArg_ParseTupleAndKeywords(
+        args, dict, "|zzizzz", (char**)kwlist,
         &pgdbname, &pghost, &pgport, &pgopt, &pguser, &pgpasswd))
+    {
         return NULL;
+    }
 
 #ifdef DEFAULT_VARS
     /* handles defaults variables (for uninitialised vars) */
@@ -4600,7 +4340,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
         pghost = PyBytes_AsString(pg_default_host);
 
     if ((pgport == -1) && (pg_default_port != Py_None))
-        pgport = (int)PyInt_AsLong(pg_default_port);
+        pgport = (int) PyInt_AsLong(pg_default_port);
 
     if ((!pgopt) && (pg_default_opt != Py_None))
         pgopt = PyBytes_AsString(pg_default_opt);
@@ -4615,8 +4355,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
         pgpasswd = PyBytes_AsString(pg_default_passwd);
 #endif /* DEFAULT_VARS */
 
-    if (!(conn_obj = PyObject_NEW(connObject, &connType)))
-    {
+    if (!(conn_obj = PyObject_NEW(connObject, &connType))) {
         set_error_msg(InternalError, "Can't create new connection object");
         return NULL;
     }
@@ -4627,8 +4366,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
     conn_obj->cast_hook = NULL;
     conn_obj->notice_receiver = NULL;
 
-    if (pgport != -1)
-    {
+    if (pgport != -1) {
         memset(port_buffer, 0, sizeof(port_buffer));
         sprintf(port_buffer, "%d", pgport);
     }
@@ -4638,8 +4376,7 @@ pgConnect(PyObject *self, PyObject *args, PyObject *dict)
         pgopt, NULL, pgdbname, pguser, pgpasswd);
     Py_END_ALLOW_THREADS
 
-    if (PQstatus(conn_obj->cnx) == CONNECTION_BAD)
-    {
+    if (PQstatus(conn_obj->cnx) == CONNECTION_BAD) {
         set_error(InternalError, "Cannot connect", conn_obj->cnx, NULL);
         Py_XDECREF(conn_obj);
         return NULL;
@@ -4652,10 +4389,12 @@ static void
 queryDealloc(queryObject *self)
 {
     Py_XDECREF(self->pgcnx);
-    if (self->col_types)
+    if (self->col_types) {
         PyMem_Free(self->col_types);
-    if (self->result)
+    }
+    if (self->result) {
         PQclear(self->result);
+    }
 
     PyObject_Del(self);
 }
@@ -4677,16 +4416,14 @@ static char queryListfields__doc__[] =
 static PyObject *
 queryListfields(queryObject *self, PyObject *noargs)
 {
-    int         i;
-    char       *name;
-    PyObject   *fieldstuple,
-               *str;
+    int i;
+    char *name;
+    PyObject *fieldstuple, *str;
 
     /* builds tuple */
     fieldstuple = PyTuple_New(self->num_fields);
     if (fieldstuple) {
-        for (i = 0; i < self->num_fields; ++i)
-        {
+        for (i = 0; i < self->num_fields; ++i) {
             name = PQfname(self->result, i);
             str = PyStr_FromString(name);
             PyTuple_SET_ITEM(fieldstuple, i, str);
@@ -4702,20 +4439,18 @@ static char queryFieldname__doc__[] =
 static PyObject *
 queryFieldname(queryObject *self, PyObject *args)
 {
-    int     i;
-    char   *name;
+    int i;
+    char *name;
 
     /* gets args */
-    if (!PyArg_ParseTuple(args, "i", &i))
-    {
+    if (!PyArg_ParseTuple(args, "i", &i)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method fieldname() takes an integer as argument");
+                        "Method fieldname() takes an integer as argument");
         return NULL;
     }
 
     /* checks number validity */
-    if (i >= self->num_fields)
-    {
+    if (i >= self->num_fields) {
         PyErr_SetString(PyExc_ValueError, "Invalid field number");
         return NULL;
     }
@@ -4732,20 +4467,18 @@ static char queryFieldnum__doc__[] =
 static PyObject *
 queryFieldnum(queryObject *self, PyObject *args)
 {
-    int     num;
-    char   *name;
+    int num;
+    char *name;
 
     /* gets args */
-    if (!PyArg_ParseTuple(args, "s", &name))
-    {
+    if (!PyArg_ParseTuple(args, "s", &name)) {
         PyErr_SetString(PyExc_TypeError,
-            "Method fieldnum() takes a string as argument");
+                        "Method fieldnum() takes a string as argument");
         return NULL;
     }
 
     /* gets field number */
-    if ((num = PQfnumber(self->result, name)) == -1)
-    {
+    if ((num = PQfnumber(self->result, name)) == -1) {
         PyErr_SetString(PyExc_ValueError, "Unknown field");
         return NULL;
     }
@@ -4759,24 +4492,27 @@ static PyObject* queryGetIter(queryObject *self)
 {
     self->current_row = 0;
     Py_INCREF(self);
-    return (PyObject*)self;
+    return (PyObject*) self;
 }
 
 /* Return the value in the given column of the current row. */
 static PyObject *
 getValueInColumn(queryObject *self, int column)
 {
-    if (PQgetisnull(self->result, self->current_row, column))
-    {
+    char *s;
+    int type;
+
+    if (PQgetisnull(self->result, self->current_row, column)) {
         Py_INCREF(Py_None);
         return Py_None;
     }
 
     /* get the string representation of the value */
     /* note: this is always null-terminated text format */
-    char   *s = PQgetvalue(self->result, self->current_row, column);
+    s = PQgetvalue(self->result, self->current_row, column);
     /* get the PyGreSQL type of the column */
-    int     type = self->col_types[column];
+    type = self->col_types[column];
+
     /* cast the string representation into a Python object */
     if (type & PYGRES_ARRAY)
         return cast_array(s,
@@ -4800,16 +4536,16 @@ getValueInColumn(queryObject *self, int column)
 static PyObject *
 queryGetRowAsTuple(queryObject *self)
 {
-    PyObject   *row_tuple = NULL;
-    int         j;
+    PyObject *row_tuple = NULL;
+    int j;
 
-    if (!(row_tuple = PyTuple_New(self->num_fields))) return NULL;
+    if (!(row_tuple = PyTuple_New(self->num_fields))) {
+        return NULL;
+    }
 
-    for (j = 0; j < self->num_fields; ++j)
-    {
+    for (j = 0; j < self->num_fields; ++j) {
         PyObject *val = getValueInColumn(self, j);
-        if (!val)
-        {
+        if (!val) {
             Py_DECREF(row_tuple); return NULL;
         }
         PyTuple_SET_ITEM(row_tuple, j, val);
@@ -4823,7 +4559,7 @@ queryGetRowAsTuple(queryObject *self)
 static PyObject *
 queryNext(queryObject *self, PyObject *noargs)
 {
-    PyObject   *row_tuple = NULL;
+    PyObject *row_tuple = NULL;
 
     if (self->current_row >= self->max_row) {
         PyErr_SetNone(PyExc_StopIteration);
@@ -4889,16 +4625,17 @@ static char queryGetresult__doc__[] =
 static PyObject *
 queryGetresult(queryObject *self, PyObject *noargs)
 {
-    PyObject   *result_list;
-    int         i;
+    PyObject *result_list;
+    int i;
 
-    if (!(result_list = PyList_New(self->max_row))) return NULL;
+    if (!(result_list = PyList_New(self->max_row))) {
+        return NULL;
+    }
 
-    for (i = self->current_row = 0; i < self->max_row; ++i)
-    {
-        PyObject   *row_tuple = queryNext(self, noargs);
-        if (!row_tuple)
-        {
+    for (i = self->current_row = 0; i < self->max_row; ++i) {
+        PyObject *row_tuple = queryNext(self, noargs);
+
+        if (!row_tuple) {
             Py_DECREF(result_list); return NULL;
         }
         PyList_SET_ITEM(result_list, i, row_tuple);
@@ -4911,16 +4648,17 @@ queryGetresult(queryObject *self, PyObject *noargs)
 static PyObject *
 queryGetRowAsDict(queryObject *self)
 {
-    PyObject   *row_dict = NULL;
-    int         j;
+    PyObject *row_dict = NULL;
+    int j;
 
-    if (!(row_dict = PyDict_New())) return NULL;
+    if (!(row_dict = PyDict_New())) {
+        return NULL;
+    }
 
-    for (j = 0; j < self->num_fields; ++j)
-    {
+    for (j = 0; j < self->num_fields; ++j) {
         PyObject *val = getValueInColumn(self, j);
-        if (!val)
-        {
+
+        if (!val) {
             Py_DECREF(row_dict); return NULL;
         }
         PyDict_SetItemString(row_dict, PQfname(self->result, j), val);
@@ -4934,7 +4672,7 @@ queryGetRowAsDict(queryObject *self)
 static PyObject *
 queryNextDict(queryObject *self, PyObject *noargs)
 {
-    PyObject   *row_dict = NULL;
+    PyObject *row_dict = NULL;
 
     if (self->current_row >= self->max_row) {
         PyErr_SetNone(PyExc_StopIteration);
@@ -5002,16 +4740,17 @@ static char queryDictresult__doc__[] =
 static PyObject *
 queryDictresult(queryObject *self, PyObject *noargs)
 {
-    PyObject   *result_list;
-    int         i;
+    PyObject *result_list;
+    int i;
 
-    if (!(result_list = PyList_New(self->max_row))) return NULL;
+    if (!(result_list = PyList_New(self->max_row))) {
+        return NULL;
+    }
 
-    for (i = self->current_row = 0; i < self->max_row; ++i)
-    {
-        PyObject   *row_dict = queryNextDict(self, noargs);
-        if (!row_dict)
-        {
+    for (i = self->current_row = 0; i < self->max_row; ++i) {
+        PyObject *row_dict = queryNextDict(self, noargs);
+
+        if (!row_dict) {
             Py_DECREF(result_list); return NULL;
         }
         PyList_SET_ITEM(result_list, i, row_dict);
@@ -5029,8 +4768,9 @@ static char queryDictiter__doc__[] =
 static PyObject *
 queryDictiter(queryObject *self, PyObject *noargs)
 {
-    if (!dictiter)
+    if (!dictiter) {
         return queryDictresult(self, noargs);
+    }
 
     return PyObject_CallFunction(dictiter, "(O)", self);
 }
@@ -5045,8 +4785,9 @@ static char queryOnenamed__doc__[] =
 static PyObject *
 queryOnenamed(queryObject *self, PyObject *noargs)
 {
-    if (!namednext)
+    if (!namednext) {
         return queryOne(self, noargs);
+    }
 
     if (self->current_row >= self->max_row) {
         Py_INCREF(Py_None); return Py_None;
@@ -5065,8 +4806,9 @@ static char querySinglenamed__doc__[] =
 static PyObject *
 querySinglenamed(queryObject *self, PyObject *noargs)
 {
-    if (!namednext)
+    if (!namednext) {
         return querySingle(self, noargs);
+    }
 
     if (self->max_row != 1) {
         set_error_msg(ProgrammingError,
@@ -5087,10 +4829,11 @@ static char queryNamedresult__doc__[] =
 static PyObject *
 queryNamedresult(queryObject *self, PyObject *noargs)
 {
-    PyObject   *res, *res_list;
+    PyObject *res, *res_list;
 
-    if (!namediter)
+    if (!namediter) {
         return queryGetresult(self, noargs);
+    }
 
     res = PyObject_CallFunction(namediter, "(O)", self);
     if (!res) return NULL;
@@ -5109,15 +4852,16 @@ static char queryNamediter__doc__[] =
 static PyObject *
 queryNamediter(queryObject *self, PyObject *noargs)
 {
-    PyObject   *res, *res_iter;
+    PyObject *res, *res_iter;
 
-    if (!namediter)
+    if (!namediter) {
         return queryGetIter(self);
+    }
 
     res = PyObject_CallFunction(namediter, "(O)", self);
     if (!res) return NULL;
     if (!PyList_Check(res)) return res;
-    res_iter = (Py_TYPE(res)->tp_iter)((PyObject *)self);
+    res_iter = (Py_TYPE(res)->tp_iter)((PyObject *) self);
     Py_DECREF(res);
     return res_iter;
 }
@@ -5131,21 +4875,24 @@ static char queryScalarresult__doc__[] =
 static PyObject *
 queryScalarresult(queryObject *self, PyObject *noargs)
 {
-    PyObject   *result_list;
+    PyObject *result_list;
 
     if (!self->num_fields) {
         set_error_msg(ProgrammingError, "No fields in result");
         return NULL;
     }
 
-    if (!(result_list = PyList_New(self->max_row))) return NULL;
+    if (!(result_list = PyList_New(self->max_row))) {
+        return NULL;
+    }
 
-    for (self->current_row = 0; self->current_row < self->max_row;
-        ++self->current_row)
+    for (self->current_row = 0;
+         self->current_row < self->max_row;
+         ++self->current_row)
     {
-        PyObject   *value = getValueInColumn(self, 0);
-        if (!value)
-        {
+        PyObject *value = getValueInColumn(self, 0);
+
+        if (!value) {
             Py_DECREF(result_list); return NULL;
         }
         PyList_SET_ITEM(result_list, self->current_row, value);
@@ -5163,8 +4910,9 @@ static char queryScalariter__doc__[] =
 static PyObject *
 queryScalariter(queryObject *self, PyObject *noargs)
 {
-    if (!scalariter)
+    if (!scalariter) {
         return queryScalarresult(self, noargs);
+    }
 
     if (!self->num_fields) {
         set_error_msg(ProgrammingError, "No fields in result");
@@ -5233,10 +4981,10 @@ querySinglescalar(queryObject *self, PyObject *noargs)
 static Py_ssize_t
 queryLen(PyObject *self)
 {
-    PyObject   *tmp;
-    long        len;
+    PyObject *tmp;
+    long len;
 
-    tmp = PyLong_FromLong(((queryObject*)self)->max_row);
+    tmp = PyLong_FromLong(((queryObject*) self)->max_row);
     len = PyLong_AsSsize_t(tmp);
     Py_DECREF(tmp);
     return len;
@@ -5246,9 +4994,9 @@ queryLen(PyObject *self)
 static PyObject *
 queryGetItem(PyObject *self, Py_ssize_t i)
 {
-    queryObject    *q = (queryObject *)self;
-    PyObject       *tmp;
-    long            row;
+    queryObject *q = (queryObject *) self;
+    PyObject *tmp;
+    long row;
 
     tmp = PyLong_FromSize_t(i);
     row = PyLong_AsLong(tmp);
@@ -5271,30 +5019,27 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
     const char *name = PyStr_AsString(nameobj);
     int fieldcode;
 
-    if (!res)
-    {
+    if (!res) {
         PyErr_SetString(PyExc_TypeError, "Cannot get current notice");
         return NULL;
     }
 
     /* pg connection object */
-    if (!strcmp(name, "pgcnx"))
-    {
-        if (self->pgcnx && check_cnx_obj(self->pgcnx))
-        {
+    if (!strcmp(name, "pgcnx")) {
+        if (self->pgcnx && check_cnx_obj(self->pgcnx)) {
             Py_INCREF(self->pgcnx);
             return (PyObject *) self->pgcnx;
         }
-        else
-        {
+        else {
             Py_INCREF(Py_None);
             return Py_None;
         }
     }
 
     /* full message */
-    if (!strcmp(name, "message"))
+    if (!strcmp(name, "message")) {
         return PyStr_FromString(PQresultErrorMessage(res));
+    }
 
     /* other possible fields */
     fieldcode = 0;
@@ -5306,13 +5051,12 @@ noticeGetAttr(noticeObject *self, PyObject *nameobj)
         fieldcode = PG_DIAG_MESSAGE_DETAIL;
     else if (!strcmp(name, "hint"))
         fieldcode = PG_DIAG_MESSAGE_HINT;
-    if (fieldcode)
-    {
+    if (fieldcode) {
         char *s = PQresultErrorField(res, fieldcode);
-        if (s)
+        if (s) {
             return PyStr_FromString(s);
-        else
-        {
+        }
+        else {
             Py_INCREF(Py_None); return Py_None;
         }
     }
@@ -5333,8 +5077,9 @@ noticeDir(noticeObject *self, PyObject *noargs)
 {
     PyObject *attrs;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-    PyObject_CallMethod(attrs, "extend", "[ssssss]",
+    attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
+    PyObject_CallMethod(
+        attrs, "extend", "[ssssss]",
         "pgcnx", "severity", "message", "primary", "detail", "hint");
 
     return attrs;
@@ -5462,8 +5207,8 @@ static PyTypeObject queryType = {
     0,                          /* tp_clear */
     0,                          /* tp_richcompare */
     0,                          /* tp_weaklistoffset */
-    (getiterfunc)queryGetIter,  /* tp_iter */
-    (iternextfunc)queryNext,    /* tp_iternext */
+    (getiterfunc) queryGetIter, /* tp_iter */
+    (iternextfunc) queryNext,   /* tp_iternext */
     queryMethods,               /* tp_methods */
 };
 
@@ -5478,40 +5223,36 @@ static char pgEscapeString__doc__[] =
 static PyObject *
 pgEscapeString(PyObject *self, PyObject *string)
 {
-    PyObject   *tmp_obj = NULL, /* auxiliary string object */
-               *to_obj; /* string object to return */
-    char       *from, /* our string argument as encoded string */
-               *to; /* the result as encoded string */
-    Py_ssize_t  from_length; /* length of string */
-    size_t      to_length; /* length of result */
-    int         encoding = -1; /* client encoding */
+    PyObject *tmp_obj = NULL,  /* auxiliary string object */
+             *to_obj;          /* string object to return */
+    char *from,  /* our string argument as encoded string */
+         *to;    /* the result as encoded string */
+    Py_ssize_t from_length;    /* length of string */
+    size_t to_length;          /* length of result */
+    int encoding = -1;         /* client encoding */
 
-    if (PyBytes_Check(string))
-    {
+    if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
-    else if (PyUnicode_Check(string))
-    {
+    else if (PyUnicode_Check(string)) {
         encoding = pg_encoding_ascii;
         tmp_obj = get_encoded_string(string, encoding);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &from, &from_length);
     }
-    else
-    {
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Method escape_string() expects a string as argument");
+                        "Method escape_string() expects a string as argument");
         return NULL;
     }
 
     to_length = 2*from_length + 1;
-    if ((Py_ssize_t)to_length < from_length) /* overflow */
-    {
+    if ((Py_ssize_t ) to_length < from_length) { /* overflow */
         to_length = from_length;
         from_length = (from_length - 1)/2;
     }
-    to = (char *)PyMem_Malloc(to_length);
-    to_length = (int)PQescapeString(to, from, (size_t)from_length);
+    to = (char *) PyMem_Malloc(to_length);
+    to_length = (int) PQescapeString(to, from, (size_t) from_length);
 
     Py_XDECREF(tmp_obj);
 
@@ -5530,34 +5271,31 @@ static char pgEscapeBytea__doc__[] =
 static PyObject *
 pgEscapeBytea(PyObject *self, PyObject *data)
 {
-    PyObject   *tmp_obj = NULL, /* auxiliary string object */
-               *to_obj; /* string object to return */
-    char       *from, /* our string argument as encoded string */
-               *to; /* the result as encoded string */
-    Py_ssize_t  from_length; /* length of string */
-    size_t      to_length; /* length of result */
-    int         encoding = -1; /* client encoding */
+    PyObject *tmp_obj = NULL,  /* auxiliary string object */
+             *to_obj;          /* string object to return */
+    char *from,  /* our string argument as encoded string */
+         *to;    /* the result as encoded string */
+    Py_ssize_t from_length;    /* length of string */
+    size_t to_length;          /* length of result */
+    int encoding = -1;         /* client encoding */
 
-    if (PyBytes_Check(data))
-    {
+    if (PyBytes_Check(data)) {
         PyBytes_AsStringAndSize(data, &from, &from_length);
     }
-    else if (PyUnicode_Check(data))
-    {
+    else if (PyUnicode_Check(data)) {
         encoding = pg_encoding_ascii;
         tmp_obj = get_encoded_string(data, encoding);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &from, &from_length);
     }
-    else
-    {
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Method escape_bytea() expects a string as argument");
+                        "Method escape_bytea() expects a string as argument");
         return NULL;
     }
 
-    to = (char *)PQescapeBytea(
-        (unsigned char*)from, (size_t)from_length, &to_length);
+    to = (char *) PQescapeBytea(
+        (unsigned char*) from, (size_t) from_length, &to_length);
 
     Py_XDECREF(tmp_obj);
 
@@ -5577,31 +5315,29 @@ static char pgUnescapeBytea__doc__[] =
 static PyObject *
 pgUnescapeBytea(PyObject *self, PyObject *data)
 {
-    PyObject   *tmp_obj = NULL, /* auxiliary string object */
-               *to_obj; /* string object to return */
-    char       *from, /* our string argument as encoded string */
-               *to; /* the result as encoded string */
-    Py_ssize_t  from_length; /* length of string */
-    size_t      to_length; /* length of result */
+    PyObject *tmp_obj = NULL,  /* auxiliary string object */
+             *to_obj;          /* string object to return */
+    char *from,  /* our string argument as encoded string */
+         *to;    /* the result as encoded string */
+    Py_ssize_t from_length;    /* length of string */
+    size_t to_length;          /* length of result */
 
-    if (PyBytes_Check(data))
-    {
+    if (PyBytes_Check(data)) {
         PyBytes_AsStringAndSize(data, &from, &from_length);
     }
-    else if (PyUnicode_Check(data))
-    {
+    else if (PyUnicode_Check(data)) {
         tmp_obj = get_encoded_string(data, pg_encoding_ascii);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &from, &from_length);
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Method unescape_bytea() expects a string as argument");
         return NULL;
     }
 
-    to = (char *)PQunescapeBytea((unsigned char*)from, &to_length);
+    to = (char *) PQunescapeBytea((unsigned char*) from, &to_length);
 
     Py_XDECREF(tmp_obj);
 
@@ -5620,12 +5356,12 @@ static char pgSetDatestyle__doc__[] =
 static PyObject *
 pgSetDatestyle(PyObject *self, PyObject *args)
 {
-    const char     *datestyle = NULL;
+    const char *datestyle = NULL;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &datestyle))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    if (!PyArg_ParseTuple(args, "z", &datestyle)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_datestyle() expects a string or None as argument");
         return NULL;
     }
@@ -5642,12 +5378,10 @@ static char pgGetDatestyle__doc__[] =
 static PyObject *
 pgGetDatestyle(PyObject *self, PyObject *noargs)
 {
-    if (date_format)
-    {
+    if (date_format) {
         return PyStr_FromString(date_format_to_style(date_format));
     }
-    else
-    {
+    else {
         Py_INCREF(Py_None); return Py_None;
     }
 }
@@ -5662,13 +5396,11 @@ pgGetDecimalPoint(PyObject *self, PyObject *noargs)
     PyObject *ret;
     char s[2];
 
-    if (decimal_point)
-    {
+    if (decimal_point) {
         s[0] = decimal_point; s[1] = '\0';
         ret = PyStr_FromString(s);
     }
-    else
-    {
+    else {
         Py_INCREF(Py_None); ret = Py_None;
     }
 
@@ -5686,24 +5418,22 @@ pgSetDecimalPoint(PyObject *self, PyObject *args)
     char *s = NULL;
 
     /* gets arguments */
-    if (PyArg_ParseTuple(args, "z", &s))
-    {
+    if (PyArg_ParseTuple(args, "z", &s)) {
         if (!s)
             s = "\0";
         else if (*s && (*(s+1) || !strchr(".,;: '*/_`|", *s)))
             s = NULL;
     }
 
-    if (s)
-    {
+    if (s) {
         decimal_point = *s;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Function set_decimal_mark() expects"
-            " a decimal mark character as argument");
-
+                        "Function set_decimal_mark() expects"
+                        " a decimal mark character as argument");
+    }
     return ret;
 }
 
@@ -5731,20 +5461,19 @@ pgSetDecimal(PyObject *self, PyObject *cls)
 {
     PyObject *ret = NULL;
 
-    if (cls == Py_None)
-    {
+    if (cls == Py_None) {
         Py_XDECREF(decimal); decimal = NULL;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else if (PyCallable_Check(cls))
-    {
+    else if (PyCallable_Check(cls)) {
         Py_XINCREF(cls); Py_XDECREF(decimal); decimal = cls;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Function set_decimal() expects"
-             " a callable or None as argument");
+                        "Function set_decimal() expects"
+                        " a callable or None as argument");
+    }
 
     return ret;
 }
@@ -5772,17 +5501,18 @@ static PyObject *
 pgSetBool(PyObject *self, PyObject *args)
 {
     PyObject *ret = NULL;
-    int         i;
+    int i;
 
     /* gets arguments */
-    if (PyArg_ParseTuple(args, "i", &i))
-    {
+    if (PyArg_ParseTuple(args, "i", &i)) {
         bool_as_text = i ? 0 : 1;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_bool() expects a boolean value as argument");
+    }
 
     return ret;
 }
@@ -5807,20 +5537,21 @@ static char pgSetArray__doc__[] =
 "set_array(on) -- set whether arrays should be converted to lists";
 
 static PyObject *
-pgSetArray(PyObject *self, PyObject *args)
+pgSetArray(PyObject* self, PyObject* args)
 {
-    PyObject *ret = NULL;
-    int         i;
+    PyObject* ret = NULL;
+    int i;
 
     /* gets arguments */
-    if (PyArg_ParseTuple(args, "i", &i))
-    {
+    if (PyArg_ParseTuple(args, "i", &i)) {
         array_as_text = i ? 0 : 1;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_array() expects a boolean value as argument");
+    }
 
     return ret;
 }
@@ -5848,17 +5579,18 @@ static PyObject *
 pgSetByteaEscaped(PyObject *self, PyObject *args)
 {
     PyObject *ret = NULL;
-    int         i;
+    int i;
 
     /* gets arguments */
-    if (PyArg_ParseTuple(args, "i", &i))
-    {
+    if (PyArg_ParseTuple(args, "i", &i)) {
         bytea_escaped = i ? 1 : 0;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_bytea_escaped() expects a boolean value as argument");
+    }
 
     return ret;
 }
@@ -5876,7 +5608,10 @@ pgSetQueryHelpers(PyObject *self, PyObject *args)
         &PyFunction_Type, &dictiter,
         &PyFunction_Type, &namediter,
         &PyFunction_Type, &namednext,
-        &PyFunction_Type, &scalariter)) return NULL;
+        &PyFunction_Type, &scalariter))
+    {
+        return NULL;
+    }
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -5908,20 +5643,19 @@ pgSetJsondecode(PyObject *self, PyObject *func)
 {
     PyObject *ret = NULL;
 
-    if (func == Py_None)
-    {
+    if (func == Py_None) {
         Py_XDECREF(jsondecode); jsondecode = NULL;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else if (PyCallable_Check(func))
-    {
+    else if (PyCallable_Check(func)) {
         Py_XINCREF(func); Py_XDECREF(jsondecode); jsondecode = func;
         Py_INCREF(Py_None); ret = Py_None;
     }
-    else
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Function jsondecode() expects"
-             " a callable or None as argument");
+                        "Function jsondecode() expects"
+                        " a callable or None as argument");
+    }
 
     return ret;
 }
@@ -5946,13 +5680,13 @@ static char pgSetDefHost__doc__[] =
 static PyObject *
 pgSetDefHost(PyObject *self, PyObject *args)
 {
-    char       *temp = NULL;
-    PyObject   *old;
+    char *tmp = NULL;
+    PyObject *old;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &temp))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    if (!PyArg_ParseTuple(args, "z", &tmp)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_defhost() expects a string or None as argument");
         return NULL;
     }
@@ -5960,10 +5694,10 @@ pgSetDefHost(PyObject *self, PyObject *args)
     /* adjusts value */
     old = pg_default_host;
 
-    if (temp)
-        pg_default_host = PyStr_FromString(temp);
-    else
-    {
+    if (tmp) {
+        pg_default_host = PyStr_FromString(tmp);
+    }
+    else {
         Py_INCREF(Py_None);
         pg_default_host = Py_None;
     }
@@ -5989,13 +5723,13 @@ static char pgSetDefBase__doc__[] =
 static PyObject *
 pgSetDefBase(PyObject *self, PyObject *args)
 {
-    char       *temp = NULL;
-    PyObject   *old;
+    char *tmp = NULL;
+    PyObject *old;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &temp))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    if (!PyArg_ParseTuple(args, "z", &tmp)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_defbase() Argument a string or None as argument");
         return NULL;
     }
@@ -6003,10 +5737,10 @@ pgSetDefBase(PyObject *self, PyObject *args)
     /* adjusts value */
     old = pg_default_base;
 
-    if (temp)
-        pg_default_base = PyStr_FromString(temp);
-    else
-    {
+    if (tmp) {
+        pg_default_base = PyStr_FromString(tmp);
+    }
+    else {
         Py_INCREF(Py_None);
         pg_default_base = Py_None;
     }
@@ -6032,13 +5766,13 @@ static char pgSetDefOpt__doc__[] =
 static PyObject *
 pgSetDefOpt(PyObject *self, PyObject *args)
 {
-    char       *temp = NULL;
-    PyObject   *old;
+    char *tmp = NULL;
+    PyObject *old;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &temp))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    if (!PyArg_ParseTuple(args, "z", &tmp)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_defopt() expects a string or None as argument");
         return NULL;
     }
@@ -6046,10 +5780,10 @@ pgSetDefOpt(PyObject *self, PyObject *args)
     /* adjusts value */
     old = pg_default_opt;
 
-    if (temp)
-        pg_default_opt = PyStr_FromString(temp);
-    else
-    {
+    if (tmp) {
+        pg_default_opt = PyStr_FromString(tmp);
+    }
+    else {
         Py_INCREF(Py_None);
         pg_default_opt = Py_None;
     }
@@ -6076,13 +5810,13 @@ static char pgSetDefUser__doc__[] =
 static PyObject *
 pgSetDefUser(PyObject *self, PyObject *args)
 {
-    char       *temp = NULL;
-    PyObject   *old;
+    char *tmp = NULL;
+    PyObject *old;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &temp))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    if (!PyArg_ParseTuple(args, "z", &tmp)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_defuser() expects a string or None as argument");
         return NULL;
     }
@@ -6090,10 +5824,10 @@ pgSetDefUser(PyObject *self, PyObject *args)
     /* adjusts value */
     old = pg_default_user;
 
-    if (temp)
-        pg_default_user = PyStr_FromString(temp);
-    else
-    {
+    if (tmp) {
+        pg_default_user = PyStr_FromString(tmp);
+    }
+    else {
         Py_INCREF(Py_None);
         pg_default_user = Py_None;
     }
@@ -6108,20 +5842,20 @@ static char pgSetDefPassword__doc__[] =
 static PyObject *
 pgSetDefPassword(PyObject *self, PyObject *args)
 {
-    char       *temp = NULL;
+    char *tmp = NULL;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &temp))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    if (!PyArg_ParseTuple(args, "z", &tmp)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function set_defpasswd() expects a string or None as argument");
         return NULL;
     }
 
-    if (temp)
-        pg_default_passwd = PyStr_FromString(temp);
-    else
-    {
+    if (tmp) {
+        pg_default_passwd = PyStr_FromString(tmp);
+    }
+    else {
         Py_INCREF(Py_None);
         pg_default_passwd = Py_None;
     }
@@ -6148,25 +5882,24 @@ static char pgSetDefPort__doc__[] =
 static PyObject *
 pgSetDefPort(PyObject *self, PyObject *args)
 {
-    long int    port = -2;
-    PyObject   *old;
+    long int port = -2;
+    PyObject *old;
 
     /* gets arguments */
-    if ((!PyArg_ParseTuple(args, "l", &port)) || (port < -1))
-    {
+    if ((!PyArg_ParseTuple(args, "l", &port)) || (port < -1)) {
         PyErr_SetString(PyExc_TypeError,
-            "Function set_deport expects"
-             " a positive integer or -1 as argument");
+                        "Function set_deport expects"
+                        " a positive integer or -1 as argument");
         return NULL;
     }
 
     /* adjusts value */
     old = pg_default_port;
 
-    if (port != -1)
+    if (port != -1) {
         pg_default_port = PyInt_FromLong(port);
-    else
-    {
+    }
+    else {
         Py_INCREF(Py_None);
         pg_default_port = Py_None;
     }
@@ -6183,45 +5916,44 @@ PyObject *
 pgCastArray(PyObject *self, PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] = {"string", "cast", "delim", NULL};
-    PyObject   *string_obj, *cast_obj = NULL, *ret;
-    char       *string, delim = ',';
-    Py_ssize_t  size;
-    int         encoding;
+    PyObject *string_obj, *cast_obj = NULL, *ret;
+    char *string, delim = ',';
+    Py_ssize_t size;
+    int encoding;
 
-    if (!PyArg_ParseTupleAndKeywords(args, dict, "O|Oc",
-            (char **) kwlist, &string_obj, &cast_obj, &delim))
-        return NULL;
-
-    if (PyBytes_Check(string_obj))
+    if (!PyArg_ParseTupleAndKeywords(
+        args, dict, "O|Oc",
+        (char**) kwlist, &string_obj, &cast_obj, &delim))
     {
+        return NULL;
+    }
+
+    if (PyBytes_Check(string_obj)) {
         PyBytes_AsStringAndSize(string_obj, &string, &size);
         string_obj = NULL;
         encoding = pg_encoding_ascii;
     }
-    else if (PyUnicode_Check(string_obj))
-    {
+    else if (PyUnicode_Check(string_obj)) {
         string_obj = PyUnicode_AsUTF8String(string_obj);
         if (!string_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(string_obj, &string, &size);
         encoding = pg_encoding_utf8;
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function cast_array() expects a string as first argument");
         return NULL;
     }
 
-    if (!cast_obj || cast_obj == Py_None)
-    {
-        if (cast_obj)
-        {
+    if (!cast_obj || cast_obj == Py_None) {
+        if (cast_obj) {
             Py_DECREF(cast_obj); cast_obj = NULL;
         }
     }
-    else if (!PyCallable_Check(cast_obj))
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else if (!PyCallable_Check(cast_obj)) {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function cast_array() expects a callable as second argument");
         return NULL;
     }
@@ -6241,56 +5973,52 @@ PyObject *
 pgCastRecord(PyObject *self, PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] = {"string", "cast", "delim", NULL};
-    PyObject   *string_obj, *cast_obj = NULL, *ret;
-    char       *string, delim = ',';
-    Py_ssize_t  size, len;
-    int         encoding;
+    PyObject *string_obj, *cast_obj = NULL, *ret;
+    char *string, delim = ',';
+    Py_ssize_t size, len;
+    int encoding;
 
-    if (!PyArg_ParseTupleAndKeywords(args, dict, "O|Oc",
-            (char **) kwlist, &string_obj, &cast_obj, &delim))
-        return NULL;
-
-    if (PyBytes_Check(string_obj))
+    if (!PyArg_ParseTupleAndKeywords(
+        args, dict, "O|Oc",
+        (char**) kwlist, &string_obj, &cast_obj, &delim))
     {
+        return NULL;
+    }
+
+    if (PyBytes_Check(string_obj)) {
         PyBytes_AsStringAndSize(string_obj, &string, &size);
         string_obj = NULL;
         encoding = pg_encoding_ascii;
     }
-    else if (PyUnicode_Check(string_obj))
-    {
+    else if (PyUnicode_Check(string_obj)) {
         string_obj = PyUnicode_AsUTF8String(string_obj);
         if (!string_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(string_obj, &string, &size);
         encoding = pg_encoding_utf8;
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function cast_record() expects a string as first argument");
         return NULL;
     }
 
-    if (!cast_obj || PyCallable_Check(cast_obj))
-    {
+    if (!cast_obj || PyCallable_Check(cast_obj)) {
         len = 0;
     }
-    else if (cast_obj == Py_None)
-    {
+    else if (cast_obj == Py_None) {
         Py_DECREF(cast_obj); cast_obj = NULL; len = 0;
     }
-    else if (PyTuple_Check(cast_obj) || PyList_Check(cast_obj))
-    {
+    else if (PyTuple_Check(cast_obj) || PyList_Check(cast_obj)) {
         len = PySequence_Size(cast_obj);
-        if (!len)
-        {
+        if (!len) {
             Py_DECREF(cast_obj); cast_obj = NULL;
         }
     }
-    else
-    {
+    else {
         PyErr_SetString(PyExc_TypeError,
-            "Function cast_record() expects a callable"
-             " or tuple or list of callables as second argument");
+                        "Function cast_record() expects a callable"
+                        " or tuple or list of callables as second argument");
         return NULL;
     }
 
@@ -6308,26 +6036,24 @@ static char pgCastHStore__doc__[] =
 PyObject *
 pgCastHStore(PyObject *self, PyObject *string)
 {
-    PyObject   *tmp_obj = NULL, *ret;
-    char       *s;
-    Py_ssize_t  size;
-    int         encoding;
+    PyObject *tmp_obj = NULL, *ret;
+    char *s;
+    Py_ssize_t size;
+    int encoding;
 
-    if (PyBytes_Check(string))
-    {
+    if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &s, &size);
         encoding = pg_encoding_ascii;
     }
-    else if (PyUnicode_Check(string))
-    {
+    else if (PyUnicode_Check(string)) {
         tmp_obj = PyUnicode_AsUTF8String(string);
         if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &s, &size);
         encoding = pg_encoding_utf8;
     }
-    else
-    {
-        PyErr_SetString(PyExc_TypeError,
+    else {
+        PyErr_SetString(
+            PyExc_TypeError,
             "Function cast_hstore() expects a string as first argument");
         return NULL;
     }
@@ -6411,7 +6137,7 @@ static struct PyModuleDef moduleDef = {
 /* Initialization function for the module */
 MODULE_INIT_FUNC(_pg)
 {
-    PyObject   *mod, *dict, *s;
+    PyObject *mod, *dict, *s;
 
     /* Create the module and add the functions */
 
@@ -6439,7 +6165,10 @@ MODULE_INIT_FUNC(_pg)
 #ifdef LARGE_OBJECTS
         || PyType_Ready(&largeType)
 #endif
-        ) return NULL;
+        )
+    {
+        return NULL;
+    }
 
     dict = PyModule_GetDict(mod);
 
@@ -6456,7 +6185,8 @@ MODULE_INIT_FUNC(_pg)
     DatabaseError = PyErr_NewException("pg.DatabaseError", Error, NULL);
     PyDict_SetItemString(dict, "DatabaseError", DatabaseError);
 
-    InternalError = PyErr_NewException("pg.InternalError", DatabaseError, NULL);
+    InternalError =
+        PyErr_NewException("pg.InternalError", DatabaseError, NULL);
     PyDict_SetItemString(dict, "InternalError", InternalError);
 
     OperationalError =
@@ -6531,8 +6261,9 @@ MODULE_INIT_FUNC(_pg)
     pg_encoding_ascii = pg_char_to_encoding("SQL_ASCII");
 
     /* Check for errors */
-    if (PyErr_Occurred())
+    if (PyErr_Occurred()) {
         return NULL;
+    }
 
     return mod;
 }
