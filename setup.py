@@ -29,7 +29,7 @@ Prerequisites to be installed:
   (the Windows installer has it as part of the database server feature)
 
 PyGreSQL currently supports Python versions 2.6, 2.7 and 3.3 to 3.7,
-and PostgreSQL versions 9.0 to 9.6 and 10.
+and PostgreSQL versions 9.0 to 9.6 and 10 or 11.
 
 Use as follows:
 python setup.py build   # to build the module
