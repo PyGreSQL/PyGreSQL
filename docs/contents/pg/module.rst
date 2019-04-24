@@ -46,15 +46,22 @@ connect -- Open a PostgreSQL connection
 This function opens a connection to a specified database on a given
 PostgreSQL server. You can use keywords here, as described in the
 Python tutorial. The names of the keywords are the name of the
-parameters given in the syntax line. For a precise description
+parameters given in the syntax line. The ``opt`` parameter can be used
+to pass command-line options to the server. For a precise description
 of the parameters, please refer to the PostgreSQL user manual.
+
+If you want to add additional parameters not specified here, you must
+pass a connection string or a connection URI instead of the ``dbname``
+(as in ``con3`` and ``con4``  in the following example).
 
 Example::
 
     import pg
 
-    con1 = pg.connect('testdb', 'myhost', 5432, None, None, 'bob', None)
-    con2 = pg.connect(dbname='testdb', host='localhost', user='bob')
+    con1 = pg.connect('testdb', 'myhost', 5432, None, 'bob', None)
+    con2 = pg.connect(dbname='testdb', host='myhost', user='bob')
+    con3 = pg.connect('host=myhost user=bob dbname=testdb connect_timeout=10')
+    con4 = pg.connect('postgresql://bob@myhost/testdb?connect_timeout=10')
 
 get/set_defhost -- default server host [DV]
 -------------------------------------------
