@@ -1,5 +1,12 @@
 #!/usr/bin/python
+#
 # $Id$
+#
+# PyGreSQL - a Python interface for the PostgreSQL database.
+#
+# Copyright (c) 2019 by the PyGreSQL Development Team
+#
+# Please see the LICENSE.TXT file for specific restrictions.
 
 """Setup script for PyGreSQL version 5.1
 

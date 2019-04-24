@@ -1,11 +1,14 @@
 #!/usr/bin/python
 #
-# pgdb.py
-#
-# Written by D'Arcy J.M. Cain
-#
 # $Id$
 #
+# PyGreSQL - a Python interface for the PostgreSQL database.
+#
+# This file contains the DB-API 2 compatible pgdb module.
+#
+# Copyright (c) 2019 by the PyGreSQL Development Team
+#
+# Please see the LICENSE.TXT file for specific restrictions.
 
 """pgdb - DB-API 2.0 compliant module for PygreSQL.
 

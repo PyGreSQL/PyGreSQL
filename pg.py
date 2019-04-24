@@ -1,9 +1,15 @@
 #!/usr/bin/python
 #
-# pg.py
-#
 # $Id$
 #
+# PyGreSQL - a Python interface for the PostgreSQL database.
+#
+# This file contains the classic pg module.
+#
+# Copyright (c) 2019 by the PyGreSQL Development Team
+#
+# Please see the LICENSE.TXT file for specific restrictions.
+
 
 """PyGreSQL classic interface.
 

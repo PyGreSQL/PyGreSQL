@@ -1,7 +1,13 @@
 /*
  * $Id: conn.c 985 2019-04-22 22:07:43Z cito $
  *
- * This file is part of PyGreSQL (source object implementation).
+ * PyGreSQL - a Python interface for the PostgreSQL database.
+ *
+ * The source object - this file is part a of the C extension module.
+ *
+ * Copyright (c) 2019 by the PyGreSQL Development Team
+ *
+ * Please see the LICENSE.TXT file for specific restrictions.
  *
  */
 
