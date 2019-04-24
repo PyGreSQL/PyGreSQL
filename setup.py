@@ -117,10 +117,13 @@ class build_pg_ext(build_ext):
         ('default-vars', None,
             "enable default variables use"),
         ('escaping-funcs', None,
-            "enable string escaping functions")]
+            "enable string escaping functions"),
+        ('ssl-info', None,
+            "use new ssl info functions")]
 
     boolean_options = build_ext.boolean_options + [
-        'direct-access', 'large-objects', 'default-vars', 'escaping-funcs']
+        'direct-access', 'large-objects', 'default-vars',
+        'escaping-funcs', 'ssl-info']
 
     def get_compiler(self):
         """Return the C compiler used for building the extension."""
@@ -131,7 +134,8 @@ class build_pg_ext(build_ext):
         self.direct_access = True
         self.large_objects = True
         self.default_vars = True
-        self.escaping_funcs = pg_version[0] >= 9
+        self.escaping_funcs = pg_version >= (9, 0)
+        self.ssl_info = pg_version >= (9, 5)
         if pg_version < (9, 0):
             warnings.warn("PygreSQL does not support this PostgreSQL version.")
 
@@ -144,8 +148,10 @@ class build_pg_ext(build_ext):
             define_macros.append(('LARGE_OBJECTS', None))
         if self.default_vars:
             define_macros.append(('DEFAULT_VARS', None))
-        if self.escaping_funcs and pg_version[0] >= 9:
+        if self.escaping_funcs and pg_version >= (9, 0):
             define_macros.append(('ESCAPING_FUNCS', None))
+        if self.ssl_info and pg_version >= (9, 5):
+            define_macros.append(('SSL_INFO', None))
         if sys.platform == 'win32':
             bits = platform.architecture()[0]
             if bits == '64bit':  # we need to find libpq64

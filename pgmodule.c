@@ -18,10 +18,10 @@
 #include <libpq-fe.h>
 #include <libpq/libpq-fs.h>
 
-/* the type definitions from <server/catalog/pg_type.h> */
+/* The type definitions from <server/catalog/pg_type.h> */
 #include "pgtypes.h"
 
-/* macros for single-source Python 2/3 compatibility */
+/* Macros for single-source Python 2/3 compatibility */
 #include "py3c.h"
 
 static PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
@@ -37,23 +37,23 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #define Py_InitModule4 Py_InitModule4_64
 #endif
 
-/* default values */
+/* Default values */
 #define PG_ARRAYSIZE 1
 
-/* flags for object validity checks */
+/* Flags for object validity checks */
 #define CHECK_OPEN   1
 #define CHECK_CLOSE  2
 #define CHECK_CNX    4
 #define CHECK_RESULT 8
 #define CHECK_DQL   16
 
-/* query result types */
+/* Query result types */
 #define RESULT_EMPTY 1
 #define RESULT_DML   2
 #define RESULT_DDL   3
 #define RESULT_DQL   4
 
-/* flags for move methods */
+/* Flags for move methods */
 #define QUERY_MOVEFIRST 1
 #define QUERY_MOVELAST  2
 #define QUERY_MOVENEXT  3
@@ -109,13 +109,13 @@ OBJECTS
    - source: Source object returned by pg.conn.source().
 */
 
-/* forward declarations for types */
+/* Forward declarations for types */
 static PyTypeObject connType, sourceType, queryType, noticeType, largeType;
 
-/* forward static declarations */
+/* Forward static declarations */
 static void notice_receiver(void *, const PGresult *);
 
-/* object declarations */
+/* Object declarations */
 
 typedef struct
 {
@@ -175,29 +175,29 @@ typedef struct
 #define is_largeObject(v) (PyType(v) == &largeType)
 #endif /* LARGE_OBJECTS */
 
-/* internal functions */
+/* Internal functions */
 #include "internal.c"
 
-/* connection object */
+/* Connection object */
 #include "conn.c"
 
-/* query object */
+/* Query object */
 #include "query.c"
 
-/* source object */
+/* Source object */
 #include "source.c"
 
-/* notice object */
+/* Notice object */
 #include "notice.c"
 
-/* large objects */
+/* Large objects */
 #ifdef LARGE_OBJECTS
 #include "large.c"
 #endif
 
 /* MODULE FUNCTIONS */
 
-/* connect to a database */
+/* Connect to a database. */
 static char pg_connect__doc__[] =
 "connect(dbname, host, port, opt) -- connect to a PostgreSQL database\n\n"
 "The connection uses the specified parameters (optional, keywords aware).\n";
@@ -282,7 +282,7 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
     return (PyObject *) conn_obj;
 }
 
-/* escape string */
+/* Escape string */
 static char pg_escape_string__doc__[] =
 "escape_string(string) -- escape a string for use within SQL";
 
@@ -330,7 +330,7 @@ pg_escape_string(PyObject *self, PyObject *string)
     return to_obj;
 }
 
-/* escape bytea */
+/* Escape bytea */
 static char pg_escape_bytea__doc__[] =
 "escape_bytea(data) -- escape binary data for use within SQL as type bytea";
 
@@ -374,7 +374,7 @@ pg_escape_bytea(PyObject *self, PyObject *data)
     return to_obj;
 }
 
-/* unescape bytea */
+/* Unescape bytea */
 static char pg_unescape_bytea__doc__[] =
 "unescape_bytea(string) -- unescape bytea data retrieved as text";
 
@@ -415,7 +415,7 @@ pg_unescape_bytea(PyObject *self, PyObject *data)
     return to_obj;
 }
 
-/* set fixed datestyle */
+/* Set fixed datestyle. */
 static char pg_set_datestyle__doc__[] =
 "set_datestyle(style) -- set which style is assumed";
 
@@ -437,7 +437,7 @@ pg_set_datestyle(PyObject *self, PyObject *args)
     Py_INCREF(Py_None); return Py_None;
 }
 
-/* get fixed datestyle */
+/* Get fixed datestyle. */
 static char pg_get_datestyle__doc__[] =
 "get_datestyle() -- get which date style is assumed";
 
@@ -452,7 +452,7 @@ pg_get_datestyle(PyObject *self, PyObject *noargs)
     }
 }
 
-/* get decimal point */
+/* Get decimal point. */
 static char pg_get_decimal_point__doc__[] =
 "get_decimal_point() -- get decimal point to be used for money values";
 
@@ -473,7 +473,7 @@ pg_get_decimal_point(PyObject *self, PyObject *noargs)
     return ret;
 }
 
-/* set decimal point */
+/* Set decimal point. */
 static char pg_set_decimal_point__doc__[] =
 "set_decimal_point(char) -- set decimal point to be used for money values";
 
@@ -503,7 +503,7 @@ pg_set_decimal_point(PyObject *self, PyObject *args)
     return ret;
 }
 
-/* get decimal type */
+/* Get decimal type. */
 static char pg_get_decimal__doc__[] =
 "get_decimal() -- get the decimal type to be used for numeric values";
 
@@ -518,7 +518,7 @@ pg_get_decimal(PyObject *self, PyObject *noargs)
     return ret;
 }
 
-/* set decimal type */
+/* Set decimal type. */
 static char pg_set_decimal__doc__[] =
 "set_decimal(cls) -- set a decimal type to be used for numeric values";
 
@@ -544,7 +544,7 @@ pg_set_decimal(PyObject *self, PyObject *cls)
     return ret;
 }
 
-/* get usage of bool values */
+/* Get usage of bool values. */
 static char pg_get_bool__doc__[] =
 "get_bool() -- check whether boolean values are converted to bool";
 
@@ -559,7 +559,7 @@ pg_get_bool(PyObject *self, PyObject *noargs)
     return ret;
 }
 
-/* set usage of bool values */
+/* Set usage of bool values. */
 static char pg_set_bool__doc__[] =
 "set_bool(on) -- set whether boolean values should be converted to bool";
 
@@ -583,7 +583,7 @@ pg_set_bool(PyObject *self, PyObject *args)
     return ret;
 }
 
-/* get conversion of arrays to lists */
+/* Get conversion of arrays to lists. */
 static char pg_get_array__doc__[] =
 "get_array() -- check whether arrays are converted as lists";
 
@@ -598,7 +598,7 @@ pg_get_array(PyObject *self, PyObject *noargs)
     return ret;
 }
 
-/* set conversion of arrays to lists */
+/* Set conversion of arrays to lists. */
 static char pg_set_array__doc__[] =
 "set_array(on) -- set whether arrays should be converted to lists";
 
@@ -622,7 +622,7 @@ pg_set_array(PyObject* self, PyObject* args)
     return ret;
 }
 
-/* check whether bytea values are unescaped */
+/* Check whether bytea values are unescaped. */
 static char pg_get_bytea_escaped__doc__[] =
 "get_bytea_escaped() -- check whether bytea will be returned escaped";
 
@@ -637,7 +637,7 @@ pg_get_bytea_escaped(PyObject *self, PyObject *noargs)
     return ret;
 }
 
-/* set usage of bool values */
+/* Set usage of bool values. */
 static char pg_set_bytea_escaped__doc__[] =
 "set_bytea_escaped(on) -- set whether bytea will be returned escaped";
 
@@ -683,7 +683,7 @@ pg_set_query_helpers(PyObject *self, PyObject *args)
     return Py_None;
 }
 
-/* get json decode function */
+/* Get json decode function. */
 static char pg_get_jsondecode__doc__[] =
 "get_jsondecode() -- get the function used for decoding json results";
 
@@ -700,7 +700,7 @@ pg_get_jsondecode(PyObject *self, PyObject *noargs)
     return ret;
 }
 
-/* set json decode function */
+/* Set json decode function. */
 static char pg_set_jsondecode__doc__[] =
 "set_jsondecode(func) -- set a function to be used for decoding json results";
 
@@ -728,7 +728,7 @@ pg_set_jsondecode(PyObject *self, PyObject *func)
 
 #ifdef DEFAULT_VARS
 
-/* gets default host */
+/* Get default host. */
 static char pg_get_defhost__doc__[] =
 "get_defhost() -- return default database host";
 
@@ -739,7 +739,7 @@ pg_get_defhost(PyObject *self, PyObject *noargs)
     return pg_default_host;
 }
 
-/* sets default host */
+/* Set default host. */
 static char pg_set_defhost__doc__[] =
 "set_defhost(string) -- set default database host and return previous value";
 
@@ -771,7 +771,7 @@ pg_set_defhost(PyObject *self, PyObject *args)
     return old;
 }
 
-/* gets default base */
+/* Get default database. */
 static char pg_get_defbase__doc__[] =
 "get_defbase() -- return default database name";
 
@@ -782,7 +782,7 @@ pg_get_defbase(PyObject *self, PyObject *noargs)
     return pg_default_base;
 }
 
-/* sets default base */
+/* Set default database. */
 static char pg_set_defbase__doc__[] =
 "set_defbase(string) -- set default database name and return previous value";
 
@@ -814,7 +814,7 @@ pg_set_defbase(PyObject *self, PyObject *args)
     return old;
 }
 
-/* gets default options */
+/* Get default options. */
 static char pg_get_defopt__doc__[] =
 "get_defopt() -- return default database options";
 
@@ -825,7 +825,7 @@ pg_get_defopt(PyObject *self, PyObject *noargs)
     return pg_default_opt;
 }
 
-/* sets default opt */
+/* Set default options. */
 static char pg_set_defopt__doc__[] =
 "set_defopt(string) -- set default options and return previous value";
 
@@ -857,7 +857,7 @@ pg_setdefopt(PyObject *self, PyObject *args)
     return old;
 }
 
-/* gets default username */
+/* Get default username. */
 static char pg_get_defuser__doc__[] =
 "get_defuser() -- return default database username";
 
@@ -868,7 +868,7 @@ pg_get_defuser(PyObject *self, PyObject *noargs)
     return pg_default_user;
 }
 
-/* sets default username */
+/* Set default username. */
 
 static char pg_set_defuser__doc__[] =
 "set_defuser(name) -- set default username and return previous value";
@@ -901,7 +901,7 @@ pg_set_defuser(PyObject *self, PyObject *args)
     return old;
 }
 
-/* sets default password */
+/* Set default password. */
 static char pg_set_defpasswd__doc__[] =
 "set_defpasswd(password) -- set default database password";
 
@@ -930,7 +930,7 @@ pg_set_defpasswd(PyObject *self, PyObject *args)
     return Py_None;
 }
 
-/* gets default port */
+/* Get default port. */
 static char pg_get_defport__doc__[] =
 "get_defport() -- return default database port";
 
@@ -941,7 +941,7 @@ pg_get_defport(PyObject *self, PyObject *noargs)
     return pg_default_port;
 }
 
-/* sets default port */
+/* Set default port. */
 static char pg_set_defport__doc__[] =
 "set_defport(port) -- set default port and return previous value";
 
@@ -974,7 +974,7 @@ pg_set_defport(PyObject *self, PyObject *args)
 }
 #endif /* DEFAULT_VARS */
 
-/* cast a string with a text representation of an array to a list */
+/* Cast a string with a text representation of an array to a list. */
 static char pg_cast_array__doc__[] =
 "cast_array(string, cast=None, delim=',') -- cast a string as an array";
 
@@ -1031,7 +1031,7 @@ pg_cast_array(PyObject *self, PyObject *args, PyObject *dict)
     return ret;
 }
 
-/* cast a string with a text representation of a record to a tuple */
+/* Cast a string with a text representation of a record to a tuple. */
 static char pg_cast_record__doc__[] =
 "cast_record(string, cast=None, delim=',') -- cast a string as a record";
 
@@ -1095,7 +1095,7 @@ pg_cast_record(PyObject *self, PyObject *args, PyObject *dict)
     return ret;
 }
 
-/* cast a string with a text representation of an hstore to a dict */
+/* Cast a string with a text representation of an hstore to a dict. */
 static char pg_cast_hstore__doc__[] =
 "cast_hstore(string) -- cast a string as an hstore";
 
@@ -1131,7 +1131,7 @@ pg_cast_hstore(PyObject *self, PyObject *string)
     return ret;
 }
 
-/* List of functions defined in the module */
+/* The list of functions defined in the module */
 
 static struct PyMethodDef pg_methods[] = {
     {"connect", (PyCFunction) pg_connect,
@@ -1300,13 +1300,13 @@ MODULE_INIT_FUNC(_pg)
     PyDict_SetItemString(dict, "__version__", s);
     Py_DECREF(s);
 
-    /* results type for queries */
+    /* Result types for queries */
     PyDict_SetItemString(dict, "RESULT_EMPTY", PyInt_FromLong(RESULT_EMPTY));
     PyDict_SetItemString(dict, "RESULT_DML", PyInt_FromLong(RESULT_DML));
     PyDict_SetItemString(dict, "RESULT_DDL", PyInt_FromLong(RESULT_DDL));
     PyDict_SetItemString(dict, "RESULT_DQL", PyInt_FromLong(RESULT_DQL));
 
-    /* transaction states */
+    /* Transaction states */
     PyDict_SetItemString(dict,"TRANS_IDLE",PyInt_FromLong(PQTRANS_IDLE));
     PyDict_SetItemString(dict,"TRANS_ACTIVE",PyInt_FromLong(PQTRANS_ACTIVE));
     PyDict_SetItemString(dict,"TRANS_INTRANS",PyInt_FromLong(PQTRANS_INTRANS));
@@ -1314,18 +1314,18 @@ MODULE_INIT_FUNC(_pg)
     PyDict_SetItemString(dict,"TRANS_UNKNOWN",PyInt_FromLong(PQTRANS_UNKNOWN));
 
 #ifdef LARGE_OBJECTS
-    /* create mode for large objects */
+    /* Create mode for large objects */
     PyDict_SetItemString(dict, "INV_READ", PyInt_FromLong(INV_READ));
     PyDict_SetItemString(dict, "INV_WRITE", PyInt_FromLong(INV_WRITE));
 
-    /* position flags for lo_lseek */
+    /* Position flags for lo_lseek */
     PyDict_SetItemString(dict, "SEEK_SET", PyInt_FromLong(SEEK_SET));
     PyDict_SetItemString(dict, "SEEK_CUR", PyInt_FromLong(SEEK_CUR));
     PyDict_SetItemString(dict, "SEEK_END", PyInt_FromLong(SEEK_END));
 #endif /* LARGE_OBJECTS */
 
 #ifdef DEFAULT_VARS
-    /* prepares default values */
+    /* Prepare default values */
     Py_INCREF(Py_None);
     pg_default_host = Py_None;
     Py_INCREF(Py_None);
@@ -1340,7 +1340,7 @@ MODULE_INIT_FUNC(_pg)
     pg_default_passwd = Py_None;
 #endif /* DEFAULT_VARS */
 
-    /* store common pg encoding ids */
+    /* Store common pg encoding ids */
 
     pg_encoding_utf8 = pg_char_to_encoding("UTF8");
     pg_encoding_latin1 = pg_char_to_encoding("LATIN1");

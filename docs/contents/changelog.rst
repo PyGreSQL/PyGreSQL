@@ -29,6 +29,8 @@ Version 5.1 (2019-mm-dd)
       factory with the pg.set_row_factory_size() function and change the
       implementation with pg.set_query_helps(), but this is not recommended
       and this function is not part of the official API.
+    - Added new connection attributes `socket`, `backend_pid`, `ssl_in_use`
+      and `ssl_attributes` (the latter need PostgreSQL >= 9.5 on the client).
 
 Vesion 5.0.7 (2019-mm-dd)
 -------------------------

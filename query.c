@@ -1,5 +1,5 @@
 /*
- * $Id: conn.c 985 2019-04-22 22:07:43Z cito $
+ * $Id: query.c 985 2019-04-22 22:07:43Z cito $
  *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
@@ -11,7 +11,7 @@
  *
  */
 
-/* Deallocate query object */
+/* Deallocate the query object. */
 static void
 query_dealloc(queryObject *self)
 {
@@ -26,7 +26,7 @@ query_dealloc(queryObject *self)
     PyObject_Del(self);
 }
 
-/* Return query as string in human readable form */
+/* Return query as string in human readable form. */
 static PyObject *
 query_str(queryObject *self)
 {
@@ -126,8 +126,8 @@ query_getitem(PyObject *self, Py_ssize_t i)
     return _query_row_as_tuple(q);
 }
 
-/* The __iter__() method of the queryObject.
-   This returns the default iterator yielding rows as tuples. */
+/* __iter__() method of the queryObject:
+   Returns the default iterator yielding rows as tuples. */
 static PyObject* query_iter(queryObject *self)
 {
     self->current_row = 0;
@@ -135,7 +135,7 @@ static PyObject* query_iter(queryObject *self)
     return (PyObject*) self;
 }
 
-/* The __next__() method of the queryObject.
+/* __next__() method of the queryObject:
    Returns the current current row as a tuple and moves to the next one. */
 static PyObject *
 query_next(queryObject *self, PyObject *noargs)
@@ -152,7 +152,7 @@ query_next(queryObject *self, PyObject *noargs)
     return row_tuple;
 }
 
-/* get number of rows */
+/* Get number of rows. */
 static char query_ntuples__doc__[] =
 "ntuples() -- return number of tuples returned by query";
 
@@ -162,7 +162,7 @@ query_ntuples(queryObject *self, PyObject *noargs)
     return PyInt_FromLong(self->max_row);
 }
 
-/* list fields names from query result */
+/* List field names from query result. */
 static char query_listfields__doc__[] =
 "listfields() -- List field names from result";
 
@@ -185,7 +185,7 @@ query_listfields(queryObject *self, PyObject *noargs)
     return fieldstuple;
 }
 
-/* get field name from last result */
+/* Get field name from number in last result. */
 static char query_fieldname__doc__[] =
 "fieldname(num) -- return name of field from result from its position";
 
@@ -213,7 +213,7 @@ query_fieldname(queryObject *self, PyObject *args)
     return PyStr_FromString(name);
 }
 
-/* gets fields number from name in last result */
+/* Get field number from name in last result. */
 static char query_fieldnum__doc__[] =
 "fieldnum(name) -- return position in query for field from its name";
 
@@ -239,7 +239,7 @@ query_fieldnum(queryObject *self, PyObject *args)
     return PyInt_FromLong(num);
 }
 
-/* Retrieves one row from the result as a tuple. */
+/* Retrieve one row from the result as a tuple. */
 static char query_one__doc__[] =
 "one() -- Get one row from the result of a query\n\n"
 "Only one row from the result is returned as a tuple of fields.\n"
@@ -260,7 +260,7 @@ query_one(queryObject *self, PyObject *noargs)
     return row_tuple;
 }
 
-/* Retrieves the single row from the result as a tuple. */
+/* Retrieve the single row from the result as a tuple. */
 static char query_single__doc__[] =
 "single() -- Get the result of a query as single row\n\n"
 "The single row from the query result is returned as a tuple of fields.\n"
@@ -287,7 +287,7 @@ query_single(queryObject *self, PyObject *noargs)
     return row_tuple;
 }
 
-/* Retrieves the last query result as a list of tuples. */
+/* Retrieve the last query result as a list of tuples. */
 static char query_getresult__doc__[] =
 "getresult() -- Get the result of a query\n\n"
 "The result is returned as a list of rows, each one a tuple of fields\n"
@@ -657,7 +657,7 @@ query_singlescalar(queryObject *self, PyObject *noargs)
     return value;
 }
 
-/* query sequence protocol methods */
+/* Query sequence protocol methods */
 static PySequenceMethods query_sequence_methods = {
     (lenfunc) query_len,           /* sq_length */
     0,                             /* sq_concat */
@@ -669,7 +669,7 @@ static PySequenceMethods query_sequence_methods = {
     0,                             /* sq_inplace_repeat */
 };
 
-/* query object methods */
+/* Query object methods */
 static struct PyMethodDef query_methods[] = {
     {"getresult", (PyCFunction) query_getresult,
         METH_NOARGS, query_getresult__doc__},
@@ -714,7 +714,7 @@ static struct PyMethodDef query_methods[] = {
 
 static char query__doc__[] = "PyGreSQL query object";
 
-/* query type definition */
+/* Query type definition */
 static PyTypeObject queryType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "pg.Query",                  /* tp_name */

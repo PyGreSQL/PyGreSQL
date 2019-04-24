@@ -114,8 +114,9 @@ class TestConnectObject(unittest.TestCase):
         self.assertTrue(r.startswith('<pg.Connection object'), r)
 
     def testAllConnectAttributes(self):
-        attributes = '''db error host options port
-            protocol_version server_version status user'''.split()
+        attributes = '''backend_pid db error host options port
+            protocol_version server_version socket
+            ssl_attributes ssl_in_use status user'''.split()
         connection_attributes = [a for a in dir(self.connection)
             if not a.startswith('__') and not self.is_method(a)]
         self.assertEqual(attributes, connection_attributes)
@@ -167,6 +168,28 @@ class TestConnectObject(unittest.TestCase):
         server_version = self.connection.server_version
         self.assertIsInstance(server_version, int)
         self.assertTrue(90000 <= server_version < 120000)
+
+    def testAttributeSocket(self):
+        socket = self.connection.socket
+        self.assertIsInstance(socket, int)
+        self.assertGreaterEqual(socket, 0)
+
+    def testAttributeBackendPid(self):
+        backend_pid = self.connection.backend_pid
+        self.assertIsInstance(backend_pid, int)
+        self.assertGreaterEqual(backend_pid, 1)
+
+    def testAttributeSslInUse(self):
+        ssl_in_use = self.connection.ssl_in_use
+        self.assertIsInstance(ssl_in_use, bool)
+        self.assertFalse(ssl_in_use)
+
+    def testAttributeSslAttributes(self):
+        ssl_attributes = self.connection.ssl_attributes
+        self.assertIsInstance(ssl_attributes, dict)
+        self.assertEqual(ssl_attributes, {
+            'cipher': None, 'compression': None, 'key_bits': None,
+            'library': None, 'protocol': None})
 
     def testAttributeStatus(self):
         status_ok = 1

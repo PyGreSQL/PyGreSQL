@@ -1,5 +1,5 @@
 /*
- * $Id: conn.c 985 2019-04-22 22:07:43Z cito $
+ * $Id: notice.c 985 2019-04-22 22:07:43Z cito $
  *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
@@ -11,7 +11,7 @@
  *
  */
 
-/* Get notice object attributes */
+/* Get notice object attributes. */
 static PyObject *
 notice_getattr(noticeObject *self, PyObject *nameobj)
 {
@@ -64,7 +64,7 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
     return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* Get the list of notice attributes */
+/* Get the list of notice attributes. */
 static PyObject *
 notice_dir(noticeObject *self, PyObject *noargs)
 {
@@ -78,14 +78,14 @@ notice_dir(noticeObject *self, PyObject *noargs)
     return attrs;
 }
 
-/* Return notice as string in human readable form */
+/* Return notice as string in human readable form. */
 static PyObject *
 notice_str(noticeObject *self)
 {
     return notice_getattr(self, PyBytes_FromString("message"));
 }
 
-/* notice object methods */
+/* Notice object methods */
 static struct PyMethodDef notice_methods[] = {
     {"__dir__", (PyCFunction) notice_dir,  METH_NOARGS, NULL},
     {NULL, NULL}
@@ -93,7 +93,7 @@ static struct PyMethodDef notice_methods[] = {
 
 static char notice__doc__[] = "PostgreSQL notice object";
 
-/* notice type definition */
+/* Notice type definition */
 static PyTypeObject noticeType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "pg.Notice",                    /* tp_name */

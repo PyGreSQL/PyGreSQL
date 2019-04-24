@@ -1,5 +1,5 @@
 /*
- * $Id: conn.c 985 2019-04-22 22:07:43Z cito $
+ * $Id: internal.c 985 2019-04-22 22:07:43Z cito $
  *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
@@ -13,22 +13,22 @@
 
 /* PyGreSQL internal types */
 
-/* simple types */
+/* Simple types */
 #define PYGRES_INT 1
 #define PYGRES_LONG 2
 #define PYGRES_FLOAT 3
 #define PYGRES_DECIMAL 4
 #define PYGRES_MONEY 5
 #define PYGRES_BOOL 6
-/* text based types */
+/* Text based types */
 #define PYGRES_TEXT 8
 #define PYGRES_BYTEA 9
 #define PYGRES_JSON 10
 #define PYGRES_OTHER 11
-/* array types */
+/* Array types */
 #define PYGRES_ARRAY 16
 
-/* shared function for encoding and decoding strings */
+/* Shared functions for encoding and decoding strings */
 
 static PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding)
@@ -58,9 +58,9 @@ get_encoded_string(PyObject *unicode_obj, int encoding)
         pg_encoding_to_char(encoding), "strict");
 }
 
-/* helper functions */
+/* Helper functions */
 
-/* get PyGreSQL internal types for a PostgreSQL type */
+/* Get PyGreSQL internal types for a PostgreSQL type. */
 static int
 get_type(Oid pgtype)
 {
@@ -175,7 +175,7 @@ get_type(Oid pgtype)
     return t;
 }
 
-/* get PyGreSQL column types for all result columns */
+/* Get PyGreSQL column types for all result columns. */
 static int *
 get_col_types(PGresult *result, int nfields)
 {
@@ -444,7 +444,7 @@ cast_unsized_simple(char *s, int type)
     return obj;
 }
 
-/* quick case insensitive check if given sized string is null */
+/* Quick case insensitive check if given sized string is null. */
 #define STR_IS_NULL(s, n) (n == 4 && \
     (s[0] == 'n' || s[0] == 'N') && \
     (s[1] == 'u' || s[1] == 'U') && \
@@ -679,7 +679,6 @@ cast_array(char *s, Py_ssize_t size, int encoding,
    functions to cast elements. The parameter len is the record size.
    The parameter delim can specify a delimiter for the elements,
    although composite types always use a comma as delimiter. */
-
 static PyObject *
 cast_record(char *s, Py_ssize_t size, int encoding,
      int *type, PyObject *cast, Py_ssize_t len, char delim)
@@ -840,7 +839,6 @@ cast_record(char *s, Py_ssize_t size, int encoding,
 
 /* Cast string s with size and encoding to a Python dictionary.
    using the input and output syntax for hstore values. */
-
 static PyObject *
 cast_hstore(char *s, Py_ssize_t size, int encoding)
 {
@@ -997,7 +995,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
     return result;
 }
 
-/* gets appropriate error type from sqlstate */
+/* Get appropriate error type from sqlstate. */
 static PyObject *
 get_error_type(const char *sqlstate)
 {
@@ -1063,7 +1061,7 @@ get_error_type(const char *sqlstate)
     return DatabaseError;
 }
 
-/* sets database error message and sqlstate attribute */
+/* Set database error message and sqlstate attribute. */
 static void
 set_error_msg_and_state(PyObject *type,
     const char *msg, int encoding, const char *sqlstate)
@@ -1099,14 +1097,14 @@ set_error_msg_and_state(PyObject *type,
     }
 }
 
-/* sets given database error message */
+/* Set given database error message. */
 static void
 set_error_msg(PyObject *type, const char *msg)
 {
     set_error_msg_and_state(type, msg, pg_encoding_ascii, NULL);
 }
 
-/* sets database error from connection and/or result */
+/* Set database error from connection and/or result. */
 static void
 set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
 {
@@ -1128,12 +1126,41 @@ set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
     set_error_msg_and_state(type, msg, encoding, sqlstate);
 }
 
-/* format result (mostly useful for debugging) */
-/* Note: This is similar to the Postgres function PQprint().
- * PQprint() is not used because handing over a stream from Python to
- * Postgres can be problematic if they use different libs for streams
- * and because using PQprint() and tp_print is not recommended any more.
- */
+#ifdef SSL_INFO
+
+/* Get SSL attributes and values as a dictionary. */
+static PyObject *
+get_ssl_attributes(PGconn *cnx) {
+    PyObject *attr_dict = NULL;
+
+    if (!(attr_dict = PyDict_New())) {
+        return NULL;
+    }
+
+    for (const char * const *s = PQsslAttributeNames(cnx); *s; ++s) {
+        const char *val = PQsslAttribute(cnx, *s);
+
+        if (val) {
+            PyObject * val_obj = PyStr_FromString(val);
+
+            PyDict_SetItemString(attr_dict, *s, val_obj);
+            Py_DECREF(val_obj);
+        }
+        else {
+            PyDict_SetItemString(attr_dict, *s, Py_None);
+        }
+    }
+
+    return attr_dict;
+}
+
+#endif /* SSL_INFO */
+
+/* Format result (mostly useful for debugging).
+   Note: This is similar to the Postgres function PQprint().
+   PQprint() is not used because handing over a stream from Python to
+   PostgreSQL can be problematic if they use different libs for streams
+   and because using PQprint() and tp_print is not recommended any more. */
 static PyObject *
 format_result(const PGresult *res)
 {
@@ -1269,7 +1296,7 @@ format_result(const PGresult *res)
         return PyStr_FromString("(nothing selected)");
 }
 
-/* internal function converting a Postgres datestyles to date formats */
+/* Internal function converting a Postgres datestyles to date formats. */
 static const char *
 date_style_to_format(const char *s)
 {
@@ -1299,7 +1326,7 @@ date_style_to_format(const char *s)
     }
 }
 
-/* internal function converting a date format to a Postgres datestyle */
+/* Internal function converting a date format to a Postgres datestyle. */
 static const char *
 date_format_to_style(const char *s)
 {
@@ -1335,7 +1362,7 @@ date_format_to_style(const char *s)
     }
 }
 
-/* internal wrapper for the notice receiver callback */
+/* Internal wrapper for the notice receiver callback. */
 static void
 notice_receiver(void *arg, const PGresult *res)
 {

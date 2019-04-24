@@ -1,5 +1,5 @@
 /*
- * $Id: conn.c 985 2019-04-22 22:07:43Z cito $
+ * $Id: large.c 985 2019-04-22 22:07:43Z cito $
  *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
@@ -11,7 +11,7 @@
  *
  */
 
-/* Deallocate large object */
+/* Deallocate large object. */
 static void
 large_dealloc(largeObject *self)
 {
@@ -22,7 +22,7 @@ large_dealloc(largeObject *self)
     PyObject_Del(self);
 }
 
-/* Return large object as string in human readable form */
+/* Return large object as string in human readable form. */
 static PyObject *
 large_str(largeObject *self)
 {
@@ -33,7 +33,7 @@ large_str(largeObject *self)
     return PyStr_FromString(str);
 }
 
-/* Check validity of large object */
+/* Check validity of large object. */
 static int
 _check_lo_obj(largeObject *self, int level)
 {
@@ -62,7 +62,7 @@ _check_lo_obj(largeObject *self, int level)
     return 1;
 }
 
-/* Get large object attributes */
+/* Get large object attributes. */
 static PyObject *
 large_getattr(largeObject *self, PyObject *nameobj)
 {
@@ -98,7 +98,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
     return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* Get the list of large object attributes */
+/* Get the list of large object attributes. */
 static PyObject *
 large_dir(largeObject *self, PyObject *noargs)
 {
@@ -111,7 +111,7 @@ large_dir(largeObject *self, PyObject *noargs)
     return attrs;
 }
 
-/* Open large object */
+/* Open large object. */
 static char large_open__doc__[] =
 "open(mode) -- open access to large object with specified mode\n\n"
 "The mode must be one of INV_READ, INV_WRITE (module level constants).\n";
@@ -145,7 +145,7 @@ large_open(largeObject *self, PyObject *args)
     return Py_None;
 }
 
-/* Close large object */
+/* Close large object. */
 static char large_close__doc__[] =
 "close() -- close access to large object data";
 
@@ -169,7 +169,7 @@ large_close(largeObject *self, PyObject *noargs)
     return Py_None;
 }
 
-/* Read from large object */
+/* Read from large object. */
 static char large_read__doc__[] =
 "read(size) -- read from large object to sized string\n\n"
 "Object must be opened in read mode before calling this method.\n";
@@ -214,7 +214,7 @@ large_read(largeObject *self, PyObject *args)
     return buffer;
 }
 
-/* Write to large object */
+/* Write to large object. */
 static char large_write__doc__[] =
 "write(string) -- write sized string to large object\n\n"
 "Object must be opened in read mode before calling this method.\n";
@@ -250,7 +250,7 @@ large_write(largeObject *self, PyObject *args)
     return Py_None;
 }
 
-/* Go to position in large object */
+/* Go to position in large object. */
 static char large_seek__doc__[] =
 "seek(offset, whence) -- move to specified position\n\n"
 "Object must be opened before calling this method. The whence option\n"
@@ -286,7 +286,7 @@ large_seek(largeObject *self, PyObject *args)
     return PyInt_FromLong(ret);
 }
 
-/* Get large object size */
+/* Get large object size. */
 static char large_size__doc__[] =
 "size() -- return large object size\n\n"
 "The object must be opened before calling this method.\n";
@@ -326,7 +326,7 @@ large_size(largeObject *self, PyObject *noargs)
     return PyInt_FromLong(end);
 }
 
-/* Get large object cursor position */
+/* Get large object cursor position. */
 static char large_tell__doc__[] =
 "tell() -- give current position in large object\n\n"
 "The object must be opened before calling this method.\n";
@@ -351,7 +351,7 @@ large_tell(largeObject *self, PyObject *noargs)
     return PyInt_FromLong(start);
 }
 
-/* Export large object as unix file */
+/* Export large object as unix file. */
 static char large_export__doc__[] =
 "export(filename) -- export large object data to specified file\n\n"
 "The object must be closed when calling this method.\n";
@@ -383,7 +383,7 @@ large_export(largeObject *self, PyObject *args)
     return Py_None;
 }
 
-/* Delete a large object */
+/* Delete a large object. */
 static char large_unlink__doc__[] =
 "unlink() -- destroy large object\n\n"
 "The object must be closed when calling this method.\n";
@@ -407,7 +407,7 @@ large_unlink(largeObject *self, PyObject *noargs)
     return Py_None;
 }
 
-/* large object methods */
+/* Large object methods */
 static struct PyMethodDef large_methods[] = {
     {"__dir__", (PyCFunction) large_dir,  METH_NOARGS, NULL},
     {"open", (PyCFunction) large_open, METH_VARARGS, large_open__doc__},
@@ -424,7 +424,7 @@ static struct PyMethodDef large_methods[] = {
 
 static char large__doc__[] = "PostgreSQL large object";
 
-/* large object type definition */
+/* Large object type definition */
 static PyTypeObject largeType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "pg.LargeObject",              /* tp_name */

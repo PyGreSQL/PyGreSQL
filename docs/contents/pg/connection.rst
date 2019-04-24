@@ -557,3 +557,27 @@ the connection and its status. These attributes are:
 .. attribute:: Connection.error
 
     the last warning/error message from the server (str)
+
+.. attribute:: Connection.socket
+
+    the file descriptor number of the connection socket to the server (int)
+
+.. versionadded:: 5.1
+
+.. attribute:: Connection.backend_pid
+
+     the PID of the backend process handling this connection (int)
+
+.. versionadded:: 5.1
+
+.. attribute:: Connection.ssl_in_use
+
+     this is True if the connection uses SSL, False if not
+
+.. versionadded:: 5.1 (needs PostgreSQL >= 9.5)
+
+.. attribute:: Connection.ssl_attributes
+
+     SSL-related information about the connection (dict)
+
+.. versionadded:: 5.1 (needs PostgreSQL >= 9.5)

@@ -194,7 +194,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testAllDBAttributes(self):
         attributes = [
             'abort', 'adapter',
-            'begin',
+            'backend_pid', 'begin',
             'cancel', 'clear', 'close', 'commit',
             'date_format', 'db', 'dbname', 'dbtypes',
             'debug', 'decode_json', 'delete',
@@ -219,8 +219,9 @@ class TestDBClassBasic(unittest.TestCase):
             'release', 'reopen', 'reset', 'rollback',
             'savepoint', 'server_version',
             'set_cast_hook', 'set_notice_receiver',
-            'set_parameter',
-            'source', 'start', 'status',
+            'set_parameter', 'socket', 'source',
+            'ssl_attributes', 'ssl_in_use',
+            'start', 'status',
             'transaction', 'truncate',
             'unescape_bytea', 'update', 'upsert',
             'use_regtypes', 'user',
@@ -277,6 +278,28 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertIsInstance(server_version, int)
         self.assertTrue(90000 <= server_version < 120000)
         self.assertEqual(server_version, self.db.db.server_version)
+
+    def testAttributeSocket(self):
+        socket = self.db.socket
+        self.assertIsInstance(socket, int)
+        self.assertGreaterEqual(socket, 0)
+
+    def testAttributeBackendPid(self):
+        backend_pid = self.db.backend_pid
+        self.assertIsInstance(backend_pid, int)
+        self.assertGreaterEqual(backend_pid, 1)
+
+    def testAttributeSslInUse(self):
+        ssl_in_use = self.db.ssl_in_use
+        self.assertIsInstance(ssl_in_use, bool)
+        self.assertFalse(ssl_in_use)
+
+    def testAttributeSslAttributes(self):
+        ssl_attributes = self.db.ssl_attributes
+        self.assertIsInstance(ssl_attributes, dict)
+        self.assertEqual(ssl_attributes, {
+            'cipher': None, 'compression': None, 'key_bits': None,
+            'library': None, 'protocol': None})
 
     def testAttributeStatus(self):
         status_ok = 1

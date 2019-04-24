@@ -1,5 +1,5 @@
 /*
- * $Id: conn.c 985 2019-04-22 22:07:43Z cito $
+ * $Id: source.c 985 2019-04-22 22:07:43Z cito $
  *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
@@ -11,7 +11,7 @@
  *
  */
 
-/* Deallocate source object */
+/* Deallocate source object. */
 static void
 source_dealloc(sourceObject *self)
 {
@@ -22,7 +22,7 @@ source_dealloc(sourceObject *self)
     PyObject_Del(self);
 }
 
-/* return source object as string in human readable form */
+/* Return source object as string in human readable form. */
 static PyObject *
 source_str(sourceObject *self)
 {
@@ -38,7 +38,7 @@ source_str(sourceObject *self)
     }
 }
 
-/* check source object validity */
+/* Check source object validity. */
 static int
 _check_source_obj(sourceObject *self, int level)
 {
@@ -64,7 +64,7 @@ _check_source_obj(sourceObject *self, int level)
     return 1;
 }
 
-/* get source object attributes */
+/* Get source object attributes. */
 static PyObject *
 source_getattr(sourceObject *self, PyObject *nameobj)
 {
@@ -100,7 +100,7 @@ source_getattr(sourceObject *self, PyObject *nameobj)
     return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* set source object attributes */
+/* Set source object attributes. */
 static int
 source_setattr(sourceObject *self, char *name, PyObject *v)
 {
@@ -120,7 +120,7 @@ source_setattr(sourceObject *self, char *name, PyObject *v)
     return -1;
 }
 
-/* close object */
+/* Close object. */
 static char source_close__doc__[] =
 "close() -- close query object without deleting it\n\n"
 "All instances of the query object can no longer be used after this call.\n";
@@ -142,7 +142,7 @@ source_close(sourceObject *self, PyObject *noargs)
     return Py_None;
 }
 
-/* database query */
+/* Database query. */
 static char source_execute__doc__[] =
 "execute(sql) -- execute a SQL statement (string)\n\n"
 "On success, this call returns the number of affected rows, or None\n"
@@ -255,7 +255,7 @@ source_execute(sourceObject *self, PyObject *sql)
     return NULL;
 }
 
-/* gets oid status for last query (valid for INSERTs, 0 for other) */
+/* Get oid status for last query (valid for INSERTs, 0 for other). */
 static char source_oidstatus__doc__[] =
 "oidstatus() -- return oid of last inserted row (if available)";
 
@@ -278,7 +278,7 @@ source_oidstatus(sourceObject *self, PyObject *noargs)
     return PyInt_FromLong(oid);
 }
 
-/* fetches rows from last result */
+/* Fetch rows from last result. */
 static char source_fetch__doc__[] =
 "fetch(num) -- return the next num rows from the last result in a list\n\n"
 "If num parameter is omitted arraysize attribute value is used.\n"
@@ -362,7 +362,7 @@ source_fetch(sourceObject *self, PyObject *args)
     return res_list;
 }
 
-/* changes current row (internal wrapper for all "move" methods) */
+/* Change current row (internal wrapper for all "move" methods). */
 static PyObject *
 _source_move(sourceObject *self, int move)
 {
@@ -393,7 +393,7 @@ _source_move(sourceObject *self, int move)
     return Py_None;
 }
 
-/* move to first result row */
+/* Move to first result row. */
 static char source_movefirst__doc__[] =
 "movefirst() -- move to first result row";
 
@@ -403,7 +403,7 @@ source_movefirst(sourceObject *self, PyObject *noargs)
     return _source_move(self, QUERY_MOVEFIRST);
 }
 
-/* move to last result row */
+/* Move to last result row. */
 static char source_movelast__doc__[] =
 "movelast() -- move to last valid result row";
 
@@ -413,7 +413,7 @@ source_movelast(sourceObject *self, PyObject *noargs)
     return _source_move(self, QUERY_MOVELAST);
 }
 
-/* move to next result row */
+/* Move to next result row. */
 static char source_movenext__doc__[] =
 "movenext() -- move to next result row";
 
@@ -423,7 +423,7 @@ source_movenext(sourceObject *self, PyObject *noargs)
     return _source_move(self, QUERY_MOVENEXT);
 }
 
-/* move to previous result row */
+/* Move to previous result row. */
 static char source_moveprev__doc__[] =
 "moveprev() -- move to previous result row";
 
@@ -433,7 +433,7 @@ source_moveprev(sourceObject *self, PyObject *noargs)
     return _source_move(self, QUERY_MOVEPREV);
 }
 
-/* put copy data */
+/* Put copy data. */
 static char source_putdata__doc__[] =
 "putdata(buffer) -- send data to server during copy from stdin";
 
@@ -550,7 +550,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     return ret; /* None or number of rows */
 }
 
-/* get copy data */
+/* Get copy data. */
 static char source_getdata__doc__[] =
 "getdata(decode) -- receive data to server during copy to stdout";
 
@@ -626,7 +626,7 @@ source_getdata(sourceObject *self, PyObject *args)
     return ret; /* buffer or number of rows */
 }
 
-/* finds field number from string/integer (internal use only) */
+/* Find field number from string/integer (internal use only). */
 static int
 _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
 {
@@ -657,7 +657,7 @@ _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
     return num;
 }
 
-/* builds field information from position (internal use only) */
+/* Build field information from position (internal use only). */
 static PyObject *
 _source_buildinfo(sourceObject *self, int num)
 {
@@ -683,7 +683,7 @@ _source_buildinfo(sourceObject *self, int num)
     return result;
 }
 
-/* lists fields info */
+/* Lists fields info. */
 static char source_listinfo__doc__[] =
 "listinfo() -- get information for all fields (position, name, type oid)";
 
@@ -716,7 +716,7 @@ source_listInfo(sourceObject *self, PyObject *noargs)
     return result;
 };
 
-/* list fields information for last result */
+/* List fields information for last result. */
 static char source_fieldinfo__doc__[] =
 "fieldinfo(desc) -- get specified field info (position, name, type oid)";
 
@@ -737,7 +737,7 @@ source_fieldinfo(sourceObject *self, PyObject *desc)
     return _source_buildinfo(self, num);
 };
 
-/* retrieve field value */
+/* Retrieve field value. */
 static char source_field__doc__[] =
 "field(desc) -- return specified field value";
 
@@ -758,7 +758,7 @@ source_field(sourceObject *self, PyObject *desc)
         PQgetvalue(self->result, self->current_row, num));
 }
 
-/* get the list of source object attributes */
+/* Get the list of source object attributes. */
 static PyObject *
 source_dir(connObject *self, PyObject *noargs)
 {
@@ -772,7 +772,7 @@ source_dir(connObject *self, PyObject *noargs)
     return attrs;
 }
 
-/* source object methods */
+/* Source object methods */
 static PyMethodDef source_methods[] = {
     {"__dir__", (PyCFunction) source_dir, METH_NOARGS, NULL},
 
@@ -807,7 +807,7 @@ static PyMethodDef source_methods[] = {
 
 static char source__doc__[] = "PyGreSQL source object";
 
-/* source type definition */
+/* Source type definition */
 static PyTypeObject sourceType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "pgdb.Source",                  /* tp_name */

@@ -11,7 +11,7 @@
  *
  */
 
-/* Deallocate connection object */
+/* Deallocate connection object. */
 static void
 conn_dealloc(connObject *self)
 {
@@ -25,7 +25,7 @@ conn_dealloc(connObject *self)
     PyObject_Del(self);
 }
 
-/* get connection attributes */
+/* Get connection attributes. */
 static PyObject *
 conn_getattr(connObject *self, PyObject *nameobj)
 {
@@ -85,10 +85,45 @@ conn_getattr(connObject *self, PyObject *nameobj)
     if (!strcmp(name, "server_version"))
         return PyInt_FromLong(PQserverVersion(self->cnx));
 
+    /* descriptor number of connection socket */
+    if (!strcmp(name, "socket")) {
+        return PyInt_FromLong(PQsocket(self->cnx));
+    }
+
+    /* PID of backend process */
+    if (!strcmp(name, "backend_pid")) {
+        return PyInt_FromLong(PQbackendPID(self->cnx));
+    }
+
+    /* whether the connection uses SSL */
+    if (!strcmp(name, "ssl_in_use")) {
+#ifdef SSL_INFO
+        if (PQsslInUse(self->cnx)) {
+            Py_INCREF(Py_True); return Py_True;
+        }
+        else {
+            Py_INCREF(Py_False); return Py_False;
+        }
+#else
+        set_error_msg(NotSupportedError, "SSL info functions not supported");
+        return NULL;
+#endif
+    }
+
+    /* SSL attributes */
+    if (!strcmp(name, "ssl_attributes")) {
+#ifdef SSL_INFO
+        return get_ssl_attributes(self->cnx);
+#else
+        set_error_msg(NotSupportedError, "SSL info functions not supported");
+        return NULL;
+#endif
+    }
+
     return PyObject_GenericGetAttr((PyObject *) self, nameobj);
 }
 
-/* Check connection validity */
+/* Check connection validity. */
 static int
 _check_cnx_obj(connObject *self)
 {
@@ -99,7 +134,7 @@ _check_cnx_obj(connObject *self)
     return 1;
 }
 
-/* source creation */
+/* Create source object. */
 static char conn_source__doc__[] =
 "source() -- create a new source object for this connection";
 
@@ -128,7 +163,7 @@ conn_source(connObject *self, PyObject *noargs)
     return (PyObject *) source_obj;
 }
 
-/* base method for execution of both unprepared and prepared queries */
+/* Base method for execution of both unprepared and prepared queries */
 static PyObject *
 _conn_query(connObject *self, PyObject *args, int prepared)
 {
@@ -350,7 +385,7 @@ _conn_query(connObject *self, PyObject *args, int prepared)
     return (PyObject *) query_obj;
 }
 
-/* database query */
+/* Database query */
 static char conn_query__doc__[] =
 "query(sql, [arg]) -- create a new query object for this connection\n\n"
 "You must pass the SQL (string) request and you can optionally pass\n"
@@ -362,7 +397,7 @@ conn_query(connObject *self, PyObject *args)
     return _conn_query(self, args, 0);
 }
 
-/* execute prepared statement */
+/* Execute prepared statement. */
 static char conn_query_prepared__doc__[] =
 "query_prepared(name, [arg]) -- execute a prepared statement\n\n"
 "You must pass the name (string) of the prepared statement and you can\n"
@@ -374,7 +409,7 @@ conn_query_prepared(connObject *self, PyObject *args)
     return _conn_query(self, args, 1);
 }
 
-/* create prepared statement */
+/* Create prepared statement. */
 static char conn_prepare__doc__[] =
 "prepare(name, sql) -- create a prepared statement\n\n"
 "You must pass the name (string) of the prepared statement and the\n"
@@ -417,7 +452,7 @@ conn_prepare(connObject *self, PyObject *args)
     return NULL; /* error */
 }
 
-/* describe prepared statement */
+/* Describe prepared statement. */
 static char conn_describe_prepared__doc__[] =
 "describe_prepared(name) -- describe a prepared statement\n\n"
 "You must pass the name (string) of the prepared statement.\n";
@@ -470,7 +505,7 @@ conn_describe_prepared(connObject *self, PyObject *args)
 static char conn_putline__doc__[] =
 "putline(line) -- send a line directly to the backend";
 
-/* direct access function: putline */
+/* Direct access function: putline. */
 static PyObject *
 conn_putline(connObject *self, PyObject *args)
 {
@@ -498,7 +533,7 @@ conn_putline(connObject *self, PyObject *args)
     return Py_None;
 }
 
-/* direct access function: getline */
+/* Direct access function: getline. */
 static char conn_getline__doc__[] =
 "getline() -- get a line directly from the backend";
 
@@ -531,7 +566,7 @@ conn_getline(connObject *self, PyObject *noargs)
     return str;
 }
 
-/* direct access function: end copy */
+/* Direct access function: end copy. */
 static char conn_endcopy__doc__[] =
 "endcopy() -- synchronize client and server";
 
@@ -554,7 +589,7 @@ conn_endcopy(connObject *self, PyObject *noargs)
 #endif /* DIRECT_ACCESS */
 
 
-/* insert table */
+/* Insert table */
 static char conn_inserttable__doc__[] =
 "inserttable(table, data) -- insert list into table\n\n"
 "The fields in the list must be in the same order as in the table.\n";
@@ -765,7 +800,7 @@ conn_inserttable(connObject *self, PyObject *args)
     return Py_None;
 }
 
-/* get transaction state */
+/* Get transaction state. */
 static char conn_transaction__doc__[] =
 "transaction() -- return the current transaction status";
 
@@ -780,7 +815,7 @@ conn_transaction(connObject *self, PyObject *noargs)
     return PyInt_FromLong(PQtransactionStatus(self->cnx));
 }
 
-/* get parameter setting */
+/* Get parameter setting. */
 static char conn_parameter__doc__[] =
 "parameter(name) -- look up a current parameter setting";
 
@@ -811,7 +846,7 @@ conn_parameter(connObject *self, PyObject *args)
     return Py_None;
 }
 
-/* get current date format */
+/* Get current date format. */
 static char conn_date_format__doc__[] =
 "date_format() -- return the current date format";
 
@@ -837,7 +872,7 @@ conn_date_format(connObject *self, PyObject *noargs)
 
 #ifdef ESCAPING_FUNCS
 
-/* escape literal */
+/* Escape literal */
 static char conn_escape_literal__doc__[] =
 "escape_literal(str) -- escape a literal constant for use within SQL";
 
@@ -882,7 +917,7 @@ conn_escape_literal(connObject *self, PyObject *string)
     return to_obj;
 }
 
-/* escape identifier */
+/* Escape identifier */
 static char conn_escape_identifier__doc__[] =
 "escape_identifier(str) -- escape an identifier for use within SQL";
 
@@ -929,7 +964,7 @@ conn_escape_identifier(connObject *self, PyObject *string)
 
 #endif /* ESCAPING_FUNCS */
 
-/* escape string */
+/* Escape string */
 static char conn_escape_string__doc__[] =
 "escape_string(str) -- escape a string for use within SQL";
 
@@ -979,7 +1014,7 @@ conn_escape_string(connObject *self, PyObject *string)
     return to_obj;
 }
 
-/* escape bytea */
+/* Escape bytea */
 static char conn_escape_bytea__doc__[] =
 "escape_bytea(data) -- escape binary data for use within SQL as type bytea";
 
@@ -1026,7 +1061,7 @@ conn_escape_bytea(connObject *self, PyObject *data)
 
 #ifdef LARGE_OBJECTS
 
-/* constructor for large objects (internal use only) */
+/* Constructor for large objects (internal use only) */
 static largeObject *
 large_new(connObject *pgcnx, Oid oid)
 {
@@ -1044,7 +1079,7 @@ large_new(connObject *pgcnx, Oid oid)
     return large_obj;
 }
 
-/* creates large object */
+/* Create large object. */
 static char conn_locreate__doc__[] =
 "locreate(mode) -- create a new large object in the database";
 
@@ -1076,7 +1111,7 @@ conn_locreate(connObject *self, PyObject *args)
     return (PyObject *) large_new(self, lo_oid);
 }
 
-/* init from already known oid */
+/* Init from already known oid. */
 static char conn_getlo__doc__[] =
 "getlo(oid) -- create a large object instance for the specified oid";
 
@@ -1108,7 +1143,7 @@ conn_getlo(connObject *self, PyObject *args)
     return (PyObject *) large_new(self, lo_oid);
 }
 
-/* import unix file */
+/* Import unix file. */
 static char conn_loimport__doc__[] =
 "loimport(name) -- create a new large object from specified file";
 
@@ -1142,7 +1177,7 @@ conn_loimport(connObject *self, PyObject *args)
 
 #endif /* LARGE_OBJECTS */
 
-/* resets connection */
+/* Reset connection. */
 static char conn_reset__doc__[] =
 "reset() -- reset connection with current parameters\n\n"
 "All derived queries and large objects derived from this connection\n"
@@ -1162,7 +1197,7 @@ conn_reset(connObject *self, PyObject *noargs)
     return Py_None;
 }
 
-/* cancels current command */
+/* Cancel current command. */
 static char conn_cancel__doc__[] =
 "cancel() -- abandon processing of the current command";
 
@@ -1178,7 +1213,7 @@ conn_cancel(connObject *self, PyObject *noargs)
     return PyInt_FromLong((long) PQrequestCancel(self->cnx));
 }
 
-/* get connection socket */
+/* Get connection socket. */
 static char conn_fileno__doc__[] =
 "fileno() -- return database connection socket file handle";
 
@@ -1197,7 +1232,7 @@ conn_fileno(connObject *self, PyObject *noargs)
 #endif
 }
 
-/* set external typecast callback function */
+/* Set external typecast callback function. */
 static char conn_set_cast_hook__doc__[] =
 "set_cast_hook(func) -- set a fallback typecast function";
 
@@ -1225,7 +1260,7 @@ conn_set_cast_hook(connObject *self, PyObject *func)
     return ret;
 }
 
-/* get notice receiver callback function */
+/* Get notice receiver callback function. */
 static char conn_get_cast_hook__doc__[] =
 "get_cast_hook() -- get the fallback typecast function";
 
@@ -1241,7 +1276,7 @@ conn_get_cast_hook(connObject *self, PyObject *noargs)
     return ret;
 }
 
-/* set notice receiver callback function */
+/* Set notice receiver callback function. */
 static char conn_set_notice_receiver__doc__[] =
 "set_notice_receiver(func) -- set the current notice receiver";
 
@@ -1270,7 +1305,7 @@ conn_set_notice_receiver(connObject *self, PyObject *func)
     return ret;
 }
 
-/* get notice receiver callback function */
+/* Get notice receiver callback function. */
 static char conn_get_notice_receiver__doc__[] =
 "get_notice_receiver() -- get the current notice receiver";
 
@@ -1286,7 +1321,7 @@ conn_get_notice_receiver(connObject *self, PyObject *noargs)
     return ret;
 }
 
-/* close without deleting */
+/* Close without deleting. */
 static char conn_close__doc__[] =
 "close() -- close connection\n\n"
 "All instances of the connection object and derived objects\n"
@@ -1310,7 +1345,7 @@ conn_close(connObject *self, PyObject *noargs)
     return Py_None;
 }
 
-/* gets asynchronous notify */
+/* Get asynchronous notify. */
 static char conn_get_notify__doc__[] =
 "getnotify() -- get database notify for this connection";
 
@@ -1365,7 +1400,7 @@ conn_get_notify(connObject *self, PyObject *noargs)
     }
 }
 
-/* get the list of connection attributes */
+/* Get the list of connection attributes. */
 static PyObject *
 conn_dir(connObject *self, PyObject *noargs)
 {
@@ -1373,14 +1408,15 @@ conn_dir(connObject *self, PyObject *noargs)
 
     attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
     PyObject_CallMethod(
-        attrs, "extend", "[sssssssss]",
+        attrs, "extend", "[sssssssssssss]",
         "host", "port", "db", "options", "error", "status", "user",
-        "protocol_version", "server_version");
+        "protocol_version", "server_version", "socket", "backend_pid",
+        "ssl_in_use", "ssl_attributes");
 
     return attrs;
 }
 
-/* connection object methods */
+/* Connection object methods */
 static struct PyMethodDef conn_methods[] = {
     {"__dir__", (PyCFunction) conn_dir,  METH_NOARGS, NULL},
 
@@ -1455,7 +1491,7 @@ static struct PyMethodDef conn_methods[] = {
 
 static char conn__doc__[] = "PostgreSQL connection object";
 
-/* connection type definition */
+/* Connection type definition */
 static PyTypeObject connType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "pg.Connection",              /* tp_name */
