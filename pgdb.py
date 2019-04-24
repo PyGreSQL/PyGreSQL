@@ -87,17 +87,17 @@ from functools import partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
-try:
+try:  # noinspection PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:
+try:  # noinspection PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
 
-try:
+try:  # noinspection PyUnresolvedReferences
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
@@ -1219,7 +1219,7 @@ class Cursor(object):
         if not table or not isinstance(table, basestring):
             raise TypeError("Need a table to copy to")
         if table.lower().startswith('select'):
-                raise ValueError("Must specify a table, not a query")
+            raise ValueError("Must specify a table, not a query")
         else:
             table = '"%s"' % (table,)
         operation = ['copy %s' % (table,)]
@@ -1433,7 +1433,6 @@ class Cursor(object):
         names = self.colnames
         if names:
             return _row_factory(tuple(names))
-
 
 
 CursorDescription = namedtuple('CursorDescription',

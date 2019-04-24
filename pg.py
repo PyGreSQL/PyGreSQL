@@ -43,12 +43,12 @@ from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 from uuid import UUID
 
-try:
+try:  # noinspection PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:
+try:  # noinspection PyUnresolvedReferences
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
