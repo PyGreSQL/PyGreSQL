@@ -8,8 +8,10 @@
 #
 # Copyright (c) 2019 by the PyGreSQL Development Team
 #
+# The notification handler is based on pgnotify which is
+# Copyright (c) 2001 Ng Pheng Siong. All rights reserved.
+#
 # Please see the LICENSE.TXT file for specific restrictions.
-
 
 """PyGreSQL classic interface.
 
@@ -19,19 +21,6 @@ level wrapper class named DB with additional functionality.
 This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
 """
-
-# Copyright (c) 1997-2019 by D'Arcy J.M. Cain.
-#
-# Contributions made by Ch. Zwerschke and others.
-#
-# The notification handler is based on pgnotify which is
-# Copyright (c) 2001 Ng Pheng Siong. All rights reserved.
-#
-# Permission to use, copy, modify, and distribute this software and its
-# documentation for any purpose and without fee is hereby granted,
-# provided that the above copyright notice appear in all copies and that
-# both that copyright notice and this permission notice appear in
-# supporting documentation.
 
 from __future__ import print_function, division
 
