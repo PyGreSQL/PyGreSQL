@@ -1132,12 +1132,13 @@ set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
 static PyObject *
 get_ssl_attributes(PGconn *cnx) {
     PyObject *attr_dict = NULL;
+    const char * const *s;
 
     if (!(attr_dict = PyDict_New())) {
         return NULL;
     }
 
-    for (const char * const *s = PQsslAttributeNames(cnx); *s; ++s) {
+    for (s = PQsslAttributeNames(cnx); *s; ++s) {
         const char *val = PQsslAttribute(cnx, *s);
 
         if (val) {
