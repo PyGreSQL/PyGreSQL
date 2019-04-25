@@ -32,6 +32,11 @@ Version 5.1 (2019-mm-dd)
       and this function is not part of the official API.
     - Added new connection attributes `socket`, `backend_pid`, `ssl_in_use`
       and `ssl_attributes` (the latter need PostgreSQL >= 9.5 on the client).
+- Changes in the DB-API 2 module (pgdb):
+    - Connections now have an `autocommit` attribute which is set to `False`
+      by default but can be set to `True` to switch to autocommit mode where
+      no transactions are started and calling commit() is not required. Note
+      that this is not part of the DB-API 2 standard.
 
 Vesion 5.0.7 (2019-mm-dd)
 -------------------------

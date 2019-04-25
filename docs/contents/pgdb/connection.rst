@@ -7,8 +7,10 @@ Connection -- The connection object
 
 These connection objects respond to the following methods.
 
-Note that ``pgdb.Connection`` objects also implement the context manager protocol,
-i.e. you can use them in a ``with`` statement.
+Note that ``pgdb.Connection`` objects also implement the context manager
+protocol, i.e. you can use them in a ``with`` statement. When the ``with``
+block ends, the current transaction will be automatically committed or
+rolled back if there was an exception, and you won't need to do this manually.
 
 close -- close the connection
 -----------------------------
@@ -34,7 +36,8 @@ commit -- commit the connection
 
     :rtype: None
 
-Note that connections always use a transaction, there is no auto-commit.
+Note that connections always use a transaction, unless you set the
+:attr:`Connection.autocommit` attribute described below.
 
 rollback -- roll back the connection
 ------------------------------------
@@ -88,7 +91,27 @@ then get your custom cursor whenever you call :meth:`Connection.cursor`.
     A dictionary with the various type codes for the PostgreSQL types
 
 This can be used for getting more information on the PostgreSQL database
-types or changing the typecast functions used for the connection.  See the
+types or changing the typecast functions used for the connection. See the
 description of the :class:`TypeCache` class for details.
 
 .. versionadded:: 5.0
+
+.. attribute:: Connection.autocommit
+
+    A read/write attribute to get/set the autocommit mode
+
+Normally, all DB-API 2 SQL commands are run inside a transaction. Sometimes
+this behavior is not desired; there are also some SQL commands such as VACUUM
+which cannot be run inside a transaction.
+
+By setting this attribute to ``True`` you can change this behavior so that no
+transactions will be started for that connection. In this case every executed
+SQL command has immediate effect on the database and you don't need to call
+:meth:`Connection.commit` explicitly. In this mode, you can still use
+``with con:`` blocks to run parts of the code using the connection ``con``
+inside a transaction.
+
+By default, this attribute is set to ``False`` which conforms to the behavior
+specified by the DB-API 2 standard (manual commit required).
+
+.. versionadded:: 5.1

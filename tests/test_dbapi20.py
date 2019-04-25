@@ -34,7 +34,7 @@ import sys
 from datetime import date, time, datetime, timedelta
 from uuid import UUID as Uuid
 
-try:
+try:  # noinspection PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
@@ -1180,39 +1180,80 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(con.DataError, pgdb.DataError)
         self.assertEqual(con.NotSupportedError, pgdb.NotSupportedError)
 
+    def test_transaction(self):
+        table = self.table_prefix + 'booze'
+        con1 = self._connect()
+        cur1 = con1.cursor()
+        self.executeDDL1(cur1)
+        con1.commit()
+        con2 = self._connect()
+        cur2 = con2.cursor()
+        cur2.execute("select name from %s" % table)
+        self.assertIsNone(cur2.fetchone())
+        cur1.execute("insert into %s values('Schlafly')" % table)
+        cur2.execute("select name from %s" % table)
+        self.assertIsNone(cur2.fetchone())
+        con1.commit()
+        cur2.execute("select name from %s" % table)
+        self.assertEqual(cur2.fetchone(), ('Schlafly',))
+        con2.close()
+        con1.close()
+
+    def test_autocommit(self):
+        table = self.table_prefix + 'booze'
+        con1 = self._connect()
+        con1.autocommit = True
+        cur1 = con1.cursor()
+        self.executeDDL1(cur1)
+        con2 = self._connect()
+        cur2 = con2.cursor()
+        cur2.execute("select name from %s" % table)
+        self.assertIsNone(cur2.fetchone())
+        cur1.execute("insert into %s values('Shmaltz Pastrami')" % table)
+        cur2.execute("select name from %s" % table)
+        self.assertEqual(cur2.fetchone(), ('Shmaltz Pastrami',))
+        con2.close()
+        con1.close()
+
     def test_connection_as_contextmanager(self):
         table = self.table_prefix + 'booze'
-        con = self._connect()
-        try:
-            cur = con.cursor()
-            cur.execute("create table %s (n smallint check(n!=4))" % table)
-            with con:
-                cur.execute("insert into %s values (1)" % table)
-                cur.execute("insert into %s values (2)" % table)
+        for autocommit in False, True:
+            con = self._connect()
+            con.autocommit = autocommit
             try:
+                cur = con.cursor()
+                if autocommit:
+                    cur.execute("truncate %s" % table)
+                else:
+                    cur.execute(
+                        "create table %s (n smallint check(n!=4))" % table)
                 with con:
-                    cur.execute("insert into %s values (3)" % table)
-                    cur.execute("insert into %s values (4)" % table)
-            except con.IntegrityError as error:
-                self.assertTrue('check' in str(error).lower())
-            with con:
-                cur.execute("insert into %s values (5)" % table)
-                cur.execute("insert into %s values (6)" % table)
-            try:
+                    cur.execute("insert into %s values (1)" % table)
+                    cur.execute("insert into %s values (2)" % table)
+                try:
+                    with con:
+                        cur.execute("insert into %s values (3)" % table)
+                        cur.execute("insert into %s values (4)" % table)
+                except con.IntegrityError as error:
+                    self.assertTrue('check' in str(error).lower())
                 with con:
-                    cur.execute("insert into %s values (7)" % table)
-                    cur.execute("insert into %s values (8)" % table)
-                    raise ValueError('transaction should rollback')
-            except ValueError as error:
-                self.assertEqual(str(error), 'transaction should rollback')
-            with con:
-                cur.execute("insert into %s values (9)" % table)
-            cur.execute("select * from %s order by 1" % table)
-            rows = cur.fetchall()
-            rows = [row[0] for row in rows]
-        finally:
-            con.close()
-        self.assertEqual(rows, [1, 2, 5, 6, 9])
+                    cur.execute("insert into %s values (5)" % table)
+                    cur.execute("insert into %s values (6)" % table)
+                try:
+                    with con:
+                        cur.execute("insert into %s values (7)" % table)
+                        cur.execute("insert into %s values (8)" % table)
+                        raise ValueError('transaction should rollback')
+                except ValueError as error:
+                    self.assertEqual(str(error), 'transaction should rollback')
+                with con:
+                    cur.execute("insert into %s values (9)" % table)
+                cur.execute("select * from %s order by 1" % table)
+                rows = cur.fetchall()
+                rows = [row[0] for row in rows]
+            finally:
+                con.close()
+            self.assertEqual(rows, [1, 2, 5, 6, 9])
 
     def test_cursor_connection(self):
         con = self._connect()

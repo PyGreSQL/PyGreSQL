@@ -1047,14 +1047,15 @@ class Cursor(object):
         rowcount = 0
         sql = "BEGIN"
         try:
-            if not self._dbcnx._tnx:
+            if not self._dbcnx._tnx and not self._dbcnx.autocommit:
                 try:
                     self._src.execute(sql)
                 except DatabaseError:
                     raise  # database provides error message
                 except Exception:
                     raise _op_error("Can't start transaction")
-                self._dbcnx._tnx = True
+                else:
+                    self._dbcnx._tnx = True
             for parameters in seq_of_parameters:
                 sql = operation
                 sql = self._quoteparams(sql, parameters)
@@ -1463,6 +1464,7 @@ class Connection(object):
         self._tnx = False  # transaction state
         self.type_cache = TypeCache(cnx)
         self.cursor_type = Cursor
+        self.autocommit = False
         try:
             self._cnx.source()
         except Exception:
@@ -1472,7 +1474,18 @@ class Connection(object):
         """Enter the runtime context for the connection object.
 
         The runtime context can be used for running transactions.
+
+        This also starts a transaction in autocommit mode.
         """
+        if self.autocommit:
+            try:
+                self._cnx.source().execute("BEGIN")
+            except DatabaseError:
+                raise  # database provides error message
+            except Exception:
+                raise _op_error("Can't start transaction")
+            else:
+                self._tnx = True
         return self
 
     def __exit__(self, et, ev, tb):
@@ -1514,9 +1527,9 @@ class Connection(object):
                 try:
                     self._cnx.source().execute("COMMIT")
                 except DatabaseError:
-                    raise
+                    raise  # database provides error message
                 except Exception:
-                    raise _op_error("Can't commit")
+                    raise _op_error("Can't commit transaction")
         else:
             raise _op_error("Connection has been closed")
 
@@ -1528,9 +1541,9 @@ class Connection(object):
                 try:
                     self._cnx.source().execute("ROLLBACK")
                 except DatabaseError:
-                    raise
+                    raise  # database provides error message
                 except Exception:
-                    raise _op_error("Can't rollback")
+                    raise _op_error("Can't rollback transaction")
         else:
             raise _op_error("Connection has been closed")
 
