@@ -176,23 +176,23 @@ typedef struct
 #endif /* LARGE_OBJECTS */
 
 /* Internal functions */
-#include "internal.c"
+#include "pginternal.c"
 
 /* Connection object */
-#include "conn.c"
+#include "pgconn.c"
 
 /* Query object */
-#include "query.c"
+#include "pgquery.c"
 
 /* Source object */
-#include "source.c"
+#include "pgsource.c"
 
 /* Notice object */
-#include "notice.c"
+#include "pgnotice.c"
 
 /* Large objects */
 #ifdef LARGE_OBJECTS
-#include "large.c"
+#include "pglarge.c"
 #endif
 
 /* MODULE FUNCTIONS */

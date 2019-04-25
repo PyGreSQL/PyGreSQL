@@ -1,5 +1,5 @@
 /*
- * $Id: large.c 985 2019-04-22 22:07:43Z cito $
+ * $Id: pglarge.c 985 2019-04-22 22:07:43Z cito $
  *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
