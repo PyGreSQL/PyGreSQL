@@ -1,5 +1,11 @@
 
 include pgmodule.c
+include conn.c
+include internal.c
+include large.c
+include notice.c
+include query.c
+include source.c
 include pgtypes.h
 include py3c.h
 
