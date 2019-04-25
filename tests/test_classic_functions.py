@@ -22,12 +22,12 @@ import pg  # the module under test
 
 from datetime import timedelta
 
-try:
+try:  # noinspection PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:
+try:  # noinspection PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str

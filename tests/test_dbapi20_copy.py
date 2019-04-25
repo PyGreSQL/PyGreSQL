@@ -37,7 +37,7 @@ except (ImportError, ValueError):
     except ImportError:
         pass
 
-try:
+try:  # noinspection PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str

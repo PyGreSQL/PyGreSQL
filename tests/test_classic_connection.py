@@ -40,12 +40,12 @@ except (ImportError, ValueError):
     except ImportError:
         pass
 
-try:
+try:  # noinspection PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:
+try:  # noinspection PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
@@ -221,7 +221,8 @@ class TestConnectObject(unittest.TestCase):
             scalariter scalarresult single singledict singlenamed singlescalar
             '''.split()
         query_members = [a for a in dir(query)
-            if not a.startswith('__')]
+            if not a.startswith('__')
+            and a != 'next']  # this is only needed in Python 2
         self.assertEqual(members, query_members)
 
     def testMethodEndcopy(self):

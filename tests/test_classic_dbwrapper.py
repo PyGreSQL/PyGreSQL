@@ -46,12 +46,12 @@ except (ImportError, ValueError):
     except ImportError:
         pass
 
-try:
+try:  # noinspection PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:
+try:  # noinspection PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
@@ -61,7 +61,7 @@ try:
 except ImportError:  # Python 2.6 or 3.0
     OrderedDict = dict
 
-if str is bytes:
+if str is bytes:  # noinspection PyUnresolvedReferences
     from StringIO import StringIO
 else:
     from io import StringIO
