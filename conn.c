@@ -620,18 +620,18 @@ conn_inserttable(connObject *self, PyObject *args)
     }
 
     /* checks list type */
-    if (PyTuple_Check(list)) {
-        m = PyTuple_Size(list);
-        getitem = PyTuple_GetItem;
-    }
-    else if (PyList_Check(list)) {
+    if (PyList_Check(list)) {
         m = PyList_Size(list);
         getitem = PyList_GetItem;
+    }
+    else if (PyTuple_Check(list)) {
+        m = PyTuple_Size(list);
+        getitem = PyTuple_GetItem;
     }
     else {
         PyErr_SetString(
             PyExc_TypeError,
-            "Method inserttable() expects some kind of array"
+            "Method inserttable() expects a list or a tuple"
             " as second argument");
         return NULL;
     }
@@ -673,7 +673,7 @@ conn_inserttable(connObject *self, PyObject *args)
         else {
             PyErr_SetString(
                 PyExc_TypeError,
-                "Second arg must contain some kind of arrays");
+                "The second argument must contain a tuple or a list");
             return NULL;
         }
         if (i) {

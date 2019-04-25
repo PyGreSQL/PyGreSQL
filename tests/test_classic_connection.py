@@ -1641,6 +1641,31 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
+    def testInserttableFromTupleOfLists(self):
+        data = tuple(list(row) for row in self.data)
+        self.c.inserttable('test', data)
+        self.assertEqual(self.get_back(), self.data)
+
+    def testInserttableFromSetofTuples(self):
+        data = set(row for row in self.data)
+        try:
+            self.c.inserttable('test', data)
+        except TypeError as e:
+            r = str(e)
+        else:
+            r = 'this is fine'
+        self.assertIn('list or a tuple as second argument', r)
+
+    def testInserttableFromListOfSets(self):
+        data = [set(row) for row in self.data]
+        try:
+            self.c.inserttable('test', data)
+        except TypeError as e:
+            r = str(e)
+        else:
+            r = 'this is fine'
+        self.assertIn('second argument must contain a tuple or a list', r)
+
     def testInserttableMultipleRows(self):
         num_rows = 100
         data = self.data[2:3] * num_rows
@@ -1706,7 +1731,6 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.get_back(), data)
 
     def testInserttableUnicodeLatin1(self):
-
         try:
             self.c.query("set client_encoding=latin1")
             self.c.query("select '¥'")
