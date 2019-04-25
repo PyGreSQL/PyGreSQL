@@ -5,7 +5,7 @@ Version 5.1 (2019-mm-dd)
 ------------------------
 - Changes in the classic PyGreSQL module (pg):
     - Support for prepared statements (following a suggestion and first
-      implementation by Justin Pryzvy on the mailing list).
+      implementation by Justin Pryzby on the mailing list).
     - DB wrapper objects based on existing connections can now be closed and
       reopened properly (but the underlying connection will not be affected).
     - The query object can now be used as iterator and will then yield the
@@ -64,13 +64,13 @@ Version 5.0.4 (2017-07-23)
 Version 5.0.3 (2016-12-10)
 --------------------------
 - It is now possible to use a custom array cast function by changing
-  the type caster for the 'anyarray' type.  For instance, by calling
+  the type caster for the 'anyarray' type. For instance, by calling
   set_typecast('anyarray', lambda v, c: v) you can have arrays returned
-  as strings instead of lists.  Note that in the pg module, you can also
+  as strings instead of lists. Note that in the pg module, you can also
   call set_array(False) in order to return arrays as strings.
 - The namedtuple classes used for the rows of query results are now cached
   and reused internally, since creating namedtuples classes in Python is a
-  somewhat expensive operation.  By default the cache has a size of 1024
+  somewhat expensive operation. By default the cache has a size of 1024
   entries, but this can be changed with the set_row_factory_size() function.
   In certain cases this change can notably improve the performance.
 - The namedresult() method in the classic API now also tries to rename
@@ -119,16 +119,16 @@ Version 5.0 (2016-03-20)
     - Conversely, when the query method returns a PostgreSQL array, it is passed
       to Python as a list. PostgreSQL records are converted to named tuples as
       well, but only if you use one of the get/insert/update/delete() methods.
-      PyGreSQL uses a new fast built-in parser to achieve this.  The automatic
+      PyGreSQL uses a new fast built-in parser to achieve this. The automatic
       conversion of arrays to lists can be disabled with set_array(False).
     - The pkey() method of the classic interface now returns tuples instead
       of frozenset. The order of the tuples is like in the primary key index.
     - Like the DB-API 2 module, the classic module now also returns bool values
-      from the database as Python bool objects instead of strings.  You can
+      from the database as Python bool objects instead of strings. You can
       still restore the old behavior by calling set_bool(False).
     - Like the DB-API 2 module, the classic module now also returns bytea
       data fetched from the database as byte strings, so you don't need to
-      call unescape_bytea() any more.  This has been made configurable though,
+      call unescape_bytea() any more. This has been made configurable though,
       and you can restore the old behavior by calling set_bytea_escaped(True).
     - A method set_jsondecode() has been added for changing or removing the
       function that automatically decodes JSON data coming from the database.
@@ -156,7 +156,7 @@ Version 5.0 (2016-03-20)
       registered type names on or off (this is the default), call the DB
       wrapper method use_regtypes().
     - A new method query_formatted() has been added to the DB wrapper class
-      that allows using the format specifications from Python.  A flag "inline"
+      that allows using the format specifications from Python. A flag "inline"
       can be set to specify whether parameters should be sent to the database
       separately or formatted into the SQL.
     - A new type helper Bytea() has been added.
@@ -205,20 +205,20 @@ Version 5.0 (2016-03-20)
       DatabaseError than just ProgrammingError. Particularly, when database
       constraints are violated, it raises an IntegrityError now.
     - The modules now provide get_typecast() and set_typecast() methods
-      allowing to control the typecasting on the global level.  The connection
+      allowing to control the typecasting on the global level. The connection
       objects have got type caches with the same methods which give control
       over the typecasting on the level of the current connection.
       See the documentation on details about the type cache and the typecast
       mechanisms provided by PyGreSQL.
     - Dates, times, timestamps and time intervals are now returned as the
       corresponding Python objects from the datetime module of the standard
-      library.  In earlier versions of PyGreSQL they had been returned as
-      strings.  You can restore the old behavior by deactivating the respective
+      library. In earlier versions of PyGreSQL they had been returned as
+      strings. You can restore the old behavior by deactivating the respective
       typecast functions, e.g. set_typecast('date', str).
     - PyGreSQL now support the "uuid" data type, converting such columns
       automatically to and from Python uuid.UUID objects.
     - PyGreSQL now supports the "hstore" data type, converting such columns
-      automatically to and from Python dictionaries.  If you want to insert
+      automatically to and from Python dictionaries. If you want to insert
       Python objects as JSON data using DB-API 2, you should wrap them in the
       new HStore() type constructor as a hint to PyGreSQL.
     - PyGreSQL now supports the "json" and "jsonb" data types, converting such
@@ -226,7 +226,7 @@ Version 5.0 (2016-03-20)
       Python objects as JSON data using DB-API 2, you should wrap them in the
       new Json() type constructor as a hint to PyGreSQL.
     - A new type helper Literal() for inserting parameters literally as SQL
-      has been added.  This is useful for table names, for instance.
+      has been added. This is useful for table names, for instance.
     - Fast parsers cast_array(), cast_record() and cast_hstore for the input
       and output syntax for PostgreSQL arrays, composite types and the hstore
       type have been added to the C extension module. The array parser also
@@ -269,9 +269,9 @@ Version 4.2 (2016-01-21)
 
 Version 4.1.1 (2013-01-08)
 --------------------------
-- Add NotificationHandler class and method.  Replaces need for pgnotify.
+- Add NotificationHandler class and method. Replaces need for pgnotify.
 - Sharpen test for inserting current_timestamp.
-- Add more quote tests.  False and 0 should evaluate to NULL.
+- Add more quote tests. False and 0 should evaluate to NULL.
 - More tests - Any number other than 0 is True.
 - Do not use positional parameters internally.
   This restores backward compatibility with version 4.0.
@@ -296,7 +296,7 @@ Version 4.1 (2013-01-01)
   so you can now write statements like "for row in cursor.execute(...)"
   (as suggested by Adam Frederick).
 - Binary objects are now automatically escaped and unescaped.
-- Bug in money quoting fixed.  Amounts of $0.00 handled correctly.
+- Bug in money quoting fixed. Amounts of $0.00 handled correctly.
 - Proper handling of date and time objects as input.
 - Proper handling of floats with 'nan' or 'inf' values as input.
 - Fixed the set_decimal() function.
@@ -453,7 +453,7 @@ made while in the PostgreSQL tree since their last release.
 
 Version 3.3 (2001-12-03)
 ------------------------
-A few cleanups.  Mostly there was some confusion about the latest version
+A few cleanups. Mostly there was some confusion about the latest version
 and so I am bumping the number to keep it straight.
 
 - Added NUMERICOID to list of returned types. This fixes a bug when
@@ -463,7 +463,7 @@ Version 3.2 (2001-06-20)
 ------------------------
 Note that there are very few changes to PyGreSQL between 3.1 and 3.2.
 The main reason for the release is the move into the PostgreSQL
-development tree.  Even the WIN32 changes are pretty minor.
+development tree. Even the WIN32 changes are pretty minor.
 
 - Add Win32 support (gerhard@bigfoot.de)
 - Fix some DB-API quoting problems (niall.smart@ebeon.com)
@@ -471,7 +471,7 @@ development tree.  Even the WIN32 changes are pretty minor.
 
 Version 3.1 (2000-11-06)
 ------------------------
-- Fix some quoting functions.  In particular handle NULLs better.
+- Fix some quoting functions. In particular handle NULLs better.
 - Use a method to add primary key information rather than direct
   manipulation of the class structures
 - Break decimal out in `_quote` (in pg.py) and treat it as float
@@ -512,7 +512,7 @@ Version 3.0 (2000-05-30)
 Version 2.4 (1999-06-15)
 ------------------------
 - Insert returns None if the user doesn't have select permissions
-  on the table.  It can (and does) happen that one has insert but
+  on the table. It can (and does) happen that one has insert but
   not select permissions on a table.
 - Added ntuples() method to query object (brit@druid.net)
 - Corrected a bug related to getresult() and the money type
@@ -545,7 +545,7 @@ Version 2.2 (1998-12-21)
 - Insert queries return the inserted oid
 - Add new `pg` wrapper (C module renamed to _pg)
 - Wrapped database connection in a class
-- Cleaned up some of the tutorial.  (More work needed.)
+- Cleaned up some of the tutorial. (More work needed.)
 - Added `version` and `__version__`.
   Thanks to thilo@eevolute.com for the suggestion.
 
@@ -555,8 +555,8 @@ Version 2.1 (1998-03-07)
 - Cleaned up pgext.py
 - Added dictresult method
 
-Version 2.0  (1997-12-23)
--------------------------
+Version 2.0 (1997-12-23)
+------------------------
 - Updated code for PostgreSQL 6.2.1 and Python 1.5
 - Reformatted code and converted to use full ANSI style prototypes
 - Changed name to PyGreSQL (from PyGres95)
