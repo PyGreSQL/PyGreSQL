@@ -4,7 +4,8 @@ ChangeLog
 Version 5.1 (2019-mm-dd)
 ------------------------
 - Changes in the classic PyGreSQL module (pg):
-    - Support for prepared statements.
+    - Support for prepared statements (following a suggestion and first
+      implementation by Justin Pryzvy on the mailing list).
     - DB wrapper objects based on existing connections can now be closed and
       reopened properly (but the underlying connection will not be affected).
     - The query object can now be used as iterator and will then yield the
