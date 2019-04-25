@@ -38,7 +38,7 @@ static Py_ssize_t
 query_len(PyObject *self)
 {
     PyObject *tmp;
-    long len;
+    Py_ssize_t len;
 
     tmp = PyLong_FromLong(((queryObject*) self)->max_row);
     len = PyLong_AsSsize_t(tmp);
