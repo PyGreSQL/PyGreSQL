@@ -16,7 +16,7 @@ then
 fi
 FILES="*.c *.h *.py *.cfg *.rst *.txt"
 NUMFILES=`ls $FILES | wc -l`
-if [ $NUMFILES != 13 ]
+if [ $NUMFILES != 15 ]
 then
     echo "Hmmm.  The number of top-level files seems to be wrong:"
     ls $FILES
