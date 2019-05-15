@@ -1,44 +1,46 @@
 ChangeLog
 =========
 
-Version 5.1 (2019-mm-dd)
+Version 5.1 (2019-05-15)
 ------------------------
-- Changes in the classic PyGreSQL module (pg):
+- Changes to the classic PyGreSQL module (pg):
     - Support for prepared statements (following a suggestion and first
       implementation by Justin Pryzby on the mailing list).
     - DB wrapper objects based on existing connections can now be closed and
       reopened properly (but the underlying connection will not be affected).
-    - The query object can now be used as iterator and will then yield the
-      rows as tuples, similar to query.getresult().
+    - The query object can now be used as an iterator similar to
+      query.getresult() and will then yield the rows as tuples.
       Thanks to Justin Pryzby for the proposal and most of the implementation.
     - Deprecated query.ntuples() in the classic API, since len(query) can now
       be used and returns the same number.
-    - The i-th row from the result can now be accessed as the `query[i]`.
+    - The i-th row of the result can now be accessed as `query[i]`.
     - New method query.scalarresult() that gets only the first field of each
       row as a list of scalar values.
     - New methods query.one(), query.onenamed(), query.onedict() and
-      query.onescalar() that fetch only one row from the result or None if
-      there is no more row, similar to cursor.fetchone() method in DB-API 2.
+      query.onescalar() that fetch only one row from the result or None
+      if there are no more rows, similar to the cursor.fetchone()
+      method in DB-API 2.
     - New methods query.single(), query.singlenamed(), query.singledict() and
       query.singlescalar() that fetch only one row from the result, and raise
-      an error when the result does not have exactly one row.
+      an error if the result does not have exactly one row.
     - New methods query.dictiter(), query.namediter() and query.scalariter()
       returning the same values as query.dictresult(), query.namedresult()
       and query.salarresult(), but as iterables instead of lists. This avoids
       creating a Python list of all results and can be slightly more efficient.
     - Removed pg.get/set_namedresult. You can configure the named tuples
       factory with the pg.set_row_factory_size() function and change the
-      implementation with pg.set_query_helps(), but this is not recommended
+      implementation with pg.set_query_helpers(), but this is not recommended
       and this function is not part of the official API.
     - Added new connection attributes `socket`, `backend_pid`, `ssl_in_use`
       and `ssl_attributes` (the latter need PostgreSQL >= 9.5 on the client).
-- Changes in the DB-API 2 module (pgdb):
+
+- Changes to the DB-API 2 module (pgdb):
     - Connections now have an `autocommit` attribute which is set to `False`
       by default but can be set to `True` to switch to autocommit mode where
       no transactions are started and calling commit() is not required. Note
       that this is not part of the DB-API 2 standard.
 
-Vesion 5.0.7 (2019-mm-dd)
+Vesion 5.0.7 (2019-05-15)
 -------------------------
 - This version officially supports the new PostgreSQL 11.
 - Fixed a bug in parsing array subscript ranges (reported by Justin Pryzby).
