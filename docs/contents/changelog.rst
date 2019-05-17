@@ -1,7 +1,7 @@
 ChangeLog
 =========
 
-Version 5.1 (2019-05-15)
+Version 5.1 (2019-05-17)
 ------------------------
 - Changes to the classic PyGreSQL module (pg):
     - Support for prepared statements (following a suggestion and first
@@ -40,7 +40,7 @@ Version 5.1 (2019-05-15)
       no transactions are started and calling commit() is not required. Note
       that this is not part of the DB-API 2 standard.
 
-Vesion 5.0.7 (2019-05-15)
+Vesion 5.0.7 (2019-05-17)
 -------------------------
 - This version officially supports the new PostgreSQL 11.
 - Fixed a bug in parsing array subscript ranges (reported by Justin Pryzby).
