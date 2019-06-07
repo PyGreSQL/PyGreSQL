@@ -1939,7 +1939,7 @@ class DB:
         """Create a prepared SQL statement.
 
         This creates a prepared statement for the given command with the
-        the given name for later execution with the query_prepared() method.
+        given name for later execution with the query_prepared() method.
 
         The name can be empty to create an unnamed statement, in which case
         any pre-existing unnamed statement is automatically replaced;

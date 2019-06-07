@@ -25,7 +25,7 @@ Version 5.1 (2019-05-17)
       an error if the result does not have exactly one row.
     - New methods query.dictiter(), query.namediter() and query.scalariter()
       returning the same values as query.dictresult(), query.namedresult()
-      and query.salarresult(), but as iterables instead of lists. This avoids
+      and query.scalarresult(), but as iterables instead of lists. This avoids
       creating a Python list of all results and can be slightly more efficient.
     - Removed pg.get/set_namedresult. You can configure the named tuples
       factory with the pg.set_row_factory_size() function and change the

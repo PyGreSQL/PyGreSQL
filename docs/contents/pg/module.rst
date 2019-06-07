@@ -445,7 +445,7 @@ is activated, but you can disable this by calling ``set_array(False)``.
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-    Arrays had been always returned as text strings only in earlier versions.
+    Arrays had been always returned as text strings in earlier versions.
 
 get/set_bytea_escaped -- whether bytea data is returned escaped
 ---------------------------------------------------------------

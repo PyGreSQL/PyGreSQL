@@ -162,7 +162,7 @@ separately is to simply cast the parameter values::
 
 In real world examples you will rarely have to cast your parameters like that,
 since in an INSERT statement or a WHERE clause comparing the parameter to a
-table column the data type will be clear from the context.
+table column, the data type will be clear from the context.
 
 When binding the parameters to a query, PyGreSQL not only adapts the basic
 types like ``int``, ``float``, ``bool`` and ``str``, but also tries to make
@@ -174,8 +174,8 @@ Lists are adapted as PostgreSQL arrays::
     >>> db.query_formatted("SELECT %(array)s::int[]", params).getresult()[0][0]
     [[1, 2], [3, 4]]
 
-Note that again we only need to cast the array parameter or use inline
-parameters because this simple query does not provide enough context.
+Note that again we need to cast the array parameter or use inline parameters
+only because this simple query does not provide enough context.
 Also note that the query gives the value back as Python lists again.  This
 is achieved by the typecasting mechanism explained in the next section.
 

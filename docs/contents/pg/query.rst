@@ -83,8 +83,8 @@ field with the highest index in the query.
 
 .. versionadded:: 5.1
 
-namedresult/namediter -- get query values a named tuples
---------------------------------------------------------
+namedresult/namediter -- get query values as named tuples
+---------------------------------------------------------
 
 .. method:: Query.namedresult()
 
