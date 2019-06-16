@@ -179,8 +179,8 @@ only because this simple query does not provide enough context.
 Also note that the query gives the value back as Python lists again.  This
 is achieved by the typecasting mechanism explained in the next section.
 
-Tuples are adapted as PostgreSQL composite types.  If you use inline paramters,
-they can also be used with the ``IN`` syntax.
+Tuples are adapted as PostgreSQL composite types.  If you use inline
+parameters, they can also be used with the ``IN`` syntax.
 
 Let's think of a more real world example again where we create a table with a
 composite type in PostgreSQL:

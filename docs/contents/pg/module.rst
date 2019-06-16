@@ -599,7 +599,7 @@ supported by the C extension module.
 cast_array/record -- fast parsers for arrays and records
 --------------------------------------------------------
 
-PosgreSQL returns arrays and records (composite types) using a special output
+PostgreSQL returns arrays and records (composite types) using a special output
 syntax with several quirks that cannot easily and quickly be parsed in Python.
 Therefore the C extension module provides two fast parsers that allow quickly
 turning these text representations into Python objects: Arrays will be

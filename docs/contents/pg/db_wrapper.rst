@@ -101,7 +101,7 @@ letters in the `kinds` parameter.  The type letters are ``r`` = ordinary table,
 ``s`` = special, ``t`` = TOAST table.  If `kinds` is None or an empty string,
 all relations are returned (this is also the default).  If `system` is set to
 `True`, then system tables and views (temporary tables, toast tables, catalog
-vies and tables) will be returned as well, otherwise they will be ignored.
+views and tables) will be returned as well, otherwise they will be ignored.
 
 get_tables -- get list of tables in connected database
 ------------------------------------------------------
