@@ -128,8 +128,8 @@ Version 5.0 (2016-03-20)
       well, but only if you use one of the get/insert/update/delete() methods.
       PyGreSQL uses a new fast built-in parser to achieve this. The automatic
       conversion of arrays to lists can be disabled with set_array(False).
-    - The pkey() method of the classic interface now returns tuples instead
-      of frozenset. The order of the tuples is like in the primary key index.
+    - The pkey() method of the classic interface now returns tuples instead of
+      frozensets, with the same order of columns as the primary key index.
     - Like the DB-API 2 module, the classic module now also returns bool values
       from the database as Python bool objects instead of strings. You can
       still restore the old behavior by calling set_bool(False).
@@ -145,7 +145,7 @@ Version 5.0 (2016-03-20)
       by the get() method of the classic interface will not automatically
       be fully qualified any more. This reduces overhead from the interface,
       but it means you must always write the table name in the same way when
-      you call the methods using it and you are using tables with OIDs.
+      you are using tables with OIDs and call methods that make use of these.
       Also, OIDs are now only used when access via primary key is not possible.
       Note that OIDs are considered deprecated anyway, and they are not created
       by default any more in PostgreSQL 8.1 and later.
@@ -171,11 +171,11 @@ Version 5.0 (2016-03-20)
     - The DB-API 2 module now always returns result rows as named tuples
       instead of simply lists as before. The documentation explains how
       you can restore the old behavior or use custom row objects instead.
-    - The names of the various classes used by the classic and DB-API 2
-      modules have been renamed to become simpler, more intuitive and in
-      line with the names used in the DB-API 2 documentation.
-      Since the API provides only objects of these types through constructor
-      functions, this should not cause any incompatibilities.
+    - Various classes used by the classic and DB-API 2 modules have been
+      renamed to become simpler, more intuitive and in line with the names
+      used in the DB-API 2 documentation. Since the API provides objects of
+      these types only through constructor functions, this should not cause
+      any incompatibilities.
     - The DB-API 2 module now supports the callproc() cursor method. Note
       that output parameters are currently not replaced in the return value.
     - The DB-API 2 module now supports copy operations between data streams
@@ -213,16 +213,16 @@ Version 5.0 (2016-03-20)
       constraints are violated, it raises an IntegrityError now.
     - The modules now provide get_typecast() and set_typecast() methods
       allowing to control the typecasting on the global level. The connection
-      objects have got type caches with the same methods which give control
-      over the typecasting on the level of the current connection.
-      See the documentation on details about the type cache and the typecast
+      objects have type caches with the same methods which give control over
+      the typecasting on the level of the current connection.
+      See the documentation for details about the type cache and the typecast
       mechanisms provided by PyGreSQL.
     - Dates, times, timestamps and time intervals are now returned as the
       corresponding Python objects from the datetime module of the standard
       library. In earlier versions of PyGreSQL they had been returned as
       strings. You can restore the old behavior by deactivating the respective
       typecast functions, e.g. set_typecast('date', str).
-    - PyGreSQL now support the "uuid" data type, converting such columns
+    - PyGreSQL now supports the "uuid" data type, converting such columns
       automatically to and from Python uuid.UUID objects.
     - PyGreSQL now supports the "hstore" data type, converting such columns
       automatically to and from Python dictionaries. If you want to insert
@@ -239,7 +239,7 @@ Version 5.0 (2016-03-20)
       type have been added to the C extension module. The array parser also
       allows using multi-dimensional arrays with PyGreSQL.
     - The tty parameter and attribute of database connections has been
-      removed since it is not supported any more since PostgreSQL 7.4.
+      removed since it is not supported by PostgreSQL versions newer than 7.4.
 
 Version 4.2.2 (2016-03-18)
 --------------------------
