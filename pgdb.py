@@ -1230,7 +1230,7 @@ class Cursor(object):
         params = []
         if format is not None:
             if not isinstance(format, basestring):
-                raise TypeError("The frmat option must be be a string")
+                raise TypeError("The format option must be be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("Invalid format")
             options.append('format %s' % (format,))
@@ -1784,7 +1784,7 @@ class Binary(bytes):
 # Additional type helpers for PyGreSQL:
 
 def Interval(days, hours=0, minutes=0, seconds=0, microseconds=0):
-    """Construct an object holding a time inverval value."""
+    """Construct an object holding a time interval value."""
     return timedelta(days, hours=hours, minutes=minutes, seconds=seconds,
         microseconds=microseconds)
 
