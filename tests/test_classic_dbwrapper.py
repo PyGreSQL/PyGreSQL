@@ -1641,9 +1641,9 @@ class TestDBClass(unittest.TestCase):
         get = self.db.get
         query = self.db.query
         self.createTable('test_students',
-                         'firstname varchar primary key, nickname varchar, grade char(2)',
-                         values=[("D'Arcy", 'Darcey', 'A+'), ('Sheldon', 'Moonpie', 'A+'),
-                                 ('Robert', 'Little Bobby Tables', 'D-')])
+            'firstname varchar primary key, nickname varchar, grade char(2)',
+            values=[("D'Arcy", 'Darcey', 'A+'), ('Sheldon', 'Moonpie', 'A+'),
+                    ('Robert', 'Little Bobby Tables', 'D-')])
         r = get('test_students', 'Sheldon')
         self.assertEqual(r, dict(
             firstname="Sheldon", nickname='Moonpie', grade='A+'))

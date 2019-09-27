@@ -1,6 +1,10 @@
 ChangeLog
 =========
 
+Version 5.1.1 (...)
+- This version changes internal queries so that they cannot be exploited using
+  a PostgreSQL security vulnerability described as CVE-2018-1058.
+
 Version 5.1 (2019-05-17)
 ------------------------
 - Changes to the classic PyGreSQL module (pg):

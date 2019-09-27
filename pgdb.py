@@ -726,11 +726,11 @@ class TypeCache(dict):
             # older remote databases (not officially supported)
             self._query_pg_type = ("SELECT oid, typname,"
                 " typlen, typtype, null as typcategory, typdelim, typrelid"
-                " FROM pg_type WHERE oid=%s")
+                " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) %s")
         else:
             self._query_pg_type = ("SELECT oid, typname,"
                 " typlen, typtype, typcategory, typdelim, typrelid"
-                " FROM pg_type WHERE oid=%s")
+                " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) %s")
 
     def __missing__(self, key):
         """Get the type info from the database if it is not cached."""
@@ -770,7 +770,9 @@ class TypeCache(dict):
         if not typ.relid:
             return None  # this type is not composite
         self._src.execute("SELECT attname, atttypid"
-            " FROM pg_attribute WHERE attrelid=%s AND attnum>0"
+            " FROM pg_catalog.pg_attribute"
+            " WHERE attrelid OPERATOR(pg_catalog.=) %s"
+            " AND attnum OPERATOR(pg_catalog.>) 0"
             " AND NOT attisdropped ORDER BY attnum" % (typ.relid,))
         return [FieldInfo(name, self.get(int(oid)))
             for name, oid in self._src.fetch(-1)]

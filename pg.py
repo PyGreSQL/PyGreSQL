@@ -1191,12 +1191,14 @@ class DbTypes(dict):
             self._query_pg_type = (
                 "SELECT oid, typname, typname::text::regtype,"
                 " typtype, null as typcategory, typdelim, typrelid"
-                " FROM pg_type WHERE oid=%s::regtype")
+                " FROM pg_catalog.pg_type"
+                " WHERE oid OPERATOR(pg_catalog.=) %s::regtype")
         else:
             self._query_pg_type = (
                 "SELECT oid, typname, typname::regtype,"
                 " typtype, typcategory, typdelim, typrelid"
-                " FROM pg_type WHERE oid=%s::regtype")
+                " FROM pg_catalog.pg_type"
+                " WHERE oid OPERATOR(pg_catalog.=) %s::regtype")
 
     def add(self, oid, pgtype, regtype,
                typtype, category, delim, relid):
@@ -1551,21 +1553,23 @@ class DB:
         self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
         if db.server_version < 80400:
-            # support older remote data bases
+            # support older remote data bases (not officially supported)
             self._query_attnames = (
                 "SELECT a.attname, t.oid, t.typname, t.typname::text::regtype,"
                 " t.typtype, null as typcategory, t.typdelim, t.typrelid"
-                " FROM pg_attribute a"
-                " JOIN pg_type t ON t.oid = a.atttypid"
-                " WHERE a.attrelid = %s::regclass AND %s"
+                " FROM pg_catalog.pg_attribute a"
+                " JOIN pg_catalog.pg_type t"
+                " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
+                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass AND %s"
                 " AND NOT a.attisdropped ORDER BY a.attnum")
         else:
             self._query_attnames = (
                 "SELECT a.attname, t.oid, t.typname, t.typname::regtype,"
                 " t.typtype, t.typcategory, t.typdelim, t.typrelid"
-                " FROM pg_attribute a"
-                " JOIN pg_type t ON t.oid = a.atttypid"
-                " WHERE a.attrelid = %s::regclass AND %s"
+                " FROM pg_catalog.pg_attribute a"
+                " JOIN pg_catalog.pg_type t"
+                " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
+                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass AND %s"
                 " AND NOT a.attisdropped ORDER BY a.attnum")
         db.set_cast_hook(self.dbtypes.typecast)
         self.debug = None  # For debugging scripts, this can be set
@@ -1997,11 +2001,13 @@ class DB:
         try:  # cache lookup
             pkey = pkeys[table]
         except KeyError:  # cache miss, check the database
-            q = ("SELECT a.attname, a.attnum, i.indkey FROM pg_index i"
-                " JOIN pg_attribute a ON a.attrelid = i.indrelid"
-                " AND a.attnum = ANY(i.indkey)"
+            q = ("SELECT a.attname, a.attnum, i.indkey"
+                " FROM pg_catalog.pg_index i"
+                " JOIN pg_catalog.pg_attribute a"
+                " ON a.attrelid OPERATOR(pg_catalog.=) i.indrelid"
+                " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
                 " AND NOT a.attisdropped"
-                " WHERE i.indrelid=%s::regclass"
+                " WHERE i.indrelid OPERATOR(pg_catalog.=) %s::regclass"
                 " AND i.indisprimary ORDER BY a.attnum") % (
                     _quote_if_unqualified('$1', table),)
             pkey = self.db.query(q, (table,)).getresult()
@@ -2023,7 +2029,8 @@ class DB:
     def get_databases(self):
         """Get list of databases in the system."""
         return [s[0] for s in
-            self.db.query('SELECT datname FROM pg_database').getresult()]
+            self.db.query(
+                'SELECT datname FROM pg_catalog.pg_database').getresult()]
 
     def get_relations(self, kinds=None, system=False):
         """Get list of relations in connected database of specified kinds.
@@ -2042,9 +2049,11 @@ class DB:
             where.append("s.nspname NOT SIMILAR"
                 " TO 'pg/_%|information/_schema' ESCAPE '/'")
         where = " WHERE %s" % ' AND '.join(where) if where else ''
-        q = ("SELECT quote_ident(s.nspname)||'.'||quote_ident(r.relname)"
-            " FROM pg_class r"
-            " JOIN pg_namespace s ON s.oid = r.relnamespace%s"
+        q = ("SELECT pg_catalog.quote_ident(s.nspname) OPERATOR(pg_catalog.||)"
+            " '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.relname)"
+            " FROM pg_catalog.pg_class r"
+            " JOIN pg_catalog.pg_namespace s"
+            " ON s.oid OPERATOR(pg_catalog.=) r.relnamespace%s"
             " ORDER BY s.nspname, r.relname") % where
         return [r[0] for r in self.db.query(q).getresult()]
 
@@ -2076,9 +2085,9 @@ class DB:
         try:  # cache lookup
             names = attnames[table]
         except KeyError:  # cache miss, check the database
-            q = "a.attnum > 0"
+            q = "a.attnum OPERATOR(pg_catalog.>) 0"
             if with_oid:
-                q = "(%s OR a.attname = 'oid')" % q
+                q = "(%s OR a.attname OPERATOR(pg_catalog.=) 'oid')" % q
             q = self._query_attnames % (_quote_if_unqualified('$1', table), q)
             names = self.db.query(q, (table,)).getresult()
             types = self.dbtypes
@@ -2113,7 +2122,7 @@ class DB:
         try:  # ask cache
             ret = privileges[table, privilege]
         except KeyError:  # cache miss, ask the database
-            q = "SELECT has_table_privilege(%s, $2)" % (
+            q = "SELECT pg_catalog.has_table_privilege(%s, $2)" % (
                 _quote_if_unqualified('$1', table),)
             q = self.db.query(q, (table, privilege))
             ret = q.getresult()[0][0] == self._make_bool(True)
@@ -2175,7 +2184,7 @@ class DB:
         adapt = params.add
         col = self.escape_identifier
         what = 'oid, *' if qoid else '*'
-        where = ' AND '.join('%s = %s' % (
+        where = ' AND '.join('%s OPERATOR(pg_catalog.=) %s' % (
             col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
@@ -2187,6 +2196,8 @@ class DB:
         q = self.db.query(q, params)
         res = q.dictresult()
         if not res:
+            # make where clause in error message better readable
+            where = where.replace('OPERATOR(pg_catalog.=)', '=')
             raise _db_error('No such record in %s\nwhere %s\nwith %s' % (
                 table, where, self._list_params(params)))
         for n, value in res[0].items():
@@ -2276,7 +2287,7 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        where = ' AND '.join('%s = %s' % (
+        where = ' AND '.join('%s OPERATOR(pg_catalog.=) %s' % (
             col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
@@ -2467,7 +2478,7 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        where = ' AND '.join('%s = %s' % (
+        where = ' AND '.join('%s OPERATOR(pg_catalog.=) %s' % (
             col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
