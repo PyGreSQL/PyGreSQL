@@ -10,6 +10,7 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
 
 install:
   - pip install .
@@ -18,7 +19,7 @@ install:
 script: python setup.py test
 
 addons:
-  postgresql: "9.4"
+  postgresql: "10"
 
 services:
   - postgresql
