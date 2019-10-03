@@ -357,6 +357,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertEqual(type_info.type, 'c')  # composite
             self.assertEqual(type_info.category, 'C')  # composite
             cols = type_cache.get_fields('pg_type')
+            if cols[0].name == 'oid':  # PostgreSQL < 12
+                del cols[0]
             self.assertEqual(cols[0].name, 'typname')
             typname = type_cache[cols[0].type]
             self.assertEqual(typname, 'name')

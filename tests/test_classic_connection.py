@@ -616,6 +616,44 @@ class TestSimpleQueries(unittest.TestCase):
         query = self.c.query
         query("drop table if exists test_table")
         self.addCleanup(query, "drop table test_table")
+        q = "create table test_table (n integer)"
+        r = query(q)
+        self.assertIsNone(r)
+        q = "insert into test_table values (1)"
+        r = query(q)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '1')
+        q = "insert into test_table select 2"
+        r = query(q)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '1')
+        q = "select n from test_table where n>1"
+        r = query(q).getresult()
+        self.assertEqual(len(r), 1)
+        r = r[0]
+        self.assertEqual(len(r), 1)
+        r = r[0]
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 2)
+        q = "insert into test_table select 3 union select 4 union select 5"
+        r = query(q)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '3')
+        q = "update test_table set n=4 where n<5"
+        r = query(q)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '4')
+        q = "delete from test_table"
+        r = query(q)
+        self.assertIsInstance(r, str)
+        self.assertEqual(r, '5')
+
+    def testQueryWithOids(self):
+        if self.c.server_version >= 120000:
+            self.skipTest("database does not support tables with oids")
+        query = self.c.query
+        query("drop table if exists test_table")
+        self.addCleanup(query, "drop table test_table")
         q = "create table test_table (n integer) with oids"
         r = query(q)
         self.assertIsNone(r)
