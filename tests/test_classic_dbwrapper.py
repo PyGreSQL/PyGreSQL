@@ -276,7 +276,9 @@ class TestDBClassBasic(unittest.TestCase):
     def testAttributeServerVersion(self):
         server_version = self.db.server_version
         self.assertIsInstance(server_version, int)
-        self.assertTrue(90000 <= server_version < 120000)
+        print("SERVERVERSION",server_version)
+        print("PORT",dbport)
+        self.assertTrue(90000 <= server_version < 130000)
         self.assertEqual(server_version, self.db.db.server_version)
 
     def testAttributeSocket(self):

@@ -11,7 +11,7 @@ If you are on Windows, make sure that the directory that contains
 libpq.dll is part of your ``PATH`` environment variable.
 
 The current version of PyGreSQL has been tested with Python versions
-2.6, 2.7 and 3.3 to 3.7, and PostgreSQL versions 9.0 to 9.6 and 10 or 11.
+2.6, 2.7 and 3.3 to 3.8, and PostgreSQL versions 9.0 to 9.6 and 10 to 12.
 
 PyGreSQL will be installed as three modules, a shared library called
 _pg.so (on Linux) or a DLL called _pg.pyd (on Windows), and two pure
