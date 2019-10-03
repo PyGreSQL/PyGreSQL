@@ -13,6 +13,7 @@
 
 /* Note: This should be linked against the same C runtime lib as Python */
 
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #include <libpq-fe.h>

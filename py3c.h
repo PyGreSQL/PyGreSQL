@@ -4,6 +4,7 @@
 
 #ifndef _PY3C_COMPAT_H_
 #define _PY3C_COMPAT_H_
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 #if PY_MAJOR_VERSION >= 3

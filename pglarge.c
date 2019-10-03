@@ -223,7 +223,8 @@ static PyObject *
 large_write(largeObject *self, PyObject *args)
 {
     char *buffer;
-    int size, bufsize;
+    int size;
+    Py_ssize_t bufsize;
 
     /* gets arguments */
     if (!PyArg_ParseTuple(args, "s#", &buffer, &bufsize)) {
@@ -239,7 +240,7 @@ large_write(largeObject *self, PyObject *args)
 
     /* sends query */
     if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
-                         bufsize)) != bufsize)
+                         (int)bufsize)) != bufsize)
     {
         PyErr_SetString(PyExc_IOError, "Buffer truncated during write");
         return NULL;

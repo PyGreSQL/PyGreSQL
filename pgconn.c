@@ -419,7 +419,7 @@ static PyObject *
 conn_prepare(connObject *self, PyObject *args)
 {
     char *name, *query;
-    int name_length, query_length;
+    Py_ssize_t name_length, query_length;
     PGresult *result;
 
     if (!self->cnx) {
@@ -461,7 +461,7 @@ static PyObject *
 conn_describe_prepared(connObject *self, PyObject *args)
 {
     char *name;
-    int name_length;
+    Py_ssize_t name_length;
     PGresult *result;
 
     if (!self->cnx) {
@@ -510,7 +510,7 @@ static PyObject *
 conn_putline(connObject *self, PyObject *args)
 {
     char *line;
-    int line_length;
+    Py_ssize_t line_length;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
