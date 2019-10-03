@@ -1355,6 +1355,42 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             objs[:] = [obj for obj in objs if repr(obj) != '(<NULL>,)']
         self.assertEqual(len(objs), 0)
 
+    def test_cve_2018_1058(self):
+        # internal queries should use qualified table and operator names,
+        # see https://nvd.nist.gov/vuln/detail/CVE-2018-1058
+        con = self._connect()
+        cur = con.cursor()
+        execute = cur.execute
+        try:
+            execute("SET TIMEZONE TO 'UTC'")
+            execute("SHOW TIMEZONE")
+            self.assertEqual(cur.fetchone()[0], 'UTC')
+            execute("""
+                CREATE OR REPLACE FUNCTION public.bad_eq(oid, integer)
+                RETURNS boolean AS $$
+                BEGIN
+                  SET TIMEZONE TO 'CET';
+                  RETURN oideq($1, $2::oid);
+                END
+                $$ LANGUAGE plpgsql
+                """)
+            execute("""
+                CREATE OPERATOR public.= (
+                  PROCEDURE = public.bad_eq,
+                  LEFTARG = oid, RIGHTARG = integer
+                );
+                """)
+            # the following select changes the time zone as a side effect if
+            # internal query uses unqualified = operator as it did earlier
+            execute("SELECT 1")
+            execute("SHOW TIMEZONE")  # make sure time zone has not changed
+            self.assertEqual(cur.fetchone()[0], 'UTC')
+        finally:
+            execute("DROP OPERATOR IF EXISTS public.= (oid, integer)")
+            execute("DROP FUNCTION IF EXISTS public.bad_eq(oid, integer)")
+            cur.close()
+            con.close()
+
 
 if __name__ == '__main__':
     unittest.main()
