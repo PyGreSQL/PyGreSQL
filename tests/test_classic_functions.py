@@ -180,8 +180,8 @@ class TestParseArray(unittest.TestCase):
         (r"{abc,d,efg}", str, ['abc', 'd', 'efg']),
         ('{Hello World!}', str, ['Hello World!']),
         ('{Hello, World!}', str, ['Hello', 'World!']),
-        ('{Hello,\ World!}', str, ['Hello', ' World!']),
-        ('{Hello\, World!}', str, ['Hello, World!']),
+        (r'{Hello,\ World!}', str, ['Hello', ' World!']),
+        (r'{Hello\, World!}', str, ['Hello, World!']),
         ('{"Hello World!"}', str, ['Hello World!']),
         ('{this, should, be, null}', str, ['this', 'should', 'be', None]),
         ('{This, should, be, NULL}', str, ['This', 'should', 'be', None]),
@@ -449,8 +449,8 @@ class TestParseRecord(unittest.TestCase):
         (r"(\'abc\')", str, ("'abc'",)),
         ('(Hello World!)', str, ('Hello World!',)),
         ('(Hello, World!)', str, ('Hello', ' World!',)),
-        ('(Hello,\ World!)', str, ('Hello', ' World!',)),
-        ('(Hello\, World!)', str, ('Hello, World!',)),
+        (r'(Hello,\ World!)', str, ('Hello', ' World!',)),
+        (r'(Hello\, World!)', str, ('Hello, World!',)),
         ('("Hello World!")', str, ('Hello World!',)),
         ("(this,shouldn't,be,null)", str, ('this', "shouldn't", 'be', 'null')),
         ('(null,should,be,)', str, ('null', 'should', 'be', None)),
@@ -659,8 +659,8 @@ class TestParseHStore(unittest.TestCase):
             '1-a': 'anything at all'}),
         ('"Hello, World!"=>"Hi!"', {'Hello, World!': 'Hi!'}),
         ('"Hi!"=>"Hello, World!"', {'Hi!': 'Hello, World!'}),
-        ('"k=>v"=>k\=\>v', {'k=>v': 'k=>v'}),
-        ('k\=\>v=>"k=>v"', {'k=>v': 'k=>v'}),
+        (r'"k=>v"=>k\=\>v', {'k=>v': 'k=>v'}),
+        (r'k\=\>v=>"k=>v"', {'k=>v': 'k=>v'}),
         ('a\\,b=>a,b=>a', {'a,b': 'a', 'b': 'a'})]
 
     def testParser(self):
