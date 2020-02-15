@@ -1,12 +1,13 @@
 Access to the source repository
 -------------------------------
 
-We are using a central `Subversion <https://subversion.apache.org/>`_
-source code repository for PyGreSQL.
+The source code of PyGreSQL is available
+on `GitHub <https://github.com/PyGreSQL/PyGreSQL>`_.
 
-The current trunk of the repository can be checked out with the command::
+The current master branch of the repository can be cloned with the command::
 
-    svn co svn://svn.pygresql.org/pygresql/trunk
+    git clone https://github.com/PyGreSQL/PyGreSQL.git
 
-You can also browse through the repository using the
-`PyGreSQL Trac browser <http://trac.pygresql.org:8000/pgtracker/browser/trunk>`_.
+
+You can also download the master branch as a
+`zip archive <https://github.com/PyGreSQL/PyGreSQL/archive/master.zip>`_.
