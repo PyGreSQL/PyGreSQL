@@ -15,7 +15,7 @@ pgtypes.h      PostgreSQL type definitions
 py3c.h         Python 2/3 compatibility layer for the C extension
 
 pg.py          the "classic" PyGreSQL module
-pgdb.py        a DB-SIG DB-API 2.0 compliant API wrapper for PygreSQL
+pgdb.py        a DB-SIG DB-API 2.0 compliant API wrapper for PyGreSQL
 
 setup.py       the Python setup script
 

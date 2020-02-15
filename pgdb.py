@@ -8,7 +8,7 @@
 #
 # Please see the LICENSE.TXT file for specific restrictions.
 
-"""pgdb - DB-API 2.0 compliant module for PygreSQL.
+"""pgdb - DB-API 2.0 compliant module for PyGreSQL.
 
 (c) 1999, Pascal Andre <andre@via.ecp.fr>.
 See package documentation for further information on copyright.

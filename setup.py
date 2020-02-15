@@ -38,20 +38,10 @@ using distutils to install Python programs.
 
 """
 
-version = '5.1.1'
-
-
-import sys
-
-if (not (2, 6) <= sys.version_info[:2] < (3, 0)
-        and not (3, 3) <= sys.version_info[:2] < (4, 0)):
-    raise Exception("Sorry, PyGreSQL %s"
-        " does not support this Python version" % version)
-
-
 import os
 import platform
 import re
+import sys
 import warnings
 try:
     from setuptools import setup
@@ -62,6 +52,12 @@ from distutils.command.build_ext import build_ext
 from distutils.ccompiler import get_default_compiler
 from distutils.sysconfig import get_python_inc, get_python_lib
 
+version = '5.1.1'
+
+if (not (2, 6) <= sys.version_info[:2] < (3, 0)
+        and not (3, 3) <= sys.version_info[:2] < (4, 0)):
+    raise Exception(
+        "Sorry, PyGreSQL %s does not support this Python version" % version)
 
 # For historical reasons, PyGreSQL does not install itself as a single
 # "pygresql" package, but as two top-level modules "pg", providing the
@@ -88,7 +84,7 @@ def pg_version():
     match = re.search(r'(\d+)\.(\d+)', pg_config('version'))
     if match:
         return tuple(map(int, match.groups()))
-    return (9, 0)
+    return 9, 0
 
 
 pg_version = pg_version()
@@ -135,7 +131,7 @@ class build_pg_ext(build_ext):
         self.escaping_funcs = pg_version >= (9, 0)
         self.ssl_info = pg_version >= (9, 5)
         if pg_version < (9, 0):
-            warnings.warn("PygreSQL does not support this PostgreSQL version.")
+            warnings.warn("PyGreSQL does not support this PostgreSQL version.")
 
     def finalize_options(self):
         """Set final values for all build_pg options."""
@@ -177,7 +173,8 @@ class build_pg_ext(build_ext):
                     define_macros.append(('MS_WIN64', None))
             elif compiler == 'msvc':  # Microsoft Visual C++
                 libraries[0] = 'lib' + libraries[0]
-                extra_compile_args[1:] = ['-J', '-W3', '-WX',
+                extra_compile_args[1:] = [
+                    '-J', '-W3', '-WX',
                     '-Dinline=__inline']  # needed for MSVC 9
 
 
@@ -194,7 +191,8 @@ setup(
     platforms=["any"],
     license="PostgreSQL",
     py_modules=py_modules,
-    ext_modules=[Extension('_pg', c_sources,
+    ext_modules=[Extension(
+        '_pg', c_sources,
         include_dirs=include_dirs, library_dirs=library_dirs,
         define_macros=define_macros, undef_macros=undef_macros,
         libraries=libraries, extra_compile_args=extra_compile_args)],
