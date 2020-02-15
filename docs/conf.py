@@ -93,7 +93,7 @@ exclude_patterns = ['_build']
 exclude_patterns += [
     'download/download.rst', 'download/files.rst',
     'community/mailinglist.rst', 'community/source.rst',
-    'community/bugtracker.rst', 'community/support.rst',
+    'community/issues.rst', 'community/support.rst',
     'community/homes.rst']
 if use_cloud_theme:
     exclude_patterns += ['about.rst']
