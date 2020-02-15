@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
  * This is the main file for the C extension module.
@@ -8,7 +6,6 @@
  * Copyright (c) 2019 by the PyGreSQL Development Team
  *
  * Please see the LICENSE.TXT file for specific restrictions.
- *
  */
 
 /* Note: This should be linked against the same C runtime lib as Python */

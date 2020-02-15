@@ -1,7 +1,5 @@
 #!/usr/bin/python
 #
-# $Id$
-#
 # PyGreSQL - a Python interface for the PostgreSQL database.
 #
 # Copyright (c) 2019 by the PyGreSQL Development Team

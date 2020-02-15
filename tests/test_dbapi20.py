@@ -1,6 +1,5 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# $Id$
 
 try:
     import unittest2 as unittest  # for Python < 2.7

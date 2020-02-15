@@ -1,6 +1,4 @@
 /*
- * $Id: pgconn.c 985 2019-04-22 22:07:43Z cito $
- *
  * PyGreSQL - a Python interface for the PostgreSQL database.
  *
  * The connection object - this file is part a of the C extension module.
@@ -8,7 +6,6 @@
  * Copyright (c) 2019 by the PyGreSQL Development Team
  *
  * Please see the LICENSE.TXT file for specific restrictions.
- *
  */
 
 /* Deallocate connection object. */

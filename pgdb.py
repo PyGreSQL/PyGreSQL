@@ -1,7 +1,5 @@
 #!/usr/bin/python
 #
-# $Id$
-#
 # PyGreSQL - a Python interface for the PostgreSQL database.
 #
 # This file contains the DB-API 2 compatible pgdb module.
