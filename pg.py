@@ -4,7 +4,7 @@
 #
 # This file contains the classic pg module.
 #
-# Copyright (c) 2019 by the PyGreSQL Development Team
+# Copyright (c) 2020 by the PyGreSQL Development Team
 #
 # The notification handler is based on pgnotify which is
 # Copyright (c) 2001 Ng Pheng Siong. All rights reserved.

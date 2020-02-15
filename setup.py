@@ -2,7 +2,7 @@
 #
 # PyGreSQL - a Python interface for the PostgreSQL database.
 #
-# Copyright (c) 2019 by the PyGreSQL Development Team
+# Copyright (c) 2020 by the PyGreSQL Development Team
 #
 # Please see the LICENSE.TXT file for specific restrictions.
 
