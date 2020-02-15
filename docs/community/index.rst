@@ -10,7 +10,7 @@ so that PyGreSQL can be further developed, modernized and improved.
 
 .. include:: source.rst
 
-.. include:: bugtracker.rst
+.. include:: issues.rst
 
 .. include:: support.rst
 
