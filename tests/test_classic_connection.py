@@ -18,7 +18,12 @@ import threading
 import time
 import os
 
-from collections import namedtuple, Iterable
+from collections import namedtuple
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+
 from decimal import Decimal
 
 import pg  # the module under test
