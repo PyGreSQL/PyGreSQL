@@ -16,10 +16,12 @@ dist/
 _build/
 
 /local/
+Vagrantfile
 
 .coverage
 .tox/
 .venv/
+.vagrant/
 
 Thumbs.db
 .DS_Store
