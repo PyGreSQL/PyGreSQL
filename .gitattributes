@@ -9,6 +9,8 @@
 *.rst text eol=lf
 *.sh text eol=lf
 *.txt text eol=lf
+*.yml text eol=lf
+
 
 *.gif binary
 *.ico binary
