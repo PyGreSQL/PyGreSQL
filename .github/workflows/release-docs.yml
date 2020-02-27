@@ -35,4 +35,3 @@ jobs:
         publish_dir: docs/_build/html
         cname: www.pygresql.org
         disable_nojekyll: true
-        force_orphan: true
