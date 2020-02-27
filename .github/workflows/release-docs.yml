@@ -34,4 +34,5 @@ jobs:
         publish_branch: gh-pages
         publish_dir: docs/_build/html
         cname: www.pygresql.org
-        disable_nojekyll: true
+        disable_nojekyll: false
+        force_orphan: true
