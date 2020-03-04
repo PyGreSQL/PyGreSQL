@@ -17,6 +17,7 @@ _build/
 _build_doctrees/
 
 /local/
+/tests/LOCAL_*.py
 Vagrantfile
 
 .coverage
