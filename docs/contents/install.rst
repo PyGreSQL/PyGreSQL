@@ -126,7 +126,6 @@ Stand-Alone
     -DNO_DEF_VAR   no default variables support
     -DNO_DIRECT    no direct access methods
     -DNO_LARGE     no large object support
-    -DNO_PQSOCKET  if running an older PostgreSQL
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.
@@ -171,7 +170,6 @@ Built-in to Python interpreter
     -DNO_DEF_VAR   no default variables support
     -DNO_DIRECT    no direct access methods
     -DNO_LARGE     no large object support
-    -DNO_PQSOCKET  if running an older PostgreSQL (see above)
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.

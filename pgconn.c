@@ -1222,11 +1222,7 @@ conn_fileno(connObject *self, PyObject *noargs)
         return NULL;
     }
 
-#ifdef NO_PQSOCKET
-    return PyInt_FromLong((long) self->cnx->sock);
-#else
     return PyInt_FromLong((long) PQsocket(self->cnx));
-#endif
 }
 
 /* Set external typecast callback function. */
