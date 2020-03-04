@@ -6,6 +6,9 @@ Version 5.1.1 (...)
 - This version officially supports the new Python 3.8 and PostgreSQL 12.
 - This version changes internal queries so that they cannot be exploited using
   a PostgreSQL security vulnerability described as CVE-2018-1058.
+- Removed NO_PQSOCKET switch which is not needed any longer.
+- Fixed documentation for other compilation options which had been renamed.
+- Started using GitHub as development platform.
 
 Version 5.1 (2019-05-17)
 ------------------------
@@ -386,7 +389,7 @@ Version 3.8.1 (2006-06-05)
 Version 3.8 (2006-02-17)
 ------------------------
 - Installed new favicon.ico from Matthew Sporleder <mspo@mspo.com>
-- Replaced snprintf by PyOS_snprintf.
+- Replaced snprintf by PyOS_snprintf
 - Removed NO_SNPRINTF switch which is not needed any longer
 - Clean up some variable names and namespace
 - Add get_relations() method to get any type of relation

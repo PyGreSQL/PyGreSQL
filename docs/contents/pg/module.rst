@@ -11,7 +11,7 @@ These "default variables" were designed to allow you to handle general
 connection parameters without heavy code in your programs. You can prompt the
 user for a value, put it in the default variable, and forget it, without
 having to modify your environment. The support for default variables can be
-disabled by setting the ``-DNO_DEF_VAR`` option in the Python setup file.
+disabled by not setting the ``default_vars`` option in the Python setup file.
 Methods relative to this are specified by the tag [DV].
 
 All variables are set to ``None`` at module initialization, specifying that

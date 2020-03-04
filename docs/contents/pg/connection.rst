@@ -14,7 +14,7 @@ significant parameters in function calls.
     Some methods give direct access to the connection socket.
     *Do not use them unless you really know what you are doing.*
     If you prefer disabling them,
-    set the ``-DNO_DIRECT`` option in the Python setup file.
+    do not set the ``direct_access`` option in the Python setup file.
     These methods are specified by the tag [DA].
 
 .. note::
@@ -22,7 +22,7 @@ significant parameters in function calls.
     Some other methods give access to large objects
     (refer to PostgreSQL user manual for more information about these).
     If you want to forbid access to these from the module,
-    set the ``-DNO_LARGE`` option in the Python setup file.
+    set the ``large_objects`` option in the Python setup file.
     These methods are specified by the tag [LO].
 
 query -- execute a SQL command string

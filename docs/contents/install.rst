@@ -123,9 +123,11 @@ Stand-Alone
 
   Some options may be added to this line::
 
-    -DNO_DEF_VAR   no default variables support
-    -DNO_DIRECT    no direct access methods
-    -DNO_LARGE     no large object support
+    -DDEFAULT_VARS      default variables support
+    -DDIRECT_ACCESS     direct access methods
+    -DLARGE_OBJECTS     large object support
+    -DESCAPING_FUNCS    support for newer escaping functions
+    -DSSL_INFO          support SSL information
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.
@@ -167,9 +169,11 @@ Built-in to Python interpreter
 
   Some options may be added to this line::
 
-    -DNO_DEF_VAR   no default variables support
-    -DNO_DIRECT    no direct access methods
-    -DNO_LARGE     no large object support
+    -DDEFAULT_VARS      default variables support
+    -DDIRECT_ACCESS     direct access methods
+    -DLARGE_OBJECTS     large object support
+    -DESCAPING_FUNCS    support for newer escaping functions
+    -DSSL_INFO          support SSL information
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.
