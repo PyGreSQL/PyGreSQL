@@ -1,23 +1,27 @@
 Current PyGreSQL versions
 -------------------------
 
-You can find PyGreSQL on the **Python Package Index** at
- * http://pypi.python.org/pypi/PyGreSQL/
+You can download PyGreSQL from the **Python Package Index** at
+ * https://pypi.org/project/PyGreSQL/#files
 
-A **CentOS package** can be found on the pkcs.org site
+**Linux RPM** packages can be found attached to the GitHub release at
+  * https://github.com/PyGreSQL/PyGreSQL/releases/
+**CentOS** packages can be found on the pkcs.org site
   * https://pkgs.org/search/?q=pygresql
-A **Debian** package can be found at
+**Debian** packages can be found at
   * https://packages.debian.org/search?suite=all&searchon=names&keywords=pygresql
-A **FreeBSD package** is available in their ports collection
+**FreeBSD** packages are available in their ports collection
   * http://www.freebsd.org/cgi/cvsweb.cgi/ports/databases/py-PyGreSQL/
-A **NetBSD package** is available in their pkgsrc collection
+**NetBSD** packages are available in their pkgsrc collection
   * https://pkgsrc.se/databases/py-postgresql
-An **openSUSE package** is available through their build service at
+**openSUSE** packages are available through their build service at
   * https://software.opensuse.org/package/PyGreSQL?search_term=pygresql
-An **Ubuntu package** is available from Launchpad at
+**Ubuntu** packages are available from Launchpad at
   * https://launchpad.net/ubuntu/+source/pygresql
-A **Windows installer** for various Python versions is also available at
-  * http://pypi.python.org/pypi/PyGreSQL/
+**Windows binaries** (executables and wheels) are available at
+  * https://pypi.org/project/PyGreSQL/#files
+**Windows MSI** packages are attached to the GitHub release at
+  * https://github.com/PyGreSQL/PyGreSQL/releases/
 
 Older PyGreSQL versions
 -----------------------

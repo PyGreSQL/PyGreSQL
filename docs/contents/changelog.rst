@@ -2,7 +2,7 @@ ChangeLog
 =========
 
 Version 5.1.1 (2020-03-05)
--------------------
+--------------------------
 - This version officially supports the new Python 3.8 and PostgreSQL 12.
 - This version changes internal queries so that they cannot be exploited using
   a PostgreSQL security vulnerability described as CVE-2018-1058.
