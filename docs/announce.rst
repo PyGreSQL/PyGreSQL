@@ -8,7 +8,7 @@ Release of PyGreSQL version 5.1.1
 
 Release 5.1.1 of PyGreSQL.
 
-It is available at: http://pygresql.org/files/PyGreSQL-5.1.1.tar.gz.
+It is available at: https://pypi.org/project/PyGreSQL/.
 
 If you are running NetBSD, look in the packages directory under databases.
 There is also a package in the FreeBSD ports collection.
@@ -22,7 +22,7 @@ This version has been built and unit tested on:
  - openSUSE
  - Ubuntu
  - Windows 7 and 10 with both MinGW and Visual Studio
- - PostgreSQL 9.0 to 9.6 and 10 tp 11 (32 and 64bit)
+ - PostgreSQL 9.0 to 9.6 and 10 to 12 (32 and 64bit)
  - Python 2.6, 2.7 and 3.3 to 3.8 (32 and 64bit)
 
 | D'Arcy J.M. Cain
