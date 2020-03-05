@@ -33,4 +33,3 @@ recursive-include docs/contents *.rst
 recursive-include docs/download *.rst
 recursive-include docs/_static *.css_t *.ico *.png
 recursive-include docs/_templates *.html
-recursive-include docs/_build/html *.css *.gif *.html *.ico *.js *.png *.txt
