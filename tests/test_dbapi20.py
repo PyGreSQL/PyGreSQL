@@ -1375,6 +1375,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 END
                 $$ LANGUAGE plpgsql
                 """)
+            execute("DROP OPERATOR IF EXISTS public.= (oid, integer)")
             execute("""
                 CREATE OPERATOR public.= (
                   PROCEDURE = public.bad_eq,
