@@ -66,7 +66,22 @@ Basic usage:
 
 from __future__ import print_function, division
 
-from _pg import *
+try:
+    from _pg import *
+except ImportError:
+    import os
+    import sys
+    # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
+    if os.name == 'nt' and sys.version_info >= (3, 8):
+        for path in os.environ["PATH"].split(os.pathsep):
+            if os.path.exists(os.path.join(path, 'libpq.dll')):
+                with os.add_dll_directory(os.path.abspath(path)):
+                    from _pg import *
+                break
+        else:
+            raise
+    else:
+        raise
 
 __version__ = version
 
