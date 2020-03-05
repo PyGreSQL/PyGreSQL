@@ -1363,6 +1363,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         cur = con.cursor()
         execute = cur.execute
         try:
+            execute("SET client_min_messages TO WARNING")
             execute("SET TIMEZONE TO 'UTC'")
             execute("SHOW TIMEZONE")
             self.assertEqual(cur.fetchone()[0], 'UTC')
