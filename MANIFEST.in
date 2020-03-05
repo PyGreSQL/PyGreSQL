@@ -1,23 +1,14 @@
 
-include pgconn.c
-include pginternal.c
-include pglarge.c
-include pgmodule.c
-include pgnotice.c
-include pgquery.c
-include pgsource.c
-
-include pgtypes.h
-include py3c.h
-
-include pg.py
-include pgdb.py
-include setup.py
-
-include setup.cfg
+include *.c
+include *.h
+include *.py
 
 include README.rst
 include LICENSE.txt
+
+include setup.cfg
+
+include tox.ini
 
 recursive-include tests *.py
 exclude tests/LOCAL_PyGreSQL.py
