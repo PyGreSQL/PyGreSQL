@@ -28,11 +28,11 @@ jobs:
         cd docs
         make html
     - name: Deploy docs to GitHub pages
-      uses: peaceiris/actions-gh-pages@v3.4.0
+      uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         publish_dir: docs/_build/html
         cname: www.pygresql.org
-        disable_nojekyll: false
+        enable_jekyll: false
         force_orphan: true
