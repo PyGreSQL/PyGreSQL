@@ -711,7 +711,7 @@ source_listInfo(sourceObject *self, PyObject *noargs)
 
     /* returns result */
     return result;
-};
+}
 
 /* List fields information for last result. */
 static char source_fieldinfo__doc__[] =
@@ -732,7 +732,7 @@ source_fieldinfo(sourceObject *self, PyObject *desc)
 
     /* returns result */
     return _source_buildinfo(self, num);
-};
+}
 
 /* Retrieve field value. */
 static char source_field__doc__[] =
