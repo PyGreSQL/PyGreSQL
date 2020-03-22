@@ -199,7 +199,7 @@ large_read(largeObject *self, PyObject *args)
     buffer = PyBytes_FromStringAndSize((char *) NULL, size);
 
     if ((size = lo_read(self->pgcnx->cnx, self->lo_fd,
-        PyBytes_AS_STRING((PyBytesObject *) (buffer)), size)) == -1)
+        PyBytes_AS_STRING((PyBytesObject *) (buffer)), (size_t) size)) == -1)
     {
         PyErr_SetString(PyExc_IOError, "Error while reading");
         Py_XDECREF(buffer);
@@ -237,7 +237,7 @@ large_write(largeObject *self, PyObject *args)
 
     /* sends query */
     if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
-                         (int)bufsize)) != bufsize)
+                         (size_t) bufsize)) != bufsize)
     {
         PyErr_SetString(PyExc_IOError, "Buffer truncated during write");
         return NULL;

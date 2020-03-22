@@ -95,7 +95,7 @@ include_dirs = [get_python_inc(), pg_config('includedir')]
 library_dirs = [get_python_lib(), pg_config('libdir')]
 define_macros = [('PYGRESQL_VERSION', version)]
 undef_macros = []
-extra_compile_args = ['-O2', '-funsigned-char', '-Wall', '-Werror']
+extra_compile_args = ['-O2', '-funsigned-char', '-Wall', '-Wconversion']
 
 
 class build_pg_ext(build_ext):
@@ -104,19 +104,15 @@ class build_pg_ext(build_ext):
     description = "build the PyGreSQL C extension"
 
     user_options = build_ext.user_options + [
-        ('direct-access', None,
-            "enable direct access functions"),
-        ('large-objects', None,
-            "enable large object support"),
-        ('default-vars', None,
-            "enable default variables use"),
-        ('escaping-funcs', None,
-            "enable string escaping functions"),
-        ('ssl-info', None,
-            "use new ssl info functions")]
+        ('strict', None, "count all compiler warnings as errors"),
+        ('direct-access', None, "enable direct access functions"),
+        ('large-objects', None, "enable large object support"),
+        ('default-vars', None, "enable default variables use"),
+        ('escaping-funcs', None, "enable string escaping functions"),
+        ('ssl-info', None, "use new ssl info functions")]
 
     boolean_options = build_ext.boolean_options + [
-        'direct-access', 'large-objects', 'default-vars',
+        'strict', 'direct-access', 'large-objects', 'default-vars',
         'escaping-funcs', 'ssl-info']
 
     def get_compiler(self):
@@ -125,6 +121,7 @@ class build_pg_ext(build_ext):
 
     def initialize_options(self):
         build_ext.initialize_options(self)
+        self.strict = False
         self.direct_access = True
         self.large_objects = True
         self.default_vars = True
@@ -136,6 +133,8 @@ class build_pg_ext(build_ext):
     def finalize_options(self):
         """Set final values for all build_pg options."""
         build_ext.finalize_options(self)
+        if self.strict:
+            extra_compile_args.append('-Werror')
         if self.direct_access:
             define_macros.append(('DIRECT_ACCESS', None))
         if self.large_objects:

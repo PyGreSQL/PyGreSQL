@@ -250,7 +250,7 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
         pgpasswd = PyBytes_AsString(pg_default_passwd);
 #endif /* DEFAULT_VARS */
 
-    if (!(conn_obj = PyObject_NEW(connObject, &connType))) {
+    if (!(conn_obj = PyObject_New(connObject, &connType))) {
         set_error_msg(InternalError, "Can't create new connection object");
         return NULL;
     }
@@ -310,20 +310,20 @@ pg_escape_string(PyObject *self, PyObject *string)
         return NULL;
     }
 
-    to_length = 2*from_length + 1;
+    to_length = 2 * (size_t) from_length + 1;
     if ((Py_ssize_t ) to_length < from_length) { /* overflow */
-        to_length = from_length;
+        to_length = (size_t) from_length;
         from_length = (from_length - 1)/2;
     }
     to = (char *) PyMem_Malloc(to_length);
-    to_length = (int) PQescapeString(to, from, (size_t) from_length);
+    to_length = (size_t) PQescapeString(to, from, (size_t) from_length);
 
     Py_XDECREF(tmp_obj);
 
     if (encoding == -1)
-        to_obj = PyBytes_FromStringAndSize(to, to_length);
+        to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t) to_length);
     else
-        to_obj = get_decoded_string(to, to_length, encoding);
+        to_obj = get_decoded_string(to, (Py_ssize_t) to_length, encoding);
     PyMem_Free(to);
     return to_obj;
 }
@@ -364,9 +364,9 @@ pg_escape_bytea(PyObject *self, PyObject *data)
     Py_XDECREF(tmp_obj);
 
     if (encoding == -1)
-        to_obj = PyBytes_FromStringAndSize(to, to_length - 1);
+        to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t) to_length - 1);
     else
-        to_obj = get_decoded_string(to, to_length - 1, encoding);
+        to_obj = get_decoded_string(to, (Py_ssize_t) to_length - 1, encoding);
     if (to)
         PQfreemem(to);
     return to_obj;
@@ -407,7 +407,7 @@ pg_unescape_bytea(PyObject *self, PyObject *data)
 
     if (!to) return PyErr_NoMemory();
 
-    to_obj = PyBytes_FromStringAndSize(to, to_length);
+    to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t) to_length);
     PQfreemem(to);
 
     return to_obj;

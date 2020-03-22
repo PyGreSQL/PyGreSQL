@@ -110,7 +110,7 @@ query_getitem(PyObject *self, Py_ssize_t i)
     PyObject *tmp;
     long row;
 
-    tmp = PyLong_FromSize_t(i);
+    tmp = PyLong_FromSize_t((size_t) i);
     row = PyLong_AsLong(tmp);
     Py_DECREF(tmp);
 
@@ -119,7 +119,7 @@ query_getitem(PyObject *self, Py_ssize_t i)
         return NULL;
     }
 
-    q->current_row = row;
+    q->current_row = (int) row;
     return _query_row_as_tuple(q);
 }
 

@@ -146,7 +146,7 @@ conn_source(connObject *self, PyObject *noargs)
     }
 
     /* allocates new query object */
-    if (!(source_obj = PyObject_NEW(sourceObject, &sourceType))) {
+    if (!(source_obj = PyObject_New(sourceObject, &sourceType))) {
         return NULL;
     }
 
@@ -229,8 +229,8 @@ _conn_query(connObject *self, PyObject *args, int prepared)
         const char **parms, **p;
         register int i;
 
-        str = (PyObject **) PyMem_Malloc(nparms * sizeof(*str));
-        parms = (const char **) PyMem_Malloc(nparms * sizeof(*parms));
+        str = (PyObject **) PyMem_Malloc((size_t) nparms * sizeof(*str));
+        parms = (const char **) PyMem_Malloc((size_t) nparms * sizeof(*parms));
         if (!str || !parms) {
             PyMem_Free((void *) parms); PyMem_Free(str);
             Py_XDECREF(query_str_obj); Py_XDECREF(param_obj);
@@ -361,7 +361,7 @@ _conn_query(connObject *self, PyObject *args, int prepared)
         return NULL; /* error detected on query */
     }
 
-    if (!(query_obj = PyObject_NEW(queryObject, &queryType)))
+    if (!(query_obj = PyObject_New(queryObject, &queryType)))
         return PyErr_NoMemory();
 
     /* stores result and returns object */
@@ -478,7 +478,7 @@ conn_describe_prepared(connObject *self, PyObject *args)
     result = PQdescribePrepared(self->cnx, name);
     Py_END_ALLOW_THREADS
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
-        queryObject *query_obj = PyObject_NEW(queryObject, &queryType);
+        queryObject *query_obj = PyObject_New(queryObject, &queryType);
         if (!query_obj)
             return PyErr_NoMemory();
         Py_XINCREF(self);
@@ -906,9 +906,9 @@ conn_escape_literal(connObject *self, PyObject *string)
     Py_XDECREF(tmp_obj);
 
     if (encoding == -1)
-        to_obj = PyBytes_FromStringAndSize(to, to_length);
+        to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t) to_length);
     else
-        to_obj = get_decoded_string(to, to_length, encoding);
+        to_obj = get_decoded_string(to, (Py_ssize_t) to_length, encoding);
     if (to)
         PQfreemem(to);
     return to_obj;
@@ -951,9 +951,9 @@ conn_escape_identifier(connObject *self, PyObject *string)
     Py_XDECREF(tmp_obj);
 
     if (encoding == -1)
-        to_obj = PyBytes_FromStringAndSize(to, to_length);
+        to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t) to_length);
     else
-        to_obj = get_decoded_string(to, to_length, encoding);
+        to_obj = get_decoded_string(to, (Py_ssize_t) to_length, encoding);
     if (to)
         PQfreemem(to);
     return to_obj;
@@ -992,9 +992,9 @@ conn_escape_string(connObject *self, PyObject *string)
         return NULL;
     }
 
-    to_length = 2*from_length + 1;
+    to_length = 2 * (size_t) from_length + 1;
     if ((Py_ssize_t) to_length < from_length) { /* overflow */
-        to_length = from_length;
+        to_length = (size_t) from_length;
         from_length = (from_length - 1)/2;
     }
     to = (char *) PyMem_Malloc(to_length);
@@ -1004,9 +1004,9 @@ conn_escape_string(connObject *self, PyObject *string)
     Py_XDECREF(tmp_obj);
 
     if (encoding == -1)
-        to_obj = PyBytes_FromStringAndSize(to, to_length);
+        to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t) to_length);
     else
-        to_obj = get_decoded_string(to, to_length, encoding);
+        to_obj = get_decoded_string(to, (Py_ssize_t) to_length, encoding);
     PyMem_Free(to);
     return to_obj;
 }
@@ -1048,9 +1048,9 @@ conn_escape_bytea(connObject *self, PyObject *data)
     Py_XDECREF(tmp_obj);
 
     if (encoding == -1)
-        to_obj = PyBytes_FromStringAndSize(to, to_length - 1);
+        to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t) to_length - 1);
     else
-        to_obj = get_decoded_string(to, to_length - 1, encoding);
+        to_obj = get_decoded_string(to, (Py_ssize_t) to_length - 1, encoding);
     if (to)
         PQfreemem(to);
     return to_obj;
@@ -1064,7 +1064,7 @@ large_new(connObject *pgcnx, Oid oid)
 {
     largeObject *large_obj;
 
-    if (!(large_obj = PyObject_NEW(largeObject, &largeType))) {
+    if (!(large_obj = PyObject_New(largeObject, &largeType))) {
         return NULL;
     }
 

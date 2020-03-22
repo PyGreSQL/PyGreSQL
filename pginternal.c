@@ -178,7 +178,7 @@ get_col_types(PGresult *result, int nfields)
 {
     int *types, *t, j;
 
-    if (!(types = PyMem_Malloc(sizeof(int) * nfields))) {
+    if (!(types = PyMem_Malloc(sizeof(int) * (size_t) nfields))) {
         return (int*) PyErr_NoMemory();
     }
 
@@ -200,7 +200,7 @@ cast_bytea_text(char *s)
 
     /* this function should not be called when bytea_escaped is set */
     tmp_str = (char *) PQunescapeBytea((unsigned char*) s, &str_len);
-    obj = PyBytes_FromStringAndSize(tmp_str, str_len);
+    obj = PyBytes_FromStringAndSize(tmp_str, (Py_ssize_t) str_len);
     if (tmp_str) {
         PQfreemem(tmp_str);
     }
@@ -221,16 +221,16 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
         case PYGRES_BYTEA:
             /* this type should not be passed when bytea_escaped is set */
             /* we need to add a null byte */
-            tmp_str = (char *) PyMem_Malloc(size + 1);
+            tmp_str = (char *) PyMem_Malloc((size_t) size + 1);
             if (!tmp_str) {
                 return PyErr_NoMemory();
             }
-            memcpy(tmp_str, s, size);
+            memcpy(tmp_str, s, (size_t) size);
             s = tmp_str; *(s + size) = '\0';
             tmp_str = (char *) PQunescapeBytea((unsigned char*) s, &str_len);
             PyMem_Free(s);
             if (!tmp_str) return PyErr_NoMemory();
-            obj = PyBytes_FromStringAndSize(tmp_str, str_len);
+            obj = PyBytes_FromStringAndSize(tmp_str, (Py_ssize_t) str_len);
             if (tmp_str) {
                 PQfreemem(tmp_str);
             }
@@ -596,7 +596,7 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 
                     /* create unescaped string */
                     t = estr;
-                    estr = (char *) PyMem_Malloc(esize);
+                    estr = (char *) PyMem_Malloc((size_t) esize);
                     if (!estr) {
                         Py_DECREF(result); return PyErr_NoMemory();
                     }
@@ -739,7 +739,7 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                 escaped = 1;
                 /* create unescaped string */
                 t = estr;
-                estr = (char *) PyMem_Malloc(esize);
+                estr = (char *) PyMem_Malloc((size_t) esize);
                 if (!estr) {
                     Py_DECREF(result); return PyErr_NoMemory();
                 }
@@ -887,7 +887,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
         size = s - key - key_esc;
         if (key_esc) {
             char *r = key, *t;
-            key = (char *) PyMem_Malloc(size);
+            key = (char *) PyMem_Malloc((size_t) size);
             if (!key) {
                 Py_DECREF(result); return PyErr_NoMemory();
             }
@@ -948,7 +948,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             size = s - val - val_esc;
             if (val_esc) {
                 char *r = val, *t;
-                val = (char *) PyMem_Malloc(size);
+                val = (char *) PyMem_Malloc((size_t) size);
                 if (!val) {
                     Py_DECREF(key_obj); Py_DECREF(result);
                     return PyErr_NoMemory();
@@ -1069,7 +1069,7 @@ set_error_msg_and_state(PyObject *type,
     if (encoding == -1) /* unknown */
         msg_obj = PyUnicode_DecodeLocale(msg, NULL);
     else
-        msg_obj = get_decoded_string(msg, strlen(msg), encoding);
+        msg_obj = get_decoded_string(msg, (Py_ssize_t) strlen(msg), encoding);
     if (!msg_obj) /* cannot decode */
 #endif
     msg_obj = PyBytes_FromString(msg);
@@ -1165,8 +1165,10 @@ format_result(const PGresult *res)
     const int n = PQnfields(res);
 
     if (n > 0) {
-        char * const aligns = (char *) PyMem_Malloc(n * sizeof(char));
-        int * const sizes = (int *) PyMem_Malloc(n * sizeof(int));
+        char * const aligns = (char *) PyMem_Malloc(
+            (unsigned int) n * sizeof(char));
+        size_t * const sizes = (size_t *) PyMem_Malloc(
+            (unsigned int) n * sizeof(size_t));
 
         if (aligns && sizes) {
             const int m = PQntuples(res);
@@ -1179,7 +1181,7 @@ format_result(const PGresult *res)
                 const char * const s = PQfname(res, j);
                 const int format = PQfformat(res, j);
 
-                sizes[j] = s ? (int) strlen(s) : 0;
+                sizes[j] = s ? strlen(s) : 0;
                 if (format) {
                     aligns[j] = '\0';
                     if (m && sizes[j] < 8)
@@ -1212,9 +1214,9 @@ format_result(const PGresult *res)
                     if (aligns[j]) {
                         const int k = PQgetlength(res, i, j);
 
-                        if (sizes[j] < k)
+                        if (sizes[j] < (size_t) k)
                             /* value must fit */
-                            sizes[j] = k;
+                            sizes[j] = (size_t) k;
                     }
                 }
             }
@@ -1222,7 +1224,7 @@ format_result(const PGresult *res)
             /* size of one row */
             for (j = 0; j < n; ++j) size += sizes[j] + 1;
             /* times number of rows incl. heading */
-            size *= (m + 2);
+            size *= (size_t) m + 2;
             /* plus size of footer */
             size += 40;
             /* is the buffer size that needs to be allocated */
@@ -1234,18 +1236,18 @@ format_result(const PGresult *res)
                 /* create the header */
                 for (j = 0; j < n; ++j) {
                     const char * const s = PQfname(res, j);
-                    const int k = sizes[j];
-                    const int h = (k - (int) strlen(s)) / 2;
+                    const size_t k = sizes[j];
+                    const size_t h = (k - (size_t) strlen(s)) / 2;
 
-                    sprintf(p, "%*s", h, "");
-                    sprintf(p + h, "%-*s", k - h, s);
+                    sprintf(p, "%*s", (int) h, "");
+                    sprintf(p + h, "%-*s", (int) (k - h), s);
                     p += k;
                     if (j + 1 < n)
                         *p++ = '|';
                 }
                 *p++ = '\n';
                 for (j = 0; j < n; ++j) {
-                    int k = sizes[j];
+                    size_t k = sizes[j];
 
                     while (k--)
                         *p++ = '-';
@@ -1257,14 +1259,14 @@ format_result(const PGresult *res)
                 for (i = 0; i < m; ++i) {
                     for (j = 0; j < n; ++j) {
                         const char align = aligns[j];
-                        const int k = sizes[j];
+                        const size_t k = sizes[j];
 
                         if (align) {
-                            sprintf(p, align == 'r' ? "%*s" : "%-*s", k,
+                            sprintf(p, align == 'r' ? "%*s" : "%-*s", (int) k,
                                     PQgetvalue(res, i, j));
                         }
                         else {
-                            sprintf(p, "%-*s", k,
+                            sprintf(p, "%-*s", (int) k,
                                     PQgetisnull(res, i, j) ? "" : "<binary>");
                         }
                         p += k;
@@ -1369,7 +1371,7 @@ notice_receiver(void *arg, const PGresult *res)
     PyObject *func = self->notice_receiver;
 
     if (func) {
-        noticeObject *notice = PyObject_NEW(noticeObject, &noticeType);
+        noticeObject *notice = PyObject_New(noticeObject, &noticeType);
         PyObject *ret;
         if (notice) {
             notice->pgcnx = arg;
