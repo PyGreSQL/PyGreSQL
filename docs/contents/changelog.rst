@@ -1,6 +1,10 @@
 ChangeLog
 =========
 
+Version 5.1.2 (...)
+-------------------
+- Improved handling of build_ext options for disabling certain features.
+
 Version 5.1.1 (2020-03-05)
 --------------------------
 - This version officially supports the new Python 3.8 and PostgreSQL 12.

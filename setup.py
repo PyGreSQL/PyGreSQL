@@ -30,8 +30,8 @@ PyGreSQL currently supports Python versions 2.6, 2.7 and 3.3 to 3.8,
 and PostgreSQL versions 9.0 to 9.6 and 10 to 12.
 
 Use as follows:
-python setup.py build   # to build the module
-python setup.py install # to install it
+python setup.py build_ext # to build the module
+python setup.py install   # to install it
 
 See docs.python.org/doc/install/ for more information on
 using distutils to install Python programs.
@@ -106,14 +106,28 @@ class build_pg_ext(build_ext):
     user_options = build_ext.user_options + [
         ('strict', None, "count all compiler warnings as errors"),
         ('direct-access', None, "enable direct access functions"),
+        ('no-direct-access', None, "disable direct access functions"),
+        ('direct-access', None, "enable direct access functions"),
+        ('no-direct-access', None, "disable direct access functions"),
         ('large-objects', None, "enable large object support"),
+        ('no-large-objects', None, "disable large object support"),
         ('default-vars', None, "enable default variables use"),
+        ('no-default-vars', None, "disable default variables use"),
         ('escaping-funcs', None, "enable string escaping functions"),
-        ('ssl-info', None, "use new ssl info functions")]
+        ('no-escaping-funcs', None, "disable string escaping functions"),
+        ('ssl-info', None, "use new ssl info functions"),
+        ('no-ssl-info', None, "do not use new ssl info functions")]
 
     boolean_options = build_ext.boolean_options + [
         'strict', 'direct-access', 'large-objects', 'default-vars',
         'escaping-funcs', 'ssl-info']
+
+    negative_opt = {
+        'no-direct-access': 'direct-access',
+        'no-large-objects': 'large-objects',
+        'no-default-vars': 'default-vars',
+        'no-escaping-funcs': 'escaping-funcs',
+        'no-ssl-info': 'ssl-info'}
 
     def get_compiler(self):
         """Return the C compiler used for building the extension."""
@@ -125,10 +139,11 @@ class build_pg_ext(build_ext):
         self.direct_access = True
         self.large_objects = True
         self.default_vars = True
-        self.escaping_funcs = pg_version >= (9, 0)
-        self.ssl_info = pg_version >= (9, 5)
+        self.escaping_funcs = True
+        self.ssl_info = True
         if pg_version < (9, 0):
-            warnings.warn("PyGreSQL does not support this PostgreSQL version.")
+            warnings.warn(
+                "PyGreSQL does not support the installed PostgreSQL version.")
 
     def finalize_options(self):
         """Set final values for all build_pg options."""
@@ -141,10 +156,20 @@ class build_pg_ext(build_ext):
             define_macros.append(('LARGE_OBJECTS', None))
         if self.default_vars:
             define_macros.append(('DEFAULT_VARS', None))
-        if self.escaping_funcs and pg_version >= (9, 0):
-            define_macros.append(('ESCAPING_FUNCS', None))
-        if self.ssl_info and pg_version >= (9, 5):
-            define_macros.append(('SSL_INFO', None))
+        if self.escaping_funcs:
+            if pg_version >= (9, 0):
+                define_macros.append(('ESCAPING_FUNCS', None))
+            else:
+                warnings.warn(
+                    "The installed PostgreSQL version"
+                    " does not support the newer string escaping functions.")
+        if self.ssl_info:
+            if pg_version >= (9, 5):
+                define_macros.append(('SSL_INFO', None))
+            else:
+                warnings.warn(
+                    "The installed PostgreSQL version"
+                    " does not support ssl info functions.")
         if sys.platform == 'win32':
             bits = platform.architecture()[0]
             if bits == '64bit':  # we need to find libpq64
@@ -182,6 +207,7 @@ setup(
     version=version,
     description="Python PostgreSQL Interfaces",
     long_description=__doc__.split('\n\n', 2)[1],  # first passage
+    long_description_content_type = 'text/plain',
     keywords="pygresql postgresql database api dbapi",
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",
