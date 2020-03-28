@@ -79,24 +79,25 @@ Download and unpack the PyGreSQL source tarball if you haven't already done so.
 
 Type the following commands to build and install PyGreSQL::
 
-    python setup.py build_ext
     python setup.py install
 
 Now you should be ready to use PyGreSQL.
 
-By default, PyGreSQL is compiled with support for all features available in the
-installed PostgreSQL version. If you want to disable certain features, you can
-pass several options to ``build_ext`` to specify these. For example, in order
-to build PyGreSQL without support for the SSL info functions, run::
+You can also run the build step separately if you want to create a distribution
+to be installed on a different system or explicitly enable or disable certain
+features. For instance, in order to build PyGreSQL without support for the SSL
+info functions, run::
 
     python setup.py build_ext --no-ssl-info
 
-If the installed PostgreSQL version does not support some features, you will
-see a warning during installation, and these feature will not be enabled, so
-disabling features is only required if you want to create a distribution for
-installation on other systems that are running older PostgreSQL versions.
+By default, PyGreSQL is compiled with support for all features available in the
+installed PostgreSQL version, and you will get warnings for the features that
+are not supported in this version. You can also explicitly require a feature in
+order to get an error if it is not available, for instance:
 
-You can find out all possible options with::
+    python setup.py build_ext --ssl-info
+
+You can find out all possible build options with::
 
     python setup.py build_ext --help
 

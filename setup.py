@@ -136,11 +136,11 @@ class build_pg_ext(build_ext):
     def initialize_options(self):
         build_ext.initialize_options(self)
         self.strict = False
-        self.direct_access = True
-        self.large_objects = True
-        self.default_vars = True
-        self.escaping_funcs = True
-        self.ssl_info = True
+        self.direct_access = None
+        self.large_objects = None
+        self.default_vars = None
+        self.escaping_funcs = None
+        self.ssl_info = None
         if pg_version < (9, 0):
             warnings.warn(
                 "PyGreSQL does not support the installed PostgreSQL version.")
@@ -150,24 +150,24 @@ class build_pg_ext(build_ext):
         build_ext.finalize_options(self)
         if self.strict:
             extra_compile_args.append('-Werror')
-        if self.direct_access:
+        if self.direct_access is None or self.direct_access:
             define_macros.append(('DIRECT_ACCESS', None))
-        if self.large_objects:
+        if self.large_objects is None or self.large_objects:
             define_macros.append(('LARGE_OBJECTS', None))
-        if self.default_vars:
+        if self.default_vars is None or self.default_vars:
             define_macros.append(('DEFAULT_VARS', None))
-        if self.escaping_funcs:
+        if self.escaping_funcs is None or self.escaping_funcs:
             if pg_version >= (9, 0):
                 define_macros.append(('ESCAPING_FUNCS', None))
             else:
-                warnings.warn(
+                (warnings.warn if self.escaping_funcs is None else sys.exit)(
                     "The installed PostgreSQL version"
                     " does not support the newer string escaping functions.")
-        if self.ssl_info:
+        if self.ssl_info is None or self.ssl_info:
             if pg_version >= (9, 5):
                 define_macros.append(('SSL_INFO', None))
             else:
-                warnings.warn(
+                (warnings.warn if self.ssl_info is None else sys.exit)(
                     "The installed PostgreSQL version"
                     " does not support ssl info functions.")
         if sys.platform == 'win32':
