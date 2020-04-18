@@ -41,6 +41,33 @@ except ImportError:
 
 __version__ = version
 
+__all__ = [
+    'DB', 'Adapter',
+    'NotificationHandler', 'Typecasts',
+    'Bytea', 'Hstore', 'Json', 'Literal',
+    'Error', 'Warning',
+    'DataError', 'DatabaseError',
+    'IntegrityError', 'InterfaceError', 'InternalError',
+    'InvalidResultError', 'MultipleResultsError',
+    'NoResultError', 'NotSupportedError',
+    'OperationalError', 'ProgrammingError',
+    'INV_READ', 'INV_WRITE',
+    'SEEK_CUR', 'SEEK_END', 'SEEK_SET',
+    'TRANS_ACTIVE', 'TRANS_IDLE', 'TRANS_INERROR',
+    'TRANS_INTRANS', 'TRANS_UNKNOWN',
+    'cast_array', 'cast_hstore', 'cast_record',
+    'connect', 'escape_bytea', 'escape_string', 'unescape_bytea',
+    'get_array', 'get_bool', 'get_bytea_escaped',
+    'get_datestyle', 'get_decimal', 'get_decimal_point',
+    'get_defbase', 'get_defhost', 'get_defopt', 'get_defport', 'get_defuser',
+    'get_jsondecode',
+    'set_array', 'set_bool', 'set_bytea_escaped',
+    'set_datestyle', 'set_decimal', 'set_decimal_point',
+    'set_defbase', 'set_defhost', 'set_defopt',
+    'set_defpasswd', 'set_defport', 'set_defuser',
+    'set_jsondecode', 'set_query_helpers',
+    'version', '__version__']
+
 import select
 import warnings
 import weakref

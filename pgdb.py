@@ -85,6 +85,23 @@ except ImportError:
 
 __version__ = version
 
+__all__ = [
+    'Connection', 'Cursor',
+    'Date', 'Time', 'Timestamp',
+    'DateFromTicks', 'TimeFromTicks', 'TimestampFromTicks',
+    'Binary', 'Interval', 'Uuid',
+    'Hstore', 'Json', 'Literal', 'Type',
+    'STRING', 'BINARY', 'NUMBER', 'DATETIME', 'ROWID', 'BOOL',
+    'SMALLINT', 'INTEGER', 'LONG', 'FLOAT', 'NUMERIC', 'MONEY',
+    'DATE', 'TIME', 'TIMESTAMP', 'INTERVAL',
+    'UUID', 'HSTORE', 'JSON', 'ARRAY', 'RECORD',
+    'Error', 'Warning',
+    'InterfaceError', 'DatabaseError', 'DataError', 'OperationalError',
+    'IntegrityError', 'ProgrammingError', 'NotSupportedError',
+    'apilevel', 'connect', 'paramstyle', 'threadsafety',
+    'get_typecast', 'set_typecast', 'reset_typecast',
+    'version', '__version__']
+
 from datetime import date, time, datetime, timedelta, tzinfo
 from time import localtime
 from decimal import Decimal
