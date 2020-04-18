@@ -609,9 +609,10 @@ class Adapter:
     def guess_simple_type(cls, value):
         """Try to guess which database type the given value has."""
         # optimize for most frequent types
-        simple_type = cls._frequent_simple_types.get(type(value))
-        if simple_type:
-            return simple_type
+        try:
+            return cls._frequent_simple_types[type(value)]
+        except KeyError:
+            pass
         if isinstance(value, Bytea):
             return 'bytea'
         if isinstance(value, basestring):
