@@ -1,11 +1,12 @@
 ChangeLog
 =========
 
-Version 5.1.2 (...)
--------------------
+Version 5.1.2 (2020-04-19)
+--------------------------
 - Improved handling of build_ext options for disabling certain features.
 - Avoid compiler warnings with proper casts. This should solve problems
   when building PyGreSQL on MaCOS.
+- Export only the public API on wildcard imports
 
 Version 5.1.1 (2020-03-05)
 --------------------------
