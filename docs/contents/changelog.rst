@@ -1,6 +1,11 @@
 ChangeLog
 =========
 
+Version 5.2 (to be released)
+----------------------------
+- ...
+
+
 Version 5.1.2 (2020-04-19)
 --------------------------
 - Improved handling of build_ext options for disabling certain features.
