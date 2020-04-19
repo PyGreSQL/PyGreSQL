@@ -18,9 +18,9 @@ You can download PyGreSQL from the **Python Package Index** at
   * https://software.opensuse.org/package/PyGreSQL?search_term=pygresql
 **Ubuntu** packages are available from Launchpad at
   * https://launchpad.net/ubuntu/+source/pygresql
-**Windows binaries** (executables and wheels) are available at
+**Windows binaries** (as wheels) are available at
   * https://pypi.org/project/PyGreSQL/#files
-**Windows MSI** packages are attached to the GitHub release at
+**Windows installers** (EXE and MSI) are attached to the GitHub release at
   * https://github.com/PyGreSQL/PyGreSQL/releases/
 
 Older PyGreSQL versions

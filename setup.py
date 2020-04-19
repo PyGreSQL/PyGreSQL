@@ -207,7 +207,7 @@ setup(
     version=version,
     description="Python PostgreSQL Interfaces",
     long_description=__doc__.split('\n\n', 2)[1],  # first passage
-    long_description_content_type = 'text/plain',
+    long_description_content_type='text/plain',
     keywords="pygresql postgresql database api dbapi",
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",
