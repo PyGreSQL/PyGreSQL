@@ -35,8 +35,6 @@ try:  # noinspection PyUnresolvedReferences
 except NameError:  # Python >= 3.0
     long = int
 
-from collections import OrderedDict
-
 
 class PgBitString:
     """Test object with a PostgreSQL representation as Bit String."""
@@ -161,8 +159,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         class TestCursor(pgdb.Cursor):
 
             def row_factory(self, row):
-                return dict(('column %s' % desc[0], value)
-                    for desc, value in zip(self.description, row))
+                return {'column %s' % desc[0]: value
+                        for desc, value in zip(self.description, row)}
 
         con = self._connect()
         con.cursor_type = TestCursor
@@ -188,8 +186,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
             def build_row_factory(self):
                 keys = [desc[0] for desc in self.description]
-                return lambda row: dict((key, value)
-                    for key, value in zip(keys, row))
+                return lambda row: {
+                    key: value for key, value in zip(keys, row)}
 
         con = self._connect()
         con.cursor_type = TestCursor

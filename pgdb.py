@@ -281,8 +281,8 @@ else:
 
 # time zones used in Postgres timestamptz output
 _timezones = dict(CET='+0100', EET='+0200', EST='-0500',
-    GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
-    UCT='+0000', UTC='+0000', WET='+0000')
+                  GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
+                  UCT='+0000', UTC='+0000', WET='+0000')
 
 
 def _timezone_as_offset(tz):
@@ -521,7 +521,7 @@ def cast_interval(value):
                     raise ValueError('Cannot parse interval: %s' % value)
     days += 365 * years + 30 * mons
     return timedelta(days=days, hours=hours, minutes=mins,
-        seconds=secs, microseconds=usecs)
+                     seconds=secs, microseconds=usecs)
 
 
 class Typecasts(dict):

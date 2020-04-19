@@ -226,8 +226,8 @@ else:
 
 # time zones used in Postgres timestamptz output
 _timezones = dict(CET='+0100', EET='+0200', EST='-0500',
-    GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
-    UCT='+0000', UTC='+0000', WET='+0000')
+                  GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
+                  UCT='+0000', UTC='+0000', WET='+0000')
 
 
 def _timezone_as_offset(tz):
@@ -693,7 +693,7 @@ class Adapter:
                             len(types) != len(values)):
                         raise TypeError('The values and types do not match')
                     literals = [add(value, typ)
-                        for value, typ in zip(values, types)]
+                                for value, typ in zip(values, types)]
                 else:
                     literals = [add(value) for value in values]
             command %= tuple(literals)
@@ -712,18 +712,18 @@ class Adapter:
             values = used_values
             if inline:
                 adapt = self.adapt_inline
-                literals = dict((key, adapt(value))
-                    for key, value in values.items())
+                literals = {key: adapt(value)
+                            for key, value in values.items()}
             else:
                 add = params.add
                 if types:
                     if not isinstance(types, dict):
                         raise TypeError('The values and types do not match')
-                    literals = dict((key, add(values[key], types.get(key)))
-                        for key in sorted(values))
+                    literals = {key: add(values[key], types.get(key))
+                                for key in sorted(values)}
                 else:
-                    literals = dict((key, add(values[key]))
-                        for key in sorted(values))
+                    literals = {key: add(values[key])
+                                for key in sorted(values)}
             command %= literals
         else:
             raise TypeError('The values must be passed as tuple, list or dict')
@@ -827,7 +827,7 @@ def cast_timestamp(value, connection):
         if len(value[3]) > 4:
             return datetime.max
         fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-            '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
+               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
     else:
         if len(value[0]) > 10:
             return datetime.max
@@ -1159,8 +1159,8 @@ class DbTypes(dict):
     information on the associated database type.
     """
 
-    _num_types = frozenset('int float num money'
-        ' int2 int4 int8 float4 float8 numeric money'.split())
+    _num_types = frozenset('int float num money int2 int4 int8'
+                           ' float4 float8 numeric money'.split())
 
     def __init__(self, db):
         """Initialize type cache for connection."""
@@ -1768,7 +1768,7 @@ class DB:
             if param == 'all':
                 q = 'SHOW ALL'
                 values = self.db.query(q).getresult()
-                values = dict(value[:2] for value in values)
+                values = {value[0]: value[1] for value in values}
                 break
             if isinstance(values, dict):
                 params[param] = key
@@ -1823,12 +1823,14 @@ class DB:
                 if len(value) == 1:
                     value = value.pop()
             if not(value is None or isinstance(value, basestring)):
-                raise ValueError('A single value must be specified'
+                raise ValueError(
+                    'A single value must be specified'
                     ' when parameter is a set')
             parameter = dict.fromkeys(parameter, value)
         elif isinstance(parameter, dict):
             if value is not None:
-                raise ValueError('A value must not be specified'
+                raise ValueError(
+                    'A value must not be specified'
                     ' when parameter is a dictionary')
         else:
             raise TypeError(
@@ -1843,7 +1845,8 @@ class DB:
                 raise TypeError('Invalid parameter')
             if param == 'all':
                 if value is not None:
-                    raise ValueError('A value must ot be specified'
+                    raise ValueError(
+                        'A value must ot be specified'
                         " when parameter is 'all'")
                 params = {'all': None}
                 break
@@ -1886,7 +1889,7 @@ class DB:
         return self.db.query(command)
 
     def query_formatted(self, command,
-            parameters=None, types=None, inline=False):
+                        parameters=None, types=None, inline=False):
         """Execute a formatted SQL command string.
 
         Similar to query, but using Python format placeholders of the form

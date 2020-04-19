@@ -1685,7 +1685,7 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.get_back(), self.data)
 
     def testInserttableFromSetofTuples(self):
-        data = set(row for row in self.data)
+        data = {row for row in self.data}
         try:
             self.c.inserttable('test', data)
         except TypeError as e:

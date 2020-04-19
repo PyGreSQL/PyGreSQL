@@ -19,6 +19,7 @@ import tempfile
 
 import pg  # the module under test
 
+from collections import OrderedDict
 from decimal import Decimal
 from datetime import date, time, datetime, timedelta
 from uuid import UUID
@@ -51,8 +52,6 @@ try:  # noinspection PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
-
-from collections import OrderedDict
 
 if str is bytes:  # noinspection PyUnresolvedReferences
     from StringIO import StringIO
@@ -660,10 +659,10 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, ['hex', 'C'])
         r = f(('standard_conforming_strings', 'datestyle', 'bytea_output'))
         self.assertEqual(r, ['on', 'ISO, YMD', 'hex'])
-        r = f(set(['bytea_output', 'lc_monetary']))
+        r = f({'bytea_output', 'lc_monetary'})
         self.assertIsInstance(r, dict)
         self.assertEqual(r, {'bytea_output': 'hex', 'lc_monetary': 'C'})
-        r = f(set(['Bytea_Output', ' LC_Monetary ']))
+        r = f({'Bytea_Output', ' LC_Monetary '})
         self.assertIsInstance(r, dict)
         self.assertEqual(r, {'Bytea_Output': 'hex', ' LC_Monetary ': 'C'})
         s = dict.fromkeys(('bytea_output', 'lc_monetary'))
@@ -720,13 +719,15 @@ class TestDBClass(unittest.TestCase):
         f(('escape_string_warning', 'standard_conforming_strings'), 'off')
         self.assertEqual(g('escape_string_warning'), 'off')
         self.assertEqual(g('standard_conforming_strings'), 'off')
-        f(set(['escape_string_warning', 'standard_conforming_strings']), 'on')
+        f({'escape_string_warning', 'standard_conforming_strings'}, 'on')
         self.assertEqual(g('escape_string_warning'), 'on')
         self.assertEqual(g('standard_conforming_strings'), 'on')
-        self.assertRaises(ValueError, f, set(['escape_string_warning',
-            'standard_conforming_strings']), ['off', 'on'])
-        f(set(['escape_string_warning', 'standard_conforming_strings']),
-            ['off', 'off'])
+        self.assertRaises(
+            ValueError, f,
+            {'escape_string_warning', 'standard_conforming_strings'},
+            ['off', 'on'])
+        f({'escape_string_warning', 'standard_conforming_strings'},
+          ['off', 'off'])
         self.assertEqual(g('escape_string_warning'), 'off')
         self.assertEqual(g('standard_conforming_strings'), 'off')
         f({'standard_conforming_strings': 'on', 'datestyle': 'ISO, YMD'})
@@ -769,7 +770,7 @@ class TestDBClass(unittest.TestCase):
         f('standard_conforming_strings', not_scs)
         self.assertEqual(g('escape_string_warning'), not_esw)
         self.assertEqual(g('standard_conforming_strings'), not_scs)
-        f(set(['escape_string_warning', 'standard_conforming_strings']))
+        f({'escape_string_warning', 'standard_conforming_strings'})
         self.assertEqual(g('escape_string_warning'), esw)
         self.assertEqual(g('standard_conforming_strings'), scs)
         db.close()
@@ -2880,8 +2881,8 @@ class TestDBClass(unittest.TestCase):
         from_table = '(select lower(name) as n2 from "%s") as t2' % table
         r = get_as_list(from_table)
         self.assertIsInstance(r, list)
-        r = set(row[0] for row in r)
-        expected = set(row[1].lower() for row in names)
+        r = {row[0] for row in r}
+        expected = {row[1].lower() for row in names}
         self.assertEqual(r, expected)
         r = get_as_list(from_table, order='n2', scalar=True)
         self.assertIsInstance(r, list)
@@ -3030,7 +3031,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, OrderedDict)
         self.assertEqual(len(r), 0)
         # test with unordered query
-        expected = dict((row[0], row[1:]) for row in colors)
+        expected = {row[0]: row[1:] for row in colors}
         r = get_as_dict(table, order=False)
         self.assertIsInstance(r, dict)
         self.assertEqual(r, expected)
@@ -3382,7 +3383,8 @@ class TestDBClass(unittest.TestCase):
 
     def testArray(self):
         returns_arrays = pg.get_array()
-        self.createTable('arraytest',
+        self.createTable(
+            'arraytest',
             'id smallint, i2 smallint[], i4 integer[], i8 bigint[],'
             ' d numeric[], f4 real[], f8 double precision[], m money[],'
             ' b bool[], v4 varchar(4)[], c4 char(4)[], t text[]')
@@ -3406,7 +3408,8 @@ class TestDBClass(unittest.TestCase):
             long_decimal = decimal('12345671234.5')
             odd_money = decimal('1234567123.25')
         t, f = (True, False) if pg.get_bool() else ('t', 'f')
-        data = dict(id=42, i2=[42, 1234, None, 0, -1],
+        data = dict(
+            id=42, i2=[42, 1234, None, 0, -1],
             i4=[42, 123456789, None, 0, 1, -1],
             i8=[long(42), long(123456789123456789), None,
                 long(0), long(1), long(-1)],
