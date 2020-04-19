@@ -23,7 +23,7 @@ This version has been built and unit tested on:
  - Ubuntu
  - Windows 7 and 10 with both MinGW and Visual Studio
  - PostgreSQL 9.0 to 9.6 and 10 to 12 (32 and 64bit)
- - Python 2.6, 2.7 and 3.3 to 3.8 (32 and 64bit)
+ - Python 2.7 and 3.5 to 3.8 (32 and 64bit)
 
 | D'Arcy J.M. Cain
 | darcy@PyGreSQL.org

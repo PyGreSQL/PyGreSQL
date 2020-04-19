@@ -3,7 +3,7 @@ ChangeLog
 
 Version 5.2 (to be released)
 ----------------------------
-- ...
+- We now Python version 2.7 or 3.5 and newer
 
 
 Version 5.1.2 (2020-04-19)

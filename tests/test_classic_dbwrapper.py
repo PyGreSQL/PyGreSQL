@@ -56,14 +56,11 @@ try:  # noinspection PyUnresolvedReferences
 except NameError:  # Python >= 3.0
     unicode = str
 
-try:
-    from collections import OrderedDict
-except ImportError:  # Python 2.6 or 3.0
-    OrderedDict = dict
+from collections import OrderedDict
 
 if str is bytes:  # noinspection PyUnresolvedReferences
     from StringIO import StringIO
-else:
+else:  # Python >= 3.0
     from io import StringIO
 
 windows = os.name == 'nt'
@@ -226,11 +223,7 @@ class TestDBClassBasic(unittest.TestCase):
             'unescape_bytea', 'update', 'upsert',
             'use_regtypes', 'user',
         ]
-        # __dir__ is not called in Python 2.6 for old-style classes
-        db_attributes = dir(self.db) if hasattr(
-            self.db.__class__, '__class__') else self.db.__dir__()
-        db_attributes = [a for a in db_attributes
-            if not a.startswith('_')]
+        db_attributes = [a for a in self.db.__dir__() if not a.startswith('_')]
         self.assertEqual(attributes, db_attributes)
 
     def testAttributeDb(self):
@@ -1005,11 +998,6 @@ class TestDBClass(unittest.TestCase):
         # test with tuple, inline
         q = f("select %s, %s, %s, %s", (3, 2.5, 'hello', True), inline=True)
         r = q.getresult()[0]
-        if isinstance(r[1], Decimal):
-            # Python 2.6 cannot compare float and Decimal
-            r = list(r)
-            r[1] = float(r[1])
-            r = tuple(r)
         self.assertEqual(r, (3, 2.5, 'hello', t))
         # test with dict
         q = f("select %(a)s::int, %(b)s::real, %(c)s::text, %(d)s::bool",
@@ -2944,8 +2932,7 @@ class TestDBClass(unittest.TestCase):
                 self.assertEqual(row.rgb, t[0])
                 self.assertEqual(row.name, t[1])
                 self.assertEqual(row._asdict(), dict(rgb=t[0], name=t[1]))
-        if OrderedDict is not dict:  # Python > 2.6
-            self.assertEqual(r.keys(), expected.keys())
+        self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname='rgb')
         self.assertIsInstance(r, OrderedDict)
         expected = OrderedDict((row[1], (row[0], row[2]))
@@ -2962,8 +2949,7 @@ class TestDBClass(unittest.TestCase):
                 self.assertEqual(row.id, t[0])
                 self.assertEqual(row.name, t[1])
                 self.assertEqual(row._asdict(), dict(id=t[0], name=t[1]))
-        if OrderedDict is not dict:  # Python > 2.6
-            self.assertEqual(r.keys(), expected.keys())
+        self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname=['id', 'rgb'])
         self.assertIsInstance(r, OrderedDict)
         expected = OrderedDict((row[:2], row[2:]) for row in colors)
@@ -2983,8 +2969,7 @@ class TestDBClass(unittest.TestCase):
             if named:
                 self.assertEqual(row.name, t[0])
                 self.assertEqual(row._asdict(), dict(name=t[0]))
-        if OrderedDict is not dict:  # Python > 2.6
-            self.assertEqual(r.keys(), expected.keys())
+        self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname=['id', 'rgb'], scalar=True)
         self.assertIsInstance(r, OrderedDict)
         expected = OrderedDict((row[:2], row[2]) for row in colors)
@@ -2995,8 +2980,7 @@ class TestDBClass(unittest.TestCase):
             self.assertIsInstance(row, str)
             t = expected[key]
             self.assertEqual(row, t)
-        if OrderedDict is not dict:  # Python > 2.6
-            self.assertEqual(r.keys(), expected.keys())
+        self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname='rgb', what=['rgb', 'name'], scalar=True)
         self.assertIsInstance(r, OrderedDict)
         expected = OrderedDict((row[1], row[2])
@@ -3008,8 +2992,7 @@ class TestDBClass(unittest.TestCase):
             self.assertIsInstance(row, str)
             t = expected[key]
             self.assertEqual(row, t)
-        if OrderedDict is not dict:  # Python > 2.6
-            self.assertEqual(r.keys(), expected.keys())
+        self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, what='id, name',
             where="rgb like '#b%'", scalar=True)
         self.assertIsInstance(r, OrderedDict)
@@ -3021,8 +3004,7 @@ class TestDBClass(unittest.TestCase):
             self.assertIsInstance(row, str)
             t = expected[key]
             self.assertEqual(row, t)
-        if OrderedDict is not dict:  # Python > 2.6
-            self.assertEqual(r.keys(), expected.keys())
+        self.assertEqual(r.keys(), expected.keys())
         expected = r
         r = get_as_dict(table, what=['name', 'id'],
             where=['id > 1', 'id < 4', "rgb like '#b%'",
@@ -3050,8 +3032,7 @@ class TestDBClass(unittest.TestCase):
         r = get_as_dict(table, order=False)
         self.assertIsInstance(r, dict)
         self.assertEqual(r, expected)
-        if dict is not OrderedDict:  # Python > 2.6
-            self.assertNotIsInstance(self, OrderedDict)
+        self.assertNotIsInstance(self, OrderedDict)
         # test with arbitrary from clause
         from_table = '(select id, lower(name) as n2 from "%s") as t2' % table
         # primary key must be passed explicitly in this case

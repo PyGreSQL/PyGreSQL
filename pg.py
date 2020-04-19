@@ -75,8 +75,7 @@ import weakref
 from datetime import date, time, datetime, timedelta, tzinfo
 from decimal import Decimal
 from math import isnan, isinf
-from collections import namedtuple
-from keyword import iskeyword
+from collections import namedtuple, OrderedDict
 from operator import itemgetter
 from functools import partial
 from re import compile as regex
@@ -180,91 +179,6 @@ except ImportError:  # Python < 3.2
 # Auxiliary classes and functions that are independent from a DB connection:
 
 try:
-    from collections import OrderedDict
-except ImportError:  # Python 2.6 or 3.0
-    OrderedDict = dict
-
-
-    class AttrDict(dict):
-        """Simple read-only ordered dictionary for storing attribute names."""
-
-        def __init__(self, *args, **kw):
-            if len(args) > 1 or kw:
-                raise TypeError
-            items = args[0] if args else []
-            if isinstance(items, dict):
-                raise TypeError
-            items = list(items)
-            self._keys = [item[0] for item in items]
-            dict.__init__(self, items)
-            self._read_only = True
-            error = self._read_only_error
-            self.clear = self.update = error
-            self.pop = self.setdefault = self.popitem = error
-
-        def __setitem__(self, key, value):
-            if self._read_only:
-                self._read_only_error()
-            dict.__setitem__(self, key, value)
-
-        def __delitem__(self, key):
-            if self._read_only:
-                self._read_only_error()
-            dict.__delitem__(self, key)
-
-        def __iter__(self):
-            return iter(self._keys)
-
-        def keys(self):
-            return list(self._keys)
-
-        def values(self):
-            return [self[key] for key in self]
-
-        def items(self):
-            return [(key, self[key]) for key in self]
-
-        def iterkeys(self):
-            return self.__iter__()
-
-        def itervalues(self):
-            return iter(self.values())
-
-        def iteritems(self):
-            return iter(self.items())
-
-        @staticmethod
-        def _read_only_error(*args, **kw):
-            raise TypeError('This object is read-only')
-
-else:
-
-     class AttrDict(OrderedDict):
-        """Simple read-only ordered dictionary for storing attribute names."""
-
-        def __init__(self, *args, **kw):
-            self._read_only = False
-            OrderedDict.__init__(self, *args, **kw)
-            self._read_only = True
-            error = self._read_only_error
-            self.clear = self.update = error
-            self.pop = self.setdefault = self.popitem = error
-
-        def __setitem__(self, key, value):
-            if self._read_only:
-                self._read_only_error()
-            OrderedDict.__setitem__(self, key, value)
-
-        def __delitem__(self, key):
-            if self._read_only:
-                self._read_only_error()
-            OrderedDict.__delitem__(self, key)
-
-        @staticmethod
-        def _read_only_error(*args, **kw):
-            raise TypeError('This object is read-only')
-
-try:
     from inspect import signature
 except ImportError:  # Python < 3.3
     from inspect import getargspec
@@ -356,8 +270,8 @@ class _SimpleTypes(dict):
                 self[key] = typ
                 self['_%s' % key] = '%s[]' % typ
 
-    # this could be a static method in Python > 2.6
-    def __missing__(self, key):
+    @staticmethod
+    def __missing__(key):
         return 'text'
 
 _simpletypes = _SimpleTypes()
@@ -426,6 +340,32 @@ class Json:
 
 class Literal(str):
     """Wrapper class for marking literal SQL values."""
+
+
+class AttrDict(OrderedDict):
+    """Simple read-only ordered dictionary for storing attribute names."""
+
+    def __init__(self, *args, **kw):
+        self._read_only = False
+        OrderedDict.__init__(self, *args, **kw)
+        self._read_only = True
+        error = self._read_only_error
+        self.clear = self.update = error
+        self.pop = self.setdefault = self.popitem = error
+
+    def __setitem__(self, key, value):
+        if self._read_only:
+            self._read_only_error()
+        OrderedDict.__setitem__(self, key, value)
+
+    def __delitem__(self, key):
+        if self._read_only:
+            self._read_only_error()
+        OrderedDict.__delitem__(self, key)
+
+    @staticmethod
+    def _read_only_error(*args, **kw):
+        raise TypeError('This object is read-only')
 
 
 class Adapter:
@@ -1328,13 +1268,7 @@ _re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
 def _row_factory(names):
     """Get a namedtuple factory for row results with the given names."""
     try:
-        try:
-            return namedtuple('Row', names, rename=True)._make
-        except TypeError:  # Python 2.6 and 3.0 do not support rename
-            names = [v if _re_fieldname.match(v) and not iskeyword(v)
-                        else 'column_%d' % (n,)
-                     for n, v in enumerate(names)]
-            return namedtuple('Row', names)._make
+        return namedtuple('Row', names, rename=True)._make
     except ValueError:  # there is still a problem with the field names
         names = ['column_%d' % (n,) for n in range(len(names))]
         return namedtuple('Row', names)._make

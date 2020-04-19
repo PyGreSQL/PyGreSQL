@@ -462,12 +462,8 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields, ('snake_case_alias', 'CamelCaseAlias'))
 
     def testNamedresultWithBadFieldnames(self):
-        try:
-            r = namedtuple('Bad', ['?'] * 6, rename=True)
-        except TypeError:  # Python 2.6 or 3.0
-            fields = tuple('column_%d' % n for n in range(6))
-        else:
-            fields = r._fields
+        r = namedtuple('Bad', ['?'] * 6, rename=True)
+        fields = r._fields
         q = ('select 3 as "0alias", 4 as _alias, 5 as "alias$", 6 as "alias?",'
             ' 7 as "kebap-case-alias", 8 as break, 9 as and_a_good_one')
         result = [tuple(range(3, 10))]

@@ -112,7 +112,6 @@ try:
 except ImportError:  # Python < 3.3
     from collections import Iterable
 from collections import namedtuple
-from keyword import iskeyword
 from functools import partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
@@ -867,13 +866,7 @@ _re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
 def _row_factory(names):
     """Get a namedtuple factory for row results with the given names."""
     try:
-        try:
-            return namedtuple('Row', names, rename=True)._make
-        except TypeError:  # Python 2.6 and 3.0 do not support rename
-            names = [v if _re_fieldname.match(v) and not iskeyword(v)
-                        else 'column_%d' % (n,)
-                     for n, v in enumerate(names)]
-            return namedtuple('Row', names)._make
+        return namedtuple('Row', names, rename=True)._make
     except ValueError:  # there is still a problem with the field names
         names = ['column_%d' % (n,) for n in range(len(names))]
         return namedtuple('Row', names)._make
