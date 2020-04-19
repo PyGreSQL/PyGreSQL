@@ -10,11 +10,7 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
-
+import unittest
 import warnings
 from time import sleep
 from threading import Thread

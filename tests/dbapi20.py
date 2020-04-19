@@ -6,10 +6,7 @@ This software is Public Domain and may be used without restrictions.
 
 __version__ = '1.5'
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
+import unittest
 
 import time
 

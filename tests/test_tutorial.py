@@ -3,10 +3,7 @@
 
 from __future__ import print_function
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
+import unittest
 
 from pg import DB
 from pgdb import connect

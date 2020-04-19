@@ -10,11 +10,7 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
-
+import unittest
 import os
 import sys
 import gc
@@ -1465,8 +1461,9 @@ class TestDBClass(unittest.TestCase):
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
         table = 'test table for get_attnames'
-        self.createTable(table, 'n int, alpha smallint, v varchar(3),'
-                ' gamma char(5), tau text, beta bool')
+        self.createTable(
+            table, 'n int, alpha smallint, v varchar(3),'
+            ' gamma char(5), tau text, beta bool')
         r = get_attnames(table)
         self.assertIsInstance(r, AttrDict)
         if self.regtypes:
@@ -1492,7 +1489,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(can('test', 'delete'), True)
         self.assertRaises(pg.DataError, can, 'test', 'foobar')
         self.assertRaises(pg.ProgrammingError, can, 'table_does_not_exist')
-        r = self.db.query('select rolsuper FROM pg_roles'
+        r = self.db.query(
+            'select rolsuper FROM pg_roles'
             ' where rolname=current_user').getresult()[0][0]
         if not pg.get_bool():
             r = r == 't'
@@ -1678,7 +1676,8 @@ class TestDBClass(unittest.TestCase):
     def testGetLittleBobbyTables(self):
         get = self.db.get
         query = self.db.query
-        self.createTable('test_students',
+        self.createTable(
+            'test_students',
             'firstname varchar primary key, nickname varchar, grade char(2)',
             values=[("D'Arcy", 'Darcey', 'A+'), ('Sheldon', 'Moonpie', 'A+'),
                     ('Robert', 'Little Bobby Tables', 'D-')])
@@ -1714,8 +1713,8 @@ class TestDBClass(unittest.TestCase):
         bool_on = pg.get_bool()
         decimal = pg.get_decimal()
         table = 'insert_test_table'
-        self.createTable(table,
-            'i2 smallint, i4 integer, i8 bigint,'
+        self.createTable(
+            table, 'i2 smallint, i4 integer, i8 bigint,'
             ' d numeric, f4 real, f8 double precision, m money,'
             ' v4 varchar(4), c4 char(4), t text,'
             ' b boolean, ts timestamp')
@@ -1789,8 +1788,8 @@ class TestDBClass(unittest.TestCase):
                 if ts == 'current_timestamp':
                     ts = data['ts']
                     self.assertIsInstance(ts, datetime)
-                    self.assertEqual(ts.strftime('%Y-%m-%d'),
-                        strftime('%Y-%m-%d'))
+                    self.assertEqual(
+                        ts.strftime('%Y-%m-%d'), strftime('%Y-%m-%d'))
                 else:
                     ts = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
                 expect['ts'] = ts
@@ -2520,14 +2519,14 @@ class TestDBClass(unittest.TestCase):
         r = query('select t from "%s" where n=3' % table).getresult()[0][0]
         self.assertEqual(r, 'c')
         table = 'delete_test_table_2'
-        self.createTable(table,
-             'n integer, m integer, t text, primary key (n, m)',
-             values=[(n + 1, m + 1, chr(ord('a') + 2 * n + m))
-                     for n in range(3) for m in range(2)])
+        self.createTable(
+            table, 'n integer, m integer, t text, primary key (n, m)',
+            values=[(n + 1, m + 1, chr(ord('a') + 2 * n + m))
+                    for n in range(3) for m in range(2)])
         self.assertRaises(KeyError, self.db.delete, table, dict(n=2, t='b'))
         self.assertEqual(self.db.delete(table, dict(n=2, m=2)), 1)
         r = [r[0] for r in query('select t from "%s" where n=2'
-            ' order by m' % table).getresult()]
+             ' order by m' % table).getresult()]
         self.assertEqual(r, ['c'])
         self.assertEqual(self.db.delete(table, dict(n=2, m=2)), 0)
         r = [r[0] for r in query('select t from "%s" where n=3'
@@ -2542,7 +2541,8 @@ class TestDBClass(unittest.TestCase):
         delete = self.db.delete
         query = self.db.query
         table = 'test table for delete()'
-        self.createTable(table, '"Prime!" smallint primary key,'
+        self.createTable(
+            table, '"Prime!" smallint primary key,'
             ' "much space" integer, "Questions?" text',
             values=[(19, 5005, 'Yes!')])
         r = {'Prime!': 17}
@@ -2559,10 +2559,11 @@ class TestDBClass(unittest.TestCase):
     def testDeleteReferenced(self):
         delete = self.db.delete
         query = self.db.query
-        self.createTable('test_parent',
-            'n smallint primary key', values=range(3))
-        self.createTable('test_child',
-            'n smallint primary key references test_parent', values=range(3))
+        self.createTable(
+            'test_parent', 'n smallint primary key', values=range(3))
+        self.createTable(
+            'test_child', 'n smallint primary key references test_parent',
+            values=range(3))
         q = ("select (select count(*) from test_parent),"
              " (select count(*) from test_child)")
         self.assertEqual(query(q).getresult()[0], (3, 3))
@@ -2760,7 +2761,8 @@ class TestDBClass(unittest.TestCase):
         truncate(['test_parent', 'test_parent_2'], only=False)
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, 0, 0, 0))
-        self.assertRaises(ValueError, truncate,
+        self.assertRaises(
+            ValueError, truncate,
             ['test_parent*', 'test_child'], only=[True, False])
         truncate(['test_parent*', 'test_child'], only=[False, True])
 
@@ -2794,8 +2796,8 @@ class TestDBClass(unittest.TestCase):
         named = hasattr(r, 'colname')
         names = [(1, 'Homer'), (2, 'Marge'),
                  (3, 'Bart'), (4, 'Lisa'), (5, 'Maggie')]
-        self.createTable(table,
-            'id smallint primary key, name varchar', values=names)
+        self.createTable(
+            table, 'id smallint primary key, name varchar', values=names)
         r = get_as_list(table)
         self.assertIsInstance(r, list)
         self.assertEqual(r, names)
@@ -2823,8 +2825,8 @@ class TestDBClass(unittest.TestCase):
         r = get_as_list(table, what='name', where="name like 'Ma%'")
         self.assertIsInstance(r, list)
         self.assertEqual(r, [('Maggie',), ('Marge',)])
-        r = get_as_list(table, what='name',
-            where=["name like 'Ma%'", "name like '%r%'"])
+        r = get_as_list(
+            table, what='name', where=["name like 'Ma%'", "name like '%r%'"])
         self.assertIsInstance(r, list)
         self.assertEqual(r, [('Marge',)])
         r = get_as_list(table, what='name', order='id')
@@ -3835,7 +3837,8 @@ class TestDBClass(unittest.TestCase):
 
     def testDate(self):
         query = self.db.query
-        for datestyle in ('ISO', 'Postgres, MDY', 'Postgres, DMY',
+        for datestyle in (
+                'ISO', 'Postgres, MDY', 'Postgres, DMY',
                 'SQL, MDY', 'SQL, DMY', 'German'):
             self.db.set_parameter('datestyle', datestyle)
             d = date(2016, 3, 14)
@@ -4004,9 +4007,9 @@ class TestDBClass(unittest.TestCase):
             except pg.DatabaseError:
                 self.skipTest("hstore extension not enabled")
         d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
-            '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
-            '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
-            'None': None, 'NULL': 'NULL', 'empty': ''}
+             '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
+             '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
+             'None': None, 'NULL': 'NULL', 'empty': ''}
         q = "select $1::hstore"
         r = self.db.query(q, (pg.Hstore(d),)).getresult()[0][0]
         self.assertIsInstance(r, dict)
@@ -4082,7 +4085,8 @@ class TestDBClass(unittest.TestCase):
         r = self.db.query("select '0,0,1'::circle").getresult()[0][0]
         self.assertIn('circle', dbtypes)
         self.assertEqual(r, 'Squared Circle: <(0,0),1>')
-        self.assertEqual(dbtypes.typecast('Impossible', 'circle'),
+        self.assertEqual(
+            dbtypes.typecast('Impossible', 'circle'),
             'Squared Circle: Impossible')
         dbtypes.reset_typecast('circle')
         self.assertIsNone(dbtypes.get_typecast('circle'))

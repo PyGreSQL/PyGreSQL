@@ -3,10 +3,7 @@
 
 from __future__ import print_function
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
+import unittest
 
 import sys
 from functools import partial
@@ -65,17 +62,20 @@ class UtilityTest(unittest.TestCase):
             except Error:
                 pass
             try:
-                db.query("CREATE TABLE %s._test_schema "
+                db.query(
+                    "CREATE TABLE %s._test_schema "
                     "(%s int PRIMARY KEY)" % (t, t))
             except Error:
                 db.query("DELETE FROM %s._test_schema" % t)
         try:
-            db.query("CREATE TABLE _test_schema "
+            db.query(
+                "CREATE TABLE _test_schema "
                 "(_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
         except Error:
             db.query("DELETE FROM _test_schema")
         try:
-            db.query("CREATE VIEW _test_vschema AS "
+            db.query(
+                "CREATE VIEW _test_vschema AS "
                 "SELECT _test, 'abc'::text AS _test2 FROM _test_schema")
         except Error:
             pass

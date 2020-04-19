@@ -373,7 +373,8 @@ class Adapter:
 
     _bool_true_values = frozenset('t true 1 y yes on'.split())
 
-    _date_literals = frozenset('current_date current_time'
+    _date_literals = frozenset(
+        'current_date current_time'
         ' current_timestamp localtime localtimestamp'.split())
 
     _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
@@ -1100,6 +1101,7 @@ class Typecasts(dict):
     def create_array_cast(self, basecast):
         """Create an array typecast for the given base cast."""
         cast_array = self['anyarray']
+
         def cast(v):
             return cast_array(v, basecast)
         return cast
@@ -1108,6 +1110,7 @@ class Typecasts(dict):
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
         record = namedtuple(name, fields)
+
         def cast(v):
             return record(*cast_record(v, casts))
         return cast
@@ -1259,6 +1262,7 @@ class DbTypes(dict):
 
 
 _re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
+
 
 # The result rows for database operations are returned as named tuples
 # by default. Since creating namedtuple classes is a somewhat expensive
@@ -1977,13 +1981,13 @@ class DB:
             pkey = pkeys[table]
         except KeyError:  # cache miss, check the database
             q = ("SELECT a.attname, a.attnum, i.indkey"
-                " FROM pg_catalog.pg_index i"
-                " JOIN pg_catalog.pg_attribute a"
-                " ON a.attrelid OPERATOR(pg_catalog.=) i.indrelid"
-                " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
-                " AND NOT a.attisdropped"
-                " WHERE i.indrelid OPERATOR(pg_catalog.=) %s::regclass"
-                " AND i.indisprimary ORDER BY a.attnum") % (
+                 " FROM pg_catalog.pg_index i"
+                 " JOIN pg_catalog.pg_attribute a"
+                 " ON a.attrelid OPERATOR(pg_catalog.=) i.indrelid"
+                 " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
+                 " AND NOT a.attisdropped"
+                 " WHERE i.indrelid OPERATOR(pg_catalog.=) %s::regclass"
+                 " AND i.indisprimary ORDER BY a.attnum") % (
                     _quote_if_unqualified('$1', table),)
             pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
@@ -2003,9 +2007,8 @@ class DB:
 
     def get_databases(self):
         """Get list of databases in the system."""
-        return [s[0] for s in
-            self.db.query(
-                'SELECT datname FROM pg_catalog.pg_database').getresult()]
+        return [s[0] for s in self.db.query(
+            'SELECT datname FROM pg_catalog.pg_database').getresult()]
 
     def get_relations(self, kinds=None, system=False):
         """Get list of relations in connected database of specified kinds.
@@ -2019,17 +2022,17 @@ class DB:
         where = []
         if kinds:
             where.append("r.relkind IN (%s)" %
-                ','.join("'%s'" % k for k in kinds))
+                         ','.join("'%s'" % k for k in kinds))
         if not system:
             where.append("s.nspname NOT SIMILAR"
-                " TO 'pg/_%|information/_schema' ESCAPE '/'")
+                         " TO 'pg/_%|information/_schema' ESCAPE '/'")
         where = " WHERE %s" % ' AND '.join(where) if where else ''
         q = ("SELECT pg_catalog.quote_ident(s.nspname) OPERATOR(pg_catalog.||)"
-            " '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.relname)"
-            " FROM pg_catalog.pg_class r"
-            " JOIN pg_catalog.pg_namespace s"
-            " ON s.oid OPERATOR(pg_catalog.=) r.relnamespace%s"
-            " ORDER BY s.nspname, r.relname") % where
+             " '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.relname)"
+             " FROM pg_catalog.pg_class r"
+             " JOIN pg_catalog.pg_namespace s"
+             " ON s.oid OPERATOR(pg_catalog.=) r.relnamespace%s"
+             " ORDER BY s.nspname, r.relname") % where
         return [r[0] for r in self.db.query(q).getresult()]
 
     def get_tables(self, system=False):
@@ -2371,7 +2374,7 @@ class DB:
         do = 'update set %s' % ', '.join(update) if update else 'nothing'
         ret = 'oid, *' if qoid else '*'
         q = ('INSERT INTO %s AS included (%s) VALUES (%s)'
-            ' ON CONFLICT (%s) DO %s RETURNING %s') % (
+             ' ON CONFLICT (%s) DO %s RETURNING %s') % (
                 self._escape_qualified_name(table), names, values,
                 target, do, ret)
         self._do_debug(q, params)
@@ -2522,7 +2525,7 @@ class DB:
         return self.db.query(q)
 
     def get_as_list(self, table, what=None, where=None,
-            order=None, limit=None, offset=None, scalar=False):
+                    order=None, limit=None, offset=None, scalar=False):
         """Get a table as a list.
 
         This gets a convenient representation of the table as a list
@@ -2588,7 +2591,7 @@ class DB:
         return res
 
     def get_as_dict(self, table, keyname=None, what=None, where=None,
-            order=None, limit=None, offset=None, scalar=False):
+                    order=None, limit=None, offset=None, scalar=False):
         """Get a table as a dictionary.
 
         This method is similar to get_as_list(), but returns the table
@@ -2678,8 +2681,8 @@ class DB:
                 rows = _namediter(_MemoryQuery(rows, fields))
         return cls(zip(keys, rows))
 
-    def notification_handler(self,
-            event, callback, arg_dict=None, timeout=None, stop_event=None):
+    def notification_handler(self, event, callback,
+                             arg_dict=None, timeout=None, stop_event=None):
         """Get notification handler that will run the given callback."""
         return NotificationHandler(self,
             event, callback, arg_dict, timeout, stop_event)

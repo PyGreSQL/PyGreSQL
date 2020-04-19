@@ -10,10 +10,7 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
+import unittest
 
 try:
     from collections.abc import Iterable
@@ -139,7 +136,7 @@ class TestCopy(unittest.TestCase):
         cur.execute("set client_min_messages=warning")
         cur.execute("drop table if exists copytest cascade")
         cur.execute("create table copytest ("
-            "id smallint primary key, name varchar(64))")
+                    "id smallint primary key, name varchar(64))")
         cur.close()
         con.commit()
         cur = con.cursor()
@@ -519,8 +516,8 @@ class TestCopyTo(TestCopy):
         self.assertEqual(ret, self.data_text)
         ret = ''.join(self.copy_to(columns=['id', 'name']))
         self.assertEqual(ret, self.data_text)
-        self.assertRaises(pgdb.ProgrammingError, self.copy_to,
-            columns=['id', 'age'])
+        self.assertRaises(
+            pgdb.ProgrammingError, self.copy_to, columns=['id', 'age'])
 
     def test_csv(self):
         ret = self.copy_to(format='csv')
@@ -552,10 +549,11 @@ class TestCopyTo(TestCopy):
             format='binary', decode=True)
 
     def test_query(self):
-        self.assertRaises(ValueError, self.cursor.copy_to, None,
+        self.assertRaises(
+            ValueError, self.cursor.copy_to, None,
             "select name from copytest", columns='noname')
-        ret = self.cursor.copy_to(None,
-            "select name||'!' from copytest where id=1941")
+        ret = self.cursor.copy_to(
+            None, "select name||'!' from copytest where id=1941")
         self.assertIsInstance(ret, Iterable)
         rows = list(ret)
         self.assertEqual(len(rows), 1)

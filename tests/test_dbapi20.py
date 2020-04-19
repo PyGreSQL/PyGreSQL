@@ -1,10 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
+import unittest
 
 import pgdb
 
@@ -256,7 +253,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertIsInstance(res, tuple)
         self.assertEqual(res, (1, 2))
         self.assertEqual(res._fields, ('abc', '_1'))
-        cur.execute('select 1 as snake_case, 2 as "CamelCase",'
+        cur.execute(
+            'select 1 as snake_case, 2 as "CamelCase",'
             ' 3 as "kebap-case", 4 as "_bad", 5 as "0bad", 6 as "bad$"')
         res = cur.fetchone()
         self.assertIsInstance(res, tuple)
@@ -289,8 +287,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         cur = con.cursor()
         cur.execute("select 123456789::int8 col0,"
-            " 123456.789::numeric(41, 13) as col1,"
-            " 'foobar'::char(39) as col2")
+                    " 123456.789::numeric(41, 13) as col1,"
+                    " 'foobar'::char(39) as col2")
         desc = cur.description
         self.assertIsInstance(desc, list)
         self.assertEqual(len(desc), 3)
@@ -447,7 +445,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         try:
             cur = con.cursor()
             cur.execute("set datestyle to iso")
-            cur.execute("create table %s ("
+            cur.execute(
+                "create table %s ("
                 "stringtest varchar,"
                 "binarytest bytea,"
                 "booltest bool,"
@@ -465,7 +464,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             for s in ('numeric', 'monetary', 'time'):
                 cur.execute("set lc_%s to 'C'" % s)
             for _i in range(2):
-                cur.execute("insert into %s values ("
+                cur.execute(
+                    "insert into %s values ("
                     "%%s,%%s,%%s,%%s,%%s,%%s,%%s,"
                     "'%%s'::money,%%s,%%s,%%s,%%s,%%s)" % table, values)
             cur.execute("select * from %s" % table)
@@ -498,7 +498,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur.execute("create table %s (i int primary key)" % table)
             cur.execute("insert into %s values (1)" % table)
             cur.execute("insert into %s values (2)" % table)
-            self.assertRaises(pgdb.IntegrityError, cur.execute,
+            self.assertRaises(
+                pgdb.IntegrityError, cur.execute,
                 "insert into %s values (1)" % table)
         finally:
             con.close()
@@ -536,7 +537,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertTrue(isnan(nan) and not isinf(nan))
         self.assertTrue(isinf(inf) and not isnan(inf))
         values = [0, 1, 0.03125, -42.53125, nan, inf, -inf,
-            'nan', 'inf', '-inf', 'NaN', 'Infinity', '-Infinity']
+                  'nan', 'inf', '-inf', 'NaN', 'Infinity', '-Infinity']
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
@@ -580,8 +581,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             cur = con.cursor()
             cur.execute("set timezone = UTC")
             cur.execute("create table %s ("
-                "d date, t time,  ts timestamp,"
-                "tz timetz, tsz timestamptz)" % table)
+                        "d date, t time,  ts timestamp,"
+                        "tz timetz, tsz timestamptz)" % table)
             for n in range(3):
                 values = [dt.date(), dt.time(), dt,
                     dt.time(), dt]
@@ -599,13 +600,14 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                             pgdb.Timestamp(*(d + t)), pgdb.Time(*(t + z)),
                             pgdb.Timestamp(*(d + t + z))]
                 for datestyle in ('iso', 'postgres, mdy', 'postgres, dmy',
-                        'sql, mdy', 'sql, dmy', 'german'):
+                                  'sql, mdy', 'sql, dmy', 'german'):
                     cur.execute("set datestyle to %s" % datestyle)
                     if n != 1:
                         cur.execute("select %s,%s,%s,%s,%s", params)
                         row = cur.fetchone()
                         self.assertEqual(row, tuple(values))
-                    cur.execute("insert into %s"
+                    cur.execute(
+                        "insert into %s"
                         " values (%%s,%%s,%%s,%%s,%%s)" % table, params)
                     cur.execute("select * from %s" % table)
                     d = cur.description
@@ -642,10 +644,10 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                     param = pgdb.Interval(
                         td.days, 0, 0, td.seconds, td.microseconds)
                 for intervalstyle in ('sql_standard ', 'postgres',
-                        'postgres_verbose', 'iso_8601'):
+                                      'postgres_verbose', 'iso_8601'):
                     cur.execute("set intervalstyle to %s" % intervalstyle)
                     cur.execute("insert into %s"
-                        " values (%%s)" % table, [param])
+                                " values (%%s)" % table, [param])
                     cur.execute("select * from %s" % table)
                     tc = cur.description[0].type_code
                     self.assertEqual(tc, pgdb.DATETIME)
@@ -672,9 +674,9 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
         d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever', 'back\\': '\\slash',
-            '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
-            '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
-            'None': None, 'NULL': 'NULL', 'empty': ''}
+             '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
+             '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
+             'None': None, 'NULL': 'NULL', 'empty': ''}
         con = self._connect()
         try:
             cur = con.cursor()
@@ -699,21 +701,23 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(result, d)
 
     def test_insert_array(self):
-        values = [(None, None), ([], []), ([None], [[None], ['null']]),
+        values = [
+            (None, None), ([], []), ([None], [[None], ['null']]),
             ([1, 2, 3], [['a', 'b'], ['c', 'd']]),
             ([20000, 25000, 25000, 30000],
-            [['breakfast', 'consulting'], ['meeting', 'lunch']]),
+             [['breakfast', 'consulting'], ['meeting', 'lunch']]),
             ([0, 1, -1], [['Hello, World!', '"Hi!"'], ['{x,y}', ' x y ']])]
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
             cur.execute("create table %s"
-                " (n smallint, i int[], t text[][])" % table)
+                        " (n smallint, i int[], t text[][])" % table)
             params = [(n, v[0], v[1]) for n, v in enumerate(values)]
             # Note that we must explicit casts because we are inserting
             # empty arrays.  Otherwise this is not necessary.
-            cur.executemany("insert into %s values"
+            cur.executemany(
+                "insert into %s values"
                 " (%%d,%%s::int[],%%s::text[][])" % table, params)
             cur.execute("select i, t from %s order by n" % table)
             d = cur.description
@@ -793,7 +797,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def test_select_record(self):
         value = (1, 25000, 2.5, 'hello', 'Hello World!', 'Hello, World!',
-            '(test)', '(x,y)', ' x y ', 'null', None)
+                 '(test)', '(x,y)', ' x y ', 'null', None)
         con = self._connect()
         try:
             cur = con.cursor()
@@ -829,7 +833,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         try:
             cur = con.cursor()
             params = (1, object())  # an object that cannot be handled
-            self.assertRaises(pgdb.InterfaceError, cur.execute,
+            self.assertRaises(
+                pgdb.InterfaceError, cur.execute,
                 "insert into %s values (%%s,%%s)" % table, params)
         finally:
             con.close()
@@ -1319,8 +1324,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 info = pgdb._row_factory.cache_info()
                 self.assertEqual(info.maxsize, maxsize)
                 self.assertEqual(info.hits + info.misses, 6)
-                self.assertEqual(info.hits,
-                    0 if maxsize is not None and maxsize < 2 else 4)
+                self.assertEqual(
+                    info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
 
     def test_memory_leaks(self):
         ids = set()

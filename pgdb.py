@@ -636,6 +636,7 @@ class Typecasts(dict):
     def create_array_cast(self, basecast):
         """Create an array typecast for the given base cast."""
         cast_array = self['anyarray']
+
         def cast(v):
             return cast_array(v, basecast)
         return cast
@@ -644,6 +645,7 @@ class Typecasts(dict):
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
         record = namedtuple(name, fields)
+
         def cast(v):
             return record(*cast_record(v, casts))
         return cast
@@ -753,11 +755,13 @@ class TypeCache(dict):
         self._typecasts.connection = cnx
         if cnx.server_version < 80400:
             # older remote databases (not officially supported)
-            self._query_pg_type = ("SELECT oid, typname,"
+            self._query_pg_type = (
+                "SELECT oid, typname,"
                 " typlen, typtype, null as typcategory, typdelim, typrelid"
                 " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) %s")
         else:
-            self._query_pg_type = ("SELECT oid, typname,"
+            self._query_pg_type = (
+                "SELECT oid, typname,"
                 " typlen, typtype, typcategory, typdelim, typrelid"
                 " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) %s")
 
@@ -778,8 +782,9 @@ class TypeCache(dict):
         if not res:
             raise KeyError('Type %s could not be found' % (key,))
         res = res[0]
-        type_code = TypeCode.create(int(res[0]), res[1],
-            int(res[2]), res[3], res[4], res[5], int(res[6]))
+        type_code = TypeCode.create(
+            int(res[0]), res[1], int(res[2]),
+            res[3], res[4], res[5], int(res[6]))
         self[type_code.oid] = self[str(type_code)] = type_code
         return type_code
 
@@ -798,13 +803,14 @@ class TypeCache(dict):
                 return None
         if not typ.relid:
             return None  # this type is not composite
-        self._src.execute("SELECT attname, atttypid"
+        self._src.execute(
+            "SELECT attname, atttypid"
             " FROM pg_catalog.pg_attribute"
             " WHERE attrelid OPERATOR(pg_catalog.=) %s"
             " AND attnum OPERATOR(pg_catalog.>) 0"
             " AND NOT attisdropped ORDER BY attnum" % (typ.relid,))
         return [FieldInfo(name, self.get(int(oid)))
-            for name, oid in self._src.fetch(-1)]
+                for name, oid in self._src.fetch(-1)]
 
     def get_typecast(self, typ):
         """Get the typecast function for the given database type."""
@@ -857,6 +863,7 @@ def _op_error(msg):
 ### Row Tuples
 
 _re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
+
 
 # The result rows for database operations are returned as named tuples
 # by default. Since creating namedtuple classes is a somewhat expensive
@@ -1737,7 +1744,7 @@ STRING = Type('char bpchar name text varchar')
 BINARY = Type('bytea')
 NUMBER = Type('int2 int4 serial int8 float4 float8 numeric money')
 DATETIME = Type('date time timetz timestamp timestamptz interval'
-    ' abstime reltime')  # these are very old
+                ' abstime reltime')  # these are very old
 ROWID = Type('oid')
 
 

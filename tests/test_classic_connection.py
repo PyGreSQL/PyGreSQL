@@ -10,10 +10,7 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
-try:
-    import unittest2 as unittest  # for Python < 2.7
-except ImportError:
-    import unittest
+import unittest
 import threading
 import time
 import os
@@ -21,7 +18,7 @@ import os
 from collections import namedtuple
 try:
     from collections.abc import Iterable
-except ImportError:
+except ImportError:  # Python < 3.3
     from collections import Iterable
 
 from decimal import Decimal
@@ -465,7 +462,7 @@ class TestSimpleQueries(unittest.TestCase):
         r = namedtuple('Bad', ['?'] * 6, rename=True)
         fields = r._fields
         q = ('select 3 as "0alias", 4 as _alias, 5 as "alias$", 6 as "alias?",'
-            ' 7 as "kebap-case-alias", 8 as break, 9 as and_a_good_one')
+             ' 7 as "kebap-case-alias", 8 as break, 9 as and_a_good_one')
         result = [tuple(range(3, 10))]
         r = self.c.query(q).namedresult()
         self.assertEqual(r, result)
@@ -1573,9 +1570,10 @@ class TestInserttable(unittest.TestCase):
         c = connect()
         c.query("drop table if exists test cascade")
         c.query("create table test ("
-            "i2 smallint, i4 integer, i8 bigint, b boolean, dt date, ti time,"
-            "d numeric, f4 real, f8 double precision, m money,"
-            "c char(1), v4 varchar(4), c4 char(4), t text)")
+                "i2 smallint, i4 integer, i8 bigint,"
+                " b boolean, dt date, ti time,"
+                "d numeric, f4 real, f8 double precision, m money,"
+                "c char(1), v4 varchar(4), c4 char(4), t text)")
         # Check whether the test database uses SQL_ASCII - this means
         # that it does not consider encoding when calculating lengths.
         c.query("set client_encoding=utf8")
