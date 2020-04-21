@@ -223,7 +223,10 @@ class TestConnectObject(unittest.TestCase):
             one onedict onenamed onescalar scalariter scalarresult
             single singledict singlenamed singlescalar
             '''.split()
-        query_members = [a for a in dir(query)
+        if pg.get_pqlib_version() < 120000:
+            members.remove('memsize')
+        query_members = [
+            a for a in dir(query)
             if not a.startswith('__')
             and a != 'next']  # this is only needed in Python 2
         self.assertEqual(members, query_members)

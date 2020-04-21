@@ -16,22 +16,10 @@ install:
 script: python setup.py test
 
 addons:
-  postgresql: "12"
-  apt:
-    sources:
-      - sourceline: deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main 12
-        key_url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
-    packages:
-      - postgresql-12
-      - postgresql-server-dev-12
-
-env:
-  global:
-  - PGPORT=5433
+  postgresql: "10"
 
 services:
   - postgresql
 
 before_script:
-  - echo "dbport = 5433" > tests/LOCAL_PyGreSQL.py
   - psql -U postgres -c 'create database unittest'
