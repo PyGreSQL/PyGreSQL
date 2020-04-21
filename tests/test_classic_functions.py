@@ -121,6 +121,12 @@ class TestHasConnect(unittest.TestCase):
         pg.set_defbase(d0)
         self.assertEqual(pg.get_defbase(), d0)
 
+    def testPqlibVersion(self):
+        v = pg.get_pqlib_version()
+        self.assertIsInstance(v, long)
+        self.assertGreater(v, 90000)
+        self.assertLess(v, 130000)
+
 
 class TestParseArray(unittest.TestCase):
     """Test the array parser."""

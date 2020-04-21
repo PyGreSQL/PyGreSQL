@@ -149,6 +149,19 @@ query_next(queryObject *self, PyObject *noargs)
     return row_tuple;
 }
 
+#ifdef MEMORY_SIZE
+
+/* Get number of bytes allocated for PGresult object */
+static char query_memsize__doc__[] =
+"memsize() -- return number of bytes allocated by query result";
+static PyObject *
+query_memsize(queryObject *self, PyObject *noargs)
+{
+    return PyLong_FromSize_t(PQresultMemorySize(self->result));
+}
+
+#endif /* MEMORY_SIZE */
+
 /* Get number of rows. */
 static char query_ntuples__doc__[] =
 "ntuples() -- return number of tuples returned by query";
@@ -706,6 +719,10 @@ static struct PyMethodDef query_methods[] = {
         METH_NOARGS, query_listfields__doc__},
     {"ntuples", (PyCFunction) query_ntuples,
         METH_NOARGS, query_ntuples__doc__},
+#ifdef MEMORY_SIZE
+    {"memsize", (PyCFunction) query_memsize,
+        METH_NOARGS, query_memsize__doc__},
+#endif /* MEMORY_SIZE */
     {NULL, NULL}
 };
 

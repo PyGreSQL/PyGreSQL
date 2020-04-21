@@ -218,9 +218,10 @@ class TestConnectObject(unittest.TestCase):
     def testAllQueryMembers(self):
         query = self.connection.query("select true where false")
         members = '''
-            dictiter dictresult fieldname fieldnum getresult listfields
-            namediter namedresult ntuples one onedict onenamed onescalar
-            scalariter scalarresult single singledict singlenamed singlescalar
+            dictiter dictresult fieldname fieldnum getresult
+            listfields memsize namediter namedresult ntuples
+            one onedict onenamed onescalar scalariter scalarresult
+            single singledict singlenamed singlescalar
             '''.split()
         query_members = [a for a in dir(query)
             if not a.startswith('__')
@@ -682,6 +683,20 @@ class TestSimpleQueries(unittest.TestCase):
         r = query(q)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
+
+    def testMemSize(self):
+        if pg.get_pqlib_version() < 120000:
+            self.skipTest("pqlib does not support memsize()")
+        query = self.c.query
+        q = query("select repeat('foo!', 8)")
+        size = q.memsize()
+        self.assertIsInstance(size, long)
+        self.assertGreaterEqual(size, 32)
+        self.assertLess(size, 8000)
+        q = query("select repeat('foo!', 2000)")
+        size = q.memsize()
+        self.assertGreaterEqual(size, 8000)
+        self.assertLess(size, 16000)
 
 
 class TestUnicodeQueries(unittest.TestCase):

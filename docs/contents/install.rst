@@ -104,6 +104,11 @@ You can find out all possible build options with::
 Alternatively, you can also use the corresponding C preprocessor macros like
 ``SSL_INFO`` directly (see the next section).
 
+Note that if you build PyGreSQL with support for newer features that are not
+available in the PQLib installed on the runtime system, you may get an error
+when importing PyGreSQL, since these features are missing in the shared library
+which will prevent Python from loading it.
+
 Compiling Manually
 ~~~~~~~~~~~~~~~~~~
 
@@ -147,7 +152,9 @@ Stand-Alone
     -DDIRECT_ACCESS     direct access methods
     -DLARGE_OBJECTS     large object support
     -DESCAPING_FUNCS    support for newer escaping functions
+    -DPQLIB_INFO        support PQLib information
     -DSSL_INFO          support SSL information
+    -DMEMORY_SIZE       support memory size function
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.
@@ -193,7 +200,9 @@ Built-in to Python interpreter
     -DDIRECT_ACCESS     direct access methods
     -DLARGE_OBJECTS     large object support
     -DESCAPING_FUNCS    support for newer escaping functions
+    -DPQLIB_INFO        support PQLib information
     -DSSL_INFO          support SSL information
+    -DMEMORY_SIZE       support memory size function
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.

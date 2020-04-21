@@ -140,7 +140,9 @@ class build_pg_ext(build_ext):
         self.large_objects = None
         self.default_vars = None
         self.escaping_funcs = None
+        self.pqlib_info = None
         self.ssl_info = None
+        self.memory_size = None
         if pg_version < (9, 0):
             warnings.warn(
                 "PyGreSQL does not support the installed PostgreSQL version.")
@@ -163,13 +165,27 @@ class build_pg_ext(build_ext):
                 (warnings.warn if self.escaping_funcs is None else sys.exit)(
                     "The installed PostgreSQL version"
                     " does not support the newer string escaping functions.")
+        if self.pqlib_info is None or self.pqlib_info:
+            if pg_version >= (9, 1):
+                define_macros.append(('PQLIB_INFO', None))
+            else:
+                (warnings.warn if self.pqlib_info is None else sys.exit)(
+                    "The installed PostgreSQL version"
+                    " does not support PQLib info functions.")
         if self.ssl_info is None or self.ssl_info:
             if pg_version >= (9, 5):
                 define_macros.append(('SSL_INFO', None))
             else:
                 (warnings.warn if self.ssl_info is None else sys.exit)(
                     "The installed PostgreSQL version"
-                    " does not support ssl info functions.")
+                    " does not support SSL info functions.")
+        if self.memory_size is None or self.memory_size:
+            if pg_version >= (12, 0):
+                define_macros.append(('MEMORY_SIZE', None))
+            else:
+                (warnings.warn if self.memory_size is None else sys.exit)(
+                    "The installed PostgreSQL version"
+                    " does not support the memory size function.")
         if sys.platform == 'win32':
             libraries[0] = 'lib' + libraries[0]
             if os.path.exists(os.path.join(

@@ -63,6 +63,24 @@ Example::
     con3 = pg.connect('host=myhost user=bob dbname=testdb connect_timeout=10')
     con4 = pg.connect('postgresql://bob@myhost/testdb?connect_timeout=10')
 
+
+get_pqlib_version -- get the version of libpq
+---------------------------------------------
+
+.. function:: get_pqlib_version()
+
+    Get the version of libpq that is being used by PyGreSQL
+
+    :returns: the version of libpq
+    :rtype: int
+    :raises TypeError: too many arguments
+
+The number is formed by converting the major, minor, and revision numbers of
+the libpq version into two-decimal-digit numbers and appending them together.
+For example, version 9.1.2 will be returned as 90102.
+
+.. versionadded:: 5.2 (needs PostgreSQL >= 9.1)
+
 get/set_defhost -- default server host [DV]
 -------------------------------------------
 

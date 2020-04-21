@@ -380,3 +380,18 @@ This method returns the number of tuples in the query result.
 
 .. deprecated:: 5.1
    You can use the normal :func:`len` function instead.
+
+memsize -- return number of bytes allocated by query result
+-----------------------------------------------------------
+
+.. method:: Query.memsize()
+
+    Return number of bytes allocated by query result
+
+    :returns: number of bytes allocated for the query result
+    :rtype: int
+    :raises TypeError: Too many arguments.
+
+This method returns the number of bytes allocated for the query result.
+
+.. versionadded:: 5.2 (needs PostgreSQL >= 12)

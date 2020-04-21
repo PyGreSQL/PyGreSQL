@@ -280,6 +280,19 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
     return (PyObject *) conn_obj;
 }
 
+#ifdef PQLIB_INFO
+
+/* Get version of libpq that is being used */
+static char pg_get_pqlib_version__doc__[] =
+"get_pqlib_version() -- get the version of libpq that is being used";
+
+static PyObject *
+pg_get_pqlib_version(PyObject *self, PyObject *noargs) {
+    return PyLong_FromLong(PQlibVersion());
+}
+
+#endif /* PQLIB_INFO */
+
 /* Escape string */
 static char pg_escape_string__doc__[] =
 "escape_string(string) -- escape a string for use within SQL";
@@ -1176,7 +1189,6 @@ static struct PyMethodDef pg_methods[] = {
         METH_VARARGS|METH_KEYWORDS, pg_cast_record__doc__},
     {"cast_hstore", (PyCFunction) pg_cast_hstore,
         METH_O, pg_cast_hstore__doc__},
-
 #ifdef DEFAULT_VARS
     {"get_defhost", pg_get_defhost, METH_NOARGS, pg_get_defhost__doc__},
     {"set_defhost", pg_set_defhost, METH_VARARGS, pg_set_defhost__doc__},
@@ -1190,6 +1202,10 @@ static struct PyMethodDef pg_methods[] = {
     {"set_defuser", pg_set_defuser, METH_VARARGS, pg_set_defuser__doc__},
     {"set_defpasswd", pg_set_defpasswd, METH_VARARGS, pg_set_defpasswd__doc__},
 #endif /* DEFAULT_VARS */
+#ifdef PQLIB_INFO
+    {"get_pqlib_version", (PyCFunction) pg_get_pqlib_version,
+        METH_NOARGS, pg_get_pqlib_version__doc__},
+#endif /* PQLIB_INFO */
     {NULL, NULL} /* sentinel */
 };
 
