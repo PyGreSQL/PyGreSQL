@@ -16,7 +16,7 @@ install:
 script: python setup.py test
 
 addons:
-  postgresql: "10"
+  postgresql: "12"
 
 services:
   - postgresql
