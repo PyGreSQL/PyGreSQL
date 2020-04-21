@@ -1,6 +1,9 @@
 # Travis CI configuration
 # see https://docs.travis-ci.com/user/languages/python
 
+os: linux
+dist: bionic
+
 language: python
 
 python:
@@ -17,6 +20,11 @@ script: python setup.py test
 
 addons:
   postgresql: "12"
+  apt:
+    packages:
+      - postgresql-12
+      - postgresql-client-12
+      - postgresql-server-dev-12
 
 services:
   - postgresql
