@@ -25,8 +25,13 @@ addons:
       - postgresql-12
       - postgresql-server-dev-12
 
+env:
+  global:
+  - PGPORT=5433
+
 services:
   - postgresql
 
 before_script:
+  - echo "dbport = 5433" > tests/LOCAL_PyGreSQL.py
   - psql -U postgres -c 'create database unittest'
