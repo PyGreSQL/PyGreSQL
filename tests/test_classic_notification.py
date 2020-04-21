@@ -191,7 +191,8 @@ class TestSyncNotification(unittest.TestCase):
         try:
             handler()
         except pg.DatabaseError as error:
-            self.assertEqual(str(error),
+            self.assertEqual(
+                str(error),
                 'Listening for "good_event" and "stop_good_event",'
                 ' but notified of "bad_event"')
         self.assertIsNotNone(self.timeout)

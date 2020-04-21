@@ -119,7 +119,8 @@ class TestConnectObject(unittest.TestCase):
         attributes = '''backend_pid db error host options port
             protocol_version server_version socket
             ssl_attributes ssl_in_use status user'''.split()
-        connection_attributes = [a for a in dir(self.connection)
+        connection_attributes = [
+            a for a in dir(self.connection)
             if not a.startswith('__') and not self.is_method(a)]
         self.assertEqual(attributes, connection_attributes)
 
@@ -132,7 +133,8 @@ class TestConnectObject(unittest.TestCase):
             prepare putline query query_prepared reset
             set_cast_hook set_notice_receiver source transaction
             '''.split()
-        connection_methods = [a for a in dir(self.connection)
+        connection_methods = [
+            a for a in dir(self.connection)
             if not a.startswith('__') and self.is_method(a)]
         self.assertEqual(methods, connection_methods)
 
@@ -356,9 +358,10 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testStr(self):
         q = ("select 1 as a, 'hello' as h, 'w' as world"
-            " union select 2, 'xyz', 'uvw'")
+             " union select 2, 'xyz', 'uvw'")
         r = self.c.query(q)
-        self.assertEqual(str(r),
+        self.assertEqual(
+            str(r),
             'a|  h  |world\n'
             '-+-----+-----\n'
             '1|hello|w    \n'
@@ -503,14 +506,14 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testGet3DictRows(self):
         q = ("select 3 as alias3"
-            " union select 1 union select 2 order by 1")
+             " union select 1 union select 2 order by 1")
         result = [{'alias3': 1}, {'alias3': 2}, {'alias3': 3}]
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
     def testGet3NamedRows(self):
         q = ("select 3 as alias3"
-            " union select 1 union select 2 order by 1")
+             " union select 1 union select 2 order by 1")
         result = [(1,), (2,), (3,)]
         r = self.c.query(q).namedresult()
         self.assertEqual(r, result)
@@ -553,17 +556,16 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testListfields(self):
         q = ('select 0 as a, 0 as b, 0 as c,'
-            ' 0 as c, 0 as b, 0 as a,'
-            ' 0 as lowercase, 0 as UPPERCASE,'
-            ' 0 as MixedCase, 0 as "MixedCase",'
-            ' 0 as a_long_name_with_underscores,'
-            ' 0 as "A long name with Blanks"')
+             ' 0 as c, 0 as b, 0 as a,'
+             ' 0 as lowercase, 0 as UPPERCASE,'
+             ' 0 as MixedCase, 0 as "MixedCase",'
+             ' 0 as a_long_name_with_underscores,'
+             ' 0 as "A long name with Blanks"')
         r = self.c.query(q).listfields()
         self.assertIsInstance(r, tuple)
         result = ('a', 'b', 'c', 'c', 'b', 'a',
-            'lowercase', 'uppercase', 'mixedcase', 'MixedCase',
-            'a_long_name_with_underscores',
-            'A long name with Blanks')
+                  'lowercase', 'uppercase', 'mixedcase', 'MixedCase',
+                  'a_long_name_with_underscores', 'A long name with Blanks')
         self.assertEqual(r, result)
 
     def testFieldname(self):
@@ -594,12 +596,12 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 0)
         q = ("select 1 as a, 2 as b, 3 as c, 4 as d"
-            " union select 5 as a, 6 as b, 7 as c, 8 as d")
+             " union select 5 as a, 6 as b, 7 as c, 8 as d")
         r = self.c.query(q).ntuples()
         self.assertIsInstance(r, int)
         self.assertEqual(r, 2)
         q = ("select 1 union select 2 union select 3"
-            " union select 4 union select 5 union select 6")
+             " union select 4 union select 5 union select 6")
         r = self.c.query(q).ntuples()
         self.assertIsInstance(r, int)
         self.assertEqual(r, 6)
@@ -608,10 +610,10 @@ class TestSimpleQueries(unittest.TestCase):
         q = "select 1 where false"
         self.assertEqual(len(self.c.query(q)), 0)
         q = ("select 1 as a, 2 as b, 3 as c, 4 as d"
-            " union select 5 as a, 6 as b, 7 as c, 8 as d")
+             " union select 5 as a, 6 as b, 7 as c, 8 as d")
         self.assertEqual(len(self.c.query(q)), 2)
         q = ("select 1 union select 2 union select 3"
-            " union select 4 union select 5 union select 6")
+             " union select 4 union select 5 union select 6")
         self.assertEqual(len(self.c.query(q)), 6)
 
     def testQuery(self):
@@ -920,41 +922,53 @@ class TestParamQueries(unittest.TestCase):
         self.assertEqual(query("select 1+$1", [1]).getresult(), [(2,)])
         self.assertEqual(query("select $1::integer", (2,)).getresult(), [(2,)])
         self.assertEqual(query("select $1::text", (2,)).getresult(), [('2',)])
-        self.assertEqual(query("select 1+$1::numeric", [1]).getresult(),
-            [(Decimal('2'),)])
-        self.assertEqual(query("select 1, $1::integer", (2,)
-            ).getresult(), [(1, 2)])
-        self.assertEqual(query("select 1 union select $1::integer", (2,)
-            ).getresult(), [(1,), (2,)])
-        self.assertEqual(query("select $1::integer+$2", (1, 2)
-            ).getresult(), [(3,)])
-        self.assertEqual(query("select $1::integer+$2", [1, 2]
-            ).getresult(), [(3,)])
-        self.assertEqual(query("select 0+$1+$2+$3+$4+$5+$6", list(range(6))
-            ).getresult(), [(15,)])
+        self.assertEqual(
+            query("select 1+$1::numeric", [1]).getresult(), [(Decimal('2'),)])
+        self.assertEqual(
+            query("select 1, $1::integer", (2,)).getresult(), [(1, 2)])
+        self.assertEqual(
+            query("select 1 union select $1::integer", (2,)).getresult(),
+            [(1,), (2,)])
+        self.assertEqual(
+            query("select $1::integer+$2", (1, 2)).getresult(), [(3,)])
+        self.assertEqual(
+            query("select $1::integer+$2", [1, 2]).getresult(), [(3,)])
+        self.assertEqual(
+            query("select 0+$1+$2+$3+$4+$5+$6", list(range(6))).getresult(),
+            [(15,)])
 
     def testQueryWithStrParams(self):
         query = self.c.query
-        self.assertEqual(query("select $1||', world!'", ('Hello',)
-            ).getresult(), [('Hello, world!',)])
-        self.assertEqual(query("select $1||', world!'", ['Hello']
-            ).getresult(), [('Hello, world!',)])
-        self.assertEqual(query("select $1||', '||$2||'!'", ('Hello', 'world'),
-            ).getresult(), [('Hello, world!',)])
-        self.assertEqual(query("select $1::text", ('Hello, world!',)
-            ).getresult(), [('Hello, world!',)])
-        self.assertEqual(query("select $1::text,$2::text", ('Hello', 'world')
-            ).getresult(), [('Hello', 'world')])
-        self.assertEqual(query("select $1::text,$2::text", ['Hello', 'world']
-            ).getresult(), [('Hello', 'world')])
-        self.assertEqual(query("select $1::text union select $2::text",
-            ('Hello', 'world')).getresult(), [('Hello',), ('world',)])
+        self.assertEqual(
+            query("select $1||', world!'", ('Hello',)).getresult(),
+            [('Hello, world!',)])
+        self.assertEqual(
+            query("select $1||', world!'", ['Hello']).getresult(),
+            [('Hello, world!',)])
+        self.assertEqual(
+            query("select $1||', '||$2||'!'", ('Hello', 'world')).getresult(),
+            [('Hello, world!',)])
+        self.assertEqual(
+            query("select $1::text", ('Hello, world!',)).getresult(),
+            [('Hello, world!',)])
+        self.assertEqual(
+            query("select $1::text,$2::text", ('Hello', 'world')).getresult(),
+            [('Hello', 'world')])
+        self.assertEqual(
+            query("select $1::text,$2::text", ['Hello', 'world']).getresult(),
+            [('Hello', 'world')])
+        self.assertEqual(
+            query("select $1::text union select $2::text",
+                  ('Hello', 'world')).getresult(),
+            [('Hello',), ('world',)])
         try:
             query("select 'wörld'")
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest('database does not support utf8')
-        self.assertEqual(query("select $1||', '||$2||'!'", ('Hello',
-            'w\xc3\xb6rld')).getresult(), [('Hello, w\xc3\xb6rld!',)])
+        self.assertEqual(
+            query("select $1||', '||$2||'!'",
+                  ('Hello', 'w\xc3\xb6rld')).getresult(),
+            [('Hello, w\xc3\xb6rld!',)])
 
     def testQueryWithUnicodeParams(self):
         query = self.c.query
@@ -963,8 +977,9 @@ class TestParamQueries(unittest.TestCase):
             query("select 'wörld'").getresult()[0][0] == 'wörld'
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support utf8")
-        self.assertEqual(query("select $1||', '||$2||'!'",
-            ('Hello', u'wörld')).getresult(), [('Hello, wörld!',)])
+        self.assertEqual(
+            query("select $1||', '||$2||'!'", ('Hello', u'wörld')).getresult(),
+            [('Hello, wörld!',)])
 
     def testQueryWithUnicodeParamsLatin1(self):
         query = self.c.query
@@ -978,19 +993,22 @@ class TestParamQueries(unittest.TestCase):
             self.assertEqual(r, [('Hello, wörld!',)])
         else:
             self.assertEqual(r, [(u'Hello, wörld!'.encode('latin1'),)])
-        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+        self.assertRaises(
+            UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', u'мир'))
         query('set client_encoding=iso_8859_1')
-        r = query("select $1||', '||$2||'!'",
-            ('Hello', u'wörld')).getresult()
+        r = query(
+            "select $1||', '||$2||'!'", ('Hello', u'wörld')).getresult()
         if unicode_strings:
             self.assertEqual(r, [('Hello, wörld!',)])
         else:
             self.assertEqual(r, [(u'Hello, wörld!'.encode('latin1'),)])
-        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+        self.assertRaises(
+            UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', u'мир'))
         query('set client_encoding=sql_ascii')
-        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+        self.assertRaises(
+            UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', u'wörld'))
 
     def testQueryWithUnicodeParamsCyrillic(self):
@@ -1000,38 +1018,44 @@ class TestParamQueries(unittest.TestCase):
             query("select 'мир'").getresult()[0][0] == 'мир'
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support cyrillic")
-        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+        self.assertRaises(
+            UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', u'wörld'))
-        r = query("select $1||', '||$2||'!'",
-            ('Hello', u'мир')).getresult()
+        r = query(
+            "select $1||', '||$2||'!'", ('Hello', u'мир')).getresult()
         if unicode_strings:
             self.assertEqual(r, [('Hello, мир!',)])
         else:
             self.assertEqual(r, [(u'Hello, мир!'.encode('cyrillic'),)])
         query('set client_encoding=sql_ascii')
-        self.assertRaises(UnicodeError, query, "select $1||', '||$2||'!'",
+        self.assertRaises(
+            UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', u'мир!'))
 
     def testQueryWithMixedParams(self):
-        self.assertEqual(self.c.query("select $1+2,$2||', world!'",
+        self.assertEqual(
+            self.c.query("select $1+2,$2||', world!'",
             (1, 'Hello'),).getresult(), [(3, 'Hello, world!')])
-        self.assertEqual(self.c.query("select $1::integer,$2::date,$3::text",
+        self.assertEqual(
+            self.c.query("select $1::integer,$2::date,$3::text",
             (4711, None, 'Hello!'),).getresult(), [(4711, None, 'Hello!')])
 
     def testQueryWithDuplicateParams(self):
-        self.assertRaises(pg.ProgrammingError,
-            self.c.query, "select $1+$1", (1,))
-        self.assertRaises(pg.ProgrammingError,
-            self.c.query, "select $1+$1", (1, 2))
+        self.assertRaises(
+            pg.ProgrammingError, self.c.query, "select $1+$1", (1,))
+        self.assertRaises(
+            pg.ProgrammingError, self.c.query, "select $1+$1", (1, 2))
 
     def testQueryWithZeroParams(self):
-        self.assertEqual(self.c.query("select 1+1", []
-            ).getresult(), [(2,)])
+        self.assertEqual(
+            self.c.query("select 1+1", []).getresult(), [(2,)])
 
     def testQueryWithGarbage(self):
         garbage = r"'\{}+()-#[]oo324"
-        self.assertEqual(self.c.query("select $1::text AS garbage", (garbage,)
-            ).dictresult(), [{'garbage': garbage}])
+        self.assertEqual(
+            self.c.query("select $1::text AS garbage",
+                         (garbage,)).dictresult(),
+            [{'garbage': garbage}])
 
 
 class TestPreparedQueries(unittest.TestCase):
@@ -1056,8 +1080,8 @@ class TestPreparedQueries(unittest.TestCase):
         self.assertRaises(pg.ProgrammingError, self.c.prepare, 'q', 'select 2')
 
     def testNonExistentPreparedStatement(self):
-        self.assertRaises(pg.OperationalError,
-            self.c.query_prepared, 'does-not-exist')
+        self.assertRaises(
+            pg.OperationalError, self.c.query_prepared, 'does-not-exist')
 
     def testUnnamedQueryWithoutParams(self):
         self.assertIsNone(self.c.prepare('', "select 'anon'"))
@@ -1266,7 +1290,8 @@ class TestQueryIterator(unittest.TestCase):
         self.assertIsInstance(r[1], dict)
 
     def testDictIterateTwoColumns(self):
-        r = self.c.query("select 1 as one, 2 as two"
+        r = self.c.query(
+            "select 1 as one, 2 as two"
             " union select 3 as one, 4 as two").dictiter()
         self.assertIsInstance(r, Iterable)
         r = list(r)
@@ -1295,7 +1320,8 @@ class TestQueryIterator(unittest.TestCase):
         self.assertEqual(r[1].number, 4)
 
     def testNamedIterateTwoColumns(self):
-        r = self.c.query("select 1 as one, 2 as two"
+        r = self.c.query(
+            "select 1 as one, 2 as two"
             " union select 3 as one, 4 as two").namediter()
         self.assertIsInstance(r, Iterable)
         r = list(r)
@@ -1744,9 +1770,9 @@ class TestInserttable(unittest.TestCase):
 
     def testInserttableMaxValues(self):
         data = [(2 ** 15 - 1, int(2 ** 31 - 1), long(2 ** 31 - 1),
-            True, '2999-12-31', '11:59:59', 1e99,
-            1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
-            "1", "1234", "1234", "1234" * 100)]
+                True, '2999-12-31', '11:59:59', 1e99,
+                1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
+                "1", "1234", "1234", "1234" * 100)]
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
@@ -1757,11 +1783,13 @@ class TestInserttable(unittest.TestCase):
             self.skipTest("database does not support utf8")
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
-        row_unicode = (0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+        row_unicode = (
+            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"käse сыр pont-l'évêque")
-        row_bytes = tuple(s.encode('utf-8')
-            if isinstance(s, unicode) else s for s in row_unicode)
+        row_bytes = tuple(
+            s.encode('utf-8') if isinstance(s, unicode) else s
+            for s in row_unicode)
         data = [row_bytes] * 2
         self.c.inserttable('test', data)
         if unicode_strings:
@@ -1775,14 +1803,16 @@ class TestInserttable(unittest.TestCase):
             self.skipTest("database does not support utf8")
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
-        row_unicode = (0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+        row_unicode = (
+            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"käse сыр pont-l'évêque")
         data = [row_unicode] * 2
         self.c.inserttable('test', data)
         if not unicode_strings:
-            row_bytes = tuple(s.encode('utf-8')
-                if isinstance(s, unicode) else s for s in row_unicode)
+            row_bytes = tuple(
+                s.encode('utf-8') if isinstance(s, unicode) else s
+                for s in row_unicode)
             data = [row_bytes] * 2
         self.assertEqual(self.get_back(), data)
 
@@ -1794,19 +1824,22 @@ class TestInserttable(unittest.TestCase):
             self.skipTest("database does not support latin1")
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
-        row_unicode = (0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+        row_unicode = (
+            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"for käse and pont-l'évêque pay in €")
         data = [row_unicode]
         # cannot encode € sign with latin1 encoding
         self.assertRaises(UnicodeEncodeError, self.c.inserttable, 'test', data)
-        row_unicode = tuple(s.replace(u'€', u'¥')
-            if isinstance(s, unicode) else s for s in row_unicode)
+        row_unicode = tuple(
+            s.replace(u'€', u'¥') if isinstance(s, unicode) else s
+            for s in row_unicode)
         data = [row_unicode] * 2
         self.c.inserttable('test', data)
         if not unicode_strings:
-            row_bytes = tuple(s.encode('latin1')
-                if isinstance(s, unicode) else s for s in row_unicode)
+            row_bytes = tuple(
+                s.encode('latin1') if isinstance(s, unicode) else s
+                for s in row_unicode)
             data = [row_bytes] * 2
         self.assertEqual(self.get_back('latin1'), data)
 
@@ -1819,14 +1852,16 @@ class TestInserttable(unittest.TestCase):
             return
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
-        row_unicode = (0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+        row_unicode = (
+            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"for käse and pont-l'évêque pay in €")
         data = [row_unicode] * 2
         self.c.inserttable('test', data)
         if not unicode_strings:
-            row_bytes = tuple(s.encode('latin9')
-                if isinstance(s, unicode) else s for s in row_unicode)
+            row_bytes = tuple(
+                s.encode('latin9') if isinstance(s, unicode) else s
+                for s in row_unicode)
             data = [row_bytes] * 2
         self.assertEqual(self.get_back('latin9'), data)
 
@@ -1834,7 +1869,8 @@ class TestInserttable(unittest.TestCase):
         self.c.query("set client_encoding=sql_ascii")
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
-        row_unicode = (0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+        row_unicode = (
+            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"for käse and pont-l'évêque pay in €")
         data = [row_unicode]
@@ -2106,7 +2142,8 @@ class TestConfigFunctions(unittest.TestCase):
         en_locales = 'en', 'en_US', 'en_US.utf8', 'en_US.UTF-8'
         en_money = '$34.25', '$ 34.25', '34.25$', '34.25 $', '34.25 Dollar'
         de_locales = 'de', 'de_DE', 'de_DE.utf8', 'de_DE.UTF-8'
-        de_money = ('34,25€', '34,25 €', '€34,25', '€ 34,25',
+        de_money = (
+            '34,25€', '34,25 €', '€34,25', '€ 34,25',
             'EUR34,25', 'EUR 34,25', '34,25 EUR', '34,25 Euro', '34,25 DM')
         # first try with English localization (using the point)
         for lc in en_locales:
@@ -2390,8 +2427,8 @@ class TestConfigFunctions(unittest.TestCase):
                 info = pg._row_factory.cache_info()
                 self.assertEqual(info.maxsize, maxsize)
                 self.assertEqual(info.hits + info.misses, 6)
-                self.assertEqual(info.hits,
-                    0 if maxsize is not None and maxsize < 2 else 4)
+                self.assertEqual(
+                    info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
 
 
 class TestStandaloneEscapeFunctions(unittest.TestCase):

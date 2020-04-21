@@ -205,11 +205,11 @@ class TestParseArray(unittest.TestCase):
         ('{{{17,18,19},{14,15,16},{11,12,13}},'
          '{{27,28,29},{24,25,26},{21,22,23}},'
          '{{37,38,39},{34,35,36},{31,32,33}}}', int,
-            [[[17, 18, 19], [14, 15, 16], [11, 12, 13]],
-             [[27, 28, 29], [24, 25, 26], [21, 22, 23]],
-             [[37, 38, 39], [34, 35, 36], [31, 32, 33]]]),
+         [[[17, 18, 19], [14, 15, 16], [11, 12, 13]],
+          [[27, 28, 29], [24, 25, 26], [21, 22, 23]],
+          [[37, 38, 39], [34, 35, 36], [31, 32, 33]]]),
         ('{{"breakfast", "consulting"}, {"meeting", "lunch"}}', str,
-            [['breakfast', 'consulting'], ['meeting', 'lunch']]),
+         [['breakfast', 'consulting'], ['meeting', 'lunch']]),
         ('[1:3]={1,2,3}', int, [1, 2, 3]),
         ('[-1:1]={1,2,3}', int, [1, 2, 3]),
         ('[-1:+1]={1,2,3}', int, [1, 2, 3]),
@@ -221,9 +221,9 @@ class TestParseArray(unittest.TestCase):
         ('[1:]={1,2,3}', int, ValueError),
         ('[:3]={1,2,3}', int, ValueError),
         ('[1:1][-2:-1][3:5]={{{1,2,3},{4,5,6}}}',
-            int, [[[1, 2, 3], [4, 5, 6]]]),
+         int, [[[1, 2, 3], [4, 5, 6]]]),
         ('  [1:1]  [-2:-1]  [3:5]  =  { { { 1 , 2 , 3 }, {4 , 5 , 6 } } }',
-            int, [[[1, 2, 3], [4, 5, 6]]]),
+         int, [[[1, 2, 3], [4, 5, 6]]]),
         ('[1:1][3:5]={{1,2,3},{4,5,6}}', int, [[1, 2, 3], [4, 5, 6]]),
         ('[3:5]={{1,2,3},{4,5,6}}', int, ValueError),
         ('[1:1][-2:-1][3:5]={{1,2,3},{4,5,6}}', int, ValueError)]
@@ -309,7 +309,9 @@ class TestParseArray(unittest.TestCase):
         self.assertEqual(f('{a}', None), ['a'])
         self.assertRaises(ValueError, f, '{a}', int)
         self.assertEqual(f('{a}', str), ['a'])
-        cast = lambda s: '%s is ok' % s
+
+        def cast(s):
+            return '%s is ok' % s
         self.assertEqual(f('{a}', cast), ['a is ok'])
 
     def testParserDelim(self):
@@ -549,7 +551,9 @@ class TestParseRecord(unittest.TestCase):
         self.assertEqual(f('(a)', None), ('a',))
         self.assertRaises(ValueError, f, '(a)', int)
         self.assertEqual(f('(a)', str), ('a',))
-        cast = lambda s: '%s is ok' % s
+
+        def cast(s):
+            return '%s is ok' % s
         self.assertEqual(f('(a)', cast), ('a is ok',))
 
     def testParserCastNonUniform(self):
@@ -568,19 +572,25 @@ class TestParseRecord(unittest.TestCase):
         self.assertRaises(ValueError, f, '(1,a)', [str, int])
         self.assertEqual(f('(a,1)', [str, int]), ('a', 1))
         self.assertRaises(ValueError, f, '(a,1)', [int, str])
-        self.assertEqual(f('(1,a,2,b,3,c)',
-            [int, str, int, str, int, str]), (1, 'a', 2, 'b', 3, 'c'))
-        self.assertEqual(f('(1,a,2,b,3,c)',
-            (int, str, int, str, int, str)), (1, 'a', 2, 'b', 3, 'c'))
-        cast1 = lambda s: '%s is ok' % s
+        self.assertEqual(
+            f('(1,a,2,b,3,c)', [int, str, int, str, int, str]),
+            (1, 'a', 2, 'b', 3, 'c'))
+        self.assertEqual(
+            f('(1,a,2,b,3,c)', (int, str, int, str, int, str)),
+            (1, 'a', 2, 'b', 3, 'c'))
+
+        def cast1(s):
+            return '%s is ok' % s
         self.assertEqual(f('(a)', [cast1]), ('a is ok',))
-        cast2 = lambda s: 'and %s is ok, too' % s
-        self.assertEqual(f('(a,b)', [cast1, cast2]),
-            ('a is ok', 'and b is ok, too'))
+
+        def cast2(s):
+            return 'and %s is ok, too' % s
+        self.assertEqual(
+            f('(a,b)', [cast1, cast2]), ('a is ok', 'and b is ok, too'))
         self.assertRaises(ValueError, f, '(a)', [cast1, cast2])
         self.assertRaises(ValueError, f, '(a,b,c)', [cast1, cast2])
-        self.assertEqual(f('(1,2,3,4,5,6)',
-            [int, float, str, None, cast1, cast2]),
+        self.assertEqual(
+            f('(1,2,3,4,5,6)', [int, float, str, None, cast1, cast2]),
             (1, 2.0, '3', '4', '5 is ok', 'and 6 is ok, too'))
 
     def testParserDelim(self):
@@ -656,10 +666,9 @@ class TestParseHStore(unittest.TestCase):
         ('"k=>v', ValueError),
         ('k=>"v', ValueError),
         ('"1-a" => "anything at all"', {'1-a': 'anything at all'}),
-        ('k => v, foo => bar, baz => whatever,'
-                ' "1-a" => "anything at all"',
-            {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
-            '1-a': 'anything at all'}),
+        ('k => v, foo => bar, baz => whatever, "1-a" => "anything at all"',
+         {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
+          '1-a': 'anything at all'}),
         ('"Hello, World!"=>"Hi!"', {'Hello, World!': 'Hi!'}),
         ('"Hi!"=>"Hello, World!"', {'Hi!': 'Hello, World!'}),
         (r'"k=>v"=>k\=\>v', {'k=>v': 'k=>v'}),
@@ -691,10 +700,10 @@ class TestCastInterval(unittest.TestCase):
             ('-1:00:00', '-01:00:00', '@ -1 hour', 'PT-1H')),
         ((0, 0, 0, 1, 0, 0, 0),
             ('0-0 0 1:00:00', '0 years 0 mons 0 days 01:00:00',
-            '@ 0 years 0 mons 0 days 1 hour', 'P0Y0M0DT1H')),
+             '@ 0 years 0 mons 0 days 1 hour', 'P0Y0M0DT1H')),
         ((0, 0, 0, -1, 0, 0, 0),
             ('-0-0 -1:00:00', '0 years 0 mons 0 days -01:00:00',
-            '@ 0 years 0 mons 0 days -1 hour', 'P0Y0M0DT-1H')),
+             '@ 0 years 0 mons 0 days -1 hour', 'P0Y0M0DT-1H')),
         ((0, 0, 1, 0, 0, 0, 0),
             ('1 0:00:00', '1 day', '@ 1 day', 'P1D')),
         ((0, 0, -1, 0, 0, 0, 0),
@@ -848,7 +857,8 @@ class TestCastInterval(unittest.TestCase):
             f = pg.cast_interval
             years, mons, days, hours, mins, secs, usecs = result
             days += 365 * years + 30 * mons
-            interval = timedelta(days=days, hours=hours, minutes=mins,
+            interval = timedelta(
+                days=days, hours=hours, minutes=mins,
                 seconds=secs, microseconds=usecs)
             for value in values:
                 self.assertEqual(f(value), interval)

@@ -126,8 +126,8 @@ class TestCopy(unittest.TestCase):
 
     @staticmethod
     def connect():
-        return pgdb.connect(database=dbname,
-            host='%s:%d' % (dbhost or '', dbport or -1))
+        return pgdb.connect(
+            database=dbname, host='%s:%d' % (dbhost or '', dbport or -1))
 
     @classmethod
     def setUpClass(cls):
@@ -244,8 +244,8 @@ class TestCopyFrom(TestCopy):
         self.assertRaises(TypeError, call, '0\t', 'copytest', null=42)
         self.assertRaises(ValueError, call, '0\t', 'copytest', size='bad')
         self.assertRaises(TypeError, call, '0\t', 'copytest', columns=42)
-        self.assertRaises(ValueError, call, b'', 'copytest',
-            format='binary', sep=',')
+        self.assertRaises(
+            ValueError, call, b'', 'copytest', format='binary', sep=',')
 
     def test_input_string(self):
         ret = self.copy_from('42\tHello, world!')
@@ -353,13 +353,13 @@ class TestCopyFrom(TestCopy):
         self.check_rowcount()
 
     def test_binary(self):
-        self.assertRaises(IOError, self.copy_from,
-            b'NOPGCOPY\n', format='binary')
+        self.assertRaises(
+            IOError, self.copy_from, b'NOPGCOPY\n', format='binary')
         self.check_rowcount(-1)
 
     def test_binary_with_sep(self):
-        self.assertRaises(ValueError, self.copy_from,
-            '', format='binary', sep='\t')
+        self.assertRaises(
+            ValueError, self.copy_from, '', format='binary', sep='\t')
 
     def test_binary_with_unicode(self):
         self.assertRaises(ValueError, self.copy_from, u'', format='binary')
@@ -395,8 +395,8 @@ class TestCopyFrom(TestCopy):
         self.check_rowcount()
 
     def test_size_invalid(self):
-        self.assertRaises(TypeError,
-            self.copy_from, self.data_file, size='invalid')
+        self.assertRaises(
+            TypeError, self.copy_from, self.data_file, size='invalid')
 
 
 class TestCopyTo(TestCopy):
@@ -545,8 +545,8 @@ class TestCopyTo(TestCopy):
         self.assertRaises(ValueError, self.copy_to, format='binary', sep='\t')
 
     def test_binary_with_unicode(self):
-        self.assertRaises(ValueError, self.copy_to,
-            format='binary', decode=True)
+        self.assertRaises(
+            ValueError, self.copy_to, format='binary', decode=True)
 
     def test_query(self):
         self.assertRaises(
