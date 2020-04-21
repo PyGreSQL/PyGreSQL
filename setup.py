@@ -172,23 +172,9 @@ class build_pg_ext(build_ext):
                     " does not support ssl info functions.")
         if sys.platform == 'win32':
             libraries[0] = 'lib' + libraries[0]
-            for path in os.environ['PATH'].split(os.pathsep):
-                library_dir = os.path.join(path, 'lib')
-                if not os.path.isdir(library_dir):
-                    continue
-                if os.path.exists(
-                        os.path.join(library_dir, libraries[0] + 'dll.lib')):
-                    libraries[0] += 'dll'
-                elif not os.path.exists(
-                        os.path.join(library_dir, libraries[0] + '.lib')):
-                    continue
-                if library_dir not in library_dirs:
-                    library_dirs.insert(1, library_dir)
-                include_dir = os.path.join(path, 'include')
-                if os.path.isdir(include_dir):
-                    if include_dir not in include_dirs:
-                        include_dirs.insert(1, include_dir)
-                break
+            if os.path.exists(os.path.join(
+                    library_dirs[1], libraries[0] + 'dll.lib')):
+                libraries[0] += 'dll'
             compiler = self.get_compiler()
             if compiler == 'mingw32':  # MinGW
                 if platform.architecture()[0] == '64bit':  # needs MinGW-w64
