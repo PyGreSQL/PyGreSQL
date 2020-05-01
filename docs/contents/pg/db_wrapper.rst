@@ -851,9 +851,9 @@ properties (such as character encoding).
 
     Escape binary data for use within SQL as type ``bytea``
 
-    :param str datastring: string containing the binary data that is to be escaped
+    :param bytes/str datastring: the binary data that is to be escaped
     :returns: the escaped string
-    :rtype: str
+    :rtype: bytes/str
 
 Similar to the module function :func:`pg.escape_bytea` with the same name,
 but the behavior of this method is adjusted depending on the connection
@@ -866,7 +866,7 @@ unescape_bytea -- unescape data retrieved from the database
 
     Unescape ``bytea`` data that has been retrieved as text
 
-    :param datastring: the ``bytea`` data string that has been retrieved as text
+    :param str string: the ``bytea`` string that has been retrieved as text
     :returns: byte string containing the binary data
     :rtype: bytes
 

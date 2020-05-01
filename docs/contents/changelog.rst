@@ -5,10 +5,10 @@ Version 5.2 (to be released)
 ----------------------------
 - We now require Python version 2.7 or 3.5 and newer
 - Changes to the classic PyGreSQL module (pg):
-  - New module level function `get_pqlib_version()` that gets the version
-    of the pqlib used by PyGreSQL (needs PostgreSQL >= 9.1 on the client).
-  - New query method `memsize()` that gets the memory size allocated by
-    the query (needs PostgreSQL >= 12 on the client).
+    - New module level function `get_pqlib_version()` that gets the version
+      of the pqlib used by PyGreSQL (needs PostgreSQL >= 9.1 on the client).
+    - New query method `memsize()` that gets the memory size allocated by
+      the query (needs PostgreSQL >= 12 on the client).
 
 
 Version 5.1.2 (2020-04-19)

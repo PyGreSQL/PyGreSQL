@@ -295,12 +295,13 @@ escape_bytea -- escape binary data for use within SQL
 
     escape binary data for use within SQL as type ``bytea``
 
-    :param str datastring: string containing the binary data that is to be escaped
+    :param bytes/str datastring: the binary data that is to be escaped
     :returns: the escaped string
-    :rtype: str
+    :rtype: bytes/str
     :raises TypeError: bad argument type, or too many arguments
 
 Escapes binary data for use within an SQL command with the type ``bytea``.
+The return value will have the same type as the given *datastring*.
 As with :func:`escape_string`, this is only used when inserting data directly
 into an SQL command string.
 
@@ -320,7 +321,7 @@ unescape_bytea -- unescape data that has been retrieved as text
 
     Unescape ``bytea`` data that has been retrieved as text
 
-    :param str datastring: the ``bytea`` data string that has been retrieved as text
+    :param str string: the ``bytea`` string that has been retrieved as text
     :returns: byte string containing the binary data
     :rtype: bytes
     :raises TypeError: bad argument type, or too many arguments
