@@ -1662,10 +1662,9 @@ def connect(dsn=None,
             value = str(value)
             if not value or ' ' in value:
                 value = "'%s'" % (value.replace(
-                    "'", "\\'").replace('\\', '\\\\'),)
+                    '\\', '\\\\').replace("'", "\\'"))
             dbname.append('%s=%s' % (kw, value))
         dbname = ' '.join(dbname)
-
     # open the connection
     cnx = _connect(dbname, dbhost, dbport, dbopt, dbuser, dbpasswd)
     return Connection(cnx)
