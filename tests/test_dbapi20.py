@@ -80,7 +80,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(pgdb.__version__, v)
 
     def test_connect_kwargs(self):
-        application_name = 'PyGreSQL DB API 2.0 Test'
+        application_name = 'PyGreSQL DB API 2.0 Test with\' quote and \\\\backslash'
         self.connect_kw_args['application_name'] = application_name
         con = self._connect()
         cur = con.cursor()
