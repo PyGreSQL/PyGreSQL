@@ -80,13 +80,22 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(pgdb.__version__, v)
 
     def test_connect_kwargs(self):
-        application_name = 'PyGreSQL DB API 2.0 Test with\' quote and \\\\backslash'
+        application_name = 'PyGreSQL DB API 2.0 Test'
         self.connect_kw_args['application_name'] = application_name
         con = self._connect()
         cur = con.cursor()
         cur.execute("select application_name from pg_stat_activity"
             " where application_name = %s", (application_name,))
         self.assertEqual(cur.fetchone(), (application_name,))
+
+    def test_connect_kwargs_with_special_chars(self):
+        special_name = 'Single \' and double " quote and \\ backslash!'
+        self.connect_kw_args['application_name'] = special_name
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute("select application_name from pg_stat_activity"
+            " where application_name = %s", (special_name,))
+        self.assertEqual(cur.fetchone(), (special_name,))
 
     def test_percent_sign(self):
         con = self._connect()

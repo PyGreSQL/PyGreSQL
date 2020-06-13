@@ -10,6 +10,10 @@ Version 5.2 (to be released)
     - New query method `memsize()` that gets the memory size allocated by
       the query (needs PostgreSQL >= 12 on the client).
 
+- Changes to the DB-API 2 module (pgdb):
+    - Connection arguments containing single quotes caused problems
+      (reported and fixed by Tyler Ramer and Jamie McAtamney).
+
 
 Version 5.1.2 (2020-04-19)
 --------------------------
