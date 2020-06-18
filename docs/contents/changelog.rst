@@ -16,6 +16,8 @@ Version 5.2 (to be released)
       instead of Exception, as required by the DB-API 2 compliance test.
     - Connection arguments containing single quotes caused problems
       (reported and fixed by Tyler Ramer and Jamie McAtamney).
+    - The `types` parameer of `format_query` can now be passed as a string
+      that will be split on whitespace when values are passed as a sequence.
 
 Version 5.1.2 (2020-04-19)
 --------------------------

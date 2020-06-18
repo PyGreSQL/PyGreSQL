@@ -686,7 +686,12 @@ class Adapter:
         return params
 
     def format_query(self, command, values=None, types=None, inline=False):
-        """Format a database query using the given values and types."""
+        """Format a database query using the given values and types.
+
+        The optional types describe the values and must be passed as a list,
+        tuple or string (that will be split on whitespace) when values are
+        passed as a list or tuple, or as a dict if values are passed as a dict.
+        """
         if not values:
             return command, []
         if inline and types:
@@ -699,6 +704,8 @@ class Adapter:
             else:
                 add = params.add
                 if types:
+                    if isinstance(types, basestring):
+                        types = types.split()
                     if (not isinstance(types, (list, tuple))
                             or len(types) != len(values)):
                         raise TypeError('The values and types do not match')

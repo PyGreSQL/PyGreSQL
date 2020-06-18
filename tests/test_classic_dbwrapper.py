@@ -4343,6 +4343,17 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(3,7.5,hello,t,{123},{abc})'])
 
+    def testAdaptQueryTypedListWithString(self):
+        format_query = self.adapter.format_query
+        self.assertRaises(TypeError, format_query, '%s,%s', (1, 2), ('int2',))
+        self.assertRaises(
+            TypeError, format_query, '%s,%s', (1,), ('int2', 'int2'))
+        values = (3, 7.5, 'hello', True)
+        types = 'int4 float4 text bool'  # pass types as list
+        sql, params = format_query("select %s,%s,%s,%s", values, types)
+        self.assertEqual(sql, 'select $1,$2,$3,$4')
+        self.assertEqual(params, [3, 7.5, 'hello', 't'])
+
     def testAdaptQueryTypedDict(self):
         format_query = self.adapter.format_query
         self.assertRaises(
