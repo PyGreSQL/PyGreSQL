@@ -39,8 +39,8 @@ def open_db():
 class UtilityTest(unittest.TestCase):
 
     @classmethod
-    def setupClass(cls):
-        """Drop test tables"""
+    def setUpClass(cls):
+        """Recreate test tables and schemas"""
         db = open_db()
         try:
             db.query("DROP VIEW _test_vschema")
@@ -50,13 +50,17 @@ class UtilityTest(unittest.TestCase):
             db.query("DROP TABLE _test_schema")
         except Exception:
             pass
-        db.query("CREATE TABLE _test_schema "
-                 "(_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
+        db.query("CREATE TABLE _test_schema"
+                 " (_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
         db.query("CREATE VIEW _test_vschema AS"
                  " SELECT _test, 'abc'::text AS _test2 FROM _test_schema")
         for t in ('_test1', '_test2'):
             try:
-                db.query("DROP SCHEMA %s CASCADE")
+                db.query("CREATE SCHEMA " + t)
+            except Exception:
+                pass
+            try:
+                db.query("DROP TABLE %s._test_schema" % (t,))
             except Exception:
                 pass
             db.query("CREATE TABLE %s._test_schema"
