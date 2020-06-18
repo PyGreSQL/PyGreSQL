@@ -4343,16 +4343,63 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(3,7.5,hello,t,{123},{abc})'])
 
-    def testAdaptQueryTypedListWithString(self):
+    def testAdaptQueryTypedListWithTypesAsString(self):
         format_query = self.adapter.format_query
-        self.assertRaises(TypeError, format_query, '%s,%s', (1, 2), ('int2',))
+        self.assertRaises(TypeError, format_query, '%s,%s', (1, 2), 'int2')
         self.assertRaises(
-            TypeError, format_query, '%s,%s', (1,), ('int2', 'int2'))
+            TypeError, format_query, '%s,%s', (1,), 'int2 int2')
         values = (3, 7.5, 'hello', True)
-        types = 'int4 float4 text bool'  # pass types as list
+        types = 'int4 float4 text bool'  # pass types as string
         sql, params = format_query("select %s,%s,%s,%s", values, types)
         self.assertEqual(sql, 'select $1,$2,$3,$4')
         self.assertEqual(params, [3, 7.5, 'hello', 't'])
+
+    def testAdaptQueryTypedListWithTypesAsClasses(self):
+        format_query = self.adapter.format_query
+        self.assertRaises(TypeError, format_query, '%s,%s', (1, 2), (int,))
+        self.assertRaises(
+            TypeError, format_query, '%s,%s', (1,), (int, int))
+        values = (3, 7.5, 'hello', True)
+        types = (int, float, str, bool)  # pass types as classes
+        sql, params = format_query("select %s,%s,%s,%s", values, types)
+        self.assertEqual(sql, 'select $1,$2,$3,$4')
+        self.assertEqual(params, [3, 7.5, 'hello', 't'])
+
+    def testAdaptQueryTypedListWithJson(self):
+        format_query = self.adapter.format_query
+        value = {'test': [1, "it's fine", 3]}
+        sql, params = format_query("select %s", (value,), 'json')
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['{"test": [1, "it\'s fine", 3]}'])
+        value = pg.Json({'test': [1, "it's fine", 3]})
+        sql, params = format_query("select %s", (value,), 'json')
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['{"test": [1, "it\'s fine", 3]}'])
+        value = {'test': [1, "it's fine", 3]}
+        sql, params = format_query("select %s", [value], [pg.Json])
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['{"test": [1, "it\'s fine", 3]}'])
+
+    def testAdaptQueryTypedWithHstore(self):
+        format_query = self.adapter.format_query
+        value = {'one': "it's fine", 'two': 2}
+        sql, params = format_query("select %s", (value,), 'hstore')
+        self.assertEqual(sql, "select $1")
+        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
+            params[0] = ','.join(sorted(params[0].split(',')))
+        self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
+        value = pg.Hstore({'one': "it's fine", 'two': 2})
+        sql, params = format_query("select %s", (value,), 'hstore')
+        self.assertEqual(sql, "select $1")
+        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
+            params[0] = ','.join(sorted(params[0].split(',')))
+        self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
+        value = pg.Hstore({'one': "it's fine", 'two': 2})
+        sql, params = format_query("select %s", [value], [pg.Hstore])
+        self.assertEqual(sql, "select $1")
+        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
+            params[0] = ','.join(sorted(params[0].split(',')))
+        self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
     def testAdaptQueryTypedDict(self):
         format_query = self.adapter.format_query
@@ -4423,6 +4470,22 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(3,7.5,hello,t,{123},{abc})'])
 
+    def testAdaptQueryUntypedListWithJson(self):
+        format_query = self.adapter.format_query
+        value = pg.Json({'test': [1, "it's fine", 3]})
+        sql, params = format_query("select %s", (value,))
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['{"test": [1, "it\'s fine", 3]}'])
+
+    def testAdaptQueryUntypedWithHstore(self):
+        format_query = self.adapter.format_query
+        value = pg.Hstore({'one': "it's fine", 'two': 2})
+        sql, params = format_query("select %s", (value,))
+        self.assertEqual(sql, "select $1")
+        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
+            params[0] = ','.join(sorted(params[0].split(',')))
+        self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
+
     def testAdaptQueryUntypedDict(self):
         format_query = self.adapter.format_query
         values = dict(i=3, f=7.5, t='hello', b=True)
@@ -4476,6 +4539,24 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query('select %s', values, inline=True)
         self.assertEqual(
             sql, "select (3,7.5,'hello',true,ARRAY[123],ARRAY['abc'])")
+        self.assertEqual(params, [])
+
+    def testAdaptQueryInlineListWithJson(self):
+        format_query = self.adapter.format_query
+        value = pg.Json({'test': [1, "it's fine", 3]})
+        sql, params = format_query("select %s", (value,), inline=True)
+        self.assertEqual(
+            sql, "select '{\"test\": [1, \"it''s fine\", 3]}'::json")
+        self.assertEqual(params, [])
+
+    def testAdaptQueryInlineListWithHstore(self):
+        format_query = self.adapter.format_query
+        value = pg.Hstore({'one': "it's fine", 'two': 2})
+        sql, params = format_query("select %s", (value,), inline=True)
+        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
+            sql = sql[:8] + ','.join(sorted(sql[8:-9].split(','))) + sql[-9:]
+        self.assertEqual(
+            sql, "select 'one=>\"it''s fine\",two=>2'::hstore")
         self.assertEqual(params, [])
 
     def testAdaptQueryInlineDict(self):

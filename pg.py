@@ -88,6 +88,11 @@ except NameError:  # Python >= 3.0
     long = int
 
 try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
+    unicode
+except NameError:  # Python >= 3.0
+    unicode = str
+
+try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
@@ -253,10 +258,51 @@ def _oid_key(table):
     return 'oid(%s)' % table
 
 
+class Bytea(bytes):
+    """Wrapper class for marking Bytea values."""
+
+
+class Hstore(dict):
+    """Wrapper class for marking hstore values."""
+
+    _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
+
+    @classmethod
+    def _quote(cls, s):
+        if s is None:
+            return 'NULL'
+        if not isinstance(s, basestring):
+            s = str(s)
+        if not s:
+            return '""'
+        s = s.replace('"', '\\"')
+        if cls._re_quote.search(s):
+            s = '"%s"' % s
+        return s
+
+    def __str__(self):
+        q = self._quote
+        return ','.join('%s=>%s' % (q(k), q(v)) for k, v in self.items())
+
+
+class Json:
+    """Wrapper class for marking Json values."""
+
+    def __init__(self, obj, encode=None):
+        self.obj = obj
+        self.encode = encode or jsonencode
+
+    def __str__(self):
+        obj = self.obj
+        if isinstance(obj, basestring):
+            return obj
+        return self.encode(obj)
+
+
 class _SimpleTypes(dict):
     """Dictionary mapping pg_type names to simple type names."""
 
-    _types = {
+    _type_strings = {
         'bool': 'bool',
         'bytea': 'bytea',
         'date': 'date interval time timetz timestamp timestamptz'
@@ -267,9 +313,20 @@ class _SimpleTypes(dict):
         'num': 'numeric', 'money': 'money',
         'text': 'bpchar char name text varchar'}
 
+    _type_classes = {
+        bool: 'bool', float: 'float', int: 'int',
+        bytes: 'text' if bytes is str else 'bytea', unicode: 'text',
+        date: 'date', time: 'date', datetime: 'date', timedelta: 'date',
+        Decimal: 'num', Bytea: 'bytea', Json: 'json', Hstore: 'hstore',
+    }
+
+    if long is not int:
+        _type_classes[long] = 'num'
+
     # noinspection PyMissingConstructor
     def __init__(self):
-        for typ, keys in self._types.items():
+        self.update(self._type_classes)
+        for typ, keys in self._type_strings.items():
             for key in keys.split():
                 self[key] = typ
                 self['_%s' % key] = '%s[]' % typ
@@ -310,38 +367,6 @@ class _ParameterList(list):
             return value
         self.append(value)
         return '$%d' % len(self)
-
-
-class Bytea(bytes):
-    """Wrapper class for marking Bytea values."""
-
-
-class Hstore(dict):
-    """Wrapper class for marking hstore values."""
-
-    _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
-
-    @classmethod
-    def _quote(cls, s):
-        if s is None:
-            return 'NULL'
-        if not s:
-            return '""'
-        s = s.replace('"', '\\"')
-        if cls._re_quote.search(s):
-            s = '"%s"' % s
-        return s
-
-    def __str__(self):
-        q = self._quote
-        return ','.join('%s=>%s' % (q(k), q(v)) for k, v in self.items())
-
-
-class Json:
-    """Wrapper class for marking Json values."""
-
-    def __init__(self, obj):
-        self.obj = obj
 
 
 class Literal(str):
@@ -427,7 +452,21 @@ class Adapter:
             return None
         if isinstance(v, basestring):
             return v
+        if isinstance(v, Json):
+            return str(v)
         return self.db.encode_json(v)
+
+    def _adapt_hstore(self, v):
+        """Adapt a hstore parameter."""
+        if not v:
+            return None
+        if isinstance(v, basestring):
+            return v
+        if isinstance(v, Hstore):
+            return str(v)
+        if isinstance(v, dict):
+            return str(Hstore(v))
+        raise TypeError('Hstore parameter %s has wrong type' % v)
 
     @classmethod
     def _adapt_text_array(cls, v):
@@ -588,8 +627,6 @@ class Adapter:
             return cls._frequent_simple_types[type(value)]
         except KeyError:
             pass
-        if isinstance(value, Bytea):
-            return 'bytea'
         if isinstance(value, basestring):
             return 'text'
         if isinstance(value, bool):
@@ -602,6 +639,12 @@ class Adapter:
             return 'num'
         if isinstance(value, (date, time, datetime, timedelta)):
             return 'date'
+        if isinstance(value, Bytea):
+            return 'bytea'
+        if isinstance(value, Json):
+            return 'json'
+        if isinstance(value, Hstore):
+            return 'hstore'
         if isinstance(value, list):
             return '%s[]' % (cls.guess_simple_base_type(value) or 'text',)
         if isinstance(value, tuple):
@@ -638,12 +681,6 @@ class Adapter:
             value = self.db.escape_bytea(value)
             if bytes is not str:  # Python >= 3.0
                 value = value.decode('ascii')
-        elif isinstance(value, Json):
-            # noinspection PyUnresolvedReferences
-            if value.encode:
-                # noinspection PyUnresolvedReferences
-                return value.encode()
-            value = self.db.encode_json(value)
         elif isinstance(value, (datetime, date, time, timedelta)):
             value = str(value)
         if isinstance(value, basestring):
@@ -666,6 +703,12 @@ class Adapter:
         if isinstance(value, tuple):
             q = self.adapt_inline
             return '(%s)' % ','.join(str(q(v)) for v in value)
+        if isinstance(value, Json):
+            value = self.db.escape_string(str(value))
+            return "'%s'::json" % value
+        if isinstance(value, Hstore):
+            value = self.db.escape_string(str(value))
+            return "'%s'::hstore" % value
         pg_repr = getattr(value, '__pg_repr__', None)
         if not pg_repr:
             raise InterfaceError(
@@ -691,6 +734,9 @@ class Adapter:
         The optional types describe the values and must be passed as a list,
         tuple or string (that will be split on whitespace) when values are
         passed as a list or tuple, or as a dict if values are passed as a dict.
+
+        If inline is set to True, then parameters will be passed inline
+        together with the query string.
         """
         if not values:
             return command, []

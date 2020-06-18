@@ -514,6 +514,24 @@ Example::
         "update employees set phone=%(phone)s where name=%(name)s",
         dict(name=name, phone=phone)).getresult()[0][0]
 
+Example with specification of types::
+
+    db.query_formatted(
+        "update orders set info=%s where id=%s",
+        ({'customer': 'Joe', 'product': 'beer'}, 'id': 7),
+        types=('json', 'int'))
+    # or
+    db.query_formatted(
+        "update orders set info=%s where id=%s",
+        ({'customer': 'Joe', 'product': 'beer'}, 'id': 7),
+        types=('json int'))
+    # or
+    db.query_formatted(
+        "update orders set info=%(info)s where id=%(id)s",
+        {'info': {'customer': 'Joe', 'product': 'beer'}, 'id': 7},
+        types={'info': 'json', 'id': 'int'})
+
+
 query_prepared -- execute a prepared statement
 ----------------------------------------------
 

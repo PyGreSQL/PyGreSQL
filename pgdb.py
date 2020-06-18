@@ -1855,6 +1855,8 @@ class Hstore(dict):
     def _quote(cls, s):
         if s is None:
             return 'NULL'
+        if not isinstance(s, basestring):
+            s = str(s)
         if not s:
             return '""'
         quote = cls._re_quote.search(s)
