@@ -1,7 +1,7 @@
 Remarks on Adaptation and Typecasting
 =====================================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 Both PostgreSQL and Python have the concept of data types, but there
 are of course differences between the two type systems.  Therefore PyGreSQL

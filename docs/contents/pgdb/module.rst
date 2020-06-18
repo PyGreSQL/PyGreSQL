@@ -1,7 +1,7 @@
 Module functions and constants
 ==============================
 
-.. py:currentmodule:: pgdb
+.. currentmodule:: pgdb
 
 The :mod:`pgdb` module defines a :func:`connect` function that allows to
 connect to a database, some global constants describing the capabilities

@@ -1,7 +1,7 @@
 DbTypes -- The internal cache for database types
 ================================================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 .. class:: DbTypes
 

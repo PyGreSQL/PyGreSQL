@@ -1,7 +1,7 @@
 The DB wrapper class
 ====================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 .. class:: DB
 
@@ -48,8 +48,7 @@ You can also initialize the DB class with an existing :mod:`pg` or :mod:`pgdb`
 connection. Pass this connection as a single unnamed parameter, or as a
 single parameter named ``db``. This allows you to use all of the methods
 of the DB class with a DB-API 2 compliant connection. Note that the
-:meth:`Connection.close` and :meth:`Connection.reopen` methods are inoperative
-in this case.
+:meth:`DB.close` and :meth:`DB.reopen` methods are inoperative in this case.
 
 pkey -- return the primary key of a table
 -----------------------------------------
@@ -799,7 +798,7 @@ escape_literal/identifier/string/bytea -- escape for SQL
 --------------------------------------------------------
 
 The following methods escape text or binary strings so that they can be
-inserted directly into an SQL command.  Except for :meth:`DB.escape_byte`,
+inserted directly into an SQL command.  Except for :meth:`DB.escape_bytea`,
 you don't need to call these methods for the strings passed as parameters
 to :meth:`DB.query`.  You also don't need to call any of these methods
 when storing data using :meth:`DB.insert` and similar.

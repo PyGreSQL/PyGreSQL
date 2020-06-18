@@ -1,7 +1,7 @@
 Connection -- The connection object
 ===================================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 .. class:: Connection
 
@@ -478,8 +478,8 @@ locreate -- create a large object in the database [LO]
 
 This method creates a large object in the database. The mode can be defined
 by OR-ing the constants defined in the :mod:`pg` module (:const:`INV_READ`,
-:const:`INV_WRITE` and :const:`INV_ARCHIVE`). Please refer to PostgreSQL
-user manual for a description of the mode values.
+and :const:`INV_WRITE`). Please refer to PostgreSQL user manual for a
+description of the mode values.
 
 getlo -- build a large object from given oid [LO]
 -------------------------------------------------

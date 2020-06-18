@@ -1,7 +1,7 @@
 Type -- Type objects and constructors
 =====================================
 
-.. py:currentmodule:: pgdb
+.. currentmodule:: pgdb
 
 .. _type_constructors:
 

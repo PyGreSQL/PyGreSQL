@@ -1,7 +1,7 @@
 Query methods
 =============
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 .. class:: Query
 
@@ -204,7 +204,7 @@ It returns None if the result does not contain one more row.
     Get one row from the result of a query as named tuple
 
     :returns: next row from the query results as a named tuple
-    :rtype: named tuple or None
+    :rtype: namedtuple or None
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
@@ -244,7 +244,7 @@ single/singledict/singlenamed/singlescalar -- get single result of a query
 
     :returns: single row from the query results as a tuple of fields
     :rtype: tuple
-	:raises InvalidResultError: result does not have exactly one row
+    :raises pg.InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
@@ -263,7 +263,7 @@ is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
 
     :returns: single row from the query results as a dictionary
     :rtype: dict
-	:raises InvalidResultError: result does not have exactly one row
+    :raises pg.InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
@@ -282,8 +282,8 @@ is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
     Get single row from the result of a query as named tuple
 
     :returns: single row from the query results as a named tuple
-    :rtype: named tuple
-	:raises InvalidResultError: result does not have exactly one row
+    :rtype: namedtuple
+    :raises pg.InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 
@@ -306,7 +306,7 @@ is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
 
     :returns: single row from the query results as a scalar value
     :rtype: type of first field
-	:raises InvalidResultError: result does not have exactly one row
+    :raises pg.InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
     :raises MemoryError: internal memory error
 

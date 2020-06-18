@@ -1,7 +1,7 @@
 Connection -- The connection object
 ===================================
 
-.. py:currentmodule:: pgdb
+.. currentmodule:: pgdb
 
 .. class:: Connection
 

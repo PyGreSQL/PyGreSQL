@@ -1,7 +1,7 @@
 TypeCache -- The internal cache for database types
 ==================================================
 
-.. py:currentmodule:: pgdb
+.. currentmodule:: pgdb
 
 .. class:: TypeCache
 

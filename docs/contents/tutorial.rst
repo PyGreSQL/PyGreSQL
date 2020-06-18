@@ -11,7 +11,7 @@ with both flavors of the PyGreSQL interface. Please choose your flavor:
 First Steps with the classic PyGreSQL Interface
 -----------------------------------------------
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 Before doing anything else, it's necessary to create a database connection.
 
@@ -190,7 +190,7 @@ For more advanced features and details, see the reference: :doc:`pg/index`
 First Steps with the DB-API 2.0 Interface
 -----------------------------------------
 
-.. py:currentmodule:: pgdb
+.. currentmodule:: pgdb
 
 As with the classic interface, the first thing you need to do is to create
 a database connection. To do this, use the function :func:`pgdb.connect`

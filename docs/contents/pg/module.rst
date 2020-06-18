@@ -1,7 +1,7 @@
 Module functions and constants
 ==============================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 The :mod:`pg` module defines a few functions that allow to connect
 to a database and to define "default variables" that override

@@ -1,7 +1,7 @@
 Cursor -- The cursor object
 ===========================
 
-.. py:currentmodule:: pgdb
+.. currentmodule:: pgdb
 
 .. class:: Cursor
 
@@ -150,7 +150,7 @@ fetchone -- fetch next row of the query result
     Fetch the next row of a query result set
 
     :returns: the next row of the query result set
-    :rtype: named tuple or None
+    :rtype: namedtuple or None
 
 Fetch the next row of a query result set, returning a single named tuple,
 or ``None`` when no more data is available. The field names of the named
@@ -176,7 +176,7 @@ fetchmany -- fetch next set of rows of the query result
     :param keep: if set to true, will keep the passed arraysize
     :tpye keep: bool
     :returns: the next set of rows of the query result
-    :rtype: list of named tuples
+    :rtype: list of namedtuples
 
 Fetch the next set of rows of a query result, returning a list of named
 tuples. An empty sequence is returned when no more rows are available.
@@ -212,7 +212,7 @@ fetchall -- fetch all rows of the query result
     Fetch all (remaining) rows of a query result
 
     :returns: the set of all rows of the query result
-    :rtype: list of named tuples
+    :rtype: list of namedtuples
 
 Fetch all (remaining) rows of a query result, returning them as list of
 named tuples. The field names of the named tuple are the same as the column

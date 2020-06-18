@@ -1,7 +1,7 @@
 LargeObject -- Large Objects
 ============================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 .. class:: LargeObject
 

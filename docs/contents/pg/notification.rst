@@ -1,7 +1,7 @@
 The Notification Handler
 ========================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 PyGreSQL comes with a client-side asynchronous notification handler that
 was based on the ``pgnotify`` module written by Ng Pheng Siong.
@@ -25,7 +25,7 @@ Instantiating the notification handler
     :param str stop_event: an optional different name to be used as stop event
 
 You can also create an instance of the NotificationHandler using the
-:class:`DB.connection_handler` method.  In this case you don't need to
+:meth:`DB.connection_handler` method.  In this case you don't need to
 pass a database connection because the :class:`DB` connection itself
 will be used as the datebase connection for the notification handler.
 

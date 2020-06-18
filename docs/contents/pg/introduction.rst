@@ -1,6 +1,8 @@
 Introduction
 ============
 
+.. currentmodule:: pg
+
 You may either choose to use the "classic" PyGreSQL interface provided by
 the :mod:`pg` module or else the newer DB-API 2.0 compliant interface
 provided by the :mod:`pgdb` module.

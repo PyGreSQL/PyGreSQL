@@ -98,6 +98,35 @@ exclude_patterns += [
 if use_cloud_theme:
     exclude_patterns += ['about.rst']
 
+# ignore certain warnings
+# (references to some of the Python names do not resolve correctly)
+nitpicky = True
+nitpick_ignore = [
+    ('py:' + t, n) for t, names in {
+        'attr': ('arraysize', 'error', 'sqlstate', 'DatabaseError.sqlstate'),
+        'class': ('bool', 'bytes', 'callable', 'class',
+                  'dict', 'float', 'function', 'int', 'iterable',
+                  'list', 'object', 'set', 'str', 'tuple',
+                  'False', 'True', 'None',
+                  'namedtuple', 'OrderedDict', 'decimal.Decimal',
+                  'bytes/str', 'list of namedtuples', 'tuple of callables',
+                  'type of first field',
+                  'Notice', 'DATETIME'),
+        'data': ('defbase', 'defhost', 'defopt', 'defpasswd', 'defport',
+                 'defuser'),
+        'exc': ('Exception', 'IOError', 'KeyError', 'MemoryError',
+                'SyntaxError', 'TypeError', 'ValueError',
+                'pg.InternalError', 'pg.InvalidResultError',
+                'pg.MultipleResultsError', 'pg.NoResultError',
+                'pg.OperationalError', 'pg.ProgrammingError'),
+        'func': ('len', 'json.dumps', 'json.loads'),
+        'meth': ('datetime.strptime',
+                 'cur.execute',
+                 'DB.close', 'DB.connection_handler', 'DB.get_regtypes',
+                 'DB.inserttable', 'DB.reopen'),
+        'obj': ('False', 'True', 'None')
+    }.items() for n in names]
+
 # The reST default role (used for this markup: `text`) for all documents.
 #default_role = None
 

@@ -1,7 +1,7 @@
 Examples for using SQL functions
 ================================
 
-.. py:currentmodule:: pg
+.. currentmodule:: pg
 
 We assume that you have already created a connection to the PostgreSQL
 database, as explained in the :doc:`basic`::
