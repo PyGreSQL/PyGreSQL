@@ -15,10 +15,10 @@ dbhost = None
 dbport = 5432
 
 try:
-    from .LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *  # noqa: F401
 except (ImportError, ValueError):
     try:
-        from LOCAL_PyGreSQL import *
+        from LOCAL_PyGreSQL import *  # noqa: F401
     except ImportError:
         pass
 

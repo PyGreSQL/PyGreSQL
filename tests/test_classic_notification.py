@@ -27,10 +27,10 @@ dbport = 5432
 debug = False  # let DB wrapper print debugging output
 
 try:
-    from .LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *  # noqa: F401
 except (ImportError, ValueError):
     try:
-        from LOCAL_PyGreSQL import *
+        from LOCAL_PyGreSQL import *  # noqa: F401
     except ImportError:
         pass
 
@@ -56,6 +56,7 @@ class TestPyNotifyAlias(unittest.TestCase):
         kwargs = dict(timeout=2, stop_event='test_stop')
         with warnings.catch_warnings(record=True) as warn_msgs:
             warnings.simplefilter("always")
+            # noinspection PyDeprecation
             handler1 = pg.pgnotify(db, *args, **kwargs)
             assert len(warn_msgs) == 1
             warn_msg = warn_msgs[0]
@@ -224,8 +225,8 @@ class TestAsyncNotification(unittest.TestCase):
         else:
             self.received.append(dict(error=arg_dict))
 
-    def start_handler(self,
-            event=None, arg_dict=None, timeout=5, stop_event=None):
+    def start_handler(self, event=None, arg_dict=None,
+                      timeout=5, stop_event=None):
         db = DB()
         if not event:
             event = 'test_async_notification'
@@ -414,6 +415,7 @@ class TestAsyncNotification(unittest.TestCase):
         self.receive(stop=True)
 
     def testNotifyNoTimeout(self):
+        # noinspection PyTypeChecker
         self.start_handler(timeout=None)
         self.assertIsNone(self.handler.timeout)
         self.assertTrue(self.handler.listening)
@@ -435,6 +437,7 @@ class TestAsyncNotification(unittest.TestCase):
         self.receive(stop=True)
 
     def testNotifyWithTimeout(self):
+        # noinspection PyTypeChecker
         self.start_handler(timeout=0.01)
         sleep(0.02)
         self.assertTrue(self.timeout)

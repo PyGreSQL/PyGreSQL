@@ -19,12 +19,12 @@ import pg  # the module under test
 
 from datetime import timedelta
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
@@ -122,6 +122,7 @@ class TestHasConnect(unittest.TestCase):
         self.assertEqual(pg.get_defbase(), d0)
 
     def testPqlibVersion(self):
+        # noinspection PyUnresolvedReferences
         v = pg.get_pqlib_version()
         self.assertIsInstance(v, long)
         self.assertGreater(v, 90000)
@@ -281,6 +282,7 @@ class TestParseArray(unittest.TestCase):
         for i in range(7):
             self.assertIsInstance(r, list)
             self.assertEqual(len(r), 1)
+            # noinspection PyUnresolvedReferences
             r = r[0]
         self.assertEqual(r, 'abc')
 
@@ -929,7 +931,7 @@ class TestConfigFunctions(unittest.TestCase):
     def testGetDatestyle(self):
         self.assertIsNone(pg.get_datestyle())
 
-    def testGetDatestyle(self):
+    def testSetDatestyle(self):
         datestyle = pg.get_datestyle()
         try:
             pg.set_datestyle('ISO, YMD')

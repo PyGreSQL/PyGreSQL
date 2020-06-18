@@ -5,7 +5,6 @@ from __future__ import print_function
 
 import unittest
 
-import sys
 from functools import partial
 from time import sleep
 from threading import Thread
@@ -19,15 +18,15 @@ dbhost = None
 dbport = 5432
 
 try:
-    from .LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *  # noqa: F401
 except (ImportError, ValueError):
     try:
-        from LOCAL_PyGreSQL import *
+        from LOCAL_PyGreSQL import *  # noqa: F401
     except ImportError:
         pass
 
 
-def opendb():
+def open_db():
     db = DB(dbname, dbhost, dbport)
     db.query("SET DATESTYLE TO 'ISO'")
     db.query("SET TIME ZONE 'EST5EDT'")
@@ -36,58 +35,50 @@ def opendb():
     db.query("SET STANDARD_CONFORMING_STRINGS=FALSE")
     return db
 
-db = opendb()
-for q in (
-    "DROP TABLE _test1._test_schema",
-    "DROP TABLE _test2._test_schema",
-    "DROP SCHEMA _test1",
-    "DROP SCHEMA _test2",
-):
-    try:
-        db.query(q)
-    except Exception:
-        pass
-db.close()
-
 
 class UtilityTest(unittest.TestCase):
 
-    def setUp(self):
-        """Setup test tables or empty them if they already exist."""
-        db = opendb()
-
+    @classmethod
+    def setupClass(cls):
+        """Drop test tables"""
+        db = open_db()
+        try:
+            db.query("DROP VIEW _test_vschema")
+        except Exception:
+            pass
+        try:
+            db.query("DROP TABLE _test_schema")
+        except Exception:
+            pass
+        db.query("CREATE TABLE _test_schema "
+                 "(_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
+        db.query("CREATE VIEW _test_vschema AS"
+                 " SELECT _test, 'abc'::text AS _test2 FROM _test_schema")
         for t in ('_test1', '_test2'):
             try:
-                db.query("CREATE SCHEMA " + t)
-            except Error:
+                db.query("DROP SCHEMA %s CASCADE")
+            except Exception:
                 pass
-            try:
-                db.query(
-                    "CREATE TABLE %s._test_schema "
-                    "(%s int PRIMARY KEY)" % (t, t))
-            except Error:
-                db.query("DELETE FROM %s._test_schema" % t)
-        try:
-            db.query(
-                "CREATE TABLE _test_schema "
-                "(_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
-        except Error:
-            db.query("DELETE FROM _test_schema")
-        try:
-            db.query(
-                "CREATE VIEW _test_vschema AS "
-                "SELECT _test, 'abc'::text AS _test2 FROM _test_schema")
-        except Error:
-            pass
+            db.query("CREATE TABLE %s._test_schema"
+                     " (%s int PRIMARY KEY)" % (t, t))
+        db.close()
 
-    def test_invalidname(self):
+    def setUp(self):
+        """Setup test tables or empty them if they already exist."""
+        db = open_db()
+        db.query("TRUNCATE TABLE _test_schema")
+        for t in ('_test1', '_test2'):
+            db.query("TRUNCATE TABLE %s._test_schema" % t)
+        db.close()
+
+    def test_invalid_name(self):
         """Make sure that invalid table names are caught"""
-        db = opendb()
+        db = open_db()
         self.assertRaises(NotSupportedError, db.get_attnames, 'x.y.z')
 
     def test_schema(self):
         """Does it differentiate the same table name in different schemas"""
-        db = opendb()
+        db = open_db()
         # see if they differentiate the table names properly
         self.assertEqual(
             db.get_attnames('_test_schema'),
@@ -107,7 +98,7 @@ class UtilityTest(unittest.TestCase):
         )
 
     def test_pkey(self):
-        db = opendb()
+        db = open_db()
         self.assertEqual(db.pkey('_test_schema'), '_test')
         self.assertEqual(db.pkey('public._test_schema'), '_test')
         self.assertEqual(db.pkey('_test1._test_schema'), '_test1')
@@ -115,7 +106,7 @@ class UtilityTest(unittest.TestCase):
         self.assertRaises(KeyError, db.pkey, '_test_vschema')
 
     def test_get(self):
-        db = opendb()
+        db = open_db()
         db.query("INSERT INTO _test_schema VALUES (1234)")
         db.get('_test_schema', 1234)
         db.get('_test_schema', 1234, keyname='_test')
@@ -123,13 +114,13 @@ class UtilityTest(unittest.TestCase):
         db.get('_test_vschema', 1234, keyname='_test')
 
     def test_params(self):
-        db = opendb()
+        db = open_db()
         db.query("INSERT INTO _test_schema VALUES ($1, $2, $3)", 12, None, 34)
         d = db.get('_test_schema', 12)
         self.assertEqual(d['dvar'], 34)
 
     def test_insert(self):
-        db = opendb()
+        db = open_db()
         d = dict(_test=1234)
         db.insert('_test_schema', d)
         self.assertEqual(d['dvar'], 999)
@@ -137,7 +128,7 @@ class UtilityTest(unittest.TestCase):
         self.assertEqual(d['dvar'], 999)
 
     def test_context_manager(self):
-        db = opendb()
+        db = open_db()
         t = '_test_schema'
         d = dict(_test=1235)
         with db:
@@ -163,26 +154,28 @@ class UtilityTest(unittest.TestCase):
         self.assertTrue(db.get(t, 1239))
 
     def test_sqlstate(self):
-        db = opendb()
+        db = open_db()
         db.query("INSERT INTO _test_schema VALUES (1234)")
         try:
             db.query("INSERT INTO _test_schema VALUES (1234)")
         except DatabaseError as error:
             self.assertTrue(isinstance(error, IntegrityError))
             # the SQLSTATE error code for unique violation is 23505
+            # noinspection PyUnresolvedReferences
             self.assertEqual(error.sqlstate, '23505')
 
     def test_mixed_case(self):
-        db = opendb()
+        db = open_db()
         try:
             db.query('CREATE TABLE _test_mc ("_Test" int PRIMARY KEY)')
         except Error:
-            db.query("DELETE FROM _test_mc")
+            db.query("TRUNCATE TABLE _test_mc")
         d = dict(_Test=1234)
-        db.insert('_test_mc', d)
+        r = db.insert('_test_mc', d)
+        self.assertEqual(r, d)
 
     def test_update(self):
-        db = opendb()
+        db = open_db()
         db.query("INSERT INTO _test_schema VALUES (1234)")
 
         r = db.get('_test_schema', 1234)
@@ -214,7 +207,7 @@ class UtilityTest(unittest.TestCase):
         run_as_method = options.get('run_as_method')
         call_notify = options.get('call_notify')
         two_payloads = options.get('two_payloads')
-        db = opendb()
+        db = open_db()
         # Get function under test, can be standalone or DB method.
         fut = db.notification_handler if run_as_method else partial(
             NotificationHandler, db)
@@ -233,7 +226,7 @@ class UtilityTest(unittest.TestCase):
             self.assertTrue(target.listening)
             self.assertTrue(thread.is_alive())
             # Open another connection for sending notifications.
-            db2 = opendb()
+            db2 = open_db()
             # Generate notification from the other connection.
             if two_payloads:
                 db2.begin()
@@ -299,7 +292,7 @@ class UtilityTest(unittest.TestCase):
 
     def test_notify_timeout(self):
         for run_as_method in False, True:
-            db = opendb()
+            db = open_db()
             # Get function under test, can be standalone or DB method.
             fut = db.notification_handler if run_as_method else partial(
                 NotificationHandler, db)
@@ -320,24 +313,4 @@ class UtilityTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == '-l':
-        print('\n'.join(unittest.getTestCaseNames(UtilityTest, 'test_')))
-        sys.exit(0)
-
-    test_list = [name for name in sys.argv[1:] if not name.startswith('-')]
-    if not test_list:
-        test_list = unittest.getTestCaseNames(UtilityTest, 'test_')
-
-    suite = unittest.TestSuite()
-    for test_name in test_list:
-        try:
-            suite.addTest(UtilityTest(test_name))
-        except Exception:
-            print("\n ERROR: %s.\n" % sys.exc_value)
-            sys.exit(1)
-
-    verbosity = '-v' in sys.argv[1:] and 2 or 1
-    failfast = '-l' in sys.argv[1:]
-    runner = unittest.TextTestRunner(verbosity=verbosity, failfast=failfast)
-    rc = runner.run(suite)
-    sys.exit(1 if rc.errors or rc.failures else 0)
+    unittest.main()

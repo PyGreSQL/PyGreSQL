@@ -16,7 +16,9 @@ import time
 import os
 
 from collections import namedtuple
+
 try:
+    # noinspection PyCompatibility
     from collections.abc import Iterable
 except ImportError:  # Python < 3.3
     from collections import Iterable
@@ -35,19 +37,19 @@ dbhost = None
 dbport = 5432
 
 try:
-    from .LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *  # noqa: F401
 except (ImportError, ValueError):
     try:
-        from LOCAL_PyGreSQL import *
+        from LOCAL_PyGreSQL import *  # noqa: F401
     except ImportError:
         pass
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
@@ -64,6 +66,7 @@ do_not_ask_for_host_reason = 'libpq issue on Windows'
 
 def connect():
     """Create a basic pg connection to the test database."""
+    # noinspection PyArgumentList
     connection = pg.connect(dbname, dbhost, dbport)
     connection.query("set client_min_messages=warning")
     return connection
@@ -225,6 +228,7 @@ class TestConnectObject(unittest.TestCase):
             one onedict onenamed onescalar scalariter scalarresult
             single singledict singlenamed singlescalar
             '''.split()
+        # noinspection PyUnresolvedReferences
         if pg.get_pqlib_version() < 120000:
             members.remove('memsize')
         query_members = [
@@ -467,6 +471,7 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testNamedresultWithBadFieldnames(self):
         r = namedtuple('Bad', ['?'] * 6, rename=True)
+        # noinspection PyUnresolvedReferences
         fields = r._fields
         q = ('select 3 as "0alias", 4 as _alias, 5 as "alias$", 6 as "alias?",'
              ' 7 as "kebap-case-alias", 8 as break, 9 as and_a_good_one')
@@ -647,6 +652,7 @@ class TestSimpleQueries(unittest.TestCase):
         r = query(q)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '4')
+        # noinspection SqlWithoutWhere
         q = "delete from test_table"
         r = query(q)
         self.assertIsInstance(r, str)
@@ -684,12 +690,14 @@ class TestSimpleQueries(unittest.TestCase):
         r = query(q)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '4')
+        # noinspection SqlWithoutWhere
         q = "delete from test_table"
         r = query(q)
         self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
 
     def testMemSize(self):
+        # noinspection PyUnresolvedReferences
         if pg.get_pqlib_version() < 120000:
             self.skipTest("pqlib does not support memsize()")
         query = self.c.query
@@ -738,6 +746,7 @@ class TestUnicodeQueries(unittest.TestCase):
             v = self.c.query(q).getresult()[0][0]
         except(pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support utf8")
+            v = None
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
         q = q.encode('utf8')
@@ -755,6 +764,7 @@ class TestUnicodeQueries(unittest.TestCase):
             v = self.c.query(q).dictresult()[0]['greeting']
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support utf8")
+            v = None
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
         q = q.encode('utf8')
@@ -762,7 +772,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testDictresultLatin1(self):
+    def testGetresultLatin1(self):
         try:
             self.c.query('set client_encoding=latin1')
         except (pg.DataError, pg.NotSupportedError):
@@ -878,12 +888,12 @@ class TestParamQueries(unittest.TestCase):
     def testQueryWithNoneParam(self):
         self.assertRaises(TypeError, self.c.query, "select $1", None)
         self.assertRaises(TypeError, self.c.query, "select $1+$2", None, None)
-        self.assertEqual(self.c.query("select $1::integer", (None,)
-            ).getresult(), [(None,)])
-        self.assertEqual(self.c.query("select $1::text", [None]
-            ).getresult(), [(None,)])
-        self.assertEqual(self.c.query("select $1::text", [[None]]
-            ).getresult(), [(None,)])
+        self.assertEqual(
+            self.c.query("select $1::integer", (None,)).getresult(), [(None,)])
+        self.assertEqual(
+            self.c.query("select $1::text", [None]).getresult(), [(None,)])
+        self.assertEqual(
+            self.c.query("select $1::text", [[None]]).getresult(), [(None,)])
 
     def testQueryWithBoolParams(self, bool_enabled=None):
         query = self.c.query
@@ -910,6 +920,7 @@ class TestParamQueries(unittest.TestCase):
             self.assertEqual(query(q, (True,)).getresult(), r_true)
         finally:
             if bool_enabled is not None:
+                # noinspection PyUnboundLocalVariable
                 pg.set_bool(bool_enabled_default)
 
     def testQueryWithBoolParamsNotDefault(self):
@@ -974,7 +985,8 @@ class TestParamQueries(unittest.TestCase):
         query = self.c.query
         try:
             query('set client_encoding=utf8')
-            query("select 'wörld'").getresult()[0][0] == 'wörld'
+            self.assertEqual(
+                query("select 'wörld'").getresult()[0][0], 'wörld')
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support utf8")
         self.assertEqual(
@@ -985,7 +997,8 @@ class TestParamQueries(unittest.TestCase):
         query = self.c.query
         try:
             query('set client_encoding=latin1')
-            query("select 'wörld'").getresult()[0][0] == 'wörld'
+            self.assertEqual(
+                query("select 'wörld'").getresult()[0][0], 'wörld')
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support latin1")
         r = query("select $1||', '||$2||'!'", ('Hello', u'wörld')).getresult()
@@ -1015,7 +1028,8 @@ class TestParamQueries(unittest.TestCase):
         query = self.c.query
         try:
             query('set client_encoding=iso_8859_5')
-            query("select 'мир'").getresult()[0][0] == 'мир'
+            self.assertEqual(
+                query("select 'мир'").getresult()[0][0], 'мир')
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support cyrillic")
         self.assertRaises(
@@ -1034,11 +1048,14 @@ class TestParamQueries(unittest.TestCase):
 
     def testQueryWithMixedParams(self):
         self.assertEqual(
-            self.c.query("select $1+2,$2||', world!'",
-            (1, 'Hello'),).getresult(), [(3, 'Hello, world!')])
+            self.c.query(
+                "select $1+2,$2||', world!'", (1, 'Hello')).getresult(),
+            [(3, 'Hello, world!')])
         self.assertEqual(
-            self.c.query("select $1::integer,$2::date,$3::text",
-            (4711, None, 'Hello!'),).getresult(), [(4711, None, 'Hello!')])
+            self.c.query(
+                "select $1::integer,$2::date,$3::text",
+                (4711, None, 'Hello!')).getresult(),
+            [(4711, None, 'Hello!')])
 
     def testQueryWithDuplicateParams(self):
         self.assertRaises(
@@ -1090,8 +1107,8 @@ class TestPreparedQueries(unittest.TestCase):
 
     def testNamedQueryWithoutParams(self):
         self.assertIsNone(self.c.prepare('hello', "select 'world'"))
-        self.assertEqual(self.c.query_prepared('hello').getresult(),
-            [('world',)])
+        self.assertEqual(
+            self.c.query_prepared('hello').getresult(), [('world',)])
 
     def testMultipleNamedQueriesWithoutParams(self):
         self.assertIsNone(self.c.prepare('query17', "select 17"))
@@ -1111,14 +1128,16 @@ class TestPreparedQueries(unittest.TestCase):
     def testMultipleNamedQueriesWithParams(self):
         self.assertIsNone(self.c.prepare('q1', "select $1 || '!'"))
         self.assertIsNone(self.c.prepare('q2', "select $1 || '-' || $2"))
-        self.assertEqual(self.c.query_prepared('q1', ['hello']).getresult(),
+        self.assertEqual(
+            self.c.query_prepared('q1', ['hello']).getresult(),
             [('hello!',)])
-        self.assertEqual(self.c.query_prepared('q2', ['he', 'lo']).getresult(),
+        self.assertEqual(
+            self.c.query_prepared('q2', ['he', 'lo']).getresult(),
             [('he-lo',)])
 
     def testDescribeNonExistentQuery(self):
-        self.assertRaises(pg.OperationalError,
-            self.c.describe_prepared, 'does-not-exist')
+        self.assertRaises(
+            pg.OperationalError, self.c.describe_prepared, 'does-not-exist')
 
     def testDescribeUnnamedQuery(self):
         self.c.prepare('', "select 1::int, 'a'::char")
@@ -1155,9 +1174,11 @@ class TestQueryResultTypes(unittest.TestCase):
         q = 'select $1::%s' % (pgtype,)
         try:
             r = self.c.query(q, (value,)).getresult()[0][0]
-        except pg.ProgrammingError:
+        except pg.ProgrammingError as e:
             if pgtype in ('json', 'jsonb'):
                 self.skipTest('database does not support json')
+            self.fail(str(e))
+        # noinspection PyUnboundLocalVariable
         self.assertIsInstance(r, pytype)
         if isinstance(value, str):
             if not value or ' ' in value or '{' in value:
@@ -1185,11 +1206,10 @@ class TestQueryResultTypes(unittest.TestCase):
     def testFloat(self):
         self.assert_proper_cast(0, 'float', float)
         self.assert_proper_cast(0, 'real', float)
-        self.assert_proper_cast(0, 'double', float)
         self.assert_proper_cast(0, 'double precision', float)
         self.assert_proper_cast('infinity', 'float', float)
 
-    def testFloat(self):
+    def testNumeric(self):
         decimal = pg.get_decimal()
         self.assert_proper_cast(decimal(0), 'numeric', decimal)
         self.assert_proper_cast(decimal(0), 'decimal', decimal)
@@ -1257,6 +1277,7 @@ class TestQueryIterator(unittest.TestCase):
         self.assertNotIsInstance(r, (list, tuple))
         self.assertIsInstance(r, Iterable)
         self.assertEqual(list(r), [(3,), (4,), (5,)])
+        # noinspection PyUnresolvedReferences
         self.assertIsInstance(r[1], tuple)
 
     def testIterateTwice(self):
@@ -1578,7 +1599,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 1)
 
-    def testSingleWithTwoRows(self):
+    def testSingleScalarWithTwoRows(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.singlescalar()
@@ -1650,16 +1671,17 @@ class TestInserttable(unittest.TestCase):
 
     data = [
         (-1, -1, long(-1), True, '1492-10-12', '08:30:00',
-            -1.2345, -1.75, -1.875, '-1.25', '-', 'r?', '!u', 'xyz'),
+         -1.2345, -1.75, -1.875, '-1.25', '-', 'r?', '!u', 'xyz'),
         (0, 0, long(0), False, '1607-04-14', '09:00:00',
-            0.0, 0.0, 0.0, '0.0', ' ', '0123', '4567', '890'),
+         0.0, 0.0, 0.0, '0.0', ' ', '0123', '4567', '890'),
         (1, 1, long(1), True, '1801-03-04', '03:45:00',
-            1.23456, 1.75, 1.875, '1.25', 'x', 'bc', 'cdef', 'g'),
+         1.23456, 1.75, 1.875, '1.25', 'x', 'bc', 'cdef', 'g'),
         (2, 2, long(2), False, '1903-12-17', '11:22:00',
-            2.345678, 2.25, 2.125, '2.75', 'y', 'q', 'ijk', 'mnop\nstux!')]
+         2.345678, 2.25, 2.125, '2.75', 'y', 'q', 'ijk', 'mnop\nstux!')]
 
     @classmethod
     def db_len(cls, s, encoding):
+        # noinspection PyUnresolvedReferences
         if cls.has_encoding:
             s = s if isinstance(s, unicode) else s.decode(encoding)
         else:
@@ -1770,9 +1792,9 @@ class TestInserttable(unittest.TestCase):
 
     def testInserttableMaxValues(self):
         data = [(2 ** 15 - 1, int(2 ** 31 - 1), long(2 ** 31 - 1),
-                True, '2999-12-31', '11:59:59', 1e99,
-                1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
-                "1", "1234", "1234", "1234" * 100)]
+                 True, '2999-12-31', '11:59:59', 1e99,
+                 1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
+                 "1", "1234", "1234", "1234" * 100)]
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
@@ -1948,6 +1970,7 @@ class TestDirectSocketAccess(unittest.TestCase):
             for i in range(n + 2):
                 v = getline()
                 if i < n:
+                    # noinspection PyStringFormat
                     self.assertEqual(v, '%d\t%s' % data[i])
                 elif i == n:
                     self.assertEqual(v, '\\.')
@@ -2040,7 +2063,7 @@ class TestNotificatons(unittest.TestCase):
         self.assertIsNone(self.c.set_notice_receiver(None))
 
     def testSetAndGetNoticeReceiver(self):
-        r = lambda notice: None
+        r = lambda notice: None  # noqa: E731
         self.assertIsNone(self.c.set_notice_receiver(r))
         self.assertIs(self.c.get_notice_receiver(), r)
         self.assertIsNone(self.c.set_notice_receiver(None))
@@ -2268,6 +2291,7 @@ class TestConfigFunctions(unittest.TestCase):
             r = query("select 3425::numeric")
         except pg.DatabaseError:
             self.skipTest('database does not support numeric')
+            r = None
         r = r.getresult()[0][0]
         self.assertIsInstance(r, decimal_class)
         self.assertEqual(r, decimal_class('3425'))
@@ -2325,6 +2349,7 @@ class TestConfigFunctions(unittest.TestCase):
             r = query("select true::bool")
         except pg.ProgrammingError:
             self.skipTest('database does not support bool')
+            r = None
         r = r.getresult()[0][0]
         self.assertIsInstance(r, bool)
         self.assertEqual(r, True)
@@ -2387,6 +2412,7 @@ class TestConfigFunctions(unittest.TestCase):
             r = query("select 'data'::bytea")
         except pg.ProgrammingError:
             self.skipTest('database does not support bytea')
+            r = None
         r = r.getresult()[0][0]
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'data')

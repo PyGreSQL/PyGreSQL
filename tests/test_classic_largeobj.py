@@ -23,16 +23,17 @@ dbhost = None
 dbport = 5432
 
 try:
-    from .LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *  # noqa: F401
 except (ImportError, ValueError):
     try:
-        from LOCAL_PyGreSQL import *
+        from LOCAL_PyGreSQL import *  # noqa: F401
     except ImportError:
         pass
 
 windows = os.name == 'nt'
 
 
+# noinspection PyArgumentList
 def connect():
     """Create a basic pg connection to the test database."""
     connection = pg.connect(dbname, dbhost, dbport)
@@ -208,6 +209,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertTrue(r.startswith('<pg.LargeObject object'), r)
 
     def testOpen(self):
+        # noinspection PyShadowingBuiltins
         open = self.obj.open
         # testing with invalid parameters
         self.assertRaises(TypeError, open)

@@ -3,7 +3,8 @@ ChangeLog
 
 Version 5.2 (to be released)
 ----------------------------
-- We now require Python version 2.7 or 3.5 and newer
+- We now require Python version 2.7 or 3.5 and newer.
+- All Python code is now tested with flake8 and made PEP8 compliant.
 - Changes to the classic PyGreSQL module (pg):
     - New module level function `get_pqlib_version()` that gets the version
       of the pqlib used by PyGreSQL (needs PostgreSQL >= 9.1 on the client).
@@ -11,9 +12,10 @@ Version 5.2 (to be released)
       the query (needs PostgreSQL >= 12 on the client).
 
 - Changes to the DB-API 2 module (pgdb):
+    - When using Python 2, errors are now derived from StandardError
+      instead of Exception, as required by the DB-API 2 compliance test.
     - Connection arguments containing single quotes caused problems
       (reported and fixed by Tyler Ramer and Jamie McAtamney).
-
 
 Version 5.1.2 (2020-04-19)
 --------------------------

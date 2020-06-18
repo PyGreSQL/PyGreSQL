@@ -104,10 +104,10 @@ __all__ = [
 
 from datetime import date, time, datetime, timedelta, tzinfo
 from time import localtime
-from decimal import Decimal
+from decimal import Decimal as StdDecimal
 from uuid import UUID as Uuid
 from math import isnan, isinf
-try:
+try:  # noinspection PyCompatibility
     from collections.abc import Iterable
 except ImportError:  # Python < 3.3
     from collections import Iterable
@@ -116,17 +116,19 @@ from functools import partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
-try:  # noinspection PyUnresolvedReferences
+Decimal = StdDecimal
+
+try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
@@ -135,13 +137,15 @@ try:
     from functools import lru_cache
 except ImportError:  # Python < 3.2
     from functools import update_wrapper
-    try:
+    try:  # noinspection PyCompatibility
         from _thread import RLock
     except ImportError:
         class RLock:  # for builds without threads
-            def __enter__(self): pass
+            def __enter__(self):
+                pass
 
-            def __exit__(self, exctype, excinst, exctb): pass
+            def __exit__(self, exctype, excinst, exctb):
+                pass
 
     def lru_cache(maxsize=128):
         """Simplified functools.lru_cache decorator for one argument."""
@@ -178,9 +182,9 @@ except ImportError:  # Python < 3.2
                         link = get(arg)
                         if link is not None:
                             root = root_full[0]
-                            prev, next, _arg, res = link
-                            prev[1] = next
-                            next[0] = prev
+                            prv, nxt, _arg, res = link
+                            prv[1] = nxt
+                            nxt[0] = prv
                             last = root[0]
                             last[1] = root[0] = link
                             link[0] = last
@@ -197,7 +201,7 @@ except ImportError:  # Python < 3.2
                             oldroot[3] = res
                             root = root_full[0] = oldroot[1]
                             oldarg = root[2]
-                            oldres = root[3]  # keep reference
+                            oldres = root[3]  # noqa F481 (keep reference)
                             root[2] = root[3] = None
                             del cache[oldarg]
                             cache[arg] = oldroot
@@ -215,7 +219,7 @@ except ImportError:  # Python < 3.2
         return decorator
 
 
-### Module Constants
+# *** Module Constants ***
 
 # compliant with DB API 2.0
 apilevel = '2.0'
@@ -231,9 +235,9 @@ paramstyle = 'pyformat'
 shortcutmethods = 1
 
 
-### Internal Type Handling
+# *** Internal Type Handling ***
 
-try:
+try:    # noinspection PyUnresolvedReferences
     from inspect import signature
 except ImportError:  # Python < 3.3
     from inspect import getargspec
@@ -392,7 +396,7 @@ def cast_timestamp(value, connection):
         if len(value[3]) > 4:
             return datetime.max
         fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-            '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
+               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
     else:
         if len(value[0]) > 10:
             return datetime.max
@@ -415,7 +419,7 @@ def cast_timestamptz(value, connection):
         if len(value[3]) > 4:
             return datetime.max
         fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-            '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
+               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
         value, tz = value[:-1], value[-1]
     else:
         if fmt.startswith('%Y-'):
@@ -535,7 +539,8 @@ class Typecasts(dict):
 
     # the default cast functions
     # (str functions are ignored but have been added for faster access)
-    defaults = {'char': str, 'bpchar': str, 'name': str,
+    defaults = {
+        'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
         'int2': int, 'int4': int, 'serial': int, 'int8': long, 'oid': int,
@@ -647,6 +652,7 @@ class Typecasts(dict):
         record = namedtuple(name, fields)
 
         def cast(v):
+            # noinspection PyArgumentList
             return record(*cast_record(v, casts))
         return cast
 
@@ -707,6 +713,7 @@ class LocalTypecasts(Typecasts):
                     self[typ] = cast
         return cast
 
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_fields(self, typ):
         """Return the fields for the given record type.
 
@@ -723,6 +730,7 @@ class TypeCode(str):
     but carry some additional information.
     """
 
+    # noinspection PyShadowingBuiltins
     @classmethod
     def create(cls, oid, name, len, type, category, delim, relid):
         """Create a type code for a PostgreSQL data type."""
@@ -735,7 +743,8 @@ class TypeCode(str):
         self.relid = relid
         return self
 
-FieldInfo = namedtuple('FieldInfo', ['name', 'type'])
+
+FieldInfo = namedtuple('FieldInfo', ('name', 'type'))
 
 
 class TypeCache(dict):
@@ -785,6 +794,7 @@ class TypeCache(dict):
         type_code = TypeCode.create(
             int(res[0]), res[1], int(res[2]),
             res[3], res[4], res[5], int(res[6]))
+        # noinspection PyUnresolvedReferences
         self[type_code.oid] = self[str(type_code)] = type_code
         return type_code
 
@@ -843,10 +853,12 @@ class _quotedict(dict):
     """
 
     def __getitem__(self, key):
+        # noinspection PyUnresolvedReferences
         return self.quote(super(_quotedict, self).__getitem__(key))
 
 
-### Error Messages
+# *** Error Messages ***
+
 
 def _db_error(msg, cls=DatabaseError):
     """Return DatabaseError with empty sqlstate attribute."""
@@ -860,7 +872,8 @@ def _op_error(msg):
     return _db_error(msg, OperationalError)
 
 
-### Row Tuples
+# *** Row Tuples ***
+
 
 _re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
 
@@ -869,6 +882,7 @@ _re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
 # by default. Since creating namedtuple classes is a somewhat expensive
 # operation, we cache up to 1024 of these classes by default.
 
+# noinspection PyUnresolvedReferences
 @lru_cache(maxsize=1024)
 def _row_factory(names):
     """Get a namedtuple factory for row results with the given names."""
@@ -884,11 +898,12 @@ def set_row_factory_size(maxsize):
 
     If maxsize is set to None, the cache can grow without bound.
     """
+    # noinspection PyGlobalUndefined
     global _row_factory
     _row_factory = lru_cache(maxsize)(_row_factory.__wrapped__)
 
 
-### Cursor Object
+# *** Cursor Object ***
 
 class Cursor(object):
     """Cursor object."""
@@ -982,7 +997,7 @@ class Cursor(object):
                 return '(%s)' % (','.join(str(q(v)) for v in value),)
             except UnicodeEncodeError:  # Python 2 with non-ascii values
                 return u'(%s)' % (','.join(unicode(q(v)) for v in value),)
-        try:
+        try:  # noinspection PyUnresolvedReferences
             value = value.__pg_repr__()
         except AttributeError:
             raise InterfaceError(
@@ -1027,7 +1042,7 @@ class Cursor(object):
                 size = mod
             precision = scale = None
         return CursorDescription(name, type_code,
-            None, size, precision, scale, None)
+                                 None, size, precision, scale, None)
 
     @property
     def description(self):
@@ -1099,6 +1114,7 @@ class Cursor(object):
         except DatabaseError:
             raise  # database provides error message
         except Error as err:
+            # noinspection PyTypeChecker
             raise _db_error(
                 "Error in '%s': '%s' " % (sql, err), InterfaceError)
         except Exception as err:
@@ -1149,7 +1165,7 @@ class Cursor(object):
             raise _db_error(str(err))
         typecast = self.type_cache.typecast
         return [self.row_factory([typecast(value, typ)
-            for typ, value in zip(self.coltypes, row)]) for row in result]
+                for typ, value in zip(self.coltypes, row)]) for row in result]
 
     def callproc(self, procname, parameters=None):
         """Call a stored database procedure with the given name.
@@ -1167,8 +1183,9 @@ class Cursor(object):
         self.execute(query, parameters)
         return parameters
 
+    # noinspection PyShadowingBuiltins
     def copy_from(self, stream, table,
-            format=None, sep=None, null=None, size=None, columns=None):
+                  format=None, sep=None, null=None, size=None, columns=None):
         """Copy data from an input stream to the specified table.
 
         The input stream can be a file-like object with a read() method or
@@ -1305,8 +1322,9 @@ class Cursor(object):
         # return the cursor object, so you can chain operations
         return self
 
+    # noinspection PyShadowingBuiltins
     def copy_to(self, stream, table,
-            format=None, sep=None, null=None, decode=None, columns=None):
+                format=None, sep=None, null=None, decode=None, columns=None):
         """Copy data from the specified table to an output stream.
 
         The output stream can be a file-like object with a write() method or
@@ -1404,6 +1422,7 @@ class Cursor(object):
 
         # write the rows to the file-like input stream
         for row in copy():
+            # noinspection PyUnboundLocalVariable
             write(row)
 
         # return the cursor object, so you can chain operations
@@ -1468,12 +1487,12 @@ class Cursor(object):
             return _row_factory(tuple(names))
 
 
-CursorDescription = namedtuple('CursorDescription',
-    ['name', 'type_code', 'display_size', 'internal_size',
-     'precision', 'scale', 'null_ok'])
+CursorDescription = namedtuple('CursorDescription', (
+    'name', 'type_code', 'display_size', 'internal_size',
+    'precision', 'scale', 'null_ok'))
 
 
-### Connection Objects
+# *** Connection Objects ***
 
 class Connection(object):
     """Connection object."""
@@ -1604,13 +1623,14 @@ class Connection(object):
             return cursor
 
 
-### Module Interface
+# *** Module Interface ***
 
 _connect = connect
 
+
 def connect(dsn=None,
-        user=None, password=None,
-        host=None, database=None, **kwargs):
+            user=None, password=None,
+            host=None, database=None, **kwargs):
     """Connect to a database."""
     # first get params from DSN
     dbport = -1
@@ -1666,11 +1686,12 @@ def connect(dsn=None,
             dbname.append('%s=%s' % (kw, value))
         dbname = ' '.join(dbname)
     # open the connection
+    # noinspection PyArgumentList
     cnx = _connect(dbname, dbhost, dbport, dbopt, dbuser, dbpasswd)
     return Connection(cnx)
 
 
-### Types Handling
+# *** Types Handling ***
 
 class Type(frozenset):
     """Type class for a couple of PostgreSQL data types.
@@ -1722,6 +1743,7 @@ class RecordType:
 
     def __eq__(self, other):
         if isinstance(other, TypeCode):
+            # noinspection PyUnresolvedReferences
             return other.type == 'c'
         elif isinstance(other, basestring):
             return other == 'record'
@@ -1730,6 +1752,7 @@ class RecordType:
 
     def __ne__(self, other):
         if isinstance(other, TypeCode):
+            # noinspection PyUnresolvedReferences
             return other.type != 'c'
         elif isinstance(other, basestring):
             return other != 'record'
@@ -1786,9 +1809,10 @@ def Time(hour, minute=0, second=0, microsecond=0, tzinfo=None):
 
 
 def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0,
-        tzinfo=None):
+              tzinfo=None):
     """Construct an object holding a time stamp value."""
-    return datetime(year, month, day, hour, minute, second, microsecond, tzinfo)
+    return datetime(year, month, day, hour, minute, second, microsecond,
+                    tzinfo)
 
 
 def DateFromTicks(ticks):
@@ -1815,7 +1839,7 @@ class Binary(bytes):
 def Interval(days, hours=0, minutes=0, seconds=0, microseconds=0):
     """Construct an object holding a time interval value."""
     return timedelta(days, hours=hours, minutes=minutes, seconds=seconds,
-        microseconds=microseconds)
+                     microseconds=microseconds)
 
 
 Uuid = Uuid  # Construct an object holding a UUID value

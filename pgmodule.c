@@ -1258,10 +1258,10 @@ MODULE_INIT_FUNC(_pg)
     dict = PyModule_GetDict(mod);
 
     /* Exceptions as defined by DB-API 2.0 */
-    Error = PyErr_NewException("pg.Error", PyExc_Exception, NULL);
+    Error = PyErr_NewException("pg.Error", PyExc_StandardError, NULL);
     PyDict_SetItemString(dict, "Error", Error);
 
-    Warning = PyErr_NewException("pg.Warning", PyExc_Exception, NULL);
+    Warning = PyErr_NewException("pg.Warning", PyExc_StandardError, NULL);
     PyDict_SetItemString(dict, "Warning", Warning);
 
     InterfaceError = PyErr_NewException(

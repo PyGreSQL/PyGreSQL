@@ -82,12 +82,12 @@ from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 from uuid import UUID
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     long
 except NameError:  # Python >= 3.0
     long = int
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     basestring
 except NameError:  # Python >= 3.0
     basestring = (str, bytes)
@@ -96,13 +96,15 @@ try:
     from functools import lru_cache
 except ImportError:  # Python < 3.2
     from functools import update_wrapper
-    try:
+    try:  # noinspection PyCompatibility
         from _thread import RLock
     except ImportError:
         class RLock:  # for builds without threads
-            def __enter__(self): pass
+            def __enter__(self):
+                pass
 
-            def __exit__(self, exctype, excinst, exctb): pass
+            def __exit__(self, exctype, excinst, exctb):
+                pass
 
     def lru_cache(maxsize=128):
         """Simplified functools.lru_cache decorator for one argument."""
@@ -139,9 +141,9 @@ except ImportError:  # Python < 3.2
                         link = get(arg)
                         if link is not None:
                             root = root_full[0]
-                            prev, next, _arg, res = link
-                            prev[1] = next
-                            next[0] = prev
+                            prv, nxt, _arg, res = link
+                            prv[1] = nxt
+                            nxt[0] = prv
                             last = root[0]
                             last[1] = root[0] = link
                             link[0] = last
@@ -158,7 +160,7 @@ except ImportError:  # Python < 3.2
                             oldroot[3] = res
                             root = root_full[0] = oldroot[1]
                             oldarg = root[2]
-                            oldres = root[3]  # keep reference
+                            oldres = root[3]  # noqa F481 (keep reference)
                             root[2] = root[3] = None
                             del cache[oldarg]
                             cache[arg] = oldroot
@@ -178,7 +180,7 @@ except ImportError:  # Python < 3.2
 
 # Auxiliary classes and functions that are independent from a DB connection:
 
-try:
+try:  # noinspection PyUnresolvedReferences
     from inspect import signature
 except ImportError:  # Python < 3.3
     from inspect import getargspec
@@ -254,16 +256,18 @@ def _oid_key(table):
 class _SimpleTypes(dict):
     """Dictionary mapping pg_type names to simple type names."""
 
-    _types = {'bool': 'bool',
+    _types = {
+        'bool': 'bool',
         'bytea': 'bytea',
         'date': 'date interval time timetz timestamp timestamptz'
-            ' abstime reltime',  # these are very old
+                ' abstime reltime',  # these are very old
         'float': 'float4 float8',
         'int': 'cid int2 int4 int8 oid xid',
         'hstore': 'hstore', 'json': 'json jsonb', 'uuid': 'uuid',
         'num': 'numeric', 'money': 'money',
         'text': 'bpchar char name text varchar'}
 
+    # noinspection PyMissingConstructor
     def __init__(self):
         for typ, keys in self._types.items():
             for key in keys.split():
@@ -273,6 +277,7 @@ class _SimpleTypes(dict):
     @staticmethod
     def __missing__(key):
         return 'text'
+
 
 _simpletypes = _SimpleTypes()
 
@@ -299,6 +304,7 @@ class _ParameterList(list):
         If this is a literal value, it will be returned as is.  Otherwise, a
         placeholder will be returned and the parameter list will be augmented.
         """
+        # noinspection PyUnresolvedReferences
         value = self.adapt(value, typ)
         if isinstance(value, Literal):
             return value
@@ -465,7 +471,7 @@ class Adapter:
         return str(v)
 
     _adapt_int_array = _adapt_float_array = _adapt_money_array = \
-            _adapt_num_array
+        _adapt_num_array
 
     def _adapt_bytea_array(self, v):
         """Adapt a bytea array parameter."""
@@ -548,6 +554,7 @@ class Adapter:
     def get_simple_name(typ):
         """Get the simple name of a database type."""
         if isinstance(typ, DbType):
+            # noinspection PyUnresolvedReferences
             return typ.simple
         return _simpletypes[typ]
 
@@ -601,9 +608,10 @@ class Adapter:
             simple_type = cls.simple_type
             guess = cls.guess_simple_type
 
+            # noinspection PyUnusedLocal
             def get_attnames(self):
                 return AttrDict((str(n + 1), simple_type(guess(v)))
-                    for n, v in enumerate(value))
+                                for n, v in enumerate(value))
 
             typ = simple_type('record')
             typ._get_attnames = get_attnames
@@ -631,7 +639,9 @@ class Adapter:
             if bytes is not str:  # Python >= 3.0
                 value = value.decode('ascii')
         elif isinstance(value, Json):
+            # noinspection PyUnresolvedReferences
             if value.encode:
+                # noinspection PyUnresolvedReferences
                 return value.encode()
             value = self.db.encode_json(value)
         elif isinstance(value, (datetime, date, time, timedelta)):
@@ -689,8 +699,8 @@ class Adapter:
             else:
                 add = params.add
                 if types:
-                    if (not isinstance(types, (list, tuple)) or
-                            len(types) != len(values)):
+                    if (not isinstance(types, (list, tuple))
+                            or len(types) != len(values)):
                         raise TypeError('The values and types do not match')
                     literals = [add(value, typ)
                                 for value, typ in zip(values, types)]
@@ -850,7 +860,7 @@ def cast_timestamptz(value, connection):
         if len(value[3]) > 4:
             return datetime.max
         fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-            '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
+               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
         value, tz = value[:-1], value[-1]
     else:
         if fmt.startswith('%Y-'):
@@ -956,7 +966,7 @@ def cast_interval(value):
                     raise ValueError('Cannot parse interval: %s' % value)
     days += 365 * years + 30 * mons
     return timedelta(days=days, hours=hours, minutes=mins,
-        seconds=secs, microseconds=usecs)
+                     seconds=secs, microseconds=usecs)
 
 
 class Typecasts(dict):
@@ -973,7 +983,8 @@ class Typecasts(dict):
 
     # the default cast functions
     # (str functions are ignored but have been added for faster access)
-    defaults = {'char': str, 'bpchar': str, 'name': str,
+    defaults = {
+        'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
         'int2': int, 'int4': int, 'serial': int, 'int8': long, 'oid': int,
@@ -1084,6 +1095,7 @@ class Typecasts(dict):
                 defaults[t] = cast
                 defaults.pop('_%s' % t, None)
 
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_attnames(self, typ):
         """Return the fields for the given record type.
 
@@ -1091,6 +1103,7 @@ class Typecasts(dict):
         """
         return {}
 
+    # noinspection PyMethodMayBeStatic
     def dateformat(self):
         """Return the current date format.
 
@@ -1112,6 +1125,7 @@ class Typecasts(dict):
         record = namedtuple(name, fields)
 
         def cast(v):
+            # noinspection PyArgumentList
             return record(*cast_record(v, casts))
         return cast
 
@@ -1149,6 +1163,7 @@ class DbType(str):
     @property
     def attnames(self):
         """Get names and types of the fields of a composite type."""
+        # noinspection PyUnresolvedReferences
         return self._get_attnames(self)
 
 
@@ -1185,7 +1200,7 @@ class DbTypes(dict):
                 " WHERE oid OPERATOR(pg_catalog.=) %s::regtype")
 
     def add(self, oid, pgtype, regtype,
-               typtype, category, delim, relid):
+            typtype, category, delim, relid):
         """Create a PostgreSQL type name with additional info."""
         if oid in self:
             return self[oid]
@@ -1268,6 +1283,7 @@ _re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
 # by default. Since creating namedtuple classes is a somewhat expensive
 # operation, we cache up to 1024 of these classes by default.
 
+# noinspection PyUnresolvedReferences
 @lru_cache(maxsize=1024)
 def _row_factory(names):
     """Get a namedtuple factory for row results with the given names."""
@@ -1283,6 +1299,7 @@ def set_row_factory_size(maxsize):
 
     If maxsize is set to None, the cache can grow without bound.
     """
+    # noinspection PyGlobalUndefined
     global _row_factory
     _row_factory = lru_cache(maxsize)(_row_factory.__wrapped__)
 
@@ -1364,7 +1381,7 @@ class NotificationHandler(object):
     """A PostgreSQL client-side asynchronous notification handler."""
 
     def __init__(self, db, event, callback=None,
-            arg_dict=None, timeout=None, stop_event=None):
+                 arg_dict=None, timeout=None, stop_event=None):
         """Initialize the notification handler.
 
         You must pass a PyGreSQL database connection, the name of an
@@ -1459,6 +1476,7 @@ class NotificationHandler(object):
         if not poll:
             rlist = [self.db.fileno()]
         while self.listening:
+            # noinspection PyUnboundLocalVariable
             if poll or select.select(rlist, [], [], self.timeout)[0]:
                 while self.listening:
                     notice = self.db.getnotify()
@@ -1484,7 +1502,7 @@ class NotificationHandler(object):
 def pgnotify(*args, **kw):
     """Same as NotificationHandler, under the traditional name."""
     warnings.warn("pgnotify is deprecated, use NotificationHandler instead",
-        DeprecationWarning, stacklevel=2)
+                  DeprecationWarning, stacklevel=2)
     return NotificationHandler(*args, **kw)
 
 
@@ -1513,6 +1531,7 @@ class DB:
                 db = db.db
             else:
                 try:
+                    # noinspection PyUnresolvedReferences
                     db = db._cnx
                 except AttributeError:
                     pass
@@ -1551,11 +1570,12 @@ class DB:
                 " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass AND %s"
                 " AND NOT a.attisdropped ORDER BY a.attnum")
         db.set_cast_hook(self.dbtypes.typecast)
-        self.debug = None  # For debugging scripts, this can be set
-            # * to a string format specification (e.g. in CGI set to "%s<BR>"),
-            # * to a file object to write debug statements or
-            # * to a callable object which takes a string argument
-            # * to any other true value to just print debug statements
+        # For debugging scripts, self.debug can be set
+        # * to a string format specification (e.g. in CGI set to "%s<BR>"),
+        # * to a file object to write debug statements or
+        # * to a callable object which takes a string argument
+        # * to any other true value to just print debug statements
+        self.debug = None
 
     def __getattr__(self, name):
         # All undefined members are same as in underlying connection:
@@ -1610,6 +1630,7 @@ class DB:
             if isinstance(self.debug, basestring):
                 print(self.debug % s)
             elif hasattr(self.debug, 'write'):
+                # noinspection PyCallingNonCallable
                 self.debug.write(s + '\n')
             elif callable(self.debug):
                 self.debug(s)
@@ -1633,7 +1654,8 @@ class DB:
         """Get boolean value corresponding to d."""
         return bool(d) if get_bool() else ('t' if d else 'f')
 
-    def _list_params(self, params):
+    @staticmethod
+    def _list_params(params):
         """Create a human readable parameter list."""
         return ', '.join('$%d=%r' % (n, v) for n, v in enumerate(params, 1))
 
@@ -1643,11 +1665,13 @@ class DB:
     # so we define unescape_bytea as a method as well
     unescape_bytea = staticmethod(unescape_bytea)
 
-    def decode_json(self, s):
+    @staticmethod
+    def decode_json(s):
         """Decode a JSON string coming from the database."""
         return (get_jsondecode() or jsondecode)(s)
 
-    def encode_json(self, d):
+    @staticmethod
+    def encode_json(d):
         """Encode a JSON string for use within SQL."""
         return jsonencode(d)
 
@@ -1991,7 +2015,7 @@ class DB:
                  " AND NOT a.attisdropped"
                  " WHERE i.indrelid OPERATOR(pg_catalog.=) %s::regclass"
                  " AND i.indisprimary ORDER BY a.attnum") % (
-                    _quote_if_unqualified('$1', table),)
+                _quote_if_unqualified('$1', table),)
             pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
                 raise KeyError('Table %s has no primary key' % table)
@@ -2319,10 +2343,11 @@ class DB:
         appear as keys in the dictionary are also updated like in the case
         keywords had been passed with the value True.
 
-        So if in the case of a conflict you want to update every column that
-        has been passed in the dictionary row, you would call upsert(table, row).
-        If you don't want to do anything in case of a conflict, i.e. leave
-        the existing row as it is, call upsert(table, row, **dict.fromkeys(row)).
+        So if in the case of a conflict you want to update every column
+        that has been passed in the dictionary row, you would call
+        upsert(table, row). If you don't want to do anything in case
+        of a conflict, i.e. leave the existing row as it is, call
+        upsert(table, row, **dict.fromkeys(row)).
 
         If you need more fine-grained control of what gets updated, you can
         also pass strings in the keyword parameters.  These strings will
@@ -2351,7 +2376,7 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        names, values, updates = [], [], []
+        names, values = [], []
         for n in attnames:
             if n in row:
                 names.append(col(n))
@@ -2378,8 +2403,7 @@ class DB:
         ret = 'oid, *' if qoid else '*'
         q = ('INSERT INTO %s AS included (%s) VALUES (%s)'
              ' ON CONFLICT (%s) DO %s RETURNING %s') % (
-                self._escape_qualified_name(table), names, values,
-                target, do, ret)
+            self._escape_qualified_name(table), names, values, target, do, ret)
         self._do_debug(q, params)
         try:
             q = self.db.query(q, params)
@@ -2673,7 +2697,10 @@ class DB:
             getrow = itemgetter(*rowind)
         else:
             rowind = rowind[0]
-            getrow = lambda row: (row[rowind],)
+
+            def getrow(row):
+                return row[rowind],  # tuple with one item
+
             rowtuple = True
         rows = map(getrow, res)
         if keytuple or rowtuple:
@@ -2682,13 +2709,14 @@ class DB:
             if rowtuple:
                 fields = [f for f in fields if f not in keyset]
                 rows = _namediter(_MemoryQuery(rows, fields))
+        # noinspection PyArgumentList
         return cls(zip(keys, rows))
 
     def notification_handler(self, event, callback,
                              arg_dict=None, timeout=None, stop_event=None):
         """Get notification handler that will run the given callback."""
-        return NotificationHandler(self,
-            event, callback, arg_dict, timeout, stop_event)
+        return NotificationHandler(self, event, callback,
+                                   arg_dict, timeout, stop_event)
 
 
 # if run as script, print some information

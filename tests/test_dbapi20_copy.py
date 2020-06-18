@@ -12,7 +12,7 @@ These tests need a database to test against.
 
 import unittest
 
-try:
+try:   # noinspection PyCompatibility
     from collections.abc import Iterable
 except ImportError:  # Python < 3.3
     from collections import Iterable
@@ -27,14 +27,14 @@ dbhost = None
 dbport = 5432
 
 try:
-    from .LOCAL_PyGreSQL import *
+    from .LOCAL_PyGreSQL import *  # noqa: F401
 except (ImportError, ValueError):
     try:
-        from LOCAL_PyGreSQL import *
+        from LOCAL_PyGreSQL import *  # noqa: F401
     except ImportError:
         pass
 
-try:  # noinspection PyUnresolvedReferences
+try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     unicode
 except NameError:  # Python >= 3.0
     unicode = str
@@ -281,6 +281,7 @@ class TestCopyFrom(TestCopy):
             self.copy_from(u'43\tWürstel, Käse!')
             self.assertEqual(self.table_data, [(43, 'Würstel, Käse!')])
             self.truncate_table()
+            # noinspection PyUnresolvedReferences
             self.copy_from(self.data_text.decode('utf-8'))
             self.check_table()
 
@@ -300,7 +301,7 @@ class TestCopyFrom(TestCopy):
 
         def test_input_iterable_bytes(self):
             self.copy_from(row.encode('utf-8')
-                for row in self.data_text.splitlines())
+                           for row in self.data_text.splitlines())
             self.check_table()
 
     def test_sep(self):
@@ -339,7 +340,7 @@ class TestCopyFrom(TestCopy):
             (1, None), (2, None), (3, 'Three'), (4, 'Four'), (5, 'Five')])
         self.check_rowcount(5)
         self.assertRaises(pgdb.ProgrammingError, self.copy_from,
-            '6\t42', columns=['id', 'age'])
+                          '6\t42', columns=['id', 'age'])
         self.check_rowcount(-1)
 
     def test_csv(self):
@@ -468,6 +469,7 @@ class TestCopyTo(TestCopy):
             self.assertEqual(len(rows), 3)
             rows = ''.join(rows)
             self.assertIsInstance(rows, unicode)
+            # noinspection PyUnresolvedReferences
             self.assertEqual(rows, self.data_text.decode('utf-8'))
 
     def test_rowcount_increment(self):

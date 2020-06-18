@@ -57,6 +57,8 @@
 
 #define Py_TPFLAGS_HAVE_ITER 0 // not needed in Python 3
 
+#define PyExc_StandardError PyExc_Exception // exists only in Python 2
+
 #else
 
 /***** Python 2 *****/
