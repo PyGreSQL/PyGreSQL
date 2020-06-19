@@ -212,6 +212,11 @@ setup(
     author_email="darcy@PyGreSQL.org",
     url="http://www.pygresql.org",
     download_url="http://www.pygresql.org/download/",
+    project_urls={
+        "Documentation": "https://pygresql.org/contents/",
+        "Issue Tracker": "https://github.com/PyGreSQL/PyGreSQL/issues/",
+        "Mailing List": "https://mail.vex.net/mailman/listinfo/pygresql",
+        "Source Code": "https://github.com/PyGreSQL/PyGreSQL"},
     platforms=["any"],
     license="PostgreSQL",
     py_modules=py_modules,
