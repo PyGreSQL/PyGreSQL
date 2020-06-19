@@ -82,6 +82,13 @@ from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 from uuid import UUID
 
+try:
+    # noinspection PyUnresolvedReferences
+    from typing import Dict, List, Union
+    has_typing = True
+except ImportError:  # Python < 3.5
+    has_typing = False
+
 try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     long
 except NameError:  # Python >= 3.0
@@ -300,43 +307,54 @@ class Json:
 
 
 class _SimpleTypes(dict):
-    """Dictionary mapping pg_type names to simple type names."""
+    """Dictionary mapping pg_type names to simple type names.
 
-    _type_strings = {
-        'bool': 'bool',
-        'bytea': 'bytea',
-        'date': 'date interval time timetz timestamp timestamptz'
-                ' abstime reltime',  # these are very old
-        'float': 'float4 float8',
-        'int': 'cid int2 int4 int8 oid xid',
-        'hstore': 'hstore', 'json': 'json jsonb', 'uuid': 'uuid',
-        'num': 'numeric', 'money': 'money',
-        'text': 'bpchar char name text varchar'}
+    The corresponding Python types and simple names are also mapped.
+    """
 
-    _type_classes = {
-        bool: 'bool', float: 'float', int: 'int',
-        bytes: 'text' if bytes is str else 'bytea', unicode: 'text',
-        date: 'date', time: 'date', datetime: 'date', timedelta: 'date',
-        Decimal: 'num', Bytea: 'bytea', Json: 'json', Hstore: 'hstore',
-    }
+    _type_aliases = {
+        'bool': [bool],
+        'bytea': [Bytea],
+        'date': ['interval', 'time', 'timetz', 'timestamp', 'timestamptz',
+                 'abstime', 'reltime',  # these are very old
+                 'datetime', 'timedelta',  # these do not really exist
+                 date, time, datetime, timedelta],
+        'float': ['float4', 'float8', float],
+        'int': ['cid', 'int2', 'int4', 'int8', 'oid', 'xid', int],
+        'hstore': [Hstore], 'json': ['jsonb', Json], 'uuid': [UUID],
+        'num': ['numeric', Decimal], 'money': [],
+        'text': ['bpchar', 'char', 'name', 'varchar',
+                 bytes, unicode, basestring]
+    }  # type: Dict[str, List[Union[str, type]]]
 
-    if long is not int:
-        _type_classes[long] = 'num'
+    if long is not int:  # Python 2 has a separate long type
+        _type_aliases['num'].append(long)
 
     # noinspection PyMissingConstructor
     def __init__(self):
-        self.update(self._type_classes)
-        for typ, keys in self._type_strings.items():
-            for key in keys.split():
+        """Initialize type mapping."""
+        for typ, keys in self._type_aliases.items():
+            keys = [typ] + keys
+            for key in keys:
                 self[key] = typ
-                self['_%s' % key] = '%s[]' % typ
+                if isinstance(key, str):
+                    self['_%s' % key] = '%s[]' % typ
+                elif has_typing and not isinstance(key, tuple):
+                    self[List[key]] = '%s[]' % typ
 
     @staticmethod
     def __missing__(key):
+        """Unmapped types are interpreted as text."""
         return 'text'
+
+    def get_type_dict(self):
+        """Get a plain dictionary of only the types."""
+        return dict((key, typ) for key, typ in self.items()
+                    if not isinstance(key, (str, tuple)))
 
 
 _simpletypes = _SimpleTypes()
+_simple_type_dict = _simpletypes.get_type_dict()
 
 
 def _quote_if_unqualified(param, name):
@@ -604,27 +622,12 @@ class Adapter:
             return typ.attnames
         return {}
 
-    _frequent_simple_types = {
-        Bytea: 'bytea',
-        str: 'text',
-        bytes: 'text',
-        bool: 'bool',
-        int: 'int',
-        long: 'int',
-        float: 'float',
-        Decimal: 'num',
-        date: 'date',
-        time: 'date',
-        datetime: 'date',
-        timedelta: 'date'
-    }
-
     @classmethod
     def guess_simple_type(cls, value):
         """Try to guess which database type the given value has."""
         # optimize for most frequent types
         try:
-            return cls._frequent_simple_types[type(value)]
+            return _simple_type_dict[type(value)]
         except KeyError:
             pass
         if isinstance(value, basestring):
@@ -645,6 +648,8 @@ class Adapter:
             return 'json'
         if isinstance(value, Hstore):
             return 'hstore'
+        if isinstance(value, UUID):
+            return 'uuid'
         if isinstance(value, list):
             return '%s[]' % (cls.guess_simple_base_type(value) or 'text',)
         if isinstance(value, tuple):
