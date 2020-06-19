@@ -1010,11 +1010,6 @@ class TestDBClass(unittest.TestCase):
         q = f("select %(a)s, %(b)s, %(c)s, %(d)s",
               dict(a=3, b=2.5, c='hello', d=True), inline=True)
         r = q.getresult()[0]
-        if isinstance(r[1], Decimal):
-            # Python 2.6 cannot compare float and Decimal
-            r = list(r)
-            r[1] = float(r[1])
-            r = tuple(r)
         self.assertEqual(r, (3, 2.5, 'hello', t))
         # test with dict and extra values
         q = f("select %(a)s||%(b)s||%(c)s||%(d)s||'epsilon'",
@@ -4829,7 +4824,7 @@ class TestMemoryLeaks(unittest.TestCase):
         objs[:] = gc.get_objects()
         objs[:] = [obj for obj in objs if id(obj) not in ids]
         if objs and sys.version_info[:3] in ((3, 5, 0), (3, 5, 1)):
-            # workaround for Python issue 26811
+            # workaround for Python 3.5 issue 26811
             objs[:] = [obj for obj in objs if repr(obj) != '(<NULL>,)']
         self.assertEqual(len(objs), 0)
 
