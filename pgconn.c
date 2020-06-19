@@ -160,9 +160,57 @@ conn_source(connObject *self, PyObject *noargs)
     return (PyObject *) source_obj;
 }
 
-/* Base method for execution of both unprepared and prepared queries */
+/* For a non-query result, set the appropriate error status,
+   return the appropriate value, and free the result set. */
 static PyObject *
-_conn_query(connObject *self, PyObject *args, int prepared)
+_conn_non_query_result(int status, PGresult* result, PGconn *cnx)
+{
+    switch (status) {
+        case PGRES_EMPTY_QUERY:
+            PyErr_SetString(PyExc_ValueError, "Empty query");
+            break;
+        case PGRES_BAD_RESPONSE:
+        case PGRES_FATAL_ERROR:
+        case PGRES_NONFATAL_ERROR:
+            set_error(ProgrammingError, "Cannot execute query",
+                cnx, result);
+            break;
+        case PGRES_COMMAND_OK:
+            {   /* INSERT, UPDATE, DELETE */
+                Oid oid = PQoidValue(result);
+
+                if (oid == InvalidOid) {  /* not a single insert */
+                    char *ret = PQcmdTuples(result);
+
+                    if (ret[0]) {  /* return number of rows affected */
+                        PyObject *obj = PyStr_FromString(ret);
+                        PQclear(result);
+                        return obj;
+                    }
+                    PQclear(result);
+                    Py_INCREF(Py_None);
+                    return Py_None;
+                }
+                /* for a single insert, return the oid */
+                PQclear(result);
+                return PyInt_FromLong(oid);
+            }
+        case PGRES_COPY_OUT: /* no data will be received */
+        case PGRES_COPY_IN:
+            PQclear(result);
+            Py_INCREF(Py_None);
+            return Py_None;
+        default:
+            set_error_msg(InternalError, "Unknown result status");
+    }
+
+    PQclear(result);
+    return NULL; /* error detected on query */
+ }
+
+/* Base method for execution of all different kinds of queries */
+static PyObject *
+_conn_query(connObject *self, PyObject *args, int prepared, int async)
 {
     PyObject *query_str_obj, *param_obj = NULL;
     PGresult* result;
@@ -282,11 +330,19 @@ _conn_query(connObject *self, PyObject *args, int prepared)
         }
 
         Py_BEGIN_ALLOW_THREADS
-        result = prepared ?
-            PQexecPrepared(self->cnx, query, nparms,
-                parms, NULL, NULL, 0) :
-            PQexecParams(self->cnx, query, nparms,
-                NULL, parms, NULL, NULL, 0);
+        if (async) {
+            status = PQsendQueryParams(self->cnx, query, nparms,
+                NULL, (const char * const *)parms, NULL, NULL, 0);
+            result = NULL;
+        }
+        else {
+            result = prepared ?
+                PQexecPrepared(self->cnx, query, nparms,
+                    parms, NULL, NULL, 0) :
+                PQexecParams(self->cnx, query, nparms,
+                    NULL, parms, NULL, NULL, 0);
+            status = result != NULL;
+        }
         Py_END_ALLOW_THREADS
 
         PyMem_Free((void *) parms);
@@ -295,10 +351,17 @@ _conn_query(connObject *self, PyObject *args, int prepared)
     }
     else {
         Py_BEGIN_ALLOW_THREADS
-        result = prepared ?
-            PQexecPrepared(self->cnx, query, 0,
-                NULL, NULL, NULL, 0) :
-            PQexec(self->cnx, query);
+        if (async) {
+            status = PQsendQuery(self->cnx, query);
+            result = NULL;
+        }
+        else {
+            result = prepared ?
+                PQexecPrepared(self->cnx, query, 0,
+                    NULL, NULL, NULL, 0) :
+                PQexec(self->cnx, query);
+            status = result != NULL;
+        }
         Py_END_ALLOW_THREADS
     }
 
@@ -307,7 +370,7 @@ _conn_query(connObject *self, PyObject *args, int prepared)
     Py_XDECREF(param_obj);
 
     /* checks result validity */
-    if (!result) {
+    if (!status) {
         PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
         return NULL;
     }
@@ -317,49 +380,8 @@ _conn_query(connObject *self, PyObject *args, int prepared)
     self->date_format = date_format; /* this is normally NULL */
 
     /* checks result status */
-    if ((status = PQresultStatus(result)) != PGRES_TUPLES_OK) {
-        switch (status) {
-            case PGRES_EMPTY_QUERY:
-                PyErr_SetString(PyExc_ValueError, "Empty query");
-                break;
-            case PGRES_BAD_RESPONSE:
-            case PGRES_FATAL_ERROR:
-            case PGRES_NONFATAL_ERROR:
-                set_error(ProgrammingError, "Cannot execute query",
-                    self->cnx, result);
-                break;
-            case PGRES_COMMAND_OK:
-                {   /* INSERT, UPDATE, DELETE */
-                    Oid oid = PQoidValue(result);
-
-                    if (oid == InvalidOid) {  /* not a single insert */
-                        char *ret = PQcmdTuples(result);
-
-                        if (ret[0]) {  /* return number of rows affected */
-                            PyObject *obj = PyStr_FromString(ret);
-                            PQclear(result);
-                            return obj;
-                        }
-                        PQclear(result);
-                        Py_INCREF(Py_None);
-                        return Py_None;
-                    }
-                    /* for a single insert, return the oid */
-                    PQclear(result);
-                    return PyInt_FromLong(oid);
-                }
-            case PGRES_COPY_OUT: /* no data will be received */
-            case PGRES_COPY_IN:
-                PQclear(result);
-                Py_INCREF(Py_None);
-                return Py_None;
-            default:
-                set_error_msg(InternalError, "Unknown result status");
-        }
-
-        PQclear(result);
-        return NULL; /* error detected on query */
-    }
+    if (result && (status = PQresultStatus(result)) != PGRES_TUPLES_OK)
+        return _conn_non_query_result(status, result, self->cnx);
 
     if (!(query_obj = PyObject_New(queryObject, &queryType)))
         return PyErr_NoMemory();
@@ -368,15 +390,23 @@ _conn_query(connObject *self, PyObject *args, int prepared)
     Py_XINCREF(self);
     query_obj->pgcnx = self;
     query_obj->result = result;
+    query_obj->async = async;
     query_obj->encoding = encoding;
     query_obj->current_row = 0;
-    query_obj->max_row = PQntuples(result);
-    query_obj->num_fields = PQnfields(result);
-    query_obj->col_types = get_col_types(result, query_obj->num_fields);
-    if (!query_obj->col_types) {
-        Py_DECREF(query_obj);
-        Py_DECREF(self);
-        return NULL;
+    if (async) {
+        query_obj->max_row = 0;
+        query_obj->num_fields = 0;
+        query_obj->col_types = NULL;
+    }
+    else {
+        query_obj->max_row = PQntuples(result);
+        query_obj->num_fields = PQnfields(result);
+        query_obj->col_types = get_col_types(result, query_obj->num_fields);
+        if (!query_obj->col_types) {
+            Py_DECREF(query_obj);
+            Py_DECREF(self);
+            return NULL;
+        }
     }
 
     return (PyObject *) query_obj;
@@ -391,7 +421,19 @@ static char conn_query__doc__[] =
 static PyObject *
 conn_query(connObject *self, PyObject *args)
 {
-    return _conn_query(self, args, 0);
+    return _conn_query(self, args, 0, 0);
+}
+
+/* Asynchronous database query */
+static char conn_send_query__doc__[] =
+"send_query(sql, [arg]) -- create a new asynchronous query for this connection\n\n"
+"You must pass the SQL (string) request and you can optionally pass\n"
+"a tuple with positional parameters.\n";
+
+static PyObject *
+conn_send_query(connObject *self, PyObject *args)
+{
+    return _conn_query(self, args, 0, 1);
 }
 
 /* Execute prepared statement. */
@@ -403,7 +445,7 @@ static char conn_query_prepared__doc__[] =
 static PyObject *
 conn_query_prepared(connObject *self, PyObject *args)
 {
-    return _conn_query(self, args, 1);
+    return _conn_query(self, args, 1, 0);
 }
 
 /* Create prepared statement. */
@@ -582,6 +624,62 @@ conn_endcopy(connObject *self, PyObject *noargs)
     }
     Py_INCREF(Py_None);
     return Py_None;
+}
+
+/* Direct access function: set blocking status. */
+static char conn_set_non_blocking__doc__[] =
+"set_non_blocking() -- set the non-blocking status of the connection";
+
+static PyObject *
+conn_set_non_blocking(connObject *self, PyObject *args)
+{
+    int non_blocking;
+
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
+
+    if (!PyArg_ParseTuple(args, "i", &non_blocking)) {
+        PyErr_SetString(PyExc_TypeError, "setnonblocking(tf), with boolean.");
+        return NULL;
+    }
+
+    if (PQsetnonblocking(self->cnx, non_blocking) < 0) {
+        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+        return NULL;
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+/* Direct access function: get blocking status. */
+static char conn_is_non_blocking__doc__[] =
+"is_non_blocking() -- report the blocking status of the connection";
+
+static PyObject *
+conn_is_non_blocking(connObject *self, PyObject *args)
+{
+    int rc;
+
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
+
+    if (!PyArg_ParseTuple(args, "")) {
+        PyErr_SetString(PyExc_TypeError,
+            "method is_non_blocking() takes no parameters");
+        return NULL;
+    }
+
+    rc = PQisnonblocking(self->cnx);
+    if (rc < 0) {
+        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+        return NULL;
+    }
+
+    return PyBool_FromLong(rc);
 }
 #endif /* DIRECT_ACCESS */
 
@@ -1269,6 +1367,40 @@ conn_get_cast_hook(connObject *self, PyObject *noargs)
     return ret;
 }
 
+/* Get asynchronous connection state. */
+static char conn_poll__doc__[] =
+"poll() -- Completes an asynchronous connection";
+
+static PyObject *
+conn_poll(connObject *self, PyObject *args)
+{
+    int rc;
+
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
+
+    /* check args */
+    if (!PyArg_ParseTuple(args, "")) {
+        PyErr_SetString(PyExc_TypeError,
+            "method poll() takes no parameters");
+        return NULL;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    rc = PQconnectPoll(self->cnx);
+    Py_END_ALLOW_THREADS
+
+    if (rc == PGRES_POLLING_FAILED) {
+        set_error(InternalError, "Polling failed", self->cnx, NULL);
+        Py_XDECREF(self);
+        return NULL;
+    }
+
+    return PyInt_FromLong(rc);
+}
+
 /* Set notice receiver callback function. */
 static char conn_set_notice_receiver__doc__[] =
 "set_notice_receiver(func) -- set the current notice receiver";
@@ -1417,12 +1549,16 @@ static struct PyMethodDef conn_methods[] = {
         METH_NOARGS, conn_source__doc__},
     {"query", (PyCFunction) conn_query,
         METH_VARARGS, conn_query__doc__},
+    {"send_query", (PyCFunction) conn_send_query,
+        METH_VARARGS, conn_send_query__doc__},
     {"query_prepared", (PyCFunction) conn_query_prepared,
         METH_VARARGS, conn_query_prepared__doc__},
     {"prepare", (PyCFunction) conn_prepare,
         METH_VARARGS, conn_prepare__doc__},
     {"describe_prepared", (PyCFunction) conn_describe_prepared,
         METH_VARARGS, conn_describe_prepared__doc__},
+    {"poll", (PyCFunction) conn_poll,
+        METH_VARARGS, conn_poll__doc__},
     {"reset", (PyCFunction) conn_reset,
         METH_NOARGS, conn_reset__doc__},
     {"cancel", (PyCFunction) conn_cancel,
@@ -1468,6 +1604,10 @@ static struct PyMethodDef conn_methods[] = {
         METH_NOARGS, conn_getline__doc__},
     {"endcopy", (PyCFunction) conn_endcopy,
         METH_NOARGS, conn_endcopy__doc__},
+    {"set_non_blocking", (PyCFunction) conn_set_non_blocking,
+        METH_O, conn_set_non_blocking__doc__},
+    {"is_non_blocking", (PyCFunction) conn_is_non_blocking,
+        METH_NOARGS, conn_is_non_blocking__doc__},
 #endif /* DIRECT_ACCESS */
 
 #ifdef LARGE_OBJECTS

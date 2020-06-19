@@ -10,6 +10,10 @@ Version 5.2 (to be released)
       of the pqlib used by PyGreSQL (needs PostgreSQL >= 9.1 on the client).
     - New query method `memsize()` that gets the memory size allocated by
       the query (needs PostgreSQL >= 12 on the client).
+    - Experimental support for asynchronous command processing.
+      Additional connection parameter ``nowait``, and connection methods
+      `send_query()`, `poll()`, `set_non_blocking()`, `is_non_blocking()`.
+      Generously contributed by Patrick TJ McPhee (#19).
 
 - Changes to the DB-API 2 module (pgdb):
     - When using Python 2, errors are now derived from StandardError
@@ -19,7 +23,7 @@ Version 5.2 (to be released)
     - The `types` parameter of `format_query` can now be passed as a string
       that will be split on whitespace when values are passed as a sequence,
       and the types can now also be specified using actual Python types
-      instead of type names (#38, suggested by Justin Pryzby).
+      instead of type names. Suggested by Justin Pryzby (#38).
 
 Version 5.1.2 (2020-04-19)
 --------------------------

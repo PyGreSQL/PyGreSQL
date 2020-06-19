@@ -102,6 +102,89 @@ _query_row_as_tuple(queryObject *self)
     return row_tuple;
 }
 
+/* Fetch the result if this is an asynchronous query and it has not yet
+   been fetched in this round-trip. Also mark whether the result should
+   be kept for this round-trip (e.g. to be used in an iterator).
+   If this is a normal query result, the query itself will be returned,
+   otherwise a result value will be returned that shall be passed on. */
+static PyObject *
+_get_async_result(queryObject *self, int keep) {
+    int fetch = 0;
+
+    if (self->async) {
+        if (self->async == 1) {
+            fetch = 1;
+            if (keep) {
+                /* mark query as fetched, do not fetch again */
+                self->async = 2;
+            }
+        } else if (!keep) {
+            self->async = 1;
+        }
+    }
+
+    if (fetch) {
+        int status;
+
+        if (!self->pgcnx) {
+            PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+            return NULL;
+        }
+
+        Py_BEGIN_ALLOW_THREADS
+        if (self->result) {
+            PQclear(self->result);
+        }
+        self->result = PQgetResult(self->pgcnx->cnx);
+        Py_END_ALLOW_THREADS
+        if (!self->result) {
+            /* end of result set, return None */
+            Py_DECREF(self->pgcnx);
+            self->pgcnx = NULL;
+            Py_INCREF(Py_None);
+            return Py_None;
+        }
+
+        if ((status = PQresultStatus(self->result)) != PGRES_TUPLES_OK) {
+            PyObject* result = _conn_non_query_result(
+                status, self->result, self->pgcnx->cnx);
+            self->result = NULL; /* since this has been already cleared */
+            if (!result) {
+                /* Raise an error. We need to call PQgetResult() to clear the
+                   connection state. This should return NULL the first time. */
+                self->result = PQgetResult(self->pgcnx->cnx);
+                while (self->result) {
+                    PQclear(self->result);
+                    self->result = PQgetResult(self->pgcnx->cnx);
+                    Py_DECREF(self->pgcnx);
+                    self->pgcnx = NULL;
+                }
+            }
+            else if (result == Py_None) {
+                /* It's would be confusing to return None here because the
+                   caller has to call again until we return None. We can't
+                   just consume that final None because we don't know if there
+                   are additional statements following this one, so we return
+                   an empty string where query() would return None. */
+                Py_DECREF(result);
+                result = PyStr_FromString("");
+            }
+            return result;
+        }
+
+        self->max_row = PQntuples(self->result);
+        self->num_fields = PQnfields(self->result);
+        self->col_types = get_col_types(self->result, self->num_fields);
+        if (!self->col_types) {
+            Py_DECREF(self);
+            Py_DECREF(self);
+            return NULL;
+        }
+    }
+    /* return the query object itself as sentinel for a normal query result */
+    return (PyObject *)self;
+}
+
 /* Return given item from a query object. */
 static PyObject *
 query_getitem(PyObject *self, Py_ssize_t i)
@@ -109,6 +192,9 @@ query_getitem(PyObject *self, Py_ssize_t i)
     queryObject *q = (queryObject *) self;
     PyObject *tmp;
     long row;
+
+    if ((tmp = _get_async_result(q, 0)) != (PyObject *)self)
+        return tmp;
 
     tmp = PyLong_FromSize_t((size_t) i);
     row = PyLong_AsLong(tmp);
@@ -127,6 +213,11 @@ query_getitem(PyObject *self, Py_ssize_t i)
    Returns the default iterator yielding rows as tuples. */
 static PyObject* query_iter(queryObject *self)
 {
+    PyObject *res;
+
+    if ((res = _get_async_result(self, 0)) != (PyObject *)self)
+        return res;
+
     self->current_row = 0;
     Py_INCREF(self);
     return (PyObject*) self;
@@ -261,12 +352,16 @@ query_one(queryObject *self, PyObject *noargs)
 {
     PyObject *row_tuple;
 
-    if (self->current_row >= self->max_row) {
-        Py_INCREF(Py_None); return Py_None;
+    if ((row_tuple = _get_async_result(self, 0)) == (PyObject *)self) {
+
+        if (self->current_row >= self->max_row) {
+            Py_INCREF(Py_None); return Py_None;
+        }
+
+        row_tuple = _query_row_as_tuple(self);
+        if (row_tuple) ++self->current_row;
     }
 
-    row_tuple = _query_row_as_tuple(self);
-    if (row_tuple) ++self->current_row;
     return row_tuple;
 }
 
@@ -283,17 +378,21 @@ query_single(queryObject *self, PyObject *noargs)
 {
     PyObject *row_tuple;
 
-    if (self->max_row != 1) {
-        if (self->max_row)
-            set_error_msg(MultipleResultsError, "Multiple results found");
-        else
-            set_error_msg(NoResultError, "No result found");
-        return NULL;
+    if ((row_tuple = _get_async_result(self, 0)) == (PyObject *)self) {
+
+        if (self->max_row != 1) {
+            if (self->max_row)
+                set_error_msg(MultipleResultsError, "Multiple results found");
+            else
+                set_error_msg(NoResultError, "No result found");
+            return NULL;
+        }
+
+        self->current_row = 0;
+        row_tuple = _query_row_as_tuple(self);
+        if (row_tuple) ++self->current_row;
     }
 
-    self->current_row = 0;
-    row_tuple = _query_row_as_tuple(self);
-    if (row_tuple) ++self->current_row;
     return row_tuple;
 }
 
@@ -309,17 +408,20 @@ query_getresult(queryObject *self, PyObject *noargs)
     PyObject *result_list;
     int i;
 
-    if (!(result_list = PyList_New(self->max_row))) {
-        return NULL;
-    }
+    if ((result_list = _get_async_result(self, 0)) == (PyObject *)self) {
 
-    for (i = self->current_row = 0; i < self->max_row; ++i) {
-        PyObject *row_tuple = query_next(self, noargs);
-
-        if (!row_tuple) {
-            Py_DECREF(result_list); return NULL;
+        if (!(result_list = PyList_New(self->max_row))) {
+            return NULL;
         }
-        PyList_SET_ITEM(result_list, i, row_tuple);
+
+        for (i = self->current_row = 0; i < self->max_row; ++i) {
+            PyObject *row_tuple = query_next(self, noargs);
+
+            if (!row_tuple) {
+                Py_DECREF(result_list); return NULL;
+            }
+            PyList_SET_ITEM(result_list, i, row_tuple);
+        }
     }
 
     return result_list;
@@ -378,12 +480,16 @@ query_onedict(queryObject *self, PyObject *noargs)
 {
     PyObject *row_dict;
 
-    if (self->current_row >= self->max_row) {
-        Py_INCREF(Py_None); return Py_None;
+    if ((row_dict = _get_async_result(self, 0)) == (PyObject *)self) {
+
+        if (self->current_row >= self->max_row) {
+            Py_INCREF(Py_None); return Py_None;
+        }
+
+        row_dict = _query_row_as_dict(self);
+        if (row_dict) ++self->current_row;
     }
 
-    row_dict = _query_row_as_dict(self);
-    if (row_dict) ++self->current_row;
     return row_dict;
 }
 
@@ -401,17 +507,21 @@ query_singledict(queryObject *self, PyObject *noargs)
 {
     PyObject *row_dict;
 
-    if (self->max_row != 1) {
-        if (self->max_row)
-            set_error_msg(MultipleResultsError, "Multiple results found");
-        else
-            set_error_msg(NoResultError, "No result found");
-        return NULL;
+    if ((row_dict = _get_async_result(self, 0)) == (PyObject *)self) {
+
+        if (self->max_row != 1) {
+            if (self->max_row)
+                set_error_msg(MultipleResultsError, "Multiple results found");
+            else
+                set_error_msg(NoResultError, "No result found");
+            return NULL;
+        }
+
+        self->current_row = 0;
+        row_dict = _query_row_as_dict(self);
+        if (row_dict) ++self->current_row;
     }
 
-    self->current_row = 0;
-    row_dict = _query_row_as_dict(self);
-    if (row_dict) ++self->current_row;
     return row_dict;
 }
 
@@ -427,17 +537,20 @@ query_dictresult(queryObject *self, PyObject *noargs)
     PyObject *result_list;
     int i;
 
-    if (!(result_list = PyList_New(self->max_row))) {
-        return NULL;
-    }
+    if ((result_list = _get_async_result(self, 0)) == (PyObject *)self) {
 
-    for (i = self->current_row = 0; i < self->max_row; ++i) {
-        PyObject *row_dict = query_next_dict(self, noargs);
-
-        if (!row_dict) {
-            Py_DECREF(result_list); return NULL;
+        if (!(result_list = PyList_New(self->max_row))) {
+            return NULL;
         }
-        PyList_SET_ITEM(result_list, i, row_dict);
+
+        for (i = self->current_row = 0; i < self->max_row; ++i) {
+            PyObject *row_dict = query_next_dict(self, noargs);
+
+            if (!row_dict) {
+                Py_DECREF(result_list); return NULL;
+            }
+            PyList_SET_ITEM(result_list, i, row_dict);
+        }
     }
 
     return result_list;
@@ -452,9 +565,14 @@ static char query_dictiter__doc__[] =
 static PyObject *
 query_dictiter(queryObject *self, PyObject *noargs)
 {
+    PyObject *res;
+
     if (!dictiter) {
         return query_dictresult(self, noargs);
     }
+
+    if ((res = _get_async_result(self, 1)) != (PyObject *)self)
+        return res;
 
     return PyObject_CallFunction(dictiter, "(O)", self);
 }
@@ -469,9 +587,14 @@ static char query_onenamed__doc__[] =
 static PyObject *
 query_onenamed(queryObject *self, PyObject *noargs)
 {
+    PyObject *res;
+
     if (!namednext) {
         return query_one(self, noargs);
     }
+
+    if ((res = _get_async_result(self, 1)) != (PyObject *)self)
+        return res;
 
     if (self->current_row >= self->max_row) {
         Py_INCREF(Py_None); return Py_None;
@@ -491,9 +614,14 @@ static char query_singlenamed__doc__[] =
 static PyObject *
 query_singlenamed(queryObject *self, PyObject *noargs)
 {
+    PyObject *res;
+
     if (!namednext) {
         return query_single(self, noargs);
     }
+
+    if ((res = _get_async_result(self, 1)) != (PyObject *)self)
+        return res;
 
     if (self->max_row != 1) {
         if (self->max_row)
@@ -522,11 +650,15 @@ query_namedresult(queryObject *self, PyObject *noargs)
         return query_getresult(self, noargs);
     }
 
-    res = PyObject_CallFunction(namediter, "(O)", self);
-    if (!res) return NULL;
-    if (PyList_Check(res)) return res;
-    res_list = PySequence_List(res);
-    Py_DECREF(res);
+    if ((res_list = _get_async_result(self, 1)) == (PyObject *)self) {
+
+        res = PyObject_CallFunction(namediter, "(O)", self);
+        if (!res) return NULL;
+        if (PyList_Check(res)) return res;
+        res_list = PySequence_List(res);
+        Py_DECREF(res);
+    }
+
     return res_list;
 }
 
@@ -545,11 +677,15 @@ query_namediter(queryObject *self, PyObject *noargs)
         return query_iter(self);
     }
 
-    res = PyObject_CallFunction(namediter, "(O)", self);
-    if (!res) return NULL;
-    if (!PyList_Check(res)) return res;
-    res_iter = (Py_TYPE(res)->tp_iter)((PyObject *) self);
-    Py_DECREF(res);
+    if ((res_iter = _get_async_result(self, 1)) == (PyObject *)self) {
+
+        res = PyObject_CallFunction(namediter, "(O)", self);
+        if (!res) return NULL;
+        if (!PyList_Check(res)) return res;
+        res_iter = (Py_TYPE(res)->tp_iter)((PyObject *) self);
+        Py_DECREF(res);
+    }
+
     return res_iter;
 }
 
@@ -564,25 +700,28 @@ query_scalarresult(queryObject *self, PyObject *noargs)
 {
     PyObject *result_list;
 
-    if (!self->num_fields) {
-        set_error_msg(ProgrammingError, "No fields in result");
-        return NULL;
-    }
+    if ((result_list = _get_async_result(self, 0)) == (PyObject *)self) {
 
-    if (!(result_list = PyList_New(self->max_row))) {
-        return NULL;
-    }
-
-    for (self->current_row = 0;
-         self->current_row < self->max_row;
-         ++self->current_row)
-    {
-        PyObject *value = _query_value_in_column(self, 0);
-
-        if (!value) {
-            Py_DECREF(result_list); return NULL;
+        if (!self->num_fields) {
+            set_error_msg(ProgrammingError, "No fields in result");
+            return NULL;
         }
-        PyList_SET_ITEM(result_list, self->current_row, value);
+
+        if (!(result_list = PyList_New(self->max_row))) {
+            return NULL;
+        }
+
+        for (self->current_row = 0;
+             self->current_row < self->max_row;
+             ++self->current_row)
+        {
+            PyObject *value = _query_value_in_column(self, 0);
+
+            if (!value) {
+                Py_DECREF(result_list); return NULL;
+            }
+            PyList_SET_ITEM(result_list, self->current_row, value);
+        }
     }
 
     return result_list;
@@ -597,9 +736,14 @@ static char query_scalariter__doc__[] =
 static PyObject *
 query_scalariter(queryObject *self, PyObject *noargs)
 {
+    PyObject *res;
+
     if (!scalariter) {
         return query_scalarresult(self, noargs);
     }
+
+    if ((res = _get_async_result(self, 1)) != (PyObject *)self)
+        return res;
 
     if (!self->num_fields) {
         set_error_msg(ProgrammingError, "No fields in result");
@@ -621,17 +765,21 @@ query_onescalar(queryObject *self, PyObject *noargs)
 {
     PyObject *value;
 
-    if (!self->num_fields) {
-        set_error_msg(ProgrammingError, "No fields in result");
-        return NULL;
+    if ((value = _get_async_result(self, 0)) == (PyObject *)self) {
+
+        if (!self->num_fields) {
+            set_error_msg(ProgrammingError, "No fields in result");
+            return NULL;
+        }
+
+        if (self->current_row >= self->max_row) {
+            Py_INCREF(Py_None); return Py_None;
+        }
+
+        value = _query_value_in_column(self, 0);
+        if (value) ++self->current_row;
     }
 
-    if (self->current_row >= self->max_row) {
-        Py_INCREF(Py_None); return Py_None;
-    }
-
-    value = _query_value_in_column(self, 0);
-    if (value) ++self->current_row;
     return value;
 }
 
@@ -648,22 +796,26 @@ query_singlescalar(queryObject *self, PyObject *noargs)
 {
     PyObject *value;
 
-    if (!self->num_fields) {
-        set_error_msg(ProgrammingError, "No fields in result");
-        return NULL;
+    if ((value = _get_async_result(self, 0)) == (PyObject *)self) {
+
+        if (!self->num_fields) {
+            set_error_msg(ProgrammingError, "No fields in result");
+            return NULL;
+        }
+
+        if (self->max_row != 1) {
+            if (self->max_row)
+                set_error_msg(MultipleResultsError, "Multiple results found");
+            else
+                set_error_msg(NoResultError, "No result found");
+            return NULL;
+        }
+
+        self->current_row = 0;
+        value = _query_value_in_column(self, 0);
+        if (value) ++self->current_row;
     }
 
-    if (self->max_row != 1) {
-        if (self->max_row)
-            set_error_msg(MultipleResultsError, "Multiple results found");
-        else
-            set_error_msg(NoResultError, "No result found");
-        return NULL;
-    }
-
-    self->current_row = 0;
-    value = _query_value_in_column(self, 0);
-    if (value) ++self->current_row;
     return value;
 }
 
@@ -752,7 +904,7 @@ static PyTypeObject queryType = {
     0,                           /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT
         |Py_TPFLAGS_HAVE_ITER,   /* tp_flags */
-    query__doc__,               /* tp_doc */
+    query__doc__,                /* tp_doc */
     0,                           /* tp_traverse */
     0,                           /* tp_clear */
     0,                           /* tp_richcompare */

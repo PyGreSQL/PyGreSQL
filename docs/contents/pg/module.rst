@@ -20,7 +20,7 @@ standard environment variables should be used.
 connect -- Open a PostgreSQL connection
 ---------------------------------------
 
-.. function:: connect([dbname], [host], [port], [opt], [user], [passwd])
+.. function:: connect([dbname], [host], [port], [opt], [user], [passwd], [nowait])
 
     Open a :mod:`pg` connection
 
@@ -36,6 +36,8 @@ connect -- Open a PostgreSQL connection
     :type user: str or None
     :param passwd: password for user (*None* = :data:`defpasswd`)
     :type passwd: str or None
+    :param nowait: whether the connection should happen asynchronously
+    :type nowait: bool
     :returns: If successful, the :class:`Connection` handling the connection
     :rtype: :class:`Connection`
     :raises TypeError: bad argument type, or too many arguments
@@ -49,10 +51,14 @@ Python tutorial. The names of the keywords are the name of the
 parameters given in the syntax line. The ``opt`` parameter can be used
 to pass command-line options to the server. For a precise description
 of the parameters, please refer to the PostgreSQL user manual.
+See :meth:`Connection.poll` for a description of the ``nowait`` parameter.
 
 If you want to add additional parameters not specified here, you must
 pass a connection string or a connection URI instead of the ``dbname``
 (as in ``con3`` and ``con4``  in the following example).
+
+.. versionchanged:: 5.2
+    Support for asynchronous connections via the ``nowait`` parameter.
 
 Example::
 
@@ -746,6 +752,13 @@ for more information about them. These constants are:
 
     large objects access modes,
     used by :meth:`Connection.locreate` and :meth:`LargeObject.open`
+
+.. data:: POLLING_OK
+.. data:: POLLING_FAILED
+.. data:: POLLING_READING
+.. data:: POLLING_WRITING
+
+    polling states, returned by :meth:`Connection.poll`
 
 .. data:: SEEK_SET
 .. data:: SEEK_CUR

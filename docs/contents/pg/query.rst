@@ -43,6 +43,9 @@ You can also call :func:`len` on a query to find the number of rows
 in the result, and access row tuples using their index directly on
 the :class:`Query` object.
 
+When the :class:`Query` object was returned by :meth:`Connection.send_query`,
+other return values are also possible, as documented there.
+
 dictresult/dictiter -- get query values as dictionaries
 -------------------------------------------------------
 
@@ -80,6 +83,9 @@ fetched from the server anyway when the query is executed.
 
 If the query has duplicate field names, you will get the value for the
 field with the highest index in the query.
+
+When the :class:`Query` object was returned by :meth:`Connection.send_query`,
+other return values are also possible, as documented there.
 
 .. versionadded:: 5.1
 
@@ -126,6 +132,9 @@ fetched from the server anyway when the query is executed.
 Column names in the database that are not valid as field names for
 named tuples (particularly, names starting with an underscore) are
 automatically renamed to valid positional names.
+
+When the :class:`Query` object was returned by :meth:`Connection.send_query`,
+other return values are also possible, as documented there.
 
 .. versionadded:: 5.1
 

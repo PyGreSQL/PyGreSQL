@@ -72,6 +72,12 @@ def connect():
     return connection
 
 
+def connect_nowait():
+    """Start a basic pg connection in a non-blocking manner."""
+    # noinspection PyArgumentList
+    return pg.connect(dbname, dbhost, dbport, nowait=True)
+
+
 class TestCanConnect(unittest.TestCase):
     """Test whether a basic connection to PostgreSQL is possible."""
 
@@ -80,6 +86,20 @@ class TestCanConnect(unittest.TestCase):
             connection = connect()
         except pg.Error as error:
             self.fail('Cannot connect to database %s:\n%s' % (dbname, error))
+        try:
+            connection.close()
+        except pg.Error:
+            self.fail('Cannot close the database connection')
+
+    def testCanConnectNoWait(self):
+        try:
+            connection = connect()
+            rc = connection.poll()
+            while rc not in (pg.POLLING_OK, pg.POLLING_FAILED):
+                rc = connection.poll()
+        except pg.Error as error:
+            self.fail('Cannot connect to database %s:\n%s' % (dbname, error))
+        self.assertEqual(rc, pg.POLLING_OK)
         try:
             connection.close()
         except pg.Error:
@@ -132,9 +152,10 @@ class TestConnectObject(unittest.TestCase):
             cancel close date_format describe_prepared endcopy
             escape_bytea escape_identifier escape_literal escape_string
             fileno get_cast_hook get_notice_receiver getline getlo getnotify
-            inserttable locreate loimport parameter
-            prepare putline query query_prepared reset
-            set_cast_hook set_notice_receiver source transaction
+            inserttable is_non_blocking locreate loimport parameter poll
+            prepare putline query query_prepared reset send_query
+            set_cast_hook set_non_blocking set_notice_receiver
+            source transaction
             '''.split()
         connection_methods = [
             a for a in dir(self.connection)
@@ -219,6 +240,49 @@ class TestConnectObject(unittest.TestCase):
 
     def testMethodQueryEmpty(self):
         self.assertRaises(ValueError, self.connection.query, '')
+
+    def testMethodSendQuerySingle(self):
+        query = self.connection.send_query
+        for q, args, result in (
+                ("select 1+1 as a", (), 2),
+                ("select 1+$1 as a", ((1,),), 2),
+                ("select 1+$1+$2 as a", ((2, 3),), 6)):
+            pgq = query(q, *args)
+            self.assertEqual(self.connection.transaction(), pg.TRANS_ACTIVE)
+            self.assertEqual(pgq.getresult()[0][0], result)
+            self.assertEqual(self.connection.transaction(), pg.TRANS_ACTIVE)
+            self.assertIsNone(pgq.getresult())
+            self.assertEqual(self.connection.transaction(), pg.TRANS_IDLE)
+
+            pgq = query(q, *args)
+            self.assertEqual(pgq.namedresult()[0].a, result)
+            self.assertIsNone(pgq.namedresult())
+
+            pgq = query(q, *args)
+            self.assertEqual(pgq.dictresult()[0]['a'], result)
+            self.assertIsNone(pgq.dictresult())
+
+    def testMethodSendQueryMultiple(self):
+        query = self.connection.send_query
+
+        pgq = query("select 1+1; select 'pg';")
+        self.assertEqual(pgq.getresult()[0][0], 2)
+        self.assertEqual(pgq.getresult()[0][0], 'pg')
+        self.assertIsNone(pgq.getresult())
+
+        pgq = query("select 1+1 as a; select 'pg' as a;")
+        self.assertEqual(pgq.namedresult()[0].a, 2)
+        self.assertEqual(pgq.namedresult()[0].a, 'pg')
+        self.assertIsNone(pgq.namedresult())
+
+        pgq = query("select 1+1 as a; select 'pg' as a;")
+        self.assertEqual(pgq.dictresult()[0]['a'], 2)
+        self.assertEqual(pgq.dictresult()[0]['a'], 'pg')
+        self.assertIsNone(pgq.dictresult())
+
+    def testMethodSendQueryEmpty(self):
+        query = self.connection.send_query('')
+        self.assertRaises(ValueError, query.getresult)
 
     def testAllQueryMembers(self):
         query = self.connection.query("select true where false")
@@ -420,6 +484,18 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
+    def testGetresultAsync(self):
+        q = "select 0"
+        result = [(0,)]
+        query = self.c.send_query(q)
+        r = query.getresult()
+        self.assertIsInstance(r, list)
+        v = r[0]
+        self.assertIsInstance(v, tuple)
+        self.assertIsInstance(v[0], int)
+        self.assertEqual(r, result)
+        self.assertIsNone(query.getresult())
+
     def testDictresult(self):
         q = "select 0 as alias0"
         result = [{'alias0': 0}]
@@ -452,6 +528,18 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
+    def testDictresultAsync(self):
+        q = "select 0 as alias0"
+        result = [{'alias0': 0}]
+        query = self.c.send_query(q)
+        r = query.dictresult()
+        self.assertIsInstance(r, list)
+        v = r[0]
+        self.assertIsInstance(v, dict)
+        self.assertIsInstance(v['alias0'], int)
+        self.assertEqual(r, result)
+        self.assertIsNone(query.dictresult())
+
     def testNamedresult(self):
         q = "select 0 as alias0"
         result = [(0,)]
@@ -481,6 +569,17 @@ class TestSimpleQueries(unittest.TestCase):
         v = r[0]
         self.assertEqual(v._fields[:6], fields)
         self.assertEqual(v._fields[6], 'and_a_good_one')
+
+    def testNamedresultAsync(self):
+        q = "select 0 as alias0"
+        query = self.c.send_query(q)
+        result = [(0,)]
+        r = query.namedresult()
+        self.assertEqual(r, result)
+        v = r[0]
+        self.assertEqual(v._fields, ('alias0',))
+        self.assertEqual(v.alias0, 0)
+        self.assertIsNone(query.namedresult())
 
     def testGet3Cols(self):
         q = "select 1,2,3"

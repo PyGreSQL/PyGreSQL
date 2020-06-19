@@ -72,7 +72,7 @@ static PyObject *pg_default_passwd; /* default password */
 #endif  /* DEFAULT_VARS */
 
 static PyObject *decimal = NULL,    /* decimal type */
-                *dictiter = NULL,   /* function for getting named results */
+                *dictiter = NULL,   /* function for getting dict results */
                 *namediter = NULL,  /* function for getting named results */
                 *namednext = NULL,  /* function for getting one named result */
                 *scalariter = NULL, /* function for getting scalar results */
@@ -154,6 +154,7 @@ typedef struct
     PyObject_HEAD
     connObject *pgcnx;       /* parent connection object */
     PGresult   *result;      /* result content */
+    int        async;        /* flag for asynchronous queries */
     int        encoding;     /* client encoding */
     int        current_row;  /* currently selected row */
     int        max_row;      /* number of rows in the result */
@@ -197,7 +198,7 @@ typedef struct
 
 /* Connect to a database. */
 static char pg_connect__doc__[] =
-"connect(dbname, host, port, opt) -- connect to a PostgreSQL database\n\n"
+"connect(dbname, host, port, opt, user, passwd, wait) -- connect to a PostgreSQL database\n\n"
 "The connection uses the specified parameters (optional, keywords aware).\n";
 
 static PyObject *
@@ -205,16 +206,17 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] =
     {
-        "dbname", "host", "port", "opt", "user", "passwd", NULL
+        "dbname", "host", "port", "opt", "user", "passwd", "nowait", NULL
     };
 
     char *pghost, *pgopt, *pgdbname, *pguser, *pgpasswd;
-    int pgport;
+    int pgport = -1, nowait = 0, nkw = 0;
     char port_buffer[20];
+    const char *keywords[sizeof(kwlist) / sizeof(*kwlist) + 1],
+               *values[sizeof(kwlist) / sizeof(*kwlist) + 1];
     connObject *conn_obj;
 
     pghost = pgopt = pgdbname = pguser = pgpasswd = NULL;
-    pgport = -1;
 
     /*
      * parses standard arguments With the right compiler warnings, this
@@ -223,8 +225,8 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
      * I try to assign all those constant strings to it.
      */
     if (!PyArg_ParseTupleAndKeywords(
-        args, dict, "|zzizzz", (char**)kwlist,
-        &pgdbname, &pghost, &pgport, &pgopt, &pguser, &pgpasswd))
+        args, dict, "|zzizzzi", (char**)kwlist,
+        &pgdbname, &pghost, &pgport, &pgopt, &pguser, &pgpasswd, &nowait))
     {
         return NULL;
     }
@@ -261,14 +263,44 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
     conn_obj->cast_hook = NULL;
     conn_obj->notice_receiver = NULL;
 
-    if (pgport != -1) {
+    if (pghost)
+    {
+        keywords[nkw] = "host";
+        values[nkw++] = pghost;
+    }
+    if (pgopt)
+    {
+        keywords[nkw] = "options";
+        values[nkw++] = pgopt;
+    }
+    if (pgdbname)
+    {
+        keywords[nkw] = "dbname";
+        values[nkw++] = pgdbname;
+    }
+    if (pguser)
+    {
+        keywords[nkw] = "user";
+        values[nkw++] = pguser;
+    }
+    if (pgpasswd)
+    {
+        keywords[nkw] = "password";
+        values[nkw++] = pgpasswd;
+    }
+    if (pgport != -1)
+    {
         memset(port_buffer, 0, sizeof(port_buffer));
         sprintf(port_buffer, "%d", pgport);
+
+        keywords[nkw] = "port";
+        values[nkw++] = port_buffer;
     }
+    keywords[nkw] = values[nkw] = NULL;
 
     Py_BEGIN_ALLOW_THREADS
-    conn_obj->cnx = PQsetdbLogin(pghost, pgport == -1 ? NULL : port_buffer,
-        pgopt, NULL, pgdbname, pguser, pgpasswd);
+    conn_obj->cnx = nowait ? PQconnectStartParams(keywords, values, 1) :
+        PQconnectdbParams(keywords, values, 1);
     Py_END_ALLOW_THREADS
 
     if (PQstatus(conn_obj->cnx) == CONNECTION_BAD) {
@@ -1321,11 +1353,17 @@ MODULE_INIT_FUNC(_pg)
     PyDict_SetItemString(dict, "RESULT_DQL", PyInt_FromLong(RESULT_DQL));
 
     /* Transaction states */
-    PyDict_SetItemString(dict,"TRANS_IDLE",PyInt_FromLong(PQTRANS_IDLE));
-    PyDict_SetItemString(dict,"TRANS_ACTIVE",PyInt_FromLong(PQTRANS_ACTIVE));
-    PyDict_SetItemString(dict,"TRANS_INTRANS",PyInt_FromLong(PQTRANS_INTRANS));
-    PyDict_SetItemString(dict,"TRANS_INERROR",PyInt_FromLong(PQTRANS_INERROR));
-    PyDict_SetItemString(dict,"TRANS_UNKNOWN",PyInt_FromLong(PQTRANS_UNKNOWN));
+    PyDict_SetItemString(dict, "TRANS_IDLE", PyInt_FromLong(PQTRANS_IDLE));
+    PyDict_SetItemString(dict, "TRANS_ACTIVE", PyInt_FromLong(PQTRANS_ACTIVE));
+    PyDict_SetItemString(dict, "TRANS_INTRANS", PyInt_FromLong(PQTRANS_INTRANS));
+    PyDict_SetItemString(dict, "TRANS_INERROR", PyInt_FromLong(PQTRANS_INERROR));
+    PyDict_SetItemString(dict, "TRANS_UNKNOWN", PyInt_FromLong(PQTRANS_UNKNOWN));
+
+    /* Polling results */
+    PyDict_SetItemString(dict, "POLLING_OK", PyInt_FromLong(PGRES_POLLING_OK));
+    PyDict_SetItemString(dict, "POLLING_FAILED", PyInt_FromLong(PGRES_POLLING_FAILED));
+    PyDict_SetItemString(dict, "POLLING_READING", PyInt_FromLong(PGRES_POLLING_READING));
+    PyDict_SetItemString(dict, "POLLING_WRITING", PyInt_FromLong(PGRES_POLLING_WRITING));
 
 #ifdef LARGE_OBJECTS
     /* Create mode for large objects */

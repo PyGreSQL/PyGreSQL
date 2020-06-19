@@ -52,6 +52,7 @@ __all__ = [
     'NoResultError', 'NotSupportedError',
     'OperationalError', 'ProgrammingError',
     'INV_READ', 'INV_WRITE',
+    'POLLING_OK', 'POLLING_FAILED', 'POLLING_READING', 'POLLING_WRITING',
     'SEEK_CUR', 'SEEK_END', 'SEEK_SET',
     'TRANS_ACTIVE', 'TRANS_IDLE', 'TRANS_INERROR',
     'TRANS_INTRANS', 'TRANS_UNKNOWN',
