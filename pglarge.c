@@ -12,8 +12,12 @@
 static void
 large_dealloc(largeObject *self)
 {
-    if (self->lo_fd >= 0 && self->pgcnx->valid)
-        lo_close(self->pgcnx->cnx, self->lo_fd);
+    /* Note: We do not try to close the large object here anymore,
+       since the server automatically closes it at the end of the
+       transaction in which it was created. So the object might already
+       be closed, which will then cause error messages on the server.
+       In other situations we might close the object too early here
+       if the Python object falls out of scope but is still needed. */
 
     Py_XDECREF(self->pgcnx);
     PyObject_Del(self);
