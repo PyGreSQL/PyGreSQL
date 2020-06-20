@@ -10,6 +10,8 @@ Version 5.2 (to be released)
       of the pqlib used by PyGreSQL (needs PostgreSQL >= 9.1 on the client).
     - New query method `memsize()` that gets the memory size allocated by
       the query (needs PostgreSQL >= 12 on the client).
+    - New query method `fieldinfo()` that gets name and type information for
+      one or all field(s) of the query. Contributed by Justin Pryzby (#39).
     - Experimental support for asynchronous command processing.
       Additional connection parameter ``nowait``, and connection methods
       `send_query()`, `poll()`, `set_non_blocking()`, `is_non_blocking()`.
@@ -20,7 +22,7 @@ Version 5.2 (to be released)
       instead of type names. Suggested by Justin Pryzby (#38).
     - The `inserttable()` method now accepts an optional column list that will
       be passed on to the COPY command. Contributed by Justin Pryzby (#24).
-    - The `DBTyptes` class now also includes the `typlen` attribute with
+    - The `DBTypes` class now also includes the `typlen` attribute with
       information about the size of the type (contributed by Justin Pryzby).
 
 - Changes to the DB-API 2 module (pgdb):

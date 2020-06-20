@@ -191,7 +191,7 @@ except ImportError:  # Python < 3.2
         return decorator
 
 
-# Auxiliary classes and functions that are independent from a DB connection:
+# Auxiliary classes and functions that are independent of a DB connection:
 
 try:  # noinspection PyUnresolvedReferences
     from inspect import signature

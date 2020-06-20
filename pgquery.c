@@ -340,6 +340,77 @@ query_fieldnum(queryObject *self, PyObject *args)
     return PyInt_FromLong(num);
 }
 
+/* Build a tuple with info for query field with given number. */
+static PyObject *
+_query_build_field_info(PGresult *res, int col_num) {
+    PyObject *info;
+
+    info = PyTuple_New(4);
+    if (info) {
+        PyTuple_SET_ITEM(info, 0, PyStr_FromString(PQfname(res, col_num)));
+        PyTuple_SET_ITEM(info, 1, PyInt_FromLong(PQftype(res, col_num)));
+        PyTuple_SET_ITEM(info, 2, PyInt_FromLong(PQfsize(res, col_num)));
+        PyTuple_SET_ITEM(info, 3, PyInt_FromLong(PQfmod(res, col_num)));
+    }
+    return info;
+}
+
+/* Get information on one or all fields in last result. */
+static char query_fieldinfo__doc__[] =
+"fieldinfo() -- return info on field(s) in query";
+
+static PyObject *
+query_fieldinfo(queryObject *self, PyObject *args)
+{
+    PyObject *result, *field = NULL;
+    int num;
+
+    /* gets args */
+    if (!PyArg_ParseTuple(args, "|O", &field)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "Method fieldinfo() takes one optional argument only");
+        return NULL;
+    }
+
+    /* check optional field arg */
+    if (field) {
+        /* gets field number */
+        if (PyBytes_Check(field)) {
+            num = PQfnumber(self->result, PyBytes_AsString(field));
+        } else if (PyStr_Check(field)) {
+            PyObject *tmp = get_encoded_string(field, self->encoding);
+            if (!tmp) return NULL;
+            num = PQfnumber(self->result, PyBytes_AsString(tmp));
+            Py_DECREF(tmp);
+        } else if (PyInt_Check(field)) {
+            num = (int) PyInt_AsLong(field);
+        } else {
+            PyErr_SetString(PyExc_TypeError,
+                            "Field should be given as column number or name");
+            return NULL;
+        }
+        if (num < 0 || num >= self->num_fields) {
+            PyErr_SetString(PyExc_IndexError, "Unknown field");
+            return NULL;
+        }
+        return _query_build_field_info(self->result, num);
+    }
+
+    if (!(result = PyTuple_New(self->num_fields))) {
+        return NULL;
+    }
+    for (num = 0; num < self->num_fields; ++num) {
+        PyObject *info = _query_build_field_info(self->result, num);
+        if (!info) {
+            Py_DECREF(result);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(result, num, info);
+    }
+    return result;
+}
+
+
 /* Retrieve one row from the result as a tuple. */
 static char query_one__doc__[] =
 "one() -- Get one row from the result of a query\n\n"
@@ -869,6 +940,8 @@ static struct PyMethodDef query_methods[] = {
         METH_VARARGS, query_fieldnum__doc__},
     {"listfields", (PyCFunction) query_listfields,
         METH_NOARGS, query_listfields__doc__},
+    {"fieldinfo", (PyCFunction) query_fieldinfo,
+        METH_VARARGS, query_fieldinfo__doc__},
     {"ntuples", (PyCFunction) query_ntuples,
         METH_NOARGS, query_ntuples__doc__},
 #ifdef MEMORY_SIZE

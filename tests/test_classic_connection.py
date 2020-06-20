@@ -287,7 +287,7 @@ class TestConnectObject(unittest.TestCase):
     def testAllQueryMembers(self):
         query = self.connection.query("select true where false")
         members = '''
-            dictiter dictresult fieldname fieldnum getresult
+            dictiter dictresult fieldinfo fieldname fieldnum getresult
             listfields memsize namediter namedresult ntuples
             one onedict onenamed onescalar scalariter scalarresult
             single singledict singlenamed singlescalar
@@ -693,6 +693,34 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).fieldnum('y')
         self.assertIsInstance(r, int)
         self.assertEqual(r, 3)
+
+    def testFieldInfoName(self):
+        q = ('select true as FooBar, 42::smallint as "FooBar",'
+             ' 4.2::numeric(4,2) as foo_bar, \'baz\'::char(3) as "Foo Bar"')
+        f = self.c.query(q).fieldinfo
+        result = (('foobar', 16, 1, -1), ('FooBar', 21, 2, -1),
+                  ('foo_bar', 1700, -1, ((4 << 16) | 2) + 4),
+                  ('Foo Bar', 1042, -1, 3 + 4))
+        r = f()
+        self.assertIsInstance(r, tuple)
+        self.assertEqual(len(r), 4)
+        self.assertEqual(r, result)
+        for field_num, info in enumerate(result):
+            field_name = info[0]
+            if field_num > 0:
+                field_name = '"%s"' % field_name
+            r = f(field_name)
+            self.assertIsInstance(r, tuple)
+            self.assertEqual(len(r), 4)
+            self.assertEqual(r, info)
+            r = f(field_num)
+            self.assertIsInstance(r, tuple)
+            self.assertEqual(len(r), 4)
+            self.assertEqual(r, info)
+        self.assertRaises(IndexError, f, 'foobaz')
+        self.assertRaises(IndexError, f, '"Foobar"')
+        self.assertRaises(IndexError, f, -1)
+        self.assertRaises(IndexError, f, 4)
 
     def testNtuples(self):  # deprecated
         q = "select 1 where false"
