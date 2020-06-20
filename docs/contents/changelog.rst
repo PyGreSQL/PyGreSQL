@@ -24,6 +24,9 @@ Version 5.2 (to be released)
       be passed on to the COPY command. Contributed by Justin Pryzby (#24).
     - The `DBTypes` class now also includes the `typlen` attribute with
       information about the size of the type (contributed by Justin Pryzby).
+    - Large objects on the server are not closed any more when they are
+      deallocated as Python objects, since this could cause several problems.
+      Bug report and analysis by Justin Pryzby (#30).
 
 - Changes to the DB-API 2 module (pgdb):
     - When using Python 2, errors are now derived from StandardError
