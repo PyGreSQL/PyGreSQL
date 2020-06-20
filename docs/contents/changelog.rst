@@ -20,6 +20,8 @@ Version 5.2 (to be released)
       instead of type names. Suggested by Justin Pryzby (#38).
     - The `inserttable()` method now accepts an optional column list that will
       be passed on to the COPY command. Contributed by Justin Pryzby (#24).
+    - The `DBTyptes` class now also includes the `typlen` attribute with
+      information about the size of the type (contributed by Justin Pryzby).
 
 - Changes to the DB-API 2 module (pgdb):
     - When using Python 2, errors are now derived from StandardError

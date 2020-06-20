@@ -13,14 +13,15 @@ returned by :meth:`DB.get_attnames` as dictionary values).
 
 These type names are strings which are equal to either the simple PyGreSQL
 names or to the more fine-grained registered PostgreSQL type names if these
-have been enabled with :meth:`DB.use_regtypes`. Besides being strings, they
-carry additional information about the associated PostgreSQL type in the
-following attributes:
+have been enabled with :meth:`DB.use_regtypes`. Type names are strings that
+are augmented with additional information about the associated PostgreSQL
+type that can be inspected using the following attributes:
 
         - *oid* -- the PostgreSQL type OID
         - *pgtype* -- the internal PostgreSQL data type name
         - *regtype* -- the registered PostgreSQL data type name
         - *simple* -- the more coarse-grained PyGreSQL type name
+        - *typlen* -- internal size of the type, negative if variable
         - *typtype* -- `b` = base type, `c` = composite type etc.
         - *category* -- `A` = Array, `b` =Boolean, `C` = Composite etc.
         - *delim* -- delimiter for array types

@@ -4062,6 +4062,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(typ.pgtype, 'numeric')
         self.assertEqual(typ.regtype, 'numeric')
         self.assertEqual(typ.simple, 'num')
+        self.assertEqual(typ.typlen, -1)
         self.assertEqual(typ.typtype, 'b')
         self.assertEqual(typ.category, 'N')
         self.assertEqual(typ.delim, ',')
@@ -4075,6 +4076,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(typ.pgtype, 'pg_type')
         self.assertEqual(typ.regtype, 'pg_type')
         self.assertEqual(typ.simple, 'record')
+        self.assertEqual(typ.typlen, -1)
         self.assertEqual(typ.typtype, 'c')
         self.assertEqual(typ.category, 'C')
         self.assertEqual(typ.delim, ',')
@@ -4086,11 +4088,13 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('typname', attnames)
         typname = attnames['typname']
         self.assertEqual(typname, 'name' if self.regtypes else 'text')
+        self.assertEqual(typname.typlen, 64)  # base
         self.assertEqual(typname.typtype, 'b')  # base
         self.assertEqual(typname.category, 'S')  # string
         self.assertIn('typlen', attnames)
         typlen = attnames['typlen']
         self.assertEqual(typlen, 'smallint' if self.regtypes else 'int')
+        self.assertEqual(typlen.typlen, 2)  # base
         self.assertEqual(typlen.typtype, 'b')  # base
         self.assertEqual(typlen.category, 'N')  # numeric
 

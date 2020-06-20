@@ -504,7 +504,7 @@ It inserts the whole values list into the given table. Internally, it
 uses the COPY command of the PostgreSQL database. The list is a list
 of tuples/lists that define the values for each inserted row. The rows
 values may contain string, integer, long or double (real) values.
-``columns`` is a optional sequence of column names to be passed on
+``columns`` is an optional sequence of column names to be passed on
 to the COPY command.
 
 .. warning::

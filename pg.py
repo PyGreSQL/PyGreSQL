@@ -361,7 +361,7 @@ _simple_type_dict = _simpletypes.get_type_dict()
 def _quote_if_unqualified(param, name):
     """Quote parameter representing a qualified name.
 
-    Puts a quote_ident() call around the give parameter unless
+    Puts a quote_ident() call around the given parameter unless
     the name contains a dot, in which case the name is ambiguous
     (could be a qualified name or just a name with a dot in it)
     and must be quoted manually by the caller.
@@ -1212,6 +1212,7 @@ class DbType(str):
         pgtype: the internal PostgreSQL data type name
         regtype: the registered PostgreSQL data type name
         simple: the more coarse-grained PyGreSQL type name
+        typlen: the internal size, negative if variable
         typtype: b = base type, c = composite type etc.
         category: A = Array, b = Boolean, C = Composite etc.
         delim: delimiter for array types
@@ -1245,21 +1246,21 @@ class DbTypes(dict):
         self._typecasts.get_attnames = self.get_attnames
         self._typecasts.connection = self._db
         if db.server_version < 80400:
-            # older remote databases (not officially supported)
+            # very old remote databases (not officially supported)
             self._query_pg_type = (
                 "SELECT oid, typname, typname::text::regtype,"
-                " typtype, null as typcategory, typdelim, typrelid"
+                " typlen, typtype, null as typcategory, typdelim, typrelid"
                 " FROM pg_catalog.pg_type"
                 " WHERE oid OPERATOR(pg_catalog.=) %s::regtype")
         else:
             self._query_pg_type = (
                 "SELECT oid, typname, typname::regtype,"
-                " typtype, typcategory, typdelim, typrelid"
+                " typlen, typtype, typcategory, typdelim, typrelid"
                 " FROM pg_catalog.pg_type"
                 " WHERE oid OPERATOR(pg_catalog.=) %s::regtype")
 
     def add(self, oid, pgtype, regtype,
-            typtype, category, delim, relid):
+            typlen, typtype, category, delim, relid):
         """Create a PostgreSQL type name with additional info."""
         if oid in self:
             return self[oid]
@@ -1269,6 +1270,7 @@ class DbTypes(dict):
         typ.simple = simple
         typ.pgtype = pgtype
         typ.regtype = regtype
+        typ.typlen = typlen
         typ.typtype = typtype
         typ.category = category
         typ.delim = delim
@@ -1284,7 +1286,7 @@ class DbTypes(dict):
         except ProgrammingError:
             res = None
         if not res:
-            raise KeyError('Type %s could not be found' % key)
+            raise KeyError('Type %s could not be found' % (key,))
         res = res[0]
         typ = self.add(*res)
         self[typ.oid] = self[typ.pgtype] = typ
@@ -1610,24 +1612,25 @@ class DB:
         self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
         if db.server_version < 80400:
-            # support older remote data bases (not officially supported)
+            # very old remote databases (not officially supported)
             self._query_attnames = (
                 "SELECT a.attname, t.oid, t.typname, t.typname::text::regtype,"
-                " t.typtype, null as typcategory, t.typdelim, t.typrelid"
+                " t.typlen, t.typtype, null as typcategory,"
+                " t.typdelim, t.typrelid"
                 " FROM pg_catalog.pg_attribute a"
                 " JOIN pg_catalog.pg_type t"
                 " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
-                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass AND %s"
-                " AND NOT a.attisdropped ORDER BY a.attnum")
+                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass"
+                " AND %s AND NOT a.attisdropped ORDER BY a.attnum")
         else:
             self._query_attnames = (
                 "SELECT a.attname, t.oid, t.typname, t.typname::regtype,"
-                " t.typtype, t.typcategory, t.typdelim, t.typrelid"
+                " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid"
                 " FROM pg_catalog.pg_attribute a"
                 " JOIN pg_catalog.pg_type t"
                 " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
-                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass AND %s"
-                " AND NOT a.attisdropped ORDER BY a.attnum")
+                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass"
+                " AND %s AND NOT a.attisdropped ORDER BY a.attnum")
         db.set_cast_hook(self.dbtypes.typecast)
         # For debugging scripts, self.debug can be set
         # * to a string format specification (e.g. in CGI set to "%s<BR>"),
