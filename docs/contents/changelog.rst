@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 5.2 (to be released)
-----------------------------
+Version 5.2 (2020-06-22)
+------------------------
 - We now require Python version 2.7 or 3.5 and newer.
 - All Python code is now tested with flake8 and made PEP8 compliant.
 - Changes to the classic PyGreSQL module (pg):
@@ -13,7 +13,7 @@ Version 5.2 (to be released)
     - New query method `fieldinfo()` that gets name and type information for
       one or all field(s) of the query. Contributed by Justin Pryzby (#39).
     - Experimental support for asynchronous command processing.
-      Additional connection parameter ``nowait``, and connection methods
+      Additional connection parameter `nowait`, and connection methods
       `send_query()`, `poll()`, `set_non_blocking()`, `is_non_blocking()`.
       Generously contributed by Patrick TJ McPhee (#19).
     - The `types` parameter of `format_query` can now be passed as a string
@@ -27,7 +27,6 @@ Version 5.2 (to be released)
     - Large objects on the server are not closed any more when they are
       deallocated as Python objects, since this could cause several problems.
       Bug report and analysis by Justin Pryzby (#30).
-
 - Changes to the DB-API 2 module (pgdb):
     - When using Python 2, errors are now derived from StandardError
       instead of Exception, as required by the DB-API 2 compliance test.
@@ -82,7 +81,6 @@ Version 5.1 (2019-05-17)
       and this function is not part of the official API.
     - Added new connection attributes `socket`, `backend_pid`, `ssl_in_use`
       and `ssl_attributes` (the latter need PostgreSQL >= 9.5 on the client).
-
 - Changes to the DB-API 2 module (pgdb):
     - Connections now have an `autocommit` attribute which is set to `False`
       by default but can be set to `True` to switch to autocommit mode where
