@@ -686,8 +686,9 @@ conn_is_non_blocking(connObject *self, PyObject *args)
 
 /* Insert table */
 static char conn_inserttable__doc__[] =
-"inserttable(table, data) -- insert list into table\n\n"
-"The fields in the list must be in the same order as in the table.\n";
+"inserttable(table, data, [columns]) -- insert list into table\n\n"
+"The fields in the list must be in the same order as in the table\n"
+"or in the list of columns if one is specified.\n";
 
 static PyObject *
 conn_inserttable(connObject *self, PyObject *args)
@@ -696,10 +697,11 @@ conn_inserttable(connObject *self, PyObject *args)
     char *table, *buffer, *bufpt;
     int encoding;
     size_t bufsiz;
-    PyObject *list, *sublist, *item;
+    PyObject *list, *sublist, *item, *columns = NULL;
     PyObject *(*getitem) (PyObject *, Py_ssize_t);
     PyObject *(*getsubitem) (PyObject *, Py_ssize_t);
-    Py_ssize_t i, j, m, n;
+    PyObject *(*getcolumn) (PyObject *, Py_ssize_t);
+    Py_ssize_t i, j, m, n = 0;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -707,7 +709,7 @@ conn_inserttable(connObject *self, PyObject *args)
     }
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "sO:filter", &table, &list)) {
+    if (!PyArg_ParseTuple(args, "sO|O", &table, &list, &columns)) {
         PyErr_SetString(
             PyExc_TypeError,
             "Method inserttable() expects a string and a list as arguments");
@@ -731,12 +733,68 @@ conn_inserttable(connObject *self, PyObject *args)
         return NULL;
     }
 
+    /* checks columns type */
+    if (columns) {
+        if (PyList_Check(columns)) {
+            n = PyList_Size(columns);
+            getcolumn = PyList_GetItem;
+        }
+        else if (PyTuple_Check(columns)) {
+            n = PyTuple_Size(columns);
+            getcolumn = PyTuple_GetItem;
+        }
+        else {
+            PyErr_SetString(
+                PyExc_TypeError,
+                "Method inserttable() expects a list or a tuple"
+                " as third argument");
+            return NULL;
+        }
+        if (!n) {
+            /* no columns specified, nothing to do */
+            Py_INCREF(Py_None);
+            return Py_None;
+        }
+    }
+
     /* allocate buffer */
     if (!(buffer = PyMem_Malloc(MAX_BUFFER_SIZE)))
         return PyErr_NoMemory();
 
+    encoding = PQclientEncoding(self->cnx);
+
     /* starts query */
-    sprintf(buffer, "copy %s from stdin", table);
+    bufpt = buffer;
+    table = PQescapeIdentifier(self->cnx, table, strlen(table));
+    bufpt += sprintf(bufpt, "copy %s", table);
+    PQfreemem(table);
+    if (columns) {
+        /* adds a string like f" ({','.join(columns)})" */
+        bufpt += sprintf(bufpt, " (");
+        for (int i = 0; i < n; ++i) {
+            PyObject *obj = getcolumn(columns, i);
+            ssize_t slen;
+            char *col;
+
+            if (PyBytes_Check(obj)) {
+                PyBytes_AsStringAndSize(obj, &col, &slen);
+            }
+            else if (PyUnicode_Check(obj)) {
+                obj = get_encoded_string(obj, encoding);
+                if (!obj) return NULL; /* pass the UnicodeEncodeError */
+                PyBytes_AsStringAndSize(obj, &col, &slen);
+                Py_DECREF(obj);
+            } else {
+                PyErr_SetString(
+                    PyExc_TypeError,
+                    "The third argument must contain only strings");
+            }
+            col = PQescapeIdentifier(self->cnx, col, (size_t) slen);
+            bufpt += sprintf(bufpt, "%s%s", col, i == n - 1 ? ")" : ",");
+            PQfreemem(col);
+        }
+    }
+    sprintf(bufpt, " from stdin");
 
     Py_BEGIN_ALLOW_THREADS
     result = PQexec(self->cnx, buffer);
@@ -748,11 +806,7 @@ conn_inserttable(connObject *self, PyObject *args)
         return NULL;
     }
 
-    encoding = PQclientEncoding(self->cnx);
-
     PQclear(result);
-
-    n = 0; /* not strictly necessary but avoids warning */
 
     /* feed table */
     for (i = 0; i < m; ++i) {

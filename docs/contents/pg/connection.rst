@@ -487,12 +487,13 @@ first, otherwise :meth:`Connection.getnotify` will always return ``None``.
 inserttable -- insert a list into a table
 -----------------------------------------
 
-.. method:: Connection.inserttable(table, values)
+.. method:: Connection.inserttable(table, values, [columns])
 
     Insert a Python list into a database table
 
     :param str table: the table name
     :param list values: list of rows values
+    :param list columns: list of column names
     :rtype: None
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises MemoryError: insert buffer could not be allocated
@@ -503,6 +504,8 @@ It inserts the whole values list into the given table. Internally, it
 uses the COPY command of the PostgreSQL database. The list is a list
 of tuples/lists that define the values for each inserted row. The rows
 values may contain string, integer, long or double (real) values.
+``columns`` is a optional sequence of column names to be passed on
+to the COPY command.
 
 .. warning::
 

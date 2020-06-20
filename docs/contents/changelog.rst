@@ -14,16 +14,18 @@ Version 5.2 (to be released)
       Additional connection parameter ``nowait``, and connection methods
       `send_query()`, `poll()`, `set_non_blocking()`, `is_non_blocking()`.
       Generously contributed by Patrick TJ McPhee (#19).
+    - The `types` parameter of `format_query` can now be passed as a string
+      that will be split on whitespace when values are passed as a sequence,
+      and the types can now also be specified using actual Python types
+      instead of type names. Suggested by Justin Pryzby (#38).
+    - The `inserttable()` method now accepts an optional column list that will
+      be passed on to the COPY command. Contributed by Justin Pryzby (#24).
 
 - Changes to the DB-API 2 module (pgdb):
     - When using Python 2, errors are now derived from StandardError
       instead of Exception, as required by the DB-API 2 compliance test.
     - Connection arguments containing single quotes caused problems
       (reported and fixed by Tyler Ramer and Jamie McAtamney).
-    - The `types` parameter of `format_query` can now be passed as a string
-      that will be split on whitespace when values are passed as a sequence,
-      and the types can now also be specified using actual Python types
-      instead of type names. Suggested by Justin Pryzby (#38).
 
 Version 5.1.2 (2020-04-19)
 --------------------------

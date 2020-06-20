@@ -1889,6 +1889,42 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
+    def testInserttableNoColumn(self):
+        data = [()] * 10
+        self.c.inserttable('test', data, [])
+        self.assertEqual(self.get_back(), [])
+
+    def testInserttableOnlyOneColumn(self):
+        data = [(42,)] * 50
+        self.c.inserttable('test', data, ['i4'])
+        data = [tuple([42 if i == 1 else None for i in range(14)])] * 50
+        self.assertEqual(self.get_back(), data)
+
+    def testInserttableOnlyTwoColumns(self):
+        data = [(bool(i % 2), i * .5) for i in range(20)]
+        self.c.inserttable('test', data, ('b', 'f4'))
+        # noinspection PyTypeChecker
+        data = [(None,) * 3 + (bool(i % 2),) + (None,) * 3 + (i * .5,)
+                + (None,) * 6 for i in range(20)]
+        self.assertEqual(self.get_back(), data)
+
+    def testInserttableWithInvalidTableName(self):
+        data = [(42,)]
+        # check that the table name is not inserted unescaped
+        # (this would pass otherwise since there is a column named i4)
+        self.assertRaises(Exception, self.c.inserttable, 'test (i4)', data)
+        # make sure that it works if parameters are passed properly
+        self.c.inserttable('test', data, ['i4'])
+
+    def testInserttableWithInvalidColumnName(self):
+        data = [(2, 4)]
+        # check that the column names are not inserted unescaped
+        # (this would pass otherwise since there are columns i2 and i4)
+        self.assertRaises(
+            Exception, self.c.inserttable, 'test', data, ['i2,i4'])
+        # make sure that it works if parameters are passed properly
+        self.c.inserttable('test', data, ['i2', 'i4'])
+
     def testInserttableMaxValues(self):
         data = [(2 ** 15 - 1, int(2 ** 31 - 1), long(2 ** 31 - 1),
                  True, '2999-12-31', '11:59:59', 1e99,
