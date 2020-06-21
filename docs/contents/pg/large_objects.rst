@@ -11,7 +11,7 @@ all the recurring variables (object OID and connection), in the same way
 :class:`Connection` instances do, thus only keeping significant parameters
 in function calls. The :class:`LargeObject` instance keeps a reference to
 the :class:`Connection` object used for its creation, sending requests
-though with its parameters. Any modification other than dereferencing the
+through with its parameters. Any modification other than dereferencing the
 :class:`Connection` object will thus affect the :class:`LargeObject` instance.
 Dereferencing the initial :class:`Connection` object is not a problem since
 Python won't deallocate it before the :class:`LargeObject` instance

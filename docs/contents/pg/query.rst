@@ -328,19 +328,19 @@ is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
 
 .. versionadded:: 5.1
 
-listfields -- list field names of previous query result
--------------------------------------------------------
+listfields -- list field names of query result
+----------------------------------------------
 
 .. method:: Query.listfields()
 
-    List field names of previous query result
+    List field names of query result
 
     :returns: field names
     :rtype: list
     :raises TypeError: too many parameters
 
-This method returns the list of field names defined for the
-query result. The fields are in the same order as the result values.
+This method returns the list of field names defined for the query result.
+The fields are in the same order as the result values.
 
 fieldname, fieldnum -- field name/number conversion
 ---------------------------------------------------
@@ -374,12 +374,12 @@ build a function that converts result list strings to their correct
 type, using a hardcoded table definition. The number returned is the
 field rank in the query result.
 
-fieldinfo -- detailed info about fields of previous query result
-----------------------------------------------------------------
+fieldinfo -- detailed info about query result fields
+----------------------------------------------------
 
 .. method:: Query.fieldinfo([field])
 
-    Get information on one or all fields of the last query
+    Get information on one or all fields of the query
 
     :param field: a column number or name (optional)
     :type field: int or str
@@ -389,10 +389,10 @@ fieldinfo -- detailed info about fields of previous query result
     :raises TypeError: too many parameters
 
 If the ``field`` is specified by passing either a column number or a field
-name, a four-tuple with information for the specified field of the previous
-query result will be returned. If no ``field`` is specified, a tuple of
-four-tuples for every field of the previous query result will be returned,
-in the order as they appear in the query result.
+name, a four-tuple with information for the specified field of the query
+result will be returned. If no ``field`` is specified, a tuple of four-tuples
+for every field of the previous query result will be returned, in the same
+order as they appear in the query result.
 
 The four-tuples contain the following information: The field name, the
 internal OID number of the field type, the size in bytes of the column or a

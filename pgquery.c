@@ -355,7 +355,7 @@ _query_build_field_info(PGresult *res, int col_num) {
     return info;
 }
 
-/* Get information on one or all fields in last result. */
+/* Get information on one or all fields of the query result. */
 static char query_fieldinfo__doc__[] =
 "fieldinfo() -- return info on field(s) in query";
 
