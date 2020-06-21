@@ -771,8 +771,8 @@ conn_inserttable(connObject *self, PyObject *args)
     if (columns) {
         /* adds a string like f" ({','.join(columns)})" */
         bufpt += sprintf(bufpt, " (");
-        for (int i = 0; i < n; ++i) {
-            PyObject *obj = getcolumn(columns, i);
+        for (j = 0; j < n; ++j) {
+            PyObject *obj = getcolumn(columns, j);
             ssize_t slen;
             char *col;
 
@@ -790,7 +790,7 @@ conn_inserttable(connObject *self, PyObject *args)
                     "The third argument must contain only strings");
             }
             col = PQescapeIdentifier(self->cnx, col, (size_t) slen);
-            bufpt += sprintf(bufpt, "%s%s", col, i == n - 1 ? ")" : ",");
+            bufpt += sprintf(bufpt, "%s%s", col, j == n - 1 ? ")" : ",");
             PQfreemem(col);
         }
     }
