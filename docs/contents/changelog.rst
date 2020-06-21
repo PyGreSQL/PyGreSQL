@@ -1,7 +1,7 @@
 ChangeLog
 =========
 
-Version 5.2 (2020-06-22)
+Version 5.2 (2020-06-21)
 ------------------------
 - We now require Python version 2.7 or 3.5 and newer.
 - All Python code is now tested with flake8 and made PEP8 compliant.
