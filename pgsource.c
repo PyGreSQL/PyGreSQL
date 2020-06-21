@@ -272,7 +272,7 @@ source_oidstatus(sourceObject *self, PyObject *noargs)
         return Py_None;
     }
 
-    return PyInt_FromLong(oid);
+    return PyInt_FromLong((long) oid);
 }
 
 /* Fetch rows from last result. */
@@ -671,7 +671,7 @@ _source_buildinfo(sourceObject *self, int num)
     PyTuple_SET_ITEM(result, 1,
         PyStr_FromString(PQfname(self->result, num)));
     PyTuple_SET_ITEM(result, 2,
-        PyInt_FromLong(PQftype(self->result, num)));
+        PyInt_FromLong((long) PQftype(self->result, num)));
     PyTuple_SET_ITEM(result, 3,
         PyInt_FromLong(PQfsize(self->result, num)));
     PyTuple_SET_ITEM(result, 4,

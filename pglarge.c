@@ -85,7 +85,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
     /* large object oid */
     if (!strcmp(name, "oid")) {
         if (_check_lo_obj(self, 0))
-            return PyInt_FromLong(self->lo_oid);
+            return PyInt_FromLong((long) self->lo_oid);
         PyErr_Clear();
         Py_INCREF(Py_None);
         return Py_None;

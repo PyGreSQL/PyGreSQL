@@ -193,7 +193,7 @@ _conn_non_query_result(int status, PGresult* result, PGconn *cnx)
                 }
                 /* for a single insert, return the oid */
                 PQclear(result);
-                return PyInt_FromLong(oid);
+                return PyInt_FromLong((long) oid);
             }
         case PGRES_COPY_OUT: /* no data will be received */
         case PGRES_COPY_IN:

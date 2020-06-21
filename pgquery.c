@@ -348,7 +348,7 @@ _query_build_field_info(PGresult *res, int col_num) {
     info = PyTuple_New(4);
     if (info) {
         PyTuple_SET_ITEM(info, 0, PyStr_FromString(PQfname(res, col_num)));
-        PyTuple_SET_ITEM(info, 1, PyInt_FromLong(PQftype(res, col_num)));
+        PyTuple_SET_ITEM(info, 1, PyInt_FromLong((long) PQftype(res, col_num)));
         PyTuple_SET_ITEM(info, 2, PyInt_FromLong(PQfsize(res, col_num)));
         PyTuple_SET_ITEM(info, 3, PyInt_FromLong(PQfmod(res, col_num)));
     }
