@@ -54,8 +54,8 @@ from distutils.sysconfig import get_python_inc, get_python_lib
 
 version = '5.2'
 
-if (not (2, 6) <= sys.version_info[:2] < (3, 0)
-        and not (3, 3) <= sys.version_info[:2] < (4, 0)):
+if not (sys.version_info[:2] == (2, 7)
+        or (3, 5) <= sys.version_info[:2] < (4, 0)):
     raise Exception(
         "Sorry, PyGreSQL %s does not support this Python version" % version)
 
