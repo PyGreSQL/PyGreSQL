@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+Version 5.2.1 (to be released)
+------------------------------
+- Changes to the DB-API 2 module (pgdb):
+    - The `copy_to()` and `copy_from()` methods now also work with table names
+      containing schema qualifiers (#47).
+
 Version 5.2 (2020-06-21)
 ------------------------
 - We now require Python version 2.7 or 3.5 and newer.

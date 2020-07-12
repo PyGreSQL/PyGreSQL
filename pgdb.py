@@ -1268,10 +1268,11 @@ class Cursor(object):
 
         if not table or not isinstance(table, basestring):
             raise TypeError("Need a table to copy to")
-        if table.lower().startswith('select'):
+        if table.lower().startswith('select '):
             raise ValueError("Must specify a table, not a query")
         else:
-            table = '"%s"' % (table,)
+            table = '.'.join(map(
+                self.connection._cnx.escape_identifier, table.split('.', 1)))
         operation = ['copy %s' % (table,)]
         options = []
         params = []
@@ -1299,7 +1300,8 @@ class Cursor(object):
             params.append(null)
         if columns:
             if not isinstance(columns, basestring):
-                columns = ','.join('"%s"' % (col,) for col in columns)
+                columns = ','.join(map(
+                    self.connection._cnx.escape_identifier, columns))
             operation.append('(%s)' % (columns,))
         operation.append("from stdin")
         if options:
@@ -1350,12 +1352,13 @@ class Cursor(object):
                 raise TypeError("Need an output stream to copy to")
         if not table or not isinstance(table, basestring):
             raise TypeError("Need a table to copy to")
-        if table.lower().startswith('select'):
+        if table.lower().startswith('select '):
             if columns:
                 raise ValueError("Columns must be specified in the query")
             table = '(%s)' % (table,)
         else:
-            table = '"%s"' % (table,)
+            table = '.'.join(map(
+                self.connection._cnx.escape_identifier, table.split('.', 1)))
         operation = ['copy %s' % (table,)]
         options = []
         params = []
@@ -1394,7 +1397,8 @@ class Cursor(object):
                     "The decode option is not allowed with binary format")
         if columns:
             if not isinstance(columns, basestring):
-                columns = ','.join('"%s"' % (col,) for col in columns)
+                columns = ','.join(map(
+                    self.connection._cnx.escape_identifier, columns))
             operation.append('(%s)' % (columns,))
 
         operation.append("to stdout")

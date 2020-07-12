@@ -253,6 +253,10 @@ class TestCopyFrom(TestCopy):
         self.assertEqual(self.table_data, [(42, 'Hello, world!')])
         self.check_rowcount(1)
 
+    def test_input_string_with_schema_name(self):
+        self.cursor.copy_from('42\tHello, world!', 'public.copytest')
+        self.assertEqual(self.table_data, [(42, 'Hello, world!')])
+
     def test_input_string_with_newline(self):
         self.copy_from('42\tHello, world!\n')
         self.assertEqual(self.table_data, [(42, 'Hello, world!')])
@@ -448,6 +452,10 @@ class TestCopyTo(TestCopy):
         self.assertIsInstance(rows, str)
         self.assertEqual(rows, self.data_text)
         self.check_rowcount()
+
+    def test_generator_with_schema_name(self):
+        ret = self.cursor.copy_to(None, 'public.copytest')
+        self.assertEqual(''.join(ret), self.data_text)
 
     if str is unicode:  # Python >= 3.0
 
