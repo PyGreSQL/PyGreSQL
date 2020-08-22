@@ -1863,7 +1863,7 @@ class DB:
         else:
             for param in params:
                 q = 'SHOW %s' % (param,)
-                value = self.db.query(q).getresult()[0][0]
+                value = self.db.query(q).singlescalar()
                 if values is None:
                     values = value
                 elif isinstance(values, list):
@@ -2192,7 +2192,7 @@ class DB:
             q = "SELECT pg_catalog.has_table_privilege(%s, $2)" % (
                 _quote_if_unqualified('$1', table),)
             q = self.db.query(q, (table, privilege))
-            ret = q.getresult()[0][0] == self._make_bool(True)
+            ret = q.singlescalar() == self._make_bool(True)
             privileges[table, privilege] = ret  # cache it
         return ret
 
