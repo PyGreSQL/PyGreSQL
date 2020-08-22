@@ -164,7 +164,7 @@ Examples::
     con1 = connect()
     con2 = connect()
     s = con1.query("begin; set transaction isolation level repeatable read;"
-                   "select pg_export_snapshot();").getresult()[0][0]
+                   "select pg_export_snapshot();").single()
     con2.query("begin; set transaction isolation level repeatable read;"
                "set transaction snapshot '%s'" % (s,))
     q1 = con1.send_query("select a,b,c from x where d=e")

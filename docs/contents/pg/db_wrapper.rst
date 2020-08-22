@@ -455,11 +455,11 @@ Example::
 
     name = input("Name? ")
     phone = input("Phone? ")
-    rows = db.query("update employees set phone=$2 where name=$1",
-        name, phone).getresult()[0][0]
+    num_rows = db.query("update employees set phone=$2 where name=$1",
+        name, phone)
     # or
-    rows = db.query("update employees set phone=$2 where name=$1",
-        (name, phone)).getresult()[0][0]
+    num_rows = db.query("update employees set phone=$2 where name=$1",
+        (name, phone))
 
 query_formatted -- execute a formatted SQL command string
 ---------------------------------------------------------
@@ -506,13 +506,13 @@ Example::
 
     name = input("Name? ")
     phone = input("Phone? ")
-    rows = db.query_formatted(
+    num_rows = db.query_formatted(
         "update employees set phone=%s where name=%s",
-        (phone, name)).getresult()[0][0]
+        (phone, name))
     # or
-    rows = db.query_formatted(
+    num_rows = db.query_formatted(
         "update employees set phone=%(phone)s where name=%(name)s",
-        dict(name=name, phone=phone)).getresult()[0][0]
+        dict(name=name, phone=phone))
 
 Example with specification of types::
 
