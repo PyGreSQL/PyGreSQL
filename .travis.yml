@@ -53,5 +53,6 @@ before_script:
   - sudo service postgresql stop
   - sudo -u postgres sed -i "s/port = 54[0-9][0-9]/port = 5432/" /etc/postgresql/11/main/postgresql.conf
   - sudo service postgresql start 11
-  - psql -U postgres -c 'create database unittest'
+  - sudo cat /etc/postgresql/11/main/pg_hba.conf
+  - sudo -u postgres psql -c 'create database unittest'
 
