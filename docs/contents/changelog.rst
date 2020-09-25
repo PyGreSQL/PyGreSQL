@@ -3,6 +3,7 @@ ChangeLog
 
 Version 5.2.1 (to be released)
 ------------------------------
+- This version officially supports the new Python 3.9 and PostgreSQL 13.
 - Changes to the DB-API 2 module (pgdb):
     - The `copy_to()` and `copy_from()` methods now also work with table names
       containing schema qualifiers (#47).

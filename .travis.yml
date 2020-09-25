@@ -8,6 +8,9 @@ matrix:
     - name: Code quality tests
       env: TOXENV=flake8,docs
       python: 3.8
+    - name: Unit tests with Python 3.9
+      env: TOXENV=py39
+      python: 3.9
     - name: Unit tests with Python 3.8
       env: TOXENV=py38
       python: 3.8
@@ -36,7 +39,8 @@ script:
   - tox -e $TOXENV
 
 addons:
-  postgresql: "10"
+  # test with last version that still supports OIDs
+  postgresql: "11"
 
 services:
   - postgresql
