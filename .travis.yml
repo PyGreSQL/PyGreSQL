@@ -39,16 +39,18 @@ script:
   - tox -e $TOXENV
 
 addons:
-  # test with last version that still supports OIDs
+  # last PostgreSQL version that still supports OIDs (11)
   postgresql: "11"
+  apt:
+    packages:
+    - postgresql-11
+    - postgresql-server-dev-11
 
 services:
   - postgresql
 
 before_script:
   - sudo service postgresql stop
-  - sudo apt-get remove -y postgresql\*
-  - sudo apt-get install postgresql-11 postgresql-client-11
   - sudo -u postgres sed -i "s/port = 54[0-9][0-9]/port = 5432/" /etc/postgresql/11/main/postgresql.conf
   - sudo service postgresql start 11
   - sudo -u postgres psql -c 'create database unittest'

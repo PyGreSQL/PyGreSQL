@@ -116,18 +116,21 @@ class build_pg_ext(build_ext):
         ('escaping-funcs', None, "enable string escaping functions"),
         ('no-escaping-funcs', None, "disable string escaping functions"),
         ('ssl-info', None, "use new ssl info functions"),
-        ('no-ssl-info', None, "do not use new ssl info functions")]
+        ('no-ssl-info', None, "do not use new ssl info functions"),
+        ('memory-size', None, "enable new memory size function"),
+        ('no-memory-size', None, "disable new memory size function")]
 
     boolean_options = build_ext.boolean_options + [
         'strict', 'direct-access', 'large-objects', 'default-vars',
-        'escaping-funcs', 'ssl-info']
+        'escaping-funcs', 'ssl-info', 'memory-size']
 
     negative_opt = {
         'no-direct-access': 'direct-access',
         'no-large-objects': 'large-objects',
         'no-default-vars': 'default-vars',
         'no-escaping-funcs': 'escaping-funcs',
-        'no-ssl-info': 'ssl-info'}
+        'no-ssl-info': 'ssl-info',
+        'no-memory-size': 'memory-size'}
 
     def get_compiler(self):
         """Return the C compiler used for building the extension."""
@@ -143,7 +146,8 @@ class build_pg_ext(build_ext):
         self.pqlib_info = None
         self.ssl_info = None
         self.memory_size = None
-        if pg_version < (9, 0):
+        supported = pg_version >= (9, 0)
+        if not supported:
             warnings.warn(
                 "PyGreSQL does not support the installed PostgreSQL version.")
 
@@ -158,32 +162,36 @@ class build_pg_ext(build_ext):
             define_macros.append(('LARGE_OBJECTS', None))
         if self.default_vars is None or self.default_vars:
             define_macros.append(('DEFAULT_VARS', None))
-        if self.escaping_funcs is None or self.escaping_funcs:
-            if pg_version >= (9, 0):
-                define_macros.append(('ESCAPING_FUNCS', None))
-            else:
-                (warnings.warn if self.escaping_funcs is None else sys.exit)(
+        wanted = self.escaping_funcs
+        supported = pg_version >= (9, 0)
+        if wanted or (wanted is None and supported):
+            define_macros.append(('ESCAPING_FUNCS', None))
+            if not supported:
+                warnings.warn(
                     "The installed PostgreSQL version"
                     " does not support the newer string escaping functions.")
-        if self.pqlib_info is None or self.pqlib_info:
-            if pg_version >= (9, 1):
-                define_macros.append(('PQLIB_INFO', None))
-            else:
-                (warnings.warn if self.pqlib_info is None else sys.exit)(
+        wanted = self.pqlib_info
+        supported = pg_version >= (9, 1)
+        if wanted or (wanted is None and supported):
+            define_macros.append(('PQLIB_INFO', None))
+            if not supported:
+                warnings.warn(
                     "The installed PostgreSQL version"
                     " does not support PQLib info functions.")
-        if self.ssl_info is None or self.ssl_info:
-            if pg_version >= (9, 5):
-                define_macros.append(('SSL_INFO', None))
-            else:
-                (warnings.warn if self.ssl_info is None else sys.exit)(
+        wanted = self.ssl_info
+        supported = pg_version >= (9, 5)
+        if wanted or (wanted is None and supported):
+            define_macros.append(('SSL_INFO', None))
+            if not supported:
+                warnings.warn(
                     "The installed PostgreSQL version"
                     " does not support SSL info functions.")
-        if self.memory_size is None or self.memory_size:
-            if pg_version >= (12, 0):
-                define_macros.append(('MEMORY_SIZE', None))
-            else:
-                (warnings.warn if self.memory_size is None else sys.exit)(
+        wanted = self.memory_size
+        supported = pg_version >= (12, 0)
+        if wanted or (wanted is None and supported):
+            define_macros.append(('MEMORY_SIZE', None))
+            if not supported:
+                warnings.warn(
                     "The installed PostgreSQL version"
                     " does not support the memory size function.")
         if sys.platform == 'win32':
