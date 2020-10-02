@@ -4400,6 +4400,21 @@ class TestDBClassAdapter(unittest.TestCase):
             params[0] = ','.join(sorted(params[0].split(',')))
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
+    def testAdaptQueryTypedWithUuid(self):
+        format_query = self.adapter.format_query
+        value = '12345678-1234-5678-1234-567812345678'
+        sql, params = format_query("select %s", (value,), 'uuid')
+        self.assertEqual(sql, "select $1")
+        self.assertEqual(params, ['12345678-1234-5678-1234-567812345678'])
+        value = UUID('{12345678-1234-5678-1234-567812345678}')
+        sql, params = format_query("select %s", (value,), 'uuid')
+        self.assertEqual(sql, "select $1")
+        self.assertEqual(params, ['12345678-1234-5678-1234-567812345678'])
+        value = UUID('{12345678-1234-5678-1234-567812345678}')
+        sql, params = format_query("select %s", (value,))
+        self.assertEqual(sql, "select $1")
+        self.assertEqual(params, ['12345678-1234-5678-1234-567812345678'])
+
     def testAdaptQueryTypedDict(self):
         format_query = self.adapter.format_query
         self.assertRaises(

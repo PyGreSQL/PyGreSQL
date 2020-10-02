@@ -487,6 +487,14 @@ class Adapter:
             return str(Hstore(v))
         raise TypeError('Hstore parameter %s has wrong type' % v)
 
+    def _adapt_uuid(self, v):
+        """Adapt a UUID parameter."""
+        if not v:
+            return None
+        if isinstance(v, basestring):
+            return v
+        return str(v)
+
     @classmethod
     def _adapt_text_array(cls, v):
         """Adapt a text type array parameter."""

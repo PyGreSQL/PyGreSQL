@@ -1,8 +1,12 @@
 ChangeLog
 =========
 
-Version 5.2.1 (2020-09-25)
+Version 5.2.2 (to be released)
 ------------------------------
+- Added a missing adapter method for UUIDs in the classic `pg` module.
+
+Version 5.2.1 (2020-09-25)
+--------------------------
 - This version officially supports the new Python 3.9 and PostgreSQL 13.
 - The `copy_to()` and `copy_from()` methods in the pgdb module now also work
   with table names containing schema qualifiers (#47).
