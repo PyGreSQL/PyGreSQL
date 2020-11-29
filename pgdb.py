@@ -1164,8 +1164,10 @@ class Cursor(object):
         except Error as err:
             raise _db_error(str(err))
         typecast = self.type_cache.typecast
-        return [self.row_factory([typecast(value, typ)
-                for typ, value in zip(self.coltypes, row)]) for row in result]
+        row_factory = self.row_factory
+        coltypes = self.coltypes
+        return [row_factory([typecast(value, typ)
+                for typ, value in zip(coltypes, row)]) for row in result]
 
     def callproc(self, procname, parameters=None):
         """Call a stored database procedure with the given name.
