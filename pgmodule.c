@@ -1055,12 +1055,10 @@ pg_cast_array(PyObject *self, PyObject *args, PyObject *dict)
         return NULL;
     }
 
-    if (!cast_obj || cast_obj == Py_None) {
-        if (cast_obj) {
-            Py_DECREF(cast_obj); cast_obj = NULL;
-        }
+    if (cast_obj == Py_None) {
+        cast_obj = NULL;
     }
-    else if (!PyCallable_Check(cast_obj)) {
+    else if (cast_obj && !PyCallable_Check(cast_obj)) {
         PyErr_SetString(
             PyExc_TypeError,
             "Function cast_array() expects a callable as second argument");
@@ -1116,12 +1114,12 @@ pg_cast_record(PyObject *self, PyObject *args, PyObject *dict)
         len = 0;
     }
     else if (cast_obj == Py_None) {
-        Py_DECREF(cast_obj); cast_obj = NULL; len = 0;
+        cast_obj = NULL; len = 0;
     }
     else if (PyTuple_Check(cast_obj) || PyList_Check(cast_obj)) {
         len = PySequence_Size(cast_obj);
         if (!len) {
-            Py_DECREF(cast_obj); cast_obj = NULL;
+            cast_obj = NULL;
         }
     }
     else {
