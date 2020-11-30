@@ -7,15 +7,18 @@ General
 You must first install Python and PostgreSQL on your system.
 If you want to access remote databases only, you don't need to install
 the full PostgreSQL server, but only the libpq C-interface library.
-If you are on Windows, make sure that the directory that contains
-libpq.dll is part of your ``PATH`` environment variable.
+On Windows, this library is called ``libpq.dll`` and is for instance contained
+in the PostgreSQL ODBC driver (search for "psqlodbc"). On Linux, it is called
+``libpq.so`` and usually provided in a package called "libpq" or "libpq5".
+On Windows, you also need to make sure that the directory that contains
+``libpq.dll`` is part of your ``PATH`` environment variable.
 
 The current version of PyGreSQL has been tested with Python versions
 2.7 and 3.5 to 3.9, and PostgreSQL versions 9.0 to 9.6 and 10 to 13.
 
 PyGreSQL will be installed as three modules, a shared library called
-_pg.so (on Linux) or a DLL called _pg.pyd (on Windows), and two pure
-Python wrapper modules called pg.py and pgdb.py.
+``_pg.so`` (on Linux) or a DLL called ``_pg.pyd`` (on Windows), and two pure
+Python wrapper modules called ``pg.py`` and ``pgdb.py``.
 All three files will be installed directly into the Python site-packages
 directory. To uninstall PyGreSQL, simply remove these three files.
 
@@ -31,6 +34,9 @@ Just run the following command in your terminal::
 This will automatically try to find and download a distribution on the
 `Python Package Index <https://pypi.python.org/>`_ that matches your operating
 system and Python version and install it.
+
+Note that you still need to have the libpq interface installed on your system
+(see the general remarks above).
 
 
 Installing from a Binary Distribution
