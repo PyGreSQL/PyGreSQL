@@ -24,20 +24,34 @@ from __future__ import print_function, division
 
 try:
     from _pg import *
-except ImportError:
+except ImportError as e:
     import os
-    import sys
-    # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
-    if os.name == 'nt' and sys.version_info >= (3, 8):
-        for path in os.environ["PATH"].split(os.pathsep):
-            if os.path.exists(os.path.join(path, 'libpq.dll')):
+    libpq = 'libpq.'
+    if os.name == 'nt':
+        libpq += 'dll'
+        import sys
+        paths = [path for path in os.environ["PATH"].split(os.pathsep)
+                 if os.path.exists(os.path.join(path, libpq))]
+        if sys.version_info >= (3, 8):
+            # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
+            for path in paths:
                 with os.add_dll_directory(os.path.abspath(path)):
-                    from _pg import *
-                break
-        else:
-            raise
+                    try:
+                        from _pg import *
+                    except ImportError:
+                        pass
+                    else:
+                        e = None
+                        break
+        if paths:
+            libpq = 'compatible ' + libpq
     else:
-        raise
+        libpq += 'so'
+    if e:
+        # note: we could use "raise from e" here in Python 3
+        raise ImportError(
+            "Cannot import shared library for PyGreSQL,\n"
+            "probably because no %s is installed.\n%s" % (libpq, e))
 
 __version__ = version
 
