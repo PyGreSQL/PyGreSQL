@@ -1137,6 +1137,30 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         sql = 'select 1'  # cannot be executed after connection is closed
         self.assertRaises(pgdb.OperationalError, cur.execute, sql)
 
+    def test_fetchall_with_various_sizes(self):
+        # we test this because there are optimizations based on result size
+        con = self._connect()
+        try:
+            for n in (1, 3, 5, 7, 10, 100, 1000):
+                cur = con.cursor()
+                try:
+                    cur.execute('select n, n::text as s, n %% 2 = 1 as b'
+                                ' from generate_series(1, %d) as s(n)' % n)
+                    res = cur.fetchall()
+                    self.assertEqual(len(res), n, res)
+                    self.assertEqual(len(res[0]), 3)
+                    self.assertEqual(res[0].n, 1)
+                    self.assertEqual(res[0].s, '1')
+                    self.assertIs(res[0].b, True)
+                    self.assertEqual(len(res[-1]), 3)
+                    self.assertEqual(res[-1].n, n)
+                    self.assertEqual(res[-1].s, str(n))
+                    self.assertIs(res[-1].b, n % 2 == 1)
+                finally:
+                    cur.close()
+        finally:
+            con.close()
+
     def test_fetchmany_with_keep(self):
         con = self._connect()
         try:

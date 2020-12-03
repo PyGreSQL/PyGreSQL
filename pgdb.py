@@ -854,10 +854,22 @@ class TypeCache(dict):
             # for NULL values, no typecast is necessary
             return None
         cast = self._typecasts[typ]
-        if not cast or cast is str:
+        if cast is None or cast is str:
             # no typecast is necessary
             return value
         return cast(value)
+
+    def get_row_caster(self, types):
+        """Get a typecast function for a complete row of values."""
+        typecasts = self._typecasts
+        casts = [typecasts[typ] for typ in types]
+        casts = [cast if cast is not str else None for cast in casts]
+
+        def row_caster(row):
+            return [value if cast is None or value is None else cast(value)
+                    for cast, value in zip(casts, row)]
+
+        return row_caster
 
 
 class _quotedict(dict):
@@ -1177,10 +1189,15 @@ class Cursor(object):
             raise
         except Error as err:
             raise _db_error(str(err))
-        typecast = self.type_cache.typecast
         row_factory = self.row_factory
         coltypes = self.coltypes
-        return [row_factory([typecast(value, typ)
+        if len(result) > 5:
+            # optimize the case where we really fetch many values
+            # by looking up all type casting functions upfront
+            cast_row = self.type_cache.get_row_caster(coltypes)
+            return [row_factory(cast_row(row)) for row in result]
+        cast_value = self.type_cache.typecast
+        return [row_factory([cast_value(value, typ)
                 for typ, value in zip(coltypes, row)]) for row in result]
 
     def callproc(self, procname, parameters=None):
