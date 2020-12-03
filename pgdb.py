@@ -838,7 +838,7 @@ class TypeCache(dict):
 
     def get_typecast(self, typ):
         """Get the typecast function for the given database type."""
-        return self._typecasts.get(typ)
+        return self._typecasts[typ]
 
     def set_typecast(self, typ, cast):
         """Set a typecast function for the specified database type(s)."""
@@ -853,7 +853,7 @@ class TypeCache(dict):
         if value is None:
             # for NULL values, no typecast is necessary
             return None
-        cast = self.get_typecast(typ)
+        cast = self._typecasts[typ]
         if not cast or cast is str:
             # no typecast is necessary
             return value
