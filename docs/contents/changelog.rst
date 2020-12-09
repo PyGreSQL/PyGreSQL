@@ -1,9 +1,12 @@
 ChangeLog
 =========
 
-Version 5.2.2 (to be released)
-------------------------------
+Version 5.2.2 (2020-12-09)
+--------------------------
 - Added a missing adapter method for UUIDs in the classic `pg` module.
+- Performance optimizations for `fetchmany()` in the `pgdb` module (#51).
+- Fixed a reference counting issues in the `cast_array/record` methods (#52).
+- Ignore incompatible libpq.dll in Windows PATH for Python >= 3.8 (#53).
 
 Version 5.2.1 (2020-09-25)
 --------------------------
@@ -97,15 +100,15 @@ Version 5.1 (2019-05-17)
       no transactions are started and calling commit() is not required. Note
       that this is not part of the DB-API 2 standard.
 
-Vesion 5.0.7 (2019-05-17)
--------------------------
+Version 5.0.7 (2019-05-17)
+--------------------------
 - This version officially supports the new PostgreSQL 11.
 - Fixed a bug in parsing array subscript ranges (reported by Justin Pryzby).
 - Fixed an issue when deleting a DB wrapper object with the underlying
   connection already closed (bug report by Jacob Champion).
 
-Vesion 5.0.6 (2018-07-29)
--------------------------
+Version 5.0.6 (2018-07-29)
+--------------------------
 - This version officially supports the new Python 3.7.
 - Correct trove classifier for the PostgreSQL License.
 
