@@ -111,7 +111,7 @@ __all__ = [
     'UUID', 'HSTORE', 'JSON', 'ARRAY', 'RECORD',
     'Error', 'Warning',
     'InterfaceError', 'DatabaseError', 'DataError', 'OperationalError',
-    'IntegrityError', 'ProgrammingError', 'NotSupportedError',
+    'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError',
     'apilevel', 'connect', 'paramstyle', 'threadsafety',
     'get_typecast', 'set_typecast', 'reset_typecast',
     'version', '__version__']
