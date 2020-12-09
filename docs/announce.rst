@@ -3,10 +3,10 @@ PyGreSQL Announcements
 ======================
 
 ---------------------------------
-Release of PyGreSQL version 5.2.1
+Release of PyGreSQL version 5.2.2
 ---------------------------------
 
-Release 5.2.1 of PyGreSQL.
+Release 5.2.2 of PyGreSQL.
 
 It is available at: https://pypi.org/project/PyGreSQL/.
 
