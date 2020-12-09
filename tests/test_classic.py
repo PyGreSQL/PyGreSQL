@@ -306,8 +306,8 @@ class UtilityTest(unittest.TestCase):
             target = fut('event_1', self.notify_callback, arg_dict, 0.05)
             thread = Thread(None, target)
             thread.start()
-            # Sleep 100ms, long enough to time out.
-            sleep(0.1)
+            # Sleep 250ms, long enough to time out.
+            sleep(0.25)
             # Verify that we've indeed timed out.
             self.assertFalse(arg_dict.get('called'))
             self.assertTrue(self.notify_timeout)
