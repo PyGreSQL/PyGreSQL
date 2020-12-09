@@ -302,12 +302,12 @@ class UtilityTest(unittest.TestCase):
                 NotificationHandler, db)
             arg_dict = dict(event=None, called=False)
             self.notify_timeout = False
-            # Listen for 'event_1' with timeout of 10ms.
-            target = fut('event_1', self.notify_callback, arg_dict, 0.01)
+            # Listen for 'event_1' with timeout of 50ms.
+            target = fut('event_1', self.notify_callback, arg_dict, 0.05)
             thread = Thread(None, target)
             thread.start()
-            # Sleep 20ms, long enough to time out.
-            sleep(0.02)
+            # Sleep 100ms, long enough to time out.
+            sleep(0.1)
             # Verify that we've indeed timed out.
             self.assertFalse(arg_dict.get('called'))
             self.assertTrue(self.notify_timeout)
