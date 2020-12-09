@@ -5,7 +5,7 @@ Version 5.2.2 (2020-12-09)
 --------------------------
 - Added a missing adapter method for UUIDs in the classic `pg` module.
 - Performance optimizations for `fetchmany()` in the `pgdb` module (#51).
-- Fixed a reference counting issues in the `cast_array/record` methods (#52).
+- Fixed a reference counting issue in the `cast_array/record` methods (#52).
 - Ignore incompatible libpq.dll in Windows PATH for Python >= 3.8 (#53).
 
 Version 5.2.1 (2020-09-25)
