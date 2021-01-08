@@ -240,8 +240,8 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
             /* this type should only be passed when jsondecode is set */
             obj = get_decoded_string(s, size, encoding);
             if (obj && jsondecode) { /* was able to decode */
-                tmp_obj = Py_BuildValue("(O)", obj);
-                obj = PyObject_CallObject(jsondecode, tmp_obj);
+                tmp_obj = obj;
+                obj = PyObject_CallFunction(jsondecode, "(O)", obj);
                 Py_DECREF(tmp_obj);
             }
             break;
