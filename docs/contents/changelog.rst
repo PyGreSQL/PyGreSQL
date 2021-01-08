@@ -1,6 +1,10 @@
 ChangeLog
 =========
 
+Version 5.2.3 (to be released)
+------------------------------
+- Fixed a reference counting issue when casting JSON columns (#57).
+
 Version 5.2.2 (2020-12-09)
 --------------------------
 - Added a missing adapter method for UUIDs in the classic `pg` module.
