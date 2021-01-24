@@ -75,12 +75,12 @@ __all__ = [
     'get_array', 'get_bool', 'get_bytea_escaped',
     'get_datestyle', 'get_decimal', 'get_decimal_point',
     'get_defbase', 'get_defhost', 'get_defopt', 'get_defport', 'get_defuser',
-    'get_jsondecode',
+    'get_jsondecode', 'get_typecast',
     'set_array', 'set_bool', 'set_bytea_escaped',
     'set_datestyle', 'set_decimal', 'set_decimal_point',
     'set_defbase', 'set_defhost', 'set_defopt',
     'set_defpasswd', 'set_defport', 'set_defuser',
-    'set_jsondecode', 'set_query_helpers',
+    'set_jsondecode', 'set_query_helpers', 'set_typecast',
     'version', '__version__']
 
 import select
