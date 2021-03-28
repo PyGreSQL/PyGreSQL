@@ -223,10 +223,8 @@ static PyObject* query_iter(queryObject *self)
     return (PyObject*) self;
 }
 
-/*
- * __next__() method of the queryObject:
- * Returns the current row as a tuple and moves to the next one.
- */
+/* __next__() method of the queryObject:
+  Returns the current row as a tuple and moves to the next one. */
 static PyObject *
 query_next(queryObject *self, PyObject *noargs)
 {
