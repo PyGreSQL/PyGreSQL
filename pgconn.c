@@ -641,7 +641,9 @@ conn_set_non_blocking(connObject *self, PyObject *args)
     }
 
     if (!PyArg_ParseTuple(args, "i", &non_blocking)) {
-        PyErr_SetString(PyExc_TypeError, "setnonblocking(tf), with boolean.");
+        PyErr_SetString(
+            PyExc_TypeError,
+            "set_non_blocking() expects a boolean value as argument");
         return NULL;
     }
 
@@ -658,18 +660,12 @@ static char conn_is_non_blocking__doc__[] =
 "is_non_blocking() -- report the blocking status of the connection";
 
 static PyObject *
-conn_is_non_blocking(connObject *self, PyObject *args)
+conn_is_non_blocking(connObject *self, PyObject *noargs)
 {
     int rc;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
-        return NULL;
-    }
-
-    if (!PyArg_ParseTuple(args, "")) {
-        PyErr_SetString(PyExc_TypeError,
-            "method is_non_blocking() takes no parameters");
         return NULL;
     }
 
@@ -679,7 +675,7 @@ conn_is_non_blocking(connObject *self, PyObject *args)
         return NULL;
     }
 
-    return PyBool_FromLong(rc);
+    return PyBool_FromLong((long)rc);
 }
 #endif /* DIRECT_ACCESS */
 
@@ -1426,19 +1422,12 @@ static char conn_poll__doc__[] =
 "poll() -- Completes an asynchronous connection";
 
 static PyObject *
-conn_poll(connObject *self, PyObject *args)
+conn_poll(connObject *self, PyObject *noargs)
 {
     int rc;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
-        return NULL;
-    }
-
-    /* check args */
-    if (!PyArg_ParseTuple(args, "")) {
-        PyErr_SetString(PyExc_TypeError,
-            "method poll() takes no parameters");
         return NULL;
     }
 
@@ -1612,7 +1601,7 @@ static struct PyMethodDef conn_methods[] = {
     {"describe_prepared", (PyCFunction) conn_describe_prepared,
         METH_VARARGS, conn_describe_prepared__doc__},
     {"poll", (PyCFunction) conn_poll,
-        METH_VARARGS, conn_poll__doc__},
+        METH_NOARGS, conn_poll__doc__},
     {"reset", (PyCFunction) conn_reset,
         METH_NOARGS, conn_reset__doc__},
     {"cancel", (PyCFunction) conn_cancel,
@@ -1659,7 +1648,7 @@ static struct PyMethodDef conn_methods[] = {
     {"endcopy", (PyCFunction) conn_endcopy,
         METH_NOARGS, conn_endcopy__doc__},
     {"set_non_blocking", (PyCFunction) conn_set_non_blocking,
-        METH_O, conn_set_non_blocking__doc__},
+        METH_VARARGS, conn_set_non_blocking__doc__},
     {"is_non_blocking", (PyCFunction) conn_is_non_blocking,
         METH_NOARGS, conn_is_non_blocking__doc__},
 #endif /* DIRECT_ACCESS */

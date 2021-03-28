@@ -84,8 +84,15 @@ class TestCanConnect(unittest.TestCase):
     def testCanConnect(self):
         try:
             connection = connect()
+            rc = connection.poll()
         except pg.Error as error:
             self.fail('Cannot connect to database %s:\n%s' % (dbname, error))
+        self.assertEqual(rc, pg.POLLING_OK)
+        self.assertIs(connection.is_non_blocking(), False)
+        connection.set_non_blocking(True)
+        self.assertIs(connection.is_non_blocking(), True)
+        connection.set_non_blocking(False)
+        self.assertIs(connection.is_non_blocking(), False)
         try:
             connection.close()
         except pg.Error:
@@ -93,13 +100,19 @@ class TestCanConnect(unittest.TestCase):
 
     def testCanConnectNoWait(self):
         try:
-            connection = connect()
+            connection = connect_nowait()
             rc = connection.poll()
+            self.assertEqual(rc, pg.POLLING_READING)
             while rc not in (pg.POLLING_OK, pg.POLLING_FAILED):
                 rc = connection.poll()
         except pg.Error as error:
             self.fail('Cannot connect to database %s:\n%s' % (dbname, error))
         self.assertEqual(rc, pg.POLLING_OK)
+        self.assertIs(connection.is_non_blocking(), False)
+        connection.set_non_blocking(True)
+        self.assertIs(connection.is_non_blocking(), True)
+        connection.set_non_blocking(False)
+        self.assertIs(connection.is_non_blocking(), False)
         try:
             connection.close()
         except pg.Error:
