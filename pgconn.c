@@ -511,7 +511,7 @@ conn_describe_prepared(connObject *self, PyObject *args)
     /* reads args */
     if (!PyArg_ParseTuple(args, "s#", &name, &name_length)) {
         PyErr_SetString(PyExc_TypeError,
-                        "Method prepare() takes a string argument");
+                        "Method describe_prepared() takes a string argument");
         return NULL;
     }
 

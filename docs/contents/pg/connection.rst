@@ -103,12 +103,12 @@ returns without waiting for the query to complete. The database connection
 cannot be used for other operations until the query completes, but the
 application can do other things, including executing queries using other
 database connections. The application can call ``select()`` using the
-``fileno```  obtained by the connection#s :meth:`Connection.fileno` method
+``fileno``  obtained by the connection's :meth:`Connection.fileno` method
 to determine when the query has results to return.
 
 This method always returns a :class:`Query` object. This object differs
 from the :class:`Query` object returned by :meth:`Connection.query` in a
-few way. Most importantly, when :meth:`Connection.send_query` is used, the
+few ways. Most importantly, when :meth:`Connection.send_query` is used, the
 application must call one of the result-returning methods such as
 :meth:`Query.getresult` or :meth:`Query.dictresult` until it either raises
 an exception or returns ``None``.
@@ -285,7 +285,7 @@ it's no different from a connection made using blocking calls.
 
 The required steps are to pass the parameter ``nowait=True`` to  the
 :meth:`pg.connect` call, then call :meth:`Connection.poll` until it either
-returns :const':`POLLING_OK` or raises an exception. To avoid blocking
+returns :const:`POLLING_OK` or raises an exception. To avoid blocking
 in :meth:`Connection.poll`, use `select()` or `poll()` to wait for the
 connection to be readable or writable, depending on the return code of the
 previous call to :meth:`Connection.poll`. The initial state of the connection

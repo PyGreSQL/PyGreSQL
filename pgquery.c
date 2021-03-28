@@ -223,8 +223,10 @@ static PyObject* query_iter(queryObject *self)
     return (PyObject*) self;
 }
 
-/* __next__() method of the queryObject:
-   Returns the current current row as a tuple and moves to the next one. */
+/*
+ * __next__() method of the queryObject:
+ * Returns the current row as a tuple and moves to the next one.
+ */
 static PyObject *
 query_next(queryObject *self, PyObject *noargs)
 {
@@ -357,7 +359,7 @@ _query_build_field_info(PGresult *res, int col_num) {
 
 /* Get information on one or all fields of the query result. */
 static char query_fieldinfo__doc__[] =
-"fieldinfo() -- return info on field(s) in query";
+"fieldinfo([name]) -- return information about field(s) in query result";
 
 static PyObject *
 query_fieldinfo(queryObject *self, PyObject *args)
@@ -522,7 +524,7 @@ _query_row_as_dict(queryObject *self)
     return row_dict;
 }
 
-/* Return the current current row as a dict and move to the next one. */
+/* Return the current row as a dict and move to the next one. */
 static PyObject *
 query_next_dict(queryObject *self, PyObject *noargs)
 {
