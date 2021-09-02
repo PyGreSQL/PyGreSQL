@@ -769,7 +769,7 @@ conn_inserttable(connObject *self, PyObject *args)
         bufpt += sprintf(bufpt, " (");
         for (j = 0; j < n; ++j) {
             PyObject *obj = getcolumn(columns, j);
-            ssize_t slen;
+            Py_ssize_t slen;
             char *col;
 
             if (PyBytes_Check(obj)) {
