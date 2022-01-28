@@ -1890,15 +1890,42 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), self.data)
 
-    def testInserttableFromSetofTuples(self):
-        data = {row for row in self.data}
+    def testInserttableWithDifferentRowSizes(self):
+        data = self.data[:-1] + [self.data[-1][:-1]]
         try:
             self.c.inserttable('test', data)
         except TypeError as e:
             r = str(e)
         else:
             r = 'this is fine'
-        self.assertIn('list or a tuple as second argument', r)
+        self.assertIn('second arg must contain sequences of the same size', r)
+
+    def testInserttableFromSetofTuples(self):
+        data = {row for row in self.data}
+        self.c.inserttable('test', data)
+        self.assertEqual(self.get_back(), self.data)
+
+    def testInserttableFromDictAsInterable(self):
+        data = {row: None for row in self.data}
+        self.c.inserttable('test', data)
+        self.assertEqual(self.get_back(), self.data)
+
+    def testInserttableFromDictKeys(self):
+        data = {row: None for row in self.data}
+        keys = data.keys()
+        self.c.inserttable('test', keys)
+        self.assertEqual(self.get_back(), self.data)
+
+    def testInserttableFromDictValues(self):
+        data = {i: row for i, row in enumerate(self.data)}
+        values = data.values()
+        self.c.inserttable('test', values)
+        self.assertEqual(self.get_back(), self.data)
+
+    def testInserttableFromGeneratorOfTuples(self):
+        data = (row for row in self.data)
+        self.c.inserttable('test', data)
+        self.assertEqual(self.get_back(), self.data)
 
     def testInserttableFromListOfSets(self):
         data = [set(row) for row in self.data]
@@ -1908,7 +1935,7 @@ class TestInserttable(unittest.TestCase):
             r = str(e)
         else:
             r = 'this is fine'
-        self.assertIn('second argument must contain a tuple or a list', r)
+        self.assertIn('second argument must contain tuples or lists', r)
 
     def testInserttableMultipleRows(self):
         num_rows = 100
@@ -2078,7 +2105,7 @@ class TestInserttable(unittest.TestCase):
     def testInserttableTooLargeColumnSpecification(self):
         # should catch buffer overflow when building the column specification
         self.assertRaises(MemoryError, self.c.inserttable,
-                          'test', [], ['very_long_column_name'] * 1000)
+                          'test', self.data, ['very_long_column_name'] * 1000)
 
 
 class TestDirectSocketAccess(unittest.TestCase):

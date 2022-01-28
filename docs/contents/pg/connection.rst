@@ -484,27 +484,27 @@ first, otherwise :meth:`Connection.getnotify` will always return ``None``.
 .. versionchanged:: 4.1
     Support for payload strings was added in version 4.1.
 
-inserttable -- insert a list into a table
------------------------------------------
+inserttable -- insert an iterable into a table
+----------------------------------------------
 
 .. method:: Connection.inserttable(table, values, [columns])
 
-    Insert a Python list into a database table
+    Insert a Python iterable into a database table
 
     :param str table: the table name
-    :param list values: list of rows values
-    :param list columns: list of column names
+    :param list values: iterable of row values, which must be lists or tuples
+    :param list columns: list or tuple of column names
     :rtype: None
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises MemoryError: insert buffer could not be allocated
     :raises ValueError: unsupported values
 
-This method allows to *quickly* insert large blocks of data in a table:
-It inserts the whole values list into the given table. Internally, it
-uses the COPY command of the PostgreSQL database. The list is a list
-of tuples/lists that define the values for each inserted row. The rows
-values may contain string, integer, long or double (real) values.
-``columns`` is an optional sequence of column names to be passed on
+This method allows to *quickly* insert large blocks of data in a table.
+Internally, it uses the COPY command of the PostgreSQL database.
+The method takes an iterable of row values which must be tuples or lists
+of the same size, containing the values for each inserted row.
+These may contain string, integer, long or double (real) values.
+``columns`` is an optional tuple or list of column names to be passed on
 to the COPY command.
 
 .. warning::

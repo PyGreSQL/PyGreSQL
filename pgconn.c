@@ -682,9 +682,9 @@ conn_is_non_blocking(connObject *self, PyObject *noargs)
 
 /* Insert table */
 static char conn_inserttable__doc__[] =
-"inserttable(table, data, [columns]) -- insert list into table\n\n"
-"The fields in the list must be in the same order as in the table\n"
-"or in the list of columns if one is specified.\n";
+"inserttable(table, data, [columns]) -- insert iterable into table\n\n"
+"The fields in the iterable must be in the same order as in the table\n"
+"or in the list or tuple of columns if one is specified.\n";
 
 static PyObject *
 conn_inserttable(connObject *self, PyObject *args)
@@ -693,11 +693,8 @@ conn_inserttable(connObject *self, PyObject *args)
     char *table, *buffer, *bufpt, *bufmax;
     int encoding;
     size_t bufsiz;
-    PyObject *list, *sublist, *item, *columns = NULL;
-    PyObject *(*getitem) (PyObject *, Py_ssize_t);
-    PyObject *(*getsubitem) (PyObject *, Py_ssize_t);
-    PyObject *(*getcolumn) (PyObject *, Py_ssize_t);
-    Py_ssize_t i, j, m, n = 0;
+    PyObject *rows, *iter_row, *item, *columns = NULL;
+    Py_ssize_t i, j, m, n;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -705,7 +702,7 @@ conn_inserttable(connObject *self, PyObject *args)
     }
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "sO|O", &table, &list, &columns)) {
+    if (!PyArg_ParseTuple(args, "sO|O", &table, &rows, &columns)) {
         PyErr_SetString(
             PyExc_TypeError,
             "Method inserttable() expects a string and a list as arguments");
@@ -713,49 +710,43 @@ conn_inserttable(connObject *self, PyObject *args)
     }
 
     /* checks list type */
-    if (PyList_Check(list)) {
-        m = PyList_Size(list);
-        getitem = PyList_GetItem;
-    }
-    else if (PyTuple_Check(list)) {
-        m = PyTuple_Size(list);
-        getitem = PyTuple_GetItem;
-    }
-    else {
+    if (!(iter_row = PyObject_GetIter(rows)))
+    {
         PyErr_SetString(
             PyExc_TypeError,
-            "Method inserttable() expects a list or a tuple"
+            "Method inserttable() expects an iterable"
             " as second argument");
         return NULL;
+    }
+    m = PySequence_Check(rows) ? PySequence_Size(rows) : -1;
+    if (!m) {
+        /* no rows specified, nothing to do */
+        Py_DECREF(iter_row); Py_INCREF(Py_None); return Py_None;
     }
 
     /* checks columns type */
     if (columns) {
-        if (PyList_Check(columns)) {
-            n = PyList_Size(columns);
-            getcolumn = PyList_GetItem;
-        }
-        else if (PyTuple_Check(columns)) {
-            n = PyTuple_Size(columns);
-            getcolumn = PyTuple_GetItem;
-        }
-        else {
+        if (!(PyTuple_Check(columns) || PyList_Check(columns))) {
             PyErr_SetString(
                 PyExc_TypeError,
-                "Method inserttable() expects a list or a tuple"
-                " as third argument");
+                "Method inserttable() expects a tuple or a list"
+                " as second argument");
             return NULL;
         }
+
+        n = PySequence_Fast_GET_SIZE(columns);
         if (!n) {
             /* no columns specified, nothing to do */
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_DECREF(iter_row); Py_INCREF(Py_None); return Py_None;
         }
+    } else {
+        n = -1; /* number of columns not yet known */
     }
 
     /* allocate buffer */
-    if (!(buffer = PyMem_Malloc(MAX_BUFFER_SIZE)))
-        return PyErr_NoMemory();
+    if (!(buffer = PyMem_Malloc(MAX_BUFFER_SIZE))) {
+        Py_DECREF(iter_row); return PyErr_NoMemory();
+    }
 
     encoding = PQclientEncoding(self->cnx);
 
@@ -770,7 +761,7 @@ conn_inserttable(connObject *self, PyObject *args)
         if (bufpt < bufmax)
             bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt), " (");
         for (j = 0; j < n; ++j) {
-            PyObject *obj = getcolumn(columns, j);
+            PyObject *obj = PySequence_Fast_GET_ITEM(columns, j);
             Py_ssize_t slen;
             char *col;
 
@@ -779,13 +770,18 @@ conn_inserttable(connObject *self, PyObject *args)
             }
             else if (PyUnicode_Check(obj)) {
                 obj = get_encoded_string(obj, encoding);
-                if (!obj) return NULL; /* pass the UnicodeEncodeError */
+                if (!obj) {
+                    Py_DECREF(iter_row);
+                    return NULL; /* pass the UnicodeEncodeError */
+                }
                 PyBytes_AsStringAndSize(obj, &col, &slen);
                 Py_DECREF(obj);
             } else {
                 PyErr_SetString(
                     PyExc_TypeError,
                     "The third argument must contain only strings");
+                Py_DECREF(iter_row);
+                return NULL;
             }
             col = PQescapeIdentifier(self->cnx, col, (size_t) slen);
             if (bufpt < bufmax)
@@ -797,7 +793,8 @@ conn_inserttable(connObject *self, PyObject *args)
     if (bufpt < bufmax)
         snprintf(bufpt, (size_t) (bufmax - bufpt), " from stdin");
     if (bufpt >= bufmax)  {
-        PyMem_Free(buffer); return PyErr_NoMemory();
+        PyMem_Free(buffer); Py_DECREF(iter_row);
+        return PyErr_NoMemory();
     }
 
     Py_BEGIN_ALLOW_THREADS
@@ -805,7 +802,7 @@ conn_inserttable(connObject *self, PyObject *args)
     Py_END_ALLOW_THREADS
 
     if (!result) {
-        PyMem_Free(buffer);
+        PyMem_Free(buffer); Py_DECREF(iter_row);
         PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
         return NULL;
     }
@@ -813,33 +810,29 @@ conn_inserttable(connObject *self, PyObject *args)
     PQclear(result);
 
     /* feed table */
-    for (i = 0; i < m; ++i) {
-        sublist = getitem(list, i);
-        if (PyTuple_Check(sublist)) {
-            j = PyTuple_Size(sublist);
-            getsubitem = PyTuple_GetItem;
-        }
-        else if (PyList_Check(sublist)) {
-            j = PyList_Size(sublist);
-            getsubitem = PyList_GetItem;
-        }
-        else {
+    for (i = 0; m < 0 || i < m; ++i) {
+
+        if (!(columns = PyIter_Next(iter_row))) break;
+
+        if (!(PyTuple_Check(columns) || PyList_Check(columns))) {
+            PyMem_Free(buffer);
+            Py_DECREF(columns); Py_DECREF(columns); Py_DECREF(iter_row);
             PyErr_SetString(
                 PyExc_TypeError,
-                "The second argument must contain a tuple or a list");
+                "The second argument must contain tuples or lists");
             return NULL;
         }
-        if (i) {
-            if (j != n) {
-                PyMem_Free(buffer);
-                PyErr_SetString(
-                    PyExc_TypeError,
-                    "Arrays contained in second arg must have same size");
-                return NULL;
-            }
-        }
-        else {
-            n = j; /* never used before this assignment */
+
+        j = PySequence_Fast_GET_SIZE(columns);
+        if (n < 0) {
+            n = j;
+        } else if (j != n) {
+            PyMem_Free(buffer);
+            Py_DECREF(columns); Py_DECREF(iter_row);
+            PyErr_SetString(
+                PyExc_TypeError,
+                "The second arg must contain sequences of the same size");
+            return NULL;
         }
 
         /* builds insert line */
@@ -851,7 +844,7 @@ conn_inserttable(connObject *self, PyObject *args)
                 *bufpt++ = '\t'; --bufsiz;
             }
 
-            item = getsubitem(sublist, j);
+            item = PySequence_Fast_GET_ITEM(columns, j);
 
             /* convert item to string and append to buffer */
             if (item == Py_None) {
@@ -877,6 +870,7 @@ conn_inserttable(connObject *self, PyObject *args)
                 PyObject *s = get_encoded_string(item, encoding);
                 if (!s) {
                     PyMem_Free(buffer);
+                    Py_DECREF(item); Py_DECREF(columns); Py_DECREF(iter_row);
                     return NULL; /* pass the UnicodeEncodeError */
                 }
                 else {
@@ -916,10 +910,13 @@ conn_inserttable(connObject *self, PyObject *args)
             }
 
             if (bufsiz <= 0) {
-                PyMem_Free(buffer); return PyErr_NoMemory();
+                PyMem_Free(buffer); Py_DECREF(columns); Py_DECREF(iter_row);
+                return PyErr_NoMemory();
             }
 
         }
+
+         Py_DECREF(columns);
 
         *bufpt++ = '\n'; *bufpt = '\0';
 
@@ -927,9 +924,14 @@ conn_inserttable(connObject *self, PyObject *args)
         if (PQputline(self->cnx, buffer)) {
             PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
             PQendcopy(self->cnx);
-            PyMem_Free(buffer);
+            PyMem_Free(buffer);  Py_DECREF(iter_row);
             return NULL;
         }
+    }
+
+    Py_DECREF(iter_row);
+    if (PyErr_Occurred()) {
+        PyMem_Free(buffer); return NULL; /* pass the iteration error */
     }
 
     /* ends query */
