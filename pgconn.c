@@ -690,7 +690,7 @@ static PyObject *
 conn_inserttable(connObject *self, PyObject *args)
 {
     PGresult *result;
-    char *table, *buffer, *bufpt;
+    char *table, *buffer, *bufpt, *bufmax;
     int encoding;
     size_t bufsiz;
     PyObject *list, *sublist, *item, *columns = NULL;
@@ -761,12 +761,14 @@ conn_inserttable(connObject *self, PyObject *args)
 
     /* starts query */
     bufpt = buffer;
+    bufmax = bufpt + MAX_BUFFER_SIZE;
     table = PQescapeIdentifier(self->cnx, table, strlen(table));
-    bufpt += sprintf(bufpt, "copy %s", table);
+    bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt), "copy %s", table);
     PQfreemem(table);
     if (columns) {
         /* adds a string like f" ({','.join(columns)})" */
-        bufpt += sprintf(bufpt, " (");
+        if (bufpt < bufmax)
+            bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt), " (");
         for (j = 0; j < n; ++j) {
             PyObject *obj = getcolumn(columns, j);
             Py_ssize_t slen;
@@ -786,11 +788,17 @@ conn_inserttable(connObject *self, PyObject *args)
                     "The third argument must contain only strings");
             }
             col = PQescapeIdentifier(self->cnx, col, (size_t) slen);
-            bufpt += sprintf(bufpt, "%s%s", col, j == n - 1 ? ")" : ",");
+            if (bufpt < bufmax)
+                bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt),
+                    "%s%s", col, j == n - 1 ? ")" : ",");
             PQfreemem(col);
         }
     }
-    sprintf(bufpt, " from stdin");
+    if (bufpt < bufmax)
+        snprintf(bufpt, (size_t) (bufmax - bufpt), " from stdin");
+    if (bufpt >= bufmax)  {
+        PyMem_Free(buffer); return PyErr_NoMemory();
+    }
 
     Py_BEGIN_ALLOW_THREADS
     result = PQexec(self->cnx, buffer);

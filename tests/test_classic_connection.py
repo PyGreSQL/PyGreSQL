@@ -2075,6 +2075,11 @@ class TestInserttable(unittest.TestCase):
         # cannot encode non-ascii unicode without a specific encoding
         self.assertRaises(UnicodeEncodeError, self.c.inserttable, 'test', data)
 
+    def testInserttableTooLargeColumnSpecification(self):
+        # should catch buffer overflow when building the column specification
+        self.assertRaises(MemoryError, self.c.inserttable,
+                          'test', [], ['very_long_column_name'] * 1000)
+
 
 class TestDirectSocketAccess(unittest.TestCase):
     """Test copy command with direct socket access."""
