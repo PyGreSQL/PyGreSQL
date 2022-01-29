@@ -1,12 +1,14 @@
 *~
 *.bak
 *.cache
+*.dll
 *.egg-info
 *.log
 *.patch
 *.pid
 *.pstats
 *.py[co]
+*.so
 *.swp
 
 __pycache__/
