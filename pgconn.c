@@ -815,7 +815,7 @@ conn_inserttable(connObject *self, PyObject *args)
         if (!(columns = PyIter_Next(iter_row))) break;
 
         if (!(PyTuple_Check(columns) || PyList_Check(columns))) {
-            PyMem_Free(buffer);
+            PQendcopy(self->cnx); PyMem_Free(buffer);
             Py_DECREF(columns); Py_DECREF(columns); Py_DECREF(iter_row);
             PyErr_SetString(
                 PyExc_TypeError,
@@ -827,7 +827,7 @@ conn_inserttable(connObject *self, PyObject *args)
         if (n < 0) {
             n = j;
         } else if (j != n) {
-            PyMem_Free(buffer);
+            PQendcopy(self->cnx); PyMem_Free(buffer);
             Py_DECREF(columns); Py_DECREF(iter_row);
             PyErr_SetString(
                 PyExc_TypeError,
@@ -869,7 +869,7 @@ conn_inserttable(connObject *self, PyObject *args)
             else if (PyUnicode_Check(item)) {
                 PyObject *s = get_encoded_string(item, encoding);
                 if (!s) {
-                    PyMem_Free(buffer);
+                    PQendcopy(self->cnx); PyMem_Free(buffer);
                     Py_DECREF(item); Py_DECREF(columns); Py_DECREF(iter_row);
                     return NULL; /* pass the UnicodeEncodeError */
                 }
@@ -910,7 +910,8 @@ conn_inserttable(connObject *self, PyObject *args)
             }
 
             if (bufsiz <= 0) {
-                PyMem_Free(buffer); Py_DECREF(columns); Py_DECREF(iter_row);
+                PQendcopy(self->cnx); PyMem_Free(buffer);
+                Py_DECREF(columns); Py_DECREF(iter_row);
                 return PyErr_NoMemory();
             }
 
@@ -923,22 +924,21 @@ conn_inserttable(connObject *self, PyObject *args)
         /* sends data */
         if (PQputline(self->cnx, buffer)) {
             PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
-            PQendcopy(self->cnx);
-            PyMem_Free(buffer);  Py_DECREF(iter_row);
+            PQendcopy(self->cnx); PyMem_Free(buffer);  Py_DECREF(iter_row);
             return NULL;
         }
     }
 
     Py_DECREF(iter_row);
     if (PyErr_Occurred()) {
-        PyMem_Free(buffer); return NULL; /* pass the iteration error */
+        PQendcopy(self->cnx); PyMem_Free(buffer);
+        return NULL; /* pass the iteration error */
     }
 
     /* ends query */
     if (PQputline(self->cnx, "\\.\n")) {
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
-        PQendcopy(self->cnx);
-        PyMem_Free(buffer);
+        PQendcopy(self->cnx); PyMem_Free(buffer);
         return NULL;
     }
 
