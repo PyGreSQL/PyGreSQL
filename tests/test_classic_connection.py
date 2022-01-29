@@ -1776,7 +1776,7 @@ class TestInserttable(unittest.TestCase):
         c.query("drop table if exists test cascade")
         c.query("create table test ("
                 "i2 smallint, i4 integer, i8 bigint,"
-                " b boolean, dt date, ti time,"
+                "b boolean, dt date, ti time,"
                 "d numeric, f4 real, f8 double precision, m money,"
                 "c char(1), v4 varchar(4), c4 char(4), t text)")
         # Check whether the test database uses SQL_ASCII - this means
@@ -2116,6 +2116,17 @@ class TestInserttable(unittest.TestCase):
         data = [row_unicode]
         # cannot encode non-ascii unicode without a specific encoding
         self.assertRaises(UnicodeEncodeError, self.c.inserttable, 'test', data)
+
+    def testInserttableFromQuery(self):
+        data = self.c.query(
+            "select 2::int2 as i2, 4::int4 as i4, 8::int8 as i8, true as b,"
+            "null as dt, null as ti, null as d,"
+            "4.5::float as float4, 8.5::float8 as f8,"
+            "null as m, 'c' as c, 'v4' as v4, null as c4, 'text' as text")
+        self.c.inserttable('test', data)
+        self.assertEqual(self.get_back(), [
+            (2, 4, 8, True, None, None, None, 4.5, 8.5,
+             None, 'c', 'v4', None, 'text')])
 
 
 class TestDirectSocketAccess(unittest.TestCase):
