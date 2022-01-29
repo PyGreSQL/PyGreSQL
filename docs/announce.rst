@@ -3,10 +3,10 @@ PyGreSQL Announcements
 ======================
 
 ---------------------------------
-Release of PyGreSQL version 5.2.2
+Release of PyGreSQL version 5.2.3
 ---------------------------------
 
-Release 5.2.2 of PyGreSQL.
+Release 5.2.3 of PyGreSQL.
 
 It is available at: https://pypi.org/project/PyGreSQL/.
 
@@ -22,8 +22,8 @@ This version has been built and unit tested on:
  - openSUSE
  - Ubuntu
  - Windows 7 and 10 with both MinGW and Visual Studio
- - PostgreSQL 9.0 to 9.6 and 10 to 13 (32 and 64bit)
- - Python 2.7 and 3.5 to 3.9 (32 and 64bit)
+ - PostgreSQL 9.0 to 9.6 and 10 to 14 (32 and 64bit)
+ - Python 2.7 and 3.5 to 3.10 (32 and 64bit)
 
 | D'Arcy J.M. Cain
 | darcy@PyGreSQL.org

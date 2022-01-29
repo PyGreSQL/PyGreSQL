@@ -3,7 +3,7 @@
  *
  * This is the main file for the C extension module.
  *
- * Copyright (c) 2020 by the PyGreSQL Development Team
+ * Copyright (c) 2022 by the PyGreSQL Development Team
  *
  * Please see the LICENSE.TXT file for specific restrictions.
  */
