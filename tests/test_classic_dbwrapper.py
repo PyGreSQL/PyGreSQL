@@ -4227,6 +4227,20 @@ class TestDBClass(unittest.TestCase):
         self.db.reopen()
         self.assertIsNone(handler.db)
 
+    def testInserttableFromQuery(self):
+        # use inserttable() to copy from one table to another
+        query = self.db.query
+        self.createTable('test_table_from', 'n integer, t timestamp')
+        self.createTable('test_table_to', 'n integer, t timestamp')
+        for i in range(1, 4):
+            query("insert into test_table_from values ($1, now())", i)
+        self.db.inserttable(
+            'test_table_to', query("select n, t::text from test_table_from"))
+        data_from = query("select * from test_table_from").getresult()
+        data_to = query("select * from test_table_to").getresult()
+        self.assertEqual([row[0] for row in data_from], [1, 2, 3])
+        self.assertEqual(data_from, data_to)
+
 
 class TestDBClassNonStdOpts(TestDBClass):
     """Test the methods of the DB class with non-standard global options."""
