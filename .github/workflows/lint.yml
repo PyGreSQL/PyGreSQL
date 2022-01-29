@@ -1,0 +1,24 @@
+name: Run PyGreSQL quality checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    name: Quality checks run
+    runs-on: ubuntu-20.04
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install tox
+        run: pip install tox
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: Run quality checks
+        run: tox -e flake8,docs
+        timeout-minutes: 5

@@ -16,19 +16,7 @@ except (ImportError, ValueError, SystemError):
     # noinspection PyUnresolvedReferences
     import dbapi20
 
-# We need a database to test against.
-# If LOCAL_PyGreSQL.py exists we will get our information from that.
-# Otherwise we use the defaults.
-dbname = 'dbapi20_test'
-dbhost = ''
-dbport = 5432
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     long
@@ -51,7 +39,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     driver = pgdb
     connect_args = ()
     connect_kw_args = {
-        'database': dbname, 'host': '%s:%d' % (dbhost or '', dbport or -1)}
+        'database': dbname, 'host': '%s:%d' % (dbhost or '', dbport or -1),
+        'user': dbuser, 'password': dbpasswd}
 
     lower_func = 'lower'  # For stored procedure test
 

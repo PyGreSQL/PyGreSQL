@@ -27,22 +27,7 @@ from decimal import Decimal
 
 import pg  # the module under test
 
-# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
-# get our information from that.  Otherwise we use the defaults.
-# These tests should be run with various PostgreSQL versions and databases
-# created with different encodings and locales.  Particularly, make sure the
-# tests are running against databases created with both SQL_ASCII and UTF8.
-dbname = 'unittest'
-dbhost = None
-dbport = 5432
-
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     long
@@ -67,7 +52,8 @@ do_not_ask_for_host_reason = 'libpq issue on Windows'
 def connect():
     """Create a basic pg connection to the test database."""
     # noinspection PyArgumentList
-    connection = pg.connect(dbname, dbhost, dbport)
+    connection = pg.connect(dbname, dbhost, dbport,
+                            user=dbuser, passwd=dbpasswd)
     connection.query("set client_min_messages=warning")
     return connection
 
@@ -75,7 +61,8 @@ def connect():
 def connect_nowait():
     """Start a basic pg connection in a non-blocking manner."""
     # noinspection PyArgumentList
-    return pg.connect(dbname, dbhost, dbport, nowait=True)
+    return pg.connect(dbname, dbhost, dbport,
+                      user=dbuser, passwd=dbpasswd, nowait=True)
 
 
 class TestCanConnect(unittest.TestCase):
@@ -102,7 +89,7 @@ class TestCanConnect(unittest.TestCase):
         try:
             connection = connect_nowait()
             rc = connection.poll()
-            self.assertEqual(rc, pg.POLLING_READING)
+            self.assertIn(rc, (pg.POLLING_READING, pg.POLLING_WRITING))
             while rc not in (pg.POLLING_OK, pg.POLLING_FAILED):
                 rc = connection.poll()
         except pg.Error as error:

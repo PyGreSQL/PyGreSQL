@@ -26,22 +26,9 @@ from uuid import UUID
 from time import strftime
 from operator import itemgetter
 
-# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
-# get our information from that.  Otherwise we use the defaults.
-# The current user must have create schema privilege on the database.
-dbname = 'unittest'
-dbhost = None
-dbport = 5432
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 debug = False  # let DB wrapper print debugging output
-
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
 
 try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     long
@@ -68,7 +55,7 @@ do_not_ask_for_host_reason = 'libpq issue on Windows'
 
 def DB():
     """Create a DB wrapper object connecting to the test database."""
-    db = pg.DB(dbname, dbhost, dbport)
+    db = pg.DB(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
     if debug:
         db.debug = debug
     db.query("set client_min_messages=warning")

@@ -16,19 +16,7 @@ import os
 
 import pg  # the module under test
 
-# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
-# get our information from that.  Otherwise we use the defaults.
-dbname = 'unittest'
-dbhost = None
-dbport = 5432
-
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 windows = os.name == 'nt'
 
@@ -36,7 +24,8 @@ windows = os.name == 'nt'
 # noinspection PyArgumentList
 def connect():
     """Create a basic pg connection to the test database."""
-    connection = pg.connect(dbname, dbhost, dbport)
+    connection = pg.connect(dbname, dbhost, dbport,
+                            user=dbuser, passwd=dbpasswd)
     connection.query("set client_min_messages=warning")
     return connection
 

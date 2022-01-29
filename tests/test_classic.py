@@ -11,23 +11,11 @@ from threading import Thread
 
 from pg import *
 
-# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
-# get our information from that.  Otherwise we use the defaults.
-dbname = 'unittest'
-dbhost = None
-dbport = 5432
-
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 
 def open_db():
-    db = DB(dbname, dbhost, dbport)
+    db = DB(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
     db.query("SET DATESTYLE TO 'ISO'")
     db.query("SET TIME ZONE 'EST5EDT'")
     db.query("SET DEFAULT_WITH_OIDS=FALSE")

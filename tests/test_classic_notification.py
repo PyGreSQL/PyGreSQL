@@ -17,12 +17,7 @@ from threading import Thread
 
 import pg  # the module under test
 
-# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
-# get our information from that.  Otherwise we use the defaults.
-# The current user must have create schema privilege on the database.
-dbname = 'unittest'
-dbhost = None
-dbport = 5432
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 debug = False  # let DB wrapper print debugging output
 
@@ -37,7 +32,7 @@ except (ImportError, ValueError):
 
 def DB():
     """Create a DB wrapper object connecting to the test database."""
-    db = pg.DB(dbname, dbhost, dbport)
+    db = pg.DB(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
     if debug:
         db.debug = debug
     return db

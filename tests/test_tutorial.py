@@ -8,19 +8,7 @@ import unittest
 from pg import DB
 from pgdb import connect
 
-# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
-# get our information from that.  Otherwise we use the defaults.
-dbname = 'unittest'
-dbhost = None
-dbport = 5432
-
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 
 class TestClassicTutorial(unittest.TestCase):
@@ -28,7 +16,7 @@ class TestClassicTutorial(unittest.TestCase):
 
     def setUp(self):
         """Setup test tables or empty them if they already exist."""
-        db = DB(dbname=dbname, host=dbhost, port=dbport)
+        db = DB(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
         db.query("set datestyle to 'iso'")
         db.query("set default_with_oids=false")
         db.query("set standard_conforming_strings=false")
@@ -122,9 +110,9 @@ class TestDbApi20Tutorial(unittest.TestCase):
 
     def setUp(self):
         """Setup test tables or empty them if they already exist."""
-        database = dbname
         host = '%s:%d' % (dbhost or '', dbport or -1)
-        con = connect(database=database, host=host)
+        con = connect(database=dbname, host=host,
+                      user=dbuser, password=dbpasswd)
         cur = con.cursor()
         cur.execute("set datestyle to 'iso'")
         cur.execute("set default_with_oids=false")

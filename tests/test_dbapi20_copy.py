@@ -19,20 +19,7 @@ except ImportError:  # Python < 3.3
 
 import pgdb  # the module under test
 
-# We need a database to test against.  If LOCAL_PyGreSQL.py exists we will
-# get our information from that.  Otherwise we use the defaults.
-# The current user must have create schema privilege on the database.
-dbname = 'unittest'
-dbhost = None
-dbport = 5432
-
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
+from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
     unicode
@@ -126,8 +113,9 @@ class TestCopy(unittest.TestCase):
 
     @staticmethod
     def connect():
-        return pgdb.connect(
-            database=dbname, host='%s:%d' % (dbhost or '', dbport or -1))
+        host = '%s:%d' % (dbhost or '', dbport or -1)
+        return pgdb.connect(database=dbname, host=host,
+                            user=dbuser, password=dbpasswd)
 
     @classmethod
     def setUpClass(cls):
