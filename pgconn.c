@@ -730,7 +730,7 @@ conn_inserttable(connObject *self, PyObject *args)
             PyErr_SetString(
                 PyExc_TypeError,
                 "Method inserttable() expects a tuple or a list"
-                " as second argument");
+                " as third argument");
             return NULL;
         }
 

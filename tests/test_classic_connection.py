@@ -1980,7 +1980,7 @@ class TestInserttable(unittest.TestCase):
         data = [(42,)]
         # check that the table name is not inserted unescaped
         # (this would pass otherwise since there is a column named i4)
-        self.assertRaises(Exception, self.c.inserttable, 'test (i4)', data)
+        self.assertRaises(OSError, self.c.inserttable, 'test (i4)', data)
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i4'])
 
@@ -1989,9 +1989,24 @@ class TestInserttable(unittest.TestCase):
         # check that the column names are not inserted unescaped
         # (this would pass otherwise since there are columns i2 and i4)
         self.assertRaises(
-            Exception, self.c.inserttable, 'test', data, ['i2,i4'])
+            TypeError, self.c.inserttable, 'test', data, ['i2,i4'])
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i2', 'i4'])
+
+    def testInserttableWithInvalidColumList(self):
+        data = self.data
+        try:
+            self.c.inserttable('test', data, 'invalid')
+        except TypeError as e:
+            r = str(e)
+        else:
+            r = 'this is fine'
+        self.assertIn('expects a tuple or a list as third argument', r)
+
+    def testInserttableWithHugeListOfColumnNames(self):
+        # should catch buffer overflow when building the column specification
+        self.assertRaises(MemoryError, self.c.inserttable,
+                          'test', self.data, ['very_long_column_name'] * 1000)
 
     def testInserttableMaxValues(self):
         data = [(2 ** 15 - 1, int(2 ** 31 - 1), long(2 ** 31 - 1),
@@ -2101,11 +2116,6 @@ class TestInserttable(unittest.TestCase):
         data = [row_unicode]
         # cannot encode non-ascii unicode without a specific encoding
         self.assertRaises(UnicodeEncodeError, self.c.inserttable, 'test', data)
-
-    def testInserttableTooLargeColumnSpecification(self):
-        # should catch buffer overflow when building the column specification
-        self.assertRaises(MemoryError, self.c.inserttable,
-                          'test', self.data, ['very_long_column_name'] * 1000)
 
 
 class TestDirectSocketAccess(unittest.TestCase):
