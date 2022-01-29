@@ -801,7 +801,7 @@ conn_inserttable(connObject *self, PyObject *args)
     result = PQexec(self->cnx, buffer);
     Py_END_ALLOW_THREADS
 
-    if (!result) {
+    if (!result || PQresultStatus(result) != PGRES_COPY_IN) {
         PyMem_Free(buffer); Py_DECREF(iter_row);
         PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
         return NULL;

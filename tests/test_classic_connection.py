@@ -1895,10 +1895,10 @@ class TestInserttable(unittest.TestCase):
         try:
             self.c.inserttable('test', data)
         except TypeError as e:
-            r = str(e)
+            self.assertIn(
+                'second arg must contain sequences of the same size', str(e))
         else:
-            r = 'this is fine'
-        self.assertIn('second arg must contain sequences of the same size', r)
+            self.assertFalse('expected an error')
 
     def testInserttableFromSetofTuples(self):
         data = {row for row in self.data}
@@ -1932,10 +1932,10 @@ class TestInserttable(unittest.TestCase):
         try:
             self.c.inserttable('test', data)
         except TypeError as e:
-            r = str(e)
+            self.assertIn(
+                'second argument must contain tuples or lists', str(e))
         else:
-            r = 'this is fine'
-        self.assertIn('second argument must contain tuples or lists', r)
+            self.assertFalse('expected an error')
 
     def testInserttableMultipleRows(self):
         num_rows = 100
@@ -1980,7 +1980,12 @@ class TestInserttable(unittest.TestCase):
         data = [(42,)]
         # check that the table name is not inserted unescaped
         # (this would pass otherwise since there is a column named i4)
-        self.assertRaises(OSError, self.c.inserttable, 'test (i4)', data)
+        try:
+            self.c.inserttable('test (i4)', data)
+        except ValueError as e:
+            self.assertIn('relation "test (i4)" does not exist', str(e))
+        else:
+            self.assertFalse('expected an error')
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i4'])
 
@@ -1988,8 +1993,13 @@ class TestInserttable(unittest.TestCase):
         data = [(2, 4)]
         # check that the column names are not inserted unescaped
         # (this would pass otherwise since there are columns i2 and i4)
-        self.assertRaises(
-            TypeError, self.c.inserttable, 'test', data, ['i2,i4'])
+        try:
+            self.c.inserttable('test', data, ['i2,i4'])
+        except ValueError as e:
+            self.assertIn(
+                'column "i2,i4" of relation "test" does not exist', str(e))
+        else:
+            self.assertFalse('expected an error')
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i2', 'i4'])
 
@@ -1998,10 +2008,10 @@ class TestInserttable(unittest.TestCase):
         try:
             self.c.inserttable('test', data, 'invalid')
         except TypeError as e:
-            r = str(e)
+            self.assertIn(
+                'expects a tuple or a list as third argument', str(e))
         else:
-            r = 'this is fine'
-        self.assertIn('expects a tuple or a list as third argument', r)
+            self.assertFalse('expected an error')
 
     def testInserttableWithHugeListOfColumnNames(self):
         # should catch buffer overflow when building the column specification
