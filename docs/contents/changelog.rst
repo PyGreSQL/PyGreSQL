@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 5.2.3 (to be released)
-------------------------------
+Version 5.2.3 (2022-01-30)
+--------------------------
 - This version officially supports the new Python 3.10 and PostgreSQL 14.
 - Some improvements and fixes in the `inserttable()` method of the `pg` module:
   - Sync with `PQendcopy()` when there was an error (#60)
