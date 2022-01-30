@@ -6,6 +6,7 @@ Version 5.2.3 (to be released)
 - This version officially supports the new Python 3.10 and PostgreSQL 14.
 - Some improvements and fixes in the `inserttable()` method of the `pg` module:
   - Sync with `PQendcopy()` when there was an error (#60)
+  - Allow specifying a schema in the table name (#61)
   - Improved check for internal result (#62)
   - Catch buffer overflows when building the copy command
   - Data can now be passed as an iterable, not just list or tuple (#66)

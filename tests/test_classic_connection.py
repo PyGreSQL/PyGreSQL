@@ -1963,6 +1963,11 @@ class TestInserttable(unittest.TestCase):
                 + (None,) * 6 for i in range(20)]
         self.assertEqual(self.get_back(), data)
 
+    def testInserttableWithDottedTableName(self):
+        data = self.data
+        self.c.inserttable('public.test', data)
+        self.assertEqual(self.get_back(), data)
+
     def testInserttableWithInvalidTableName(self):
         data = [(42,)]
         # check that the table name is not inserted unescaped
@@ -1975,6 +1980,14 @@ class TestInserttable(unittest.TestCase):
             self.assertFalse('expected an error')
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i4'])
+
+    def testInserttableWithInvalidDataType(self):
+        try:
+            self.c.inserttable('test', 42)
+        except TypeError as e:
+            self.assertIn('expects an iterable as second argument', str(e))
+        else:
+            self.assertFalse('expected an error')
 
     def testInserttableWithInvalidColumnName(self):
         data = [(2, 4)]

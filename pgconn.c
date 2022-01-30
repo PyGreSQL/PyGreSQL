@@ -690,7 +690,7 @@ static PyObject *
 conn_inserttable(connObject *self, PyObject *args)
 {
     PGresult *result;
-    char *table, *buffer, *bufpt, *bufmax;
+    char *table, *buffer, *bufpt, *bufmax, *s, *t;
     int encoding;
     size_t bufsiz;
     PyObject *rows, *iter_row, *item, *columns = NULL;
@@ -753,9 +753,18 @@ conn_inserttable(connObject *self, PyObject *args)
     /* starts query */
     bufpt = buffer;
     bufmax = bufpt + MAX_BUFFER_SIZE;
-    table = PQescapeIdentifier(self->cnx, table, strlen(table));
-    bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt), "copy %s", table);
-    PQfreemem(table);
+    bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt), "copy ");
+
+    s = table;
+    do {
+        t = strchr(s, '.'); if (!t) t = s + strlen(s);
+        table = PQescapeIdentifier(self->cnx, s, (size_t) (t - s));
+        if (bufpt < bufmax)
+            bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt), "%s", table);
+        PQfreemem(table);
+        s = t; if (*s &&  bufpt < bufmax) *bufpt++ = *s++;
+    } while (*s);
+
     if (columns) {
         /* adds a string like f" ({','.join(columns)})" */
         if (bufpt < bufmax)
