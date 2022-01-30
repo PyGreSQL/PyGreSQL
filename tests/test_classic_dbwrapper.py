@@ -4763,8 +4763,11 @@ class TestSchemas(unittest.TestCase):
             self.assertNotIn('oid(t)', r)
 
     def testQeryInformationSchema(self):
-        q = ("select array_agg(column_name) from information_schema.columns"
-             " where table_schema in ('s1', 's2', 's3', 's4')")
+        q = "column_name"
+        if self.db.server_version < 110000:
+            q += "::text"  # old version does not have sql_identifier array
+        q = "select array_agg(%s) from information_schema.columns" % q
+        q += " where table_schema in ('s1', 's2', 's3', 's4')"
         r = self.db.query(q).onescalar()
         self.assertIsInstance(r, list)
         self.assertEqual(set(r), set(['d', 'n'] * 8))
