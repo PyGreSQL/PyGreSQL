@@ -780,7 +780,7 @@ conn_inserttable(connObject *self, PyObject *args)
             else if (PyUnicode_Check(obj)) {
                 obj = get_encoded_string(obj, encoding);
                 if (!obj) {
-                    Py_DECREF(iter_row);
+                    PyMem_Free(buffer); Py_DECREF(iter_row);
                     return NULL; /* pass the UnicodeEncodeError */
                 }
                 PyBytes_AsStringAndSize(obj, &col, &slen);
@@ -789,7 +789,7 @@ conn_inserttable(connObject *self, PyObject *args)
                 PyErr_SetString(
                     PyExc_TypeError,
                     "The third argument must contain only strings");
-                Py_DECREF(iter_row);
+                PyMem_Free(buffer); Py_DECREF(iter_row);
                 return NULL;
             }
             col = PQescapeIdentifier(self->cnx, col, (size_t) slen);
