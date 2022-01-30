@@ -5,15 +5,15 @@ Version 5.2.3 (2022-01-30)
 --------------------------
 - This version officially supports the new Python 3.10 and PostgreSQL 14.
 - Some improvements and fixes in the `inserttable()` method of the `pg` module:
-  - Sync with `PQendcopy()` when there was an error (#60)
-  - Allow specifying a schema in the table name (#61)
-  - Improved check for internal result (#62)
-  - Catch buffer overflows when building the copy command
-  - Data can now be passed as an iterable, not just list or tuple (#66)
+    - Sync with `PQendcopy()` when there was an error (#60)
+    - Allow specifying a schema in the table name (#61)
+    - Improved check for internal result (#62)
+    - Catch buffer overflows when building the copy command
+    - Data can now be passed as an iterable, not just list or tuple (#66)
 - Some more fixes in the `pg` module:
-  - Fix upsert with limited number of columns (#58).
-  - Fix argument handling of `is/set_non_blocking()`.
-  - Add missing `get/set_typecasts` in list of exports.
+    - Fix upsert with limited number of columns (#58).
+    - Fix argument handling of `is/set_non_blocking()`.
+    - Add missing `get/set_typecasts` in list of exports.
 - Fixed a reference counting issue when casting JSON columns (#57).
 
 Version 5.2.2 (2020-12-09)
