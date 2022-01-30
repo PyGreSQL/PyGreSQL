@@ -53,10 +53,10 @@ class TestPyNotifyAlias(unittest.TestCase):
             warnings.simplefilter("always")
             # noinspection PyDeprecation
             handler1 = pg.pgnotify(db, *args, **kwargs)
-            assert len(warn_msgs) == 1
+            self.assertEqual(len(warn_msgs), 1)
             warn_msg = warn_msgs[0]
-            assert issubclass(warn_msg.category, DeprecationWarning)
-            assert 'deprecated' in str(warn_msg.message)
+            self.assertTrue(issubclass(warn_msg.category, DeprecationWarning))
+            self.assertIn('deprecated', str(warn_msg.message))
         self.assertIsInstance(handler1, pg.NotificationHandler)
         handler2 = db.notification_handler(*args, **kwargs)
         self.assertIsInstance(handler2, pg.NotificationHandler)
