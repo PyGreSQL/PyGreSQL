@@ -2160,6 +2160,12 @@ class TestDBClass(unittest.TestCase):
         s = dict(m=3, u='z')
         r = upsert(table, s, oid='invalid')
         self.assertIs(r, s)
+        s = dict(n=2)
+        # do not modify columns missing in the dict
+        r = upsert(table, s)
+        self.assertIs(r, s)
+        r = query(q).getresult()
+        self.assertEqual(r, [(1, 'x2'), (2, 'y3')])
 
     def testUpsertWithOids(self):
         if not self.oids:

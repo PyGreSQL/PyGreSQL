@@ -2476,7 +2476,7 @@ class DB:
         keyname.add('oid')
         for n in attnames:
             if n not in keyname:
-                value = kw.get(n, True)
+                value = kw.get(n, n in row)
                 if value:
                     if not isinstance(value, basestring):
                         value = 'excluded.%s' % col(n)
