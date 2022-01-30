@@ -4762,6 +4762,13 @@ class TestSchemas(unittest.TestCase):
         else:
             self.assertNotIn('oid(t)', r)
 
+    def testQeryInformationSchema(self):
+        q = ("select array_agg(column_name) from information_schema.columns"
+             " where table_schema in ('s1', 's2', 's3', 's4')")
+        r = self.db.query(q).onescalar()
+        self.assertIsInstance(r, list)
+        self.assertEqual(set(r), set(['d', 'n'] * 8))
+
 
 class TestDebug(unittest.TestCase):
     """Test the debug attribute of the DB class."""

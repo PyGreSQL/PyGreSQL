@@ -795,7 +795,7 @@ class TypeCache(dict):
         else:
             if '.' not in key and '"' not in key:
                 key = '"%s"' % (key,)
-            oid = "'%s'::regtype" % (self._escape_string(key),)
+            oid = "'%s'::pg_catalog.regtype" % (self._escape_string(key),)
         try:
             self._src.execute(self._query_pg_type % (oid,))
         except ProgrammingError:

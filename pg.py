@@ -1270,16 +1270,16 @@ class DbTypes(dict):
         if db.server_version < 80400:
             # very old remote databases (not officially supported)
             self._query_pg_type = (
-                "SELECT oid, typname, typname::text::regtype,"
+                "SELECT oid, typname, oid::pg_catalog.regtype,"
                 " typlen, typtype, null as typcategory, typdelim, typrelid"
                 " FROM pg_catalog.pg_type"
-                " WHERE oid OPERATOR(pg_catalog.=) %s::regtype")
+                " WHERE oid OPERATOR(pg_catalog.=) %s::pg_catalog.regtype")
         else:
             self._query_pg_type = (
-                "SELECT oid, typname, typname::regtype,"
+                "SELECT oid, typname, oid::pg_catalog.regtype,"
                 " typlen, typtype, typcategory, typdelim, typrelid"
                 " FROM pg_catalog.pg_type"
-                " WHERE oid OPERATOR(pg_catalog.=) %s::regtype")
+                " WHERE oid OPERATOR(pg_catalog.=) %s::pg_catalog.regtype")
 
     def add(self, oid, pgtype, regtype,
             typlen, typtype, category, delim, relid):
@@ -1636,22 +1636,26 @@ class DB:
         if db.server_version < 80400:
             # very old remote databases (not officially supported)
             self._query_attnames = (
-                "SELECT a.attname, t.oid, t.typname, t.typname::text::regtype,"
+                "SELECT a.attname,"
+                " t.oid, t.typname, t.oid::pg_catalog.regtype,"
                 " t.typlen, t.typtype, null as typcategory,"
                 " t.typdelim, t.typrelid"
                 " FROM pg_catalog.pg_attribute a"
                 " JOIN pg_catalog.pg_type t"
                 " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
-                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass"
+                " WHERE a.attrelid OPERATOR(pg_catalog.=)"
+                " %s::pg_catalog.regclass"
                 " AND %s AND NOT a.attisdropped ORDER BY a.attnum")
         else:
             self._query_attnames = (
-                "SELECT a.attname, t.oid, t.typname, t.typname::regtype,"
+                "SELECT a.attname,"
+                " t.oid, t.typname, t.oid::pg_catalog.regtype,"
                 " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid"
                 " FROM pg_catalog.pg_attribute a"
                 " JOIN pg_catalog.pg_type t"
                 " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
-                " WHERE a.attrelid OPERATOR(pg_catalog.=) %s::regclass"
+                " WHERE a.attrelid OPERATOR(pg_catalog.=)"
+                " %s::pg_catalog.regclass"
                 " AND %s AND NOT a.attisdropped ORDER BY a.attnum")
         db.set_cast_hook(self.dbtypes.typecast)
         # For debugging scripts, self.debug can be set
@@ -2097,7 +2101,8 @@ class DB:
                  " ON a.attrelid OPERATOR(pg_catalog.=) i.indrelid"
                  " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
                  " AND NOT a.attisdropped"
-                 " WHERE i.indrelid OPERATOR(pg_catalog.=) %s::regclass"
+                 " WHERE i.indrelid OPERATOR(pg_catalog.=)"
+                 " %s::pg_catalog.regclass"
                  " AND i.indisprimary ORDER BY a.attnum") % (
                 _quote_if_unqualified('$1', table),)
             pkey = self.db.query(q, (table,)).getresult()
