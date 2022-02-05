@@ -868,11 +868,27 @@ conn_inserttable(connObject *self, PyObject *args)
                 const char* t = PyBytes_AsString(item);
 
                 while (*t && bufsiz) {
-                    if (*t == '\\' || *t == '\t' || *t == '\n') {
-                        *bufpt++ = '\\'; --bufsiz;
-                        if (!bufsiz) break;
+                    switch (*t) {
+                        case '\\':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= '\\';
+                            break;
+                        case '\t':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= 't';
+                            break;
+                        case '\r':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= 'r';
+                            break;
+                        case '\n':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= 'n';
+                            break;
+                        default:
+                           *bufpt ++= *t;
                     }
-                    *bufpt++ = *t++; --bufsiz;
+                    ++t; --bufsiz;
                 }
             }
             else if (PyUnicode_Check(item)) {
@@ -886,11 +902,27 @@ conn_inserttable(connObject *self, PyObject *args)
                     const char* t = PyBytes_AsString(s);
 
                     while (*t && bufsiz) {
-                        if (*t == '\\' || *t == '\t' || *t == '\n') {
-                            *bufpt++ = '\\'; --bufsiz;
-                            if (!bufsiz) break;
+                        switch (*t) {
+                            case '\\':
+                                *bufpt++ = '\\';
+                                if (--bufsiz) *bufpt ++= '\\';
+                                break;
+                            case '\t':
+                                *bufpt++ = '\\';
+                                if (--bufsiz) *bufpt ++= 't';
+                                break;
+                            case '\r':
+                                *bufpt++ = '\\';
+                                if (--bufsiz) *bufpt ++= 'r';
+                                break;
+                            case '\n':
+                                *bufpt++ = '\\';
+                                if (--bufsiz) *bufpt ++= 'n';
+                                break;
+                            default:
+                               *bufpt ++= *t;
                         }
-                        *bufpt++ = *t++; --bufsiz;
+                        ++t; --bufsiz;
                     }
                     Py_DECREF(s);
                 }
@@ -909,11 +941,27 @@ conn_inserttable(connObject *self, PyObject *args)
                 const char* t = PyStr_AsString(s);
 
                 while (*t && bufsiz) {
-                    if (*t == '\\' || *t == '\t' || *t == '\n') {
-                        *bufpt++ = '\\'; --bufsiz;
-                        if (!bufsiz) break;
+                    switch (*t) {
+                        case '\\':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= '\\';
+                            break;
+                        case '\t':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= 't';
+                            break;
+                        case '\r':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= 'r';
+                            break;
+                        case '\n':
+                            *bufpt++ = '\\';
+                            if (--bufsiz) *bufpt ++= 'n';
+                            break;
+                        default:
+                           *bufpt ++= *t;
                     }
-                    *bufpt++ = *t++; --bufsiz;
+                    ++t; --bufsiz;
                 }
                 Py_DECREF(s);
             }

@@ -2138,6 +2138,20 @@ class TestInserttable(unittest.TestCase):
             (2, 4, 8, True, None, None, None, 4.5, 8.5,
              None, 'c', 'v4', None, 'text')])
 
+    def testInserttableSpecialChars(self):
+        class S(object):
+            def __repr__(self):
+                return s
+
+        s = '1\'2"3\b4\f5\n6\r7\t8\b9\\0'
+        s1 = s.encode('ascii') if unicode_strings else s.decode('ascii')
+        s2 = S()
+        d = self.data[-1][:-1]
+        data = [d + (s,), d + (s1,), d + (s2,)]
+        self.c.inserttable('test', data)
+        data = [data[0]] * 3
+        self.assertEqual(self.get_back(), data)
+
 
 class TestDirectSocketAccess(unittest.TestCase):
     """Test copy command with direct socket access."""
