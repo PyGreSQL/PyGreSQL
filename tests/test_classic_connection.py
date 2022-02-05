@@ -2146,11 +2146,10 @@ class TestInserttable(unittest.TestCase):
         s = '1\'2"3\b4\f5\n6\r7\t8\b9\\0'
         s1 = s.encode('ascii') if unicode_strings else s.decode('ascii')
         s2 = S()
-        d = self.data[-1][:-1]
-        data = [d + (s,), d + (s1,), d + (s2,)]
-        self.c.inserttable('test', data)
-        data = [data[0]] * 3
-        self.assertEqual(self.get_back(), data)
+        data = [(t,) for t in (s, s1, s2)]
+        self.c.inserttable('test', data, ['t'])
+        self.assertEqual(
+            self.c.query('select t from test').getresult(), [(s,)] * 3)
 
 
 class TestDirectSocketAccess(unittest.TestCase):
