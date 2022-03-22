@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+Version 5.2.4 (to be released)
+------------------------------
+- Two more fixes in the `inserttable()` method of the `pg` module:
+    - `inserttable()` failed to escape carriage return (#68)
+    - Fix use after free issue in `inserttable()` (#71)
+
 Version 5.2.3 (2022-01-30)
 --------------------------
 - This version officially supports the new Python 3.10 and PostgreSQL 14.

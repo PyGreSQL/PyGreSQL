@@ -775,7 +775,7 @@ conn_inserttable(connObject *self, PyObject *args)
             char *col;
 
             if (PyBytes_Check(obj)) {
-                PyBytes_AsStringAndSize(obj, &col, &slen);
+                Py_INCREF(obj);
             }
             else if (PyUnicode_Check(obj)) {
                 obj = get_encoded_string(obj, encoding);
@@ -783,8 +783,6 @@ conn_inserttable(connObject *self, PyObject *args)
                     PyMem_Free(buffer); Py_DECREF(iter_row);
                     return NULL; /* pass the UnicodeEncodeError */
                 }
-                PyBytes_AsStringAndSize(obj, &col, &slen);
-                Py_DECREF(obj);
             } else {
                 PyErr_SetString(
                     PyExc_TypeError,
@@ -792,7 +790,9 @@ conn_inserttable(connObject *self, PyObject *args)
                 PyMem_Free(buffer); Py_DECREF(iter_row);
                 return NULL;
             }
+            PyBytes_AsStringAndSize(obj, &col, &slen);
             col = PQescapeIdentifier(self->cnx, col, (size_t) slen);
+            Py_DECREF(obj);
             if (bufpt < bufmax)
                 bufpt += snprintf(bufpt, (size_t) (bufmax - bufpt),
                     "%s%s", col, j == n - 1 ? ")" : ",");
