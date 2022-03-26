@@ -6,7 +6,7 @@
 #
 # Please see the LICENSE.TXT file for specific restrictions.
 
-"""Setup script for PyGreSQL version 5.2.3
+"""Setup script for PyGreSQL version 5.2.4
 
 PyGreSQL is an open-source Python module that interfaces to a
 PostgreSQL database. It embeds the PostgreSQL query library to allow
@@ -52,7 +52,7 @@ from distutils.command.build_ext import build_ext
 from distutils.ccompiler import get_default_compiler
 from distutils.sysconfig import get_python_inc, get_python_lib
 
-version = '5.2.3'
+version = '5.2.4'
 
 if not (sys.version_info[:2] == (2, 7)
         or (3, 5) <= sys.version_info[:2] < (4, 0)):

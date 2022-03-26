@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 5.2.4 (to be released)
-------------------------------
+Version 5.2.4 (2022-03-26)
+--------------------------
 - Three more fixes in the `inserttable()` method of the `pg` module:
     - `inserttable()` failed to escape carriage return (#68)
     - Allow larger row sizes up to 64 KB (#69)
