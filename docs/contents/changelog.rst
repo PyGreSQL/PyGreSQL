@@ -7,7 +7,8 @@ Version 5.2.4 (to be released)
     - `inserttable()` failed to escape carriage return (#68)
     - Allow larger row sizes up to 64 KB (#69)
     - Fix use after free issue in `inserttable()` (#71)
-- The `getline()` method of `pg` connections now also supports up to 64 KB size
+- Replace obsolete functions for copy used internally (#59).
+  Therefore, `getline()` now does not return `\.` at the end any more.
 
 Version 5.2.3 (2022-01-30)
 --------------------------

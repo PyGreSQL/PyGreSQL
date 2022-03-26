@@ -2205,7 +2205,6 @@ class TestDirectSocketAccess(unittest.TestCase):
         try:
             for i, v in data:
                 putline("%d\t%s\n" % (i, v))
-            putline("\\.\n")
         finally:
             self.c.endcopy()
         r = query("select * from test").getresult()
@@ -2222,7 +2221,6 @@ class TestDirectSocketAccess(unittest.TestCase):
         try:
             putline(u"47\tkäse\n".encode('utf8'))
             putline("35\twürstel\n")
-            putline(b"\\.\n")
         finally:
             self.c.endcopy()
         r = query("select * from test").getresult()
@@ -2236,14 +2234,12 @@ class TestDirectSocketAccess(unittest.TestCase):
         self.c.inserttable('test', data)
         query("copy test to stdout")
         try:
-            for i in range(n + 2):
+            for i in range(n + 1):
                 v = getline()
                 if i < n:
                     # noinspection PyStringFormat
                     self.assertEqual(v, '%d\t%s' % data[i])
                 elif i == n:
-                    self.assertEqual(v, '\\.')
-                else:
                     self.assertIsNone(v)
         finally:
             try:
@@ -2268,7 +2264,6 @@ class TestDirectSocketAccess(unittest.TestCase):
             v = getline()
             self.assertIsInstance(v, str)
             self.assertEqual(v, '73\twürstel')
-            self.assertEqual(getline(), '\\.')
             self.assertIsNone(getline())
         finally:
             try:

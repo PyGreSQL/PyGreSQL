@@ -550,23 +550,27 @@ conn_putline(connObject *self, PyObject *args)
 {
     char *line;
     Py_ssize_t line_length;
+    int ret;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
-    /* reads args */
+    /* read args */
     if (!PyArg_ParseTuple(args, "s#", &line, &line_length)) {
         PyErr_SetString(PyExc_TypeError,
                         "Method putline() takes a string argument");
         return NULL;
     }
 
-    /* sends line to backend */
-    if (PQputline(self->cnx, line)) {
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+    /* send line to backend */
+    ret = PQputCopyData(self->cnx, line, (int) line_length);
+    if (ret != 1) {
+        PyErr_SetString(PyExc_IOError, ret == -1 ? PQerrorMessage(self->cnx) :
+            "Line cannot be queued, wait for write-ready and try again");
         return NULL;
+
     }
     Py_INCREF(Py_None);
     return Py_None;
@@ -579,29 +583,39 @@ static char conn_getline__doc__[] =
 static PyObject *
 conn_getline(connObject *self, PyObject *noargs)
 {
-    char line[MAX_BUFFER_SIZE];
-    PyObject *str = NULL;     /* GCC */
+    char *line = NULL;
+    PyObject *str = NULL;
+    int ret;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
-    /* gets line */
-    switch (PQgetline(self->cnx, line, MAX_BUFFER_SIZE)) {
-        case 0:
-            str = PyStr_FromString(line);
-            break;
-        case 1:
-            PyErr_SetString(PyExc_MemoryError, "Buffer overflow");
-            str = NULL;
-            break;
-        case EOF:
-            Py_INCREF(Py_None);
-            str = Py_None;
-            break;
-    }
+    /* get line synchronously */
+    ret = PQgetCopyData(self->cnx, &line, 0);
 
+    /* check result */
+    if (ret <= 0) {
+        if (line != NULL) PQfreemem(line);
+        if (ret == -1) {
+            PQgetResult(self->cnx);
+            Py_INCREF(Py_None);
+            return Py_None;
+        }
+        PyErr_SetString(PyExc_MemoryError,
+            ret == -2 ? PQerrorMessage(self->cnx) :
+            "No line available, wait for read-ready and try again");
+        return NULL;
+    }
+    if (line == NULL) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    /* for backward compatibility, convert terminating newline to zero byte */
+    if (*line) line[strlen(line) - 1] = '\0';
+    str = PyStr_FromString(line);
+    PQfreemem(line);
     return str;
 }
 
@@ -612,14 +626,20 @@ static char conn_endcopy__doc__[] =
 static PyObject *
 conn_endcopy(connObject *self, PyObject *noargs)
 {
+    int ret;
+
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
-    /* ends direct copy */
-    if (PQendcopy(self->cnx)) {
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+    /* end direct copy */
+    ret = PQputCopyEnd(self->cnx, NULL);
+    if (ret != 1)
+    {
+        PyErr_SetString(PyExc_IOError, ret == -1 ? PQerrorMessage(self->cnx) :
+            "Termination message cannot be queued,"
+            " wait for write-ready and try again");
         return NULL;
     }
     Py_INCREF(Py_None);
@@ -691,7 +711,7 @@ conn_inserttable(connObject *self, PyObject *args)
 {
     PGresult *result;
     char *table, *buffer, *bufpt, *bufmax, *s, *t;
-    int encoding;
+    int encoding, ret;
     size_t bufsiz;
     PyObject *rows, *iter_row, *item, *columns = NULL;
     Py_ssize_t i, j, m, n;
@@ -714,8 +734,7 @@ conn_inserttable(connObject *self, PyObject *args)
     {
         PyErr_SetString(
             PyExc_TypeError,
-            "Method inserttable() expects an iterable"
-            " as second argument");
+            "Method inserttable() expects an iterable as second argument");
         return NULL;
     }
     m = PySequence_Check(rows) ? PySequence_Size(rows) : -1;
@@ -824,7 +843,7 @@ conn_inserttable(connObject *self, PyObject *args)
         if (!(columns = PyIter_Next(iter_row))) break;
 
         if (!(PyTuple_Check(columns) || PyList_Check(columns))) {
-            PQendcopy(self->cnx); PyMem_Free(buffer);
+            PQputCopyEnd(self->cnx, "Invalid arguments"); PyMem_Free(buffer);
             Py_DECREF(columns); Py_DECREF(columns); Py_DECREF(iter_row);
             PyErr_SetString(
                 PyExc_TypeError,
@@ -836,7 +855,7 @@ conn_inserttable(connObject *self, PyObject *args)
         if (n < 0) {
             n = j;
         } else if (j != n) {
-            PQendcopy(self->cnx); PyMem_Free(buffer);
+            PQputCopyEnd(self->cnx, "Invalid arguments"); PyMem_Free(buffer);
             Py_DECREF(columns); Py_DECREF(iter_row);
             PyErr_SetString(
                 PyExc_TypeError,
@@ -894,7 +913,8 @@ conn_inserttable(connObject *self, PyObject *args)
             else if (PyUnicode_Check(item)) {
                 PyObject *s = get_encoded_string(item, encoding);
                 if (!s) {
-                    PQendcopy(self->cnx); PyMem_Free(buffer);
+                    PQputCopyEnd(self->cnx, "Encoding error");
+                    PyMem_Free(buffer);
                     Py_DECREF(item); Py_DECREF(columns); Py_DECREF(iter_row);
                     return NULL; /* pass the UnicodeEncodeError */
                 }
@@ -967,40 +987,39 @@ conn_inserttable(connObject *self, PyObject *args)
             }
 
             if (bufsiz <= 0) {
-                PQendcopy(self->cnx); PyMem_Free(buffer);
+                PQputCopyEnd(self->cnx, "Memory error"); PyMem_Free(buffer);
                 Py_DECREF(columns); Py_DECREF(iter_row);
                 return PyErr_NoMemory();
             }
 
         }
 
-         Py_DECREF(columns);
+        Py_DECREF(columns);
 
-        *bufpt++ = '\n'; *bufpt = '\0';
+        *bufpt++ = '\n';
 
         /* sends data */
-        if (PQputline(self->cnx, buffer)) {
-            PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
-            PQendcopy(self->cnx); PyMem_Free(buffer);  Py_DECREF(iter_row);
+        ret =  PQputCopyData(self->cnx, buffer, (int) (bufpt - buffer));
+        if (ret != 1) {
+            char *errormsg = ret == - 1 ?
+                PQerrorMessage(self->cnx) : "Data cannot be queued";
+            PyErr_SetString(PyExc_IOError, errormsg);
+            PQputCopyEnd(self->cnx, errormsg);
+            PyMem_Free(buffer); Py_DECREF(iter_row);
             return NULL;
         }
     }
 
     Py_DECREF(iter_row);
     if (PyErr_Occurred()) {
-        PQendcopy(self->cnx); PyMem_Free(buffer);
+        PQerrorMessage(self->cnx); PyMem_Free(buffer);
         return NULL; /* pass the iteration error */
     }
 
-    /* ends query */
-    if (PQputline(self->cnx, "\\.\n")) {
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
-        PQendcopy(self->cnx); PyMem_Free(buffer);
-        return NULL;
-    }
-
-    if (PQendcopy(self->cnx)) {
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+    ret = PQputCopyEnd(self->cnx, NULL);
+    if (ret != 1) {
+        PyErr_SetString(PyExc_IOError, ret == -1 ?
+            PQerrorMessage(self->cnx) : "Data cannot be queued");
         PyMem_Free(buffer);
         return NULL;
     }
