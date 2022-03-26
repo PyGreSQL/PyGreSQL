@@ -57,7 +57,7 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #define QUERY_MOVENEXT  3
 #define QUERY_MOVEPREV  4
 
-#define MAX_BUFFER_SIZE 8192  /* maximum transaction size */
+#define MAX_BUFFER_SIZE 65536 /* maximum transaction size */
 #define MAX_ARRAY_DEPTH 16    /* maximum allowed depth of an array */
 
 /* MODULE GLOBAL VARIABLES */

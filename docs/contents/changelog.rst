@@ -3,9 +3,11 @@ ChangeLog
 
 Version 5.2.4 (to be released)
 ------------------------------
-- Two more fixes in the `inserttable()` method of the `pg` module:
+- Three more fixes in the `inserttable()` method of the `pg` module:
     - `inserttable()` failed to escape carriage return (#68)
+    - Allow larger row sizes up to 64 KB (#69)
     - Fix use after free issue in `inserttable()` (#71)
+- The `getline()` method of `pg` connections now also supports up to 64 KB size
 
 Version 5.2.3 (2022-01-30)
 --------------------------

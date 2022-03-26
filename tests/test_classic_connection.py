@@ -2014,9 +2014,14 @@ class TestInserttable(unittest.TestCase):
             self.assertFalse('expected an error')
 
     def testInserttableWithHugeListOfColumnNames(self):
-        # should catch buffer overflow when building the column specification
-        self.assertRaises(MemoryError, self.c.inserttable,
-                          'test', self.data, ['very_long_column_name'] * 1000)
+        data = self.data
+        # try inserting data with a huge list of column names
+        cols = ['very_long_column_name'] * 2000
+        # Should raise a value error because the column does not exist
+        self.assertRaises(ValueError, self.c.inserttable, 'test', data, cols)
+        # double the size, should catch buffer overflow and raise memory error
+        cols *= 2
+        self.assertRaises(MemoryError, self.c.inserttable, 'test', data, cols)
 
     def testInserttableMaxValues(self):
         data = [(2 ** 15 - 1, int(2 ** 31 - 1), long(2 ** 31 - 1),
@@ -2150,6 +2155,18 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data, ['t'])
         self.assertEqual(
             self.c.query('select t from test').getresult(), [(s,)] * 3)
+
+    def testInsertTableBigRowSize(self):
+        # inserting rows with a size of up to 64k bytes should work
+        t = '*' * 50000
+        data = [(t,)]
+        self.c.inserttable('test', data, ['t'])
+        self.assertEqual(
+            self.c.query('select t from test').getresult(), data)
+        # double the size, should catch buffer overflow and raise memory error
+        t *= 2
+        data = [(t,)]
+        self.assertRaises(MemoryError, self.c.inserttable, 'test', data, ['t'])
 
 
 class TestDirectSocketAccess(unittest.TestCase):
