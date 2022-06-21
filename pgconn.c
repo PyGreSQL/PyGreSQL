@@ -1012,7 +1012,7 @@ conn_inserttable(connObject *self, PyObject *args)
 
     Py_DECREF(iter_row);
     if (PyErr_Occurred()) {
-        PQerrorMessage(self->cnx); PyMem_Free(buffer);
+        PyMem_Free(buffer);
         return NULL; /* pass the iteration error */
     }
 
@@ -1026,9 +1026,18 @@ conn_inserttable(connObject *self, PyObject *args)
 
     PyMem_Free(buffer);
 
-    /* no error : returns nothing */
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_BEGIN_ALLOW_THREADS
+    result = PQgetResult(self->cnx);
+    Py_END_ALLOW_THREADS
+    if (PQresultStatus(result) != PGRES_COMMAND_OK) {
+        PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
+        PQclear(result);
+        return NULL;
+    } else {
+        long ntuples = atol(PQcmdTuples(result));
+        PQclear(result);
+        return PyInt_FromLong(ntuples);
+    }
 }
 
 /* Get transaction state. */

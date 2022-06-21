@@ -4227,10 +4227,11 @@ class TestDBClass(unittest.TestCase):
         self.createTable('test_table_to', 'n integer, t timestamp')
         for i in range(1, 4):
             query("insert into test_table_from values ($1, now())", i)
-        self.db.inserttable(
+        n = self.db.inserttable(
             'test_table_to', query("select n, t::text from test_table_from"))
         data_from = query("select * from test_table_from").getresult()
         data_to = query("select * from test_table_to").getresult()
+        self.assertEqual(n, 3)
         self.assertEqual([row[0] for row in data_from], [1, 2, 3])
         self.assertEqual(data_from, data_to)
 
