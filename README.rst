@@ -2,8 +2,8 @@ PyGreSQL - Python interface for PostgreSQL
 ==========================================
 
 PyGreSQL is a Python module that interfaces to a PostgreSQL database.
-It embeds the PostgreSQL query library to allow easy use of the powerful
-PostgreSQL features from a Python script.
+It wraps the lower level C API library libpq to allow easy use of the
+powerful PostgreSQL features from Python.
 
 PyGreSQL should run on most platforms where PostgreSQL and Python is running.
 It is based on the PyGres95 code written by Pascal Andre.

@@ -1,7 +1,7 @@
 **PyGreSQL** is an *open-source* `Python <http://www.python.org>`_ module
 that interfaces to a `PostgreSQL <http://www.postgresql.org>`_ database.
-It embeds the PostgreSQL query library to allow easy use of the powerful
-PostgreSQL features from a Python script.
+It wraps the lower level C API library libpq to allow easy use of the
+powerful PostgreSQL features from Python.
 
     | This software is copyright © 1995, Pascal Andre.
     | Further modifications are copyright © 1997-2008 by D'Arcy J.M. Cain.
@@ -27,8 +27,8 @@ The Python implementation is copyrighted but freely usable and distributable,
 even for commercial use.
 
 **PyGreSQL** is a Python module that interfaces to a PostgreSQL database.
-It embeds the PostgreSQL query library to allow easy use of the powerful
-PostgreSQL features from a Python script or application.
+It wraps the lower level C API library libpq to allow easy use of the
+powerful PostgreSQL features from Python.
 
 PyGreSQL is developed and tested on a NetBSD system, but it also runs on
 most other platforms where PostgreSQL and Python is running.  It is based

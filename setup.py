@@ -9,8 +9,8 @@
 """Setup script for PyGreSQL version 5.2.4
 
 PyGreSQL is an open-source Python module that interfaces to a
-PostgreSQL database. It embeds the PostgreSQL query library to allow
-easy use of the powerful PostgreSQL features from a Python script.
+PostgreSQL database. It wraps the lower level C API library libpq
+to allow easy use of the powerful PostgreSQL features from Python.
 
 Authors and history:
 * PyGreSQL written 1997 by D'Arcy J.M. Cain <darcy@druid.net>
