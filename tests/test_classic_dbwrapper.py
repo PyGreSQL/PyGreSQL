@@ -4899,7 +4899,7 @@ class TestSchemas(unittest.TestCase):
         else:
             self.assertNotIn('oid(t)', r)
 
-    def testQeryInformationSchema(self):
+    def testQueryInformationSchema(self):
         q = "column_name"
         if self.db.server_version < 110000:
             q += "::text"  # old version does not have sql_identifier array

@@ -6,11 +6,13 @@ Version 5.2.5 (to be released)
 - This version officially supports the new Python 3.11 and PostgreSQL 15.
 - Two more improvements in the `inserttable()` method of the `pg` module
   (thanks to Justin Pryzby for this contribution):
+
     - error handling has been improved (#72)
     - the method now returns the number of inserted rows (#73)
 - Another improvement in the `pg` module (#83):
     - generated columns can be requested with the `get_generated()` method
     - generated columns are ignored by the insert, update and upsert method
+- Avoid internal query and error when casting the `sql_identifier` type (#82)
 
 Version 5.2.4 (2022-03-26)
 --------------------------

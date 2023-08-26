@@ -555,7 +555,7 @@ class Typecasts(dict):
     # (str functions are ignored but have been added for faster access)
     defaults = {
         'char': str, 'bpchar': str, 'name': str,
-        'text': str, 'varchar': str,
+        'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
         'int2': int, 'int4': int, 'serial': int, 'int8': long, 'oid': int,
         'hstore': cast_hstore, 'json': jsondecode, 'jsonb': jsondecode,
