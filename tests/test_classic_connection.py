@@ -2026,7 +2026,8 @@ class TestInserttable(unittest.TestCase):
     def testInserttableWithOutOfRangeData(self):
         # try inserting data out of range for the column type
         # Should raise a value error because of smallint out of range
-        self.assertRaises(ValueError, self.c.inserttable, 'test', [[33000]], ['i2'])
+        self.assertRaises(
+            ValueError, self.c.inserttable, 'test', [[33000]], ['i2'])
 
     def testInserttableMaxValues(self):
         data = [(2 ** 15 - 1, int(2 ** 31 - 1), long(2 ** 31 - 1),
