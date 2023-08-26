@@ -9,7 +9,7 @@ on:
 jobs:
   tests:
     name: Unit tests run
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     strategy:
       fail-fast: false
@@ -22,15 +22,17 @@ jobs:
           - {python: "3.8", postgres: "12"}
           - {python: "3.9", postgres: "13"}
           - {python: "3.10", postgres: "14"}
+          - {python: "3.11", postgres: "15"}
 
           # Opposite extremes of the supported Py/PG range, other architecture
-          - {python: "2.7", postgres: "14", architecture: "x86"}
-          - {python: "3.5", postgres: "13", architecture: "x86"}
-          - {python: "3.6", postgres: "12", architecture: "x86"}
-          - {python: "3.7", postgres: "11", architecture: "x86"}
-          - {python: "3.8", postgres: "10", architecture: "x86"}
-          - {python: "3.9", postgres: "9.6", architecture: "x86"}
-          - {python: "3.10", postgres: "9.3", architecture: "x86"}
+          - {python: "2.7", postgres: "15", architecture: "x86"}
+          - {python: "3.5", postgres: "14", architecture: "x86"}
+          - {python: "3.6", postgres: "13", architecture: "x86"}
+          - {python: "3.7", postgres: "12", architecture: "x86"}
+          - {python: "3.8", postgres: "11", architecture: "x86"}
+          - {python: "3.9", postgres: "10", architecture: "x86"}
+          - {python: "3.10", postgres: "9.6", architecture: "x86"}
+          - {python: "3.11", postgres: "9.3", architecture: "x86"}
 
     env:
       PYGRESQL_DB: test
@@ -54,10 +56,10 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install tox
         run: pip install tox
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
       - name: Run tests
