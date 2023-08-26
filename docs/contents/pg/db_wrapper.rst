@@ -136,6 +136,20 @@ By default, only a limited number of simple types will be returned.
 You can get the registered types instead, if enabled by calling the
 :meth:`DB.use_regtypes` method.
 
+get_generated -- get the generated columns of a table
+-----------------------------------------------------
+
+.. method:: DB.get_generated(table)
+
+    Get the generated columns of a table
+
+    :param str table: name of table
+    :returns: an frozenset of column names
+
+Given the name of a table, digs out the set of generated columns.
+
+.. versionadded:: 5.2.5
+
 has_table_privilege -- check table privilege
 --------------------------------------------
 

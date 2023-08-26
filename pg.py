@@ -1629,6 +1629,7 @@ class DB:
         self.dbname = db.db
         self._regtypes = False
         self._attnames = {}
+        self._generated = {}
         self._pkeys = {}
         self._privileges = {}
         self.adapter = Adapter(self)
@@ -1657,6 +1658,17 @@ class DB:
                 " WHERE a.attrelid OPERATOR(pg_catalog.=)"
                 " %s::pg_catalog.regclass"
                 " AND %s AND NOT a.attisdropped ORDER BY a.attnum")
+        if db.server_version < 100000:
+            self._query_generated = None
+        elif db.server_version < 120000:
+            self._query_generated = (
+                "a.attidentity OPERATOR(pg_catalog.=) 'a'"
+            )
+        else:
+            self._query_generated = (
+                "(a.attidentity OPERATOR(pg_catalog.=) 'a' OR"
+                " a.attgenerated OPERATOR(pg_catalog.!=) '')"
+            )
         db.set_cast_hook(self.dbtypes.typecast)
         # For debugging scripts, self.debug can be set
         # * to a string format specification (e.g. in CGI set to "%s<BR>"),
@@ -2130,7 +2142,7 @@ class DB:
         """Get list of relations in connected database of specified kinds.
 
         If kinds is None or empty, all kinds of relations are returned.
-        Otherwise kinds can be a string or sequence of type letters
+        Otherwise, kinds can be a string or sequence of type letters
         specifying which kind of relations you want to list.
 
         Set the system flag if you want to get the system relations as well.
@@ -2188,6 +2200,32 @@ class DB:
             names = ((name[0], types.add(*name[1:])) for name in names)
             names = AttrDict(names)
             attnames[table] = names  # cache it
+        return names
+
+    def get_generated(self, table, flush=False):
+        """Given the name of a table, dig out the set of generated columns.
+
+        Returns a set of column names that are generated and unalterable.
+
+        If flush is set, then the internal cache for generated columns will
+        be flushed. This may be necessary after the database schema or
+        the search path has been changed.
+        """
+        query_generated = self._query_generated
+        if not query_generated:
+            return frozenset()
+        generated = self._generated
+        if flush:
+            generated.clear()
+            self._do_debug('The generated cache has been flushed')
+        try:  # cache lookup
+            names = generated[table]
+        except KeyError:  # cache miss, check the database
+            q = "a.attnum OPERATOR(pg_catalog.>) 0 AND " + query_generated
+            q = self._query_attnames % (_quote_if_unqualified('$1', table), q)
+            names = self.db.query(q, (table,)).getresult()
+            names = frozenset(name[0] for name in names)
+            generated[table] = names  # cache it
         return names
 
     def use_regtypes(self, regtypes=None):
@@ -2307,8 +2345,8 @@ class DB:
         be passed as the first parameter.  The other parameters are used for
         providing the data of the row that shall be inserted into the table.
         If a dictionary is supplied as the second parameter, it starts with
-        that.  Otherwise it uses a blank dictionary. Either way the dictionary
-        is updated from the keywords.
+        that.  Otherwise, it uses a blank dictionary.
+        Either way the dictionary is updated from the keywords.
 
         The dictionary is then reloaded with the values actually inserted in
         order to pick up values modified by rules, triggers, etc.
@@ -2321,13 +2359,14 @@ class DB:
         if 'oid' in row:
             del row['oid']  # do not insert oid
         attnames = self.get_attnames(table)
+        generated = self.get_generated(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
         names, values = [], []
         for n in attnames:
-            if n in row:
+            if n in row and n not in generated:
                 names.append(col(n))
                 values.append(adapt(row[n], attnames[n]))
         if not names:
@@ -2360,6 +2399,7 @@ class DB:
         if table.endswith('*'):
             table = table[:-1].rstrip()  # need parent table name
         attnames = self.get_attnames(table)
+        generated = self.get_generated(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
         if row is None:
             row = {}
@@ -2390,7 +2430,7 @@ class DB:
         values = []
         keyname = set(keyname)
         for n in attnames:
-            if n in row and n not in keyname:
+            if n in row and n not in keyname and n not in generated:
                 values.append('%s = %s' % (col(n), adapt(row[n], attnames[n])))
         if not values:
             return row
@@ -2461,13 +2501,14 @@ class DB:
         if 'oid' in kw:
             del kw['oid']  # do not update oid
         attnames = self.get_attnames(table)
+        generated = self.get_generated(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
         names, values = [], []
         for n in attnames:
-            if n in row:
+            if n in row and n not in generated:
                 names.append(col(n))
                 values.append(adapt(row[n], attnames[n]))
         names, values = ', '.join(names), ', '.join(values)
@@ -2480,7 +2521,7 @@ class DB:
         keyname = set(keyname)
         keyname.add('oid')
         for n in attnames:
-            if n not in keyname:
+            if n not in keyname and n not in generated:
                 value = kw.get(n, n in row)
                 if value:
                     if not isinstance(value, basestring):
