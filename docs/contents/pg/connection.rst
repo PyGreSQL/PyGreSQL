@@ -494,7 +494,7 @@ inserttable -- insert an iterable into a table
     :param str table: the table name
     :param list values: iterable of row values, which must be lists or tuples
     :param list columns: list or tuple of column names
-    :rtype: None
+    :rtype: int
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises MemoryError: insert buffer could not be allocated
     :raises ValueError: unsupported values
@@ -506,6 +506,7 @@ of the same size, containing the values for each inserted row.
 These may contain string, integer, long or double (real) values.
 ``columns`` is an optional tuple or list of column names to be passed on
 to the COPY command.
+The number of rows affected is returned.
 
 .. warning::
 
