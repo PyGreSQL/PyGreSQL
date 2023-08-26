@@ -2,7 +2,7 @@
 #
 # PyGreSQL - a Python interface for the PostgreSQL database.
 #
-# Copyright (c) 2022 by the PyGreSQL Development Team
+# Copyright (c) 2023 by the PyGreSQL Development Team
 #
 # Please see the LICENSE.TXT file for specific restrictions.
 
@@ -26,8 +26,8 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-PyGreSQL currently supports Python versions 2.7 and 3.5 to 3.10,
-and PostgreSQL versions 9.0 to 9.6 and 10 to 14.
+PyGreSQL currently supports Python versions 2.7 and 3.5 to 3.11,
+and PostgreSQL versions 9.0 to 9.6 and 10 to 15.
 
 Use as follows:
 python setup.py build_ext # to build the module
@@ -252,6 +252,7 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         "Programming Language :: SQL",
         "Topic :: Database",
         "Topic :: Database :: Front-Ends",

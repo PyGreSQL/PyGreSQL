@@ -23,11 +23,13 @@ _build_doctrees/
 docker-compose.yml
 Dockerfile
 Vagrantfile
+Vagrantfile-*
 
 .coverage
 .tox/
 .venv/
 .vagrant/
+.vagrant-*/
 
 Thumbs.db
 .DS_Store

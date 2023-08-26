@@ -195,7 +195,7 @@ class TestConnectObject(unittest.TestCase):
     def testAttributeServerVersion(self):
         server_version = self.connection.server_version
         self.assertIsInstance(server_version, int)
-        self.assertTrue(90000 <= server_version < 150000)
+        self.assertTrue(90000 <= server_version < 160000)
 
     def testAttributeSocket(self):
         socket = self.connection.socket
@@ -871,7 +871,7 @@ class TestUnicodeQueries(unittest.TestCase):
         # pass the query as unicode
         try:
             v = self.c.query(q).getresult()[0][0]
-        except(pg.DataError, pg.NotSupportedError):
+        except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support utf8")
             v = None
         self.assertIsInstance(v, str)
@@ -2623,7 +2623,7 @@ class TestConfigFunctions(unittest.TestCase):
         finally:
             pg.set_bool(use_bool)
         self.assertIsInstance(r, str)
-        self.assertIs(r, 't')
+        self.assertEqual(r, 't')
         pg.set_bool(True)
         try:
             r = query("select true::bool").getresult()[0][0]

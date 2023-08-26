@@ -22,8 +22,8 @@ This version has been built and unit tested on:
  - openSUSE
  - Ubuntu
  - Windows 7 and 10 with both MinGW and Visual Studio
- - PostgreSQL 9.0 to 9.6 and 10 to 14 (32 and 64bit)
- - Python 2.7 and 3.5 to 3.10 (32 and 64bit)
+ - PostgreSQL 9.0 to 9.6 and 10 to 15 (32 and 64bit)
+ - Python 2.7 and 3.5 to 3.11 (32 and 64bit)
 
 | D'Arcy J.M. Cain
 | darcy@PyGreSQL.org

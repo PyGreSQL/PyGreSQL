@@ -4,7 +4,7 @@
 #
 # This file contains the classic pg module.
 #
-# Copyright (c) 2022 by the PyGreSQL Development Team
+# Copyright (c) 2023 by the PyGreSQL Development Team
 #
 # The notification handler is based on pgnotify which is
 # Copyright (c) 2001 Ng Pheng Siong. All rights reserved.
@@ -99,7 +99,7 @@ from uuid import UUID
 
 try:
     # noinspection PyUnresolvedReferences
-    from typing import Dict, List, Union
+    from typing import Dict, List, Union  # noqa: F401
     has_typing = True
 except ImportError:  # Python < 3.5
     has_typing = False
@@ -1934,7 +1934,7 @@ class DB:
                 value = set(value)
                 if len(value) == 1:
                     value = value.pop()
-            if not(value is None or isinstance(value, basestring)):
+            if not (value is None or isinstance(value, basestring)):
                 raise ValueError(
                     'A single value must be specified'
                     ' when parameter is a set')

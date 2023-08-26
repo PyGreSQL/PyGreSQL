@@ -3,7 +3,7 @@
  *
  * Large object support - this file is part a of the C extension module.
  *
- * Copyright (c) 2022 by the PyGreSQL Development Team
+ * Copyright (c) 2023 by the PyGreSQL Development Team
  *
  * Please see the LICENSE.TXT file for specific restrictions.
  */

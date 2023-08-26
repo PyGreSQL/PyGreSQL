@@ -126,7 +126,7 @@ class TestHasConnect(unittest.TestCase):
         v = pg.get_pqlib_version()
         self.assertIsInstance(v, long)
         self.assertGreater(v, 90000)
-        self.assertLess(v, 150000)
+        self.assertLess(v, 160000)
 
 
 class TestParseArray(unittest.TestCase):
