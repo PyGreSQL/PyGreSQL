@@ -13,6 +13,7 @@ Version 5.2.5 (to be released)
     - generated columns can be requested with the `get_generated()` method
     - generated columns are ignored by the insert, update and upsert method
 - Avoid internal query and error when casting the `sql_identifier` type (#82)
+- Fix issue with multiple calls of `getresult()` after `send_query()` (#80)
 
 Version 5.2.4 (2022-03-26)
 --------------------------

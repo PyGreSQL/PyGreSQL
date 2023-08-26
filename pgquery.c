@@ -139,8 +139,9 @@ _get_async_result(queryObject *self, int keep) {
         Py_END_ALLOW_THREADS
         if (!self->result) {
             /* end of result set, return None */
-            Py_DECREF(self->pgcnx);
-            self->pgcnx = NULL;
+            self->max_row = 0;
+            self->num_fields = 0;
+            self->col_types = NULL;
             Py_INCREF(Py_None);
             return Py_None;
         }
@@ -161,7 +162,7 @@ _get_async_result(queryObject *self, int keep) {
                 }
             }
             else if (result == Py_None) {
-                /* It's would be confusing to return None here because the
+                /* It would be confusing to return None here because the
                    caller has to call again until we return None. We can't
                    just consume that final None because we don't know if there
                    are additional statements following this one, so we return
@@ -180,7 +181,12 @@ _get_async_result(queryObject *self, int keep) {
             Py_DECREF(self);
             return NULL;
         }
+    } else if (self->async == 2 &&
+               !self->max_row && !self->num_fields && !self->col_types) {
+        Py_INCREF(Py_None);
+        return Py_None;
     }
+
     /* return the query object itself as sentinel for a normal query result */
     return (PyObject *)self;
 }
@@ -722,7 +728,6 @@ query_namedresult(queryObject *self, PyObject *noargs)
     }
 
     if ((res_list = _get_async_result(self, 1)) == (PyObject *)self) {
-
         res = PyObject_CallFunction(namediter, "(O)", self);
         if (!res) return NULL;
         if (PyList_Check(res)) return res;

@@ -158,6 +158,23 @@ class TestDBClassInit(unittest.TestCase):
         self.assertRaises(pg.InternalError, db.close)
         del db
 
+    def testAsyncQueryBeforeDeletion(self):
+        db = DB()
+        query = db.send_query('select 1')
+        self.assertEqual(query.getresult(), [(1,)])
+        self.assertIsNone(query.getresult())
+        self.assertIsNone(query.getresult())
+        del db
+        gc.collect()
+
+    def testAsyncQueryAfterDeletion(self):
+        db = DB()
+        query = db.send_query('select 1')
+        del db
+        gc.collect()
+        self.assertIsNone(query.getresult())
+        self.assertIsNone(query.getresult())
+
 
 class TestDBClassBasic(unittest.TestCase):
     """Test existence of the DB class wrapped pg connection methods."""

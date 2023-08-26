@@ -580,6 +580,17 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields, ('alias0',))
         self.assertEqual(v.alias0, 0)
         self.assertIsNone(query.namedresult())
+        self.assertIsNone(query.namedresult())
+
+    def testListFieldsAfterSecondGetResultAsync(self):
+        q = "select 1 as one"
+        query = self.c.send_query(q)
+        self.assertEqual(query.getresult(), [(1,)])
+        self.assertEqual(query.listfields(), ('one',))
+        self.assertIsNone(query.getresult())
+        self.assertEqual(query.listfields(), ())
+        self.assertIsNone(query.getresult())
+        self.assertEqual(query.listfields(), ())
 
     def testGet3Cols(self):
         q = "select 1,2,3"
