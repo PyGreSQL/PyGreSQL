@@ -95,6 +95,19 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         cur.execute("select 'a %% sign'")
         self.assertEqual(cur.fetchone(), ('a % sign',))
 
+    def test_paramstyles(self):
+        self.assertEqual(pgdb.paramstyle, 'pyformat')
+        con = self._connect()
+        cur = con.cursor()
+        # parameters can be passed as tuple
+        cur.execute("select %s, %s, %s", (123, 'abc', True))
+        self.assertEqual(cur.fetchone(), (123, 'abc', True))
+        # parameters can be passed as dict
+        cur.execute("select %(one)s, %(two)s, %(one)s, %(three)s", {
+            "one": 123, "two": "abc", "three": True
+        })
+        self.assertEqual(cur.fetchone(), (123, 'abc', 123, True))
+
     def test_callproc_no_params(self):
         con = self._connect()
         cur = con.cursor()
