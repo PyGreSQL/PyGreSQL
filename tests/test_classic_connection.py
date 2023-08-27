@@ -2185,6 +2185,20 @@ class TestInserttable(unittest.TestCase):
         data = [(t,)]
         self.assertRaises(MemoryError, self.c.inserttable, 'test', data, ['t'])
 
+    def testInsertTableSmallIntOverflow(self):
+        rest_row = self.data[2][1:]
+        data = [(32000,) + rest_row]
+        self.c.inserttable('test', data)
+        self.assertEqual(self.get_back(), data)
+        data = [(33000,) + rest_row]
+        try:
+            self.c.inserttable('test', data)
+        except ValueError as e:
+            self.assertIn(
+                'value "33000" is out of range for type smallint', str(e))
+        else:
+            self.assertFalse('expected an error')
+
 
 class TestDirectSocketAccess(unittest.TestCase):
     """Test copy command with direct socket access."""
