@@ -1526,7 +1526,7 @@ class TestDBClass(unittest.TestCase):
     def testGetGeneratedIsCached(self):
         server_version = self.db.server_version
         if server_version < 100000:
-            return
+            self.skipTest("database does not support generated columns")
         get_generated = self.db.get_generated
         query = self.db.query
         table = 'test_get_generated_2'
@@ -2472,6 +2472,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, [(31, 9009, 'No.')])
 
     def testUpsertWithGeneratedColumns(self):
+        if self.db.server_version < 90500:
+            self.skipTest('database does not support upsert')
         upsert = self.db.upsert
         get = self.db.get
         server_version = self.db.server_version
