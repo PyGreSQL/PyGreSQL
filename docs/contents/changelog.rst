@@ -1,8 +1,8 @@
 ChangeLog
 =========
 
-Version 5.2.5 (to be released)
-------------------------------
+Version 5.2.5 (2023-08-28)
+--------------------------
 - This version officially supports the new Python 3.11 and PostgreSQL 15.
 - Two more improvements in the `inserttable()` method of the `pg` module
   (thanks to Justin Pryzby for this contribution):
