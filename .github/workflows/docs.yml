@@ -33,6 +33,6 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         publish_dir: docs/_build/html
-        cname: pygresql.org
+        # cname: pygresql.org
         enable_jekyll: false
         force_orphan: true
