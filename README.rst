@@ -24,6 +24,7 @@ see the documentation.
 Documentation
 -------------
 
-The documentation is available at `pygresql.org <https://pygresql.org/>`_.
-
-At mirror of the documentation can be found at `pygresql.readthedocs.io <https://pygresql.readthedocs.io/>`_.
+The documentation is available at
+`pygresql.github.io/PyGreSQL/ <http://pygresql.github.io/PyGreSQL/>`_
+and at `pygresql.readthedocs.io <https://pygresql.readthedocs.io/>`_,
+where you can also find the documentation for older versions.

@@ -4,12 +4,12 @@ Access to the source repository
 The source code of PyGreSQL is available as a `Git <https://git-scm.com/>`_
 repository on `GitHub <https://github.com/PyGreSQL/PyGreSQL>`_.
 
-The current master branch of the repository can be cloned with the command::
+The current main branch of the repository can be cloned with the command::
 
     git clone https://github.com/PyGreSQL/PyGreSQL.git
 
-You can also download the master branch as a
-`zip archive <https://github.com/PyGreSQL/PyGreSQL/archive/master.zip>`_.
+You can also download the main branch as a
+`zip archive <https://github.com/PyGreSQL/PyGreSQL/archive/main.zip>`_.
 
 Contributions can be proposed as
 `pull requests <https://github.com/PyGreSQL/PyGreSQL/pulls>`_ on GitHub.

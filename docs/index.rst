@@ -1,5 +1,3 @@
-.. PyGreSQL index page with toc (for use without cloud theme)
-
 Welcome to PyGreSQL
 ===================
 
