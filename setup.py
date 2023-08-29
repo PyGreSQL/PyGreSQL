@@ -104,31 +104,13 @@ class build_pg_ext(build_ext):
 
     user_options = build_ext.user_options + [
         ('strict', None, "count all compiler warnings as errors"),
-        ('direct-access', None, "enable direct access functions"),
-        ('no-direct-access', None, "disable direct access functions"),
-        ('direct-access', None, "enable direct access functions"),
-        ('no-direct-access', None, "disable direct access functions"),
-        ('large-objects', None, "enable large object support"),
-        ('no-large-objects', None, "disable large object support"),
-        ('default-vars', None, "enable default variables use"),
-        ('no-default-vars', None, "disable default variables use"),
-        ('escaping-funcs', None, "enable string escaping functions"),
-        ('no-escaping-funcs', None, "disable string escaping functions"),
-        ('ssl-info', None, "use new ssl info functions"),
-        ('no-ssl-info', None, "do not use new ssl info functions"),
-        ('memory-size', None, "enable new memory size function"),
-        ('no-memory-size', None, "disable new memory size function")]
+        ('memory-size', None, "enable memory size function"),
+        ('no-memory-size', None, "disable memory size function")]
 
     boolean_options = build_ext.boolean_options + [
-        'strict', 'direct-access', 'large-objects', 'default-vars',
-        'escaping-funcs', 'ssl-info', 'memory-size']
+        'strict', 'memory-size']
 
     negative_opt = {
-        'no-direct-access': 'direct-access',
-        'no-large-objects': 'large-objects',
-        'no-default-vars': 'default-vars',
-        'no-escaping-funcs': 'escaping-funcs',
-        'no-ssl-info': 'ssl-info',
         'no-memory-size': 'memory-size'}
 
     def get_compiler(self):
@@ -138,12 +120,6 @@ class build_pg_ext(build_ext):
     def initialize_options(self):
         build_ext.initialize_options(self)
         self.strict = False
-        self.direct_access = None
-        self.large_objects = None
-        self.default_vars = None
-        self.escaping_funcs = None
-        self.pqlib_info = None
-        self.ssl_info = None
         self.memory_size = None
         supported = pg_version >= (10, 0)
         if not supported:
@@ -155,18 +131,6 @@ class build_pg_ext(build_ext):
         build_ext.finalize_options(self)
         if self.strict:
             extra_compile_args.append('-Werror')
-        if self.direct_access is None or self.direct_access:
-            define_macros.append(('DIRECT_ACCESS', None))
-        if self.large_objects is None or self.large_objects:
-            define_macros.append(('LARGE_OBJECTS', None))
-        if self.default_vars is None or self.default_vars:
-            define_macros.append(('DEFAULT_VARS', None))
-        if self.escaping_funcs is None or self.escaping_funcs:
-            define_macros.append(('ESCAPING_FUNCS', None))
-        if self.pqlib_info is None or self.pqlib_info:
-            define_macros.append(('PQLIB_INFO', None))
-        if self.ssl_info is None or self.ssl_info:
-            define_macros.append(('SSL_INFO', None))
         wanted = self.memory_size
         supported = pg_version >= (12, 0)
         if (wanted is None and supported) or wanted:

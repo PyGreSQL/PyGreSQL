@@ -1115,8 +1115,6 @@ set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
     set_error_msg_and_state(type, msg, encoding, sqlstate);
 }
 
-#ifdef SSL_INFO
-
 /* Get SSL attributes and values as a dictionary. */
 static PyObject *
 get_ssl_attributes(PGconn *cnx) {
@@ -1143,8 +1141,6 @@ get_ssl_attributes(PGconn *cnx) {
 
     return attr_dict;
 }
-
-#endif /* SSL_INFO */
 
 /* Format result (mostly useful for debugging).
    Note: This is similar to the Postgres function PQprint().

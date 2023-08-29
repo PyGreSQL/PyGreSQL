@@ -10,9 +10,7 @@ the environment variables used by PostgreSQL.
 These "default variables" were designed to allow you to handle general
 connection parameters without heavy code in your programs. You can prompt the
 user for a value, put it in the default variable, and forget it, without
-having to modify your environment. The support for default variables can be
-disabled by not setting the ``default_vars`` option in the Python setup file.
-Methods relative to this are specified by the tag [DV].
+having to modify your environment.
 
 All variables are set to ``None`` at module initialization, specifying that
 standard environment variables should be used.
@@ -87,8 +85,8 @@ For example, version 9.1.2 will be returned as 90102.
 
 .. versionadded:: 5.2 (needs PostgreSQL >= 9.1)
 
-get/set_defhost -- default server host [DV]
--------------------------------------------
+get/set_defhost -- default server host
+--------------------------------------
 
 .. function:: get_defhost(host)
 
@@ -117,8 +115,8 @@ If ``None`` is supplied as parameter, environment variables will
 be used in future connections. It returns the previous setting
 for default host.
 
-get/set_defport -- default server port [DV]
--------------------------------------------
+get/set_defport -- default server port
+--------------------------------------
 
 .. function:: get_defport()
 
@@ -145,8 +143,8 @@ This methods sets the default port value for new connections. If -1 is
 supplied as parameter, environment variables will be used in future
 connections. It returns the previous setting for default port.
 
-get/set_defopt --  default connection options [DV]
---------------------------------------------------
+get/set_defopt --  default connection options
+---------------------------------------------
 
 .. function:: get_defopt()
 
@@ -174,8 +172,8 @@ This methods sets the default connection options value for new connections.
 If ``None`` is supplied as parameter, environment variables will be used in
 future connections. It returns the previous setting for default options.
 
-get/set_defbase -- default database name [DV]
----------------------------------------------
+get/set_defbase -- default database name
+----------------------------------------
 
 .. function:: get_defbase()
 
@@ -203,8 +201,8 @@ This method sets the default database name value for new connections. If
 ``None`` is supplied as parameter, environment variables will be used in
 future connections. It returns the previous setting for default host.
 
-get/set_defuser -- default database user [DV]
----------------------------------------------
+get/set_defuser -- default database user
+----------------------------------------
 
 .. function:: get_defuser()
 
@@ -232,8 +230,8 @@ This method sets the default database user name for new connections. If
 ``None`` is supplied as parameter, environment variables will be used in
 future connections. It returns the previous setting for default host.
 
-get/set_defpasswd -- default database password [DV]
----------------------------------------------------
+get/set_defpasswd -- default database password
+----------------------------------------------
 
 .. function:: get_defpasswd()
 

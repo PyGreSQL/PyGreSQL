@@ -59,14 +59,12 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 
 /* MODULE GLOBAL VARIABLES */
 
-#ifdef DEFAULT_VARS
 static PyObject *pg_default_host;   /* default database host */
 static PyObject *pg_default_base;   /* default database name */
 static PyObject *pg_default_opt;    /* default connection options */
 static PyObject *pg_default_port;   /* default connection port */
 static PyObject *pg_default_user;   /* default username */
 static PyObject *pg_default_passwd; /* default password */
-#endif  /* DEFAULT_VARS */
 
 static PyObject *decimal = NULL,    /* decimal type */
                 *dictiter = NULL,   /* function for getting dict results */
@@ -160,7 +158,6 @@ typedef struct
 }   queryObject;
 #define is_queryObject(v) (PyType(v) == &queryType)
 
-#ifdef LARGE_OBJECTS
 typedef struct
 {
     PyObject_HEAD
@@ -169,7 +166,6 @@ typedef struct
     int lo_fd;          /* large object fd */
 }   largeObject;
 #define is_largeObject(v) (PyType(v) == &largeType)
-#endif /* LARGE_OBJECTS */
 
 /* Internal functions */
 #include "pginternal.c"
@@ -187,9 +183,7 @@ typedef struct
 #include "pgnotice.c"
 
 /* Large objects */
-#ifdef LARGE_OBJECTS
 #include "pglarge.c"
-#endif
 
 /* MODULE FUNCTIONS */
 
@@ -228,7 +222,6 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
         return NULL;
     }
 
-#ifdef DEFAULT_VARS
     /* handles defaults variables (for uninitialised vars) */
     if ((!pghost) && (pg_default_host != Py_None))
         pghost = PyBytes_AsString(pg_default_host);
@@ -247,7 +240,6 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
 
     if ((!pgpasswd) && (pg_default_passwd != Py_None))
         pgpasswd = PyBytes_AsString(pg_default_passwd);
-#endif /* DEFAULT_VARS */
 
     if (!(conn_obj = PyObject_New(connObject, &connType))) {
         set_error_msg(InternalError, "Can't create new connection object");
@@ -309,8 +301,6 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
     return (PyObject *) conn_obj;
 }
 
-#ifdef PQLIB_INFO
-
 /* Get version of libpq that is being used */
 static char pg_get_pqlib_version__doc__[] =
 "get_pqlib_version() -- get the version of libpq that is being used";
@@ -319,8 +309,6 @@ static PyObject *
 pg_get_pqlib_version(PyObject *self, PyObject *noargs) {
     return PyLong_FromLong(PQlibVersion());
 }
-
-#endif /* PQLIB_INFO */
 
 /* Escape string */
 static char pg_escape_string__doc__[] =
@@ -766,8 +754,6 @@ pg_set_jsondecode(PyObject *self, PyObject *func)
     return ret;
 }
 
-#ifdef DEFAULT_VARS
-
 /* Get default host. */
 static char pg_get_defhost__doc__[] =
 "get_defhost() -- return default database host";
@@ -1012,7 +998,6 @@ pg_set_defport(PyObject *self, PyObject *args)
 
     return old;
 }
-#endif /* DEFAULT_VARS */
 
 /* Cast a string with a text representation of an array to a list. */
 static char pg_cast_array__doc__[] =
@@ -1216,7 +1201,6 @@ static struct PyMethodDef pg_methods[] = {
         METH_VARARGS|METH_KEYWORDS, pg_cast_record__doc__},
     {"cast_hstore", (PyCFunction) pg_cast_hstore,
         METH_O, pg_cast_hstore__doc__},
-#ifdef DEFAULT_VARS
     {"get_defhost", pg_get_defhost, METH_NOARGS, pg_get_defhost__doc__},
     {"set_defhost", pg_set_defhost, METH_VARARGS, pg_set_defhost__doc__},
     {"get_defbase", pg_get_defbase, METH_NOARGS, pg_get_defbase__doc__},
@@ -1228,11 +1212,8 @@ static struct PyMethodDef pg_methods[] = {
     {"get_defuser", pg_get_defuser, METH_NOARGS, pg_get_defuser__doc__},
     {"set_defuser", pg_set_defuser, METH_VARARGS, pg_set_defuser__doc__},
     {"set_defpasswd", pg_set_defpasswd, METH_VARARGS, pg_set_defpasswd__doc__},
-#endif /* DEFAULT_VARS */
-#ifdef PQLIB_INFO
     {"get_pqlib_version", (PyCFunction) pg_get_pqlib_version,
         METH_NOARGS, pg_get_pqlib_version__doc__},
-#endif /* PQLIB_INFO */
     {NULL, NULL} /* sentinel */
 };
 
@@ -1260,17 +1241,13 @@ PyMODINIT_FUNC PyInit__pg(void)
     /* Initialize here because some Windows platforms get confused otherwise */
     connType.tp_base = noticeType.tp_base =
         queryType.tp_base = sourceType.tp_base = &PyBaseObject_Type;
-#ifdef LARGE_OBJECTS
     largeType.tp_base = &PyBaseObject_Type;
-#endif
 
     if (PyType_Ready(&connType)
         || PyType_Ready(&noticeType)
         || PyType_Ready(&queryType)
         || PyType_Ready(&sourceType)
-#ifdef LARGE_OBJECTS
         || PyType_Ready(&largeType)
-#endif
         )
     {
         return NULL;
@@ -1354,7 +1331,6 @@ PyMODINIT_FUNC PyInit__pg(void)
     PyDict_SetItemString(dict, "POLLING_READING", PyLong_FromLong(PGRES_POLLING_READING));
     PyDict_SetItemString(dict, "POLLING_WRITING", PyLong_FromLong(PGRES_POLLING_WRITING));
 
-#ifdef LARGE_OBJECTS
     /* Create mode for large objects */
     PyDict_SetItemString(dict, "INV_READ", PyLong_FromLong(INV_READ));
     PyDict_SetItemString(dict, "INV_WRITE", PyLong_FromLong(INV_WRITE));
@@ -1363,9 +1339,7 @@ PyMODINIT_FUNC PyInit__pg(void)
     PyDict_SetItemString(dict, "SEEK_SET", PyLong_FromLong(SEEK_SET));
     PyDict_SetItemString(dict, "SEEK_CUR", PyLong_FromLong(SEEK_CUR));
     PyDict_SetItemString(dict, "SEEK_END", PyLong_FromLong(SEEK_END));
-#endif /* LARGE_OBJECTS */
 
-#ifdef DEFAULT_VARS
     /* Prepare default values */
     Py_INCREF(Py_None);
     pg_default_host = Py_None;
@@ -1379,7 +1353,6 @@ PyMODINIT_FUNC PyInit__pg(void)
     pg_default_user = Py_None;
     Py_INCREF(Py_None);
     pg_default_passwd = Py_None;
-#endif /* DEFAULT_VARS */
 
     /* Store common pg encoding ids */
 

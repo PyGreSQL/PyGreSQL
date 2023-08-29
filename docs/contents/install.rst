@@ -91,24 +91,24 @@ Now you should be ready to use PyGreSQL.
 
 You can also run the build step separately if you want to create a distribution
 to be installed on a different system or explicitly enable or disable certain
-features. For instance, in order to build PyGreSQL without support for the SSL
-info functions, run::
+features. For instance, in order to build PyGreSQL without support for the
+memory size functions, run::
 
-    python setup.py build_ext --no-ssl-info
+    python setup.py build_ext --no-memory-size
 
 By default, PyGreSQL is compiled with support for all features available in the
 installed PostgreSQL version, and you will get warnings for the features that
 are not supported in this version. You can also explicitly require a feature in
 order to get an error if it is not available, for instance:
 
-    python setup.py build_ext --ssl-info
+    python setup.py build_ext --memory-size
 
 You can find out all possible build options with::
 
     python setup.py build_ext --help
 
 Alternatively, you can also use the corresponding C preprocessor macros like
-``SSL_INFO`` directly (see the next section).
+``MEMORY_SIZE`` directly (see the next section).
 
 Note that if you build PyGreSQL with support for newer features that are not
 available in the PQLib installed on the runtime system, you may get an error
@@ -154,13 +154,7 @@ Stand-Alone
 
   Some options may be added to this line::
 
-    -DDEFAULT_VARS      default variables support
-    -DDIRECT_ACCESS     direct access methods
-    -DLARGE_OBJECTS     large object support
-    -DESCAPING_FUNCS    support for newer escaping functions
-    -DPQLIB_INFO        support PQLib information
-    -DSSL_INFO          support SSL information
-    -DMEMORY_SIZE       support memory size function
+    -DMEMORY_SIZE = support memory size function (PostgreSQL 12 or newer)
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.
@@ -202,13 +196,7 @@ Built-in to Python interpreter
 
   Some options may be added to this line::
 
-    -DDEFAULT_VARS      default variables support
-    -DDIRECT_ACCESS     direct access methods
-    -DLARGE_OBJECTS     large object support
-    -DESCAPING_FUNCS    support for newer escaping functions
-    -DPQLIB_INFO        support PQLib information
-    -DSSL_INFO          support SSL information
-    -DMEMORY_SIZE       support memory size function
+    -DMEMORY_SIZE = support memory size function (PostgreSQL 12 or newer)
 
   On some systems you may need to include ``-lcrypt`` in the list of libraries
   to make it compile.

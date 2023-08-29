@@ -13,17 +13,8 @@ significant parameters in function calls.
 
     Some methods give direct access to the connection socket.
     *Do not use them unless you really know what you are doing.*
-    If you prefer disabling them,
-    do not set the ``direct_access`` option in the Python setup file.
-    These methods are specified by the tag [DA].
-
-.. note::
-
-    Some other methods give access to large objects
-    (refer to PostgreSQL user manual for more information about these).
-    If you want to forbid access to these from the module,
-    set the ``large_objects`` option in the Python setup file.
-    These methods are specified by the tag [LO].
+    Some other methods give access to large objects.
+    Refer to the PostgreSQL user manual for more information about these.
 
 query -- execute a SQL command string
 -------------------------------------
@@ -605,8 +596,8 @@ attributes:
 
 .. versionadded:: 4.1
 
-putline -- write a line to the server socket [DA]
--------------------------------------------------
+putline -- write a line to the server socket
+--------------------------------------------
 
 .. method:: Connection.putline(line)
 
@@ -618,8 +609,8 @@ putline -- write a line to the server socket [DA]
 
 This method allows to directly write a string to the server socket.
 
-getline -- get a line from server socket [DA]
----------------------------------------------
+getline -- get a line from server socket
+----------------------------------------
 
 .. method:: Connection.getline()
 
@@ -633,8 +624,8 @@ getline -- get a line from server socket [DA]
 
 This method allows to directly read a string from the server socket.
 
-endcopy -- synchronize client and server [DA]
----------------------------------------------
+endcopy -- synchronize client and server
+----------------------------------------
 
 .. method:: Connection.endcopy()
 
@@ -647,8 +638,8 @@ endcopy -- synchronize client and server [DA]
 The use of direct access methods may desynchronize client and server.
 This method ensure that client and server will be synchronized.
 
-locreate -- create a large object in the database [LO]
-------------------------------------------------------
+locreate -- create a large object in the database
+-------------------------------------------------
 
 .. method:: Connection.locreate(mode)
 
@@ -665,8 +656,8 @@ by OR-ing the constants defined in the :mod:`pg` module (:const:`INV_READ`,
 and :const:`INV_WRITE`). Please refer to PostgreSQL user manual for a
 description of the mode values.
 
-getlo -- build a large object from given oid [LO]
--------------------------------------------------
+getlo -- build a large object from given oid
+--------------------------------------------
 
 .. method:: Connection.getlo(oid)
 
@@ -681,8 +672,8 @@ getlo -- build a large object from given oid [LO]
 This method allows reusing a previously created large object through the
 :class:`LargeObject` interface, provided the user has its OID.
 
-loimport -- import a file to a large object [LO]
-------------------------------------------------
+loimport -- import a file to a large object
+-------------------------------------------
 
 .. method:: Connection.loimport(name)
 

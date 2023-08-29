@@ -94,27 +94,17 @@ conn_getattr(connObject *self, PyObject *nameobj)
 
     /* whether the connection uses SSL */
     if (!strcmp(name, "ssl_in_use")) {
-#ifdef SSL_INFO
         if (PQsslInUse(self->cnx)) {
             Py_INCREF(Py_True); return Py_True;
         }
         else {
             Py_INCREF(Py_False); return Py_False;
         }
-#else
-        set_error_msg(NotSupportedError, "SSL info functions not supported");
-        return NULL;
-#endif
     }
 
     /* SSL attributes */
     if (!strcmp(name, "ssl_attributes")) {
-#ifdef SSL_INFO
         return get_ssl_attributes(self->cnx);
-#else
-        set_error_msg(NotSupportedError, "SSL info functions not supported");
-        return NULL;
-#endif
     }
 
     return PyObject_GenericGetAttr((PyObject *) self, nameobj);
@@ -540,7 +530,6 @@ conn_describe_prepared(connObject *self, PyObject *args)
     return NULL; /* error */
 }
 
-#ifdef DIRECT_ACCESS
 static char conn_putline__doc__[] =
 "putline(line) -- send a line directly to the backend";
 
@@ -697,7 +686,6 @@ conn_is_non_blocking(connObject *self, PyObject *noargs)
 
     return PyBool_FromLong((long)rc);
 }
-#endif /* DIRECT_ACCESS */
 
 
 /* Insert table */
@@ -1110,8 +1098,6 @@ conn_date_format(connObject *self, PyObject *noargs)
     return PyUnicode_FromString(fmt);
 }
 
-#ifdef ESCAPING_FUNCS
-
 /* Escape literal */
 static char conn_escape_literal__doc__[] =
 "escape_literal(str) -- escape a literal constant for use within SQL";
@@ -1201,8 +1187,6 @@ conn_escape_identifier(connObject *self, PyObject *string)
         PQfreemem(to);
     return to_obj;
 }
-
-#endif /* ESCAPING_FUNCS */
 
 /* Escape string */
 static char conn_escape_string__doc__[] =
@@ -1298,8 +1282,6 @@ conn_escape_bytea(connObject *self, PyObject *data)
         PQfreemem(to);
     return to_obj;
 }
-
-#ifdef LARGE_OBJECTS
 
 /* Constructor for large objects (internal use only) */
 static largeObject *
@@ -1414,8 +1396,6 @@ conn_loimport(connObject *self, PyObject *args)
 
     return (PyObject *) large_new(self, lo_oid);
 }
-
-#endif /* LARGE_OBJECTS */
 
 /* Reset connection. */
 static char conn_reset__doc__[] =
@@ -1724,18 +1704,15 @@ static struct PyMethodDef conn_methods[] = {
     {"date_format", (PyCFunction) conn_date_format,
         METH_NOARGS, conn_date_format__doc__},
 
-#ifdef ESCAPING_FUNCS
     {"escape_literal", (PyCFunction) conn_escape_literal,
         METH_O, conn_escape_literal__doc__},
     {"escape_identifier", (PyCFunction) conn_escape_identifier,
         METH_O, conn_escape_identifier__doc__},
-#endif /* ESCAPING_FUNCS */
     {"escape_string", (PyCFunction) conn_escape_string,
         METH_O, conn_escape_string__doc__},
     {"escape_bytea", (PyCFunction) conn_escape_bytea,
         METH_O, conn_escape_bytea__doc__},
 
-#ifdef DIRECT_ACCESS
     {"putline", (PyCFunction) conn_putline,
         METH_VARARGS, conn_putline__doc__},
     {"getline", (PyCFunction) conn_getline,
@@ -1746,16 +1723,13 @@ static struct PyMethodDef conn_methods[] = {
         METH_VARARGS, conn_set_non_blocking__doc__},
     {"is_non_blocking", (PyCFunction) conn_is_non_blocking,
         METH_NOARGS, conn_is_non_blocking__doc__},
-#endif /* DIRECT_ACCESS */
 
-#ifdef LARGE_OBJECTS
     {"locreate", (PyCFunction) conn_locreate,
         METH_VARARGS, conn_locreate__doc__},
     {"getlo", (PyCFunction) conn_getlo,
         METH_VARARGS, conn_getlo__doc__},
     {"loimport", (PyCFunction) conn_loimport,
         METH_VARARGS, conn_loimport__doc__},
-#endif /* LARGE_OBJECTS */
 
     {NULL, NULL} /* sentinel */
 };
