@@ -93,7 +93,7 @@ except ImportError as e:
     if e:
         raise ImportError(
             "Cannot import shared library for PyGreSQL,\n"
-            "probably because no %s is installed.\n%s" % (libpq, e)) from e
+            f"probably because no {libpq} is installed.\n{e}") from e
 else:
     del version
 
@@ -389,7 +389,7 @@ def cast_interval(value):
                         secs = -secs
                         usecs = -usecs
                 else:
-                    raise ValueError('Cannot parse interval: %s' % value)
+                    raise ValueError(f'Cannot parse interval: {value}')
     days += 365 * years + 30 * mons
     return timedelta(days=days, hours=hours, minutes=mins,
                      seconds=secs, microseconds=usecs)
@@ -429,7 +429,7 @@ class Typecasts(dict):
         but returns None when no special cast function exists.
         """
         if not isinstance(typ, str):
-            raise TypeError('Invalid type: %s' % typ)
+            raise TypeError(f'Invalid type: {typ}')
         cast = self.defaults.get(typ)
         if cast:
             # store default for faster access
@@ -471,13 +471,13 @@ class Typecasts(dict):
         if cast is None:
             for t in typ:
                 self.pop(t, None)
-                self.pop('_%s' % t, None)
+                self.pop(f'_{t}', None)
         else:
             if not callable(cast):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 self[t] = self._add_connection(cast)
-                self.pop('_%s' % t, None)
+                self.pop(f'_{t}', None)
 
     def reset(self, typ=None):
         """Reset the typecasts for the specified type(s) to their defaults.
@@ -495,7 +495,7 @@ class Typecasts(dict):
                 cast = defaults.get(t)
                 if cast:
                     self[t] = self._add_connection(cast)
-                    t = '_%s' % t
+                    t = f'_{t}'
                     cast = defaults.get(t)
                     if cast:
                         self[t] = self._add_connection(cast)
@@ -503,7 +503,7 @@ class Typecasts(dict):
                         self.pop(t, None)
                 else:
                     self.pop(t, None)
-                    self.pop('_%s' % t, None)
+                    self.pop(f'_{t}', None)
 
     def create_array_cast(self, basecast):
         """Create an array typecast for the given base cast."""
@@ -640,8 +640,8 @@ class TypeCache(dict):
             oid = key
         else:
             if '.' not in key and '"' not in key:
-                key = '"%s"' % (key,)
-            oid = "'%s'::pg_catalog.regtype" % (self._escape_string(key),)
+                key = f'"{key}"'
+            oid = f"'{self._escape_string(key)}'::pg_catalog.regtype"
         try:
             self._src.execute(self._query_pg_type.format(oid))
         except ProgrammingError:
@@ -649,7 +649,7 @@ class TypeCache(dict):
         else:
             res = self._src.fetch(1)
         if not res:
-            raise KeyError('Type %s could not be found' % (key,))
+            raise KeyError(f'Type {key} could not be found')
         res = res[0]
         type_code = TypeCode.create(
             int(res[0]), res[1], int(res[2]),
@@ -676,9 +676,9 @@ class TypeCache(dict):
         self._src.execute(
             "SELECT attname, atttypid"
             " FROM pg_catalog.pg_attribute"
-            " WHERE attrelid OPERATOR(pg_catalog.=) %s"
+            f" WHERE attrelid OPERATOR(pg_catalog.=) {typ.relid}"
             " AND attnum OPERATOR(pg_catalog.>) 0"
-            " AND NOT attisdropped ORDER BY attnum" % (typ.relid,))
+            " AND NOT attisdropped ORDER BY attnum")
         return [FieldInfo(name, self.get(int(oid)))
                 for name, oid in self._src.fetch(-1)]
 
@@ -761,7 +761,7 @@ def _row_factory(names):
     try:
         return namedtuple('Row', names, rename=True)._make
     except ValueError:  # there is still a problem with the field names
-        names = ['column_%d' % (n,) for n in range(len(names))]
+        names = [f'column_{n}' for n in range(len(names))]
         return namedtuple('Row', names)._make
 
 
@@ -820,7 +820,7 @@ class Cursor(object):
                 value = self._cnx.escape_bytea(value).decode('ascii')
             else:
                 value = self._cnx.escape_string(value)
-            return "'%s'" % (value,)
+            return f"'{value}'"
         if isinstance(value, float):
             if isinf(value):
                 return "'-Infinity'" if value < 0 else "'Infinity'"
@@ -831,18 +831,18 @@ class Cursor(object):
             return value
         if isinstance(value, datetime):
             if value.tzinfo:
-                return "'%s'::timestamptz" % (value,)
-            return "'%s'::timestamp" % (value,)
+                return f"'{value}'::timestamptz"
+            return f"'{value}'::timestamp"
         if isinstance(value, date):
-            return "'%s'::date" % (value,)
+            return f"'{value}'::date"
         if isinstance(value, time):
             if value.tzinfo:
-                return "'%s'::timetz" % (value,)
-            return "'%s'::time" % value
+                return f"'{value}'::timetz"
+            return f"'{value}'::time"
         if isinstance(value, timedelta):
-            return "'%s'::interval" % (value,)
+            return f"'{value}'::interval"
         if isinstance(value, Uuid):
-            return "'%s'::uuid" % (value,)
+            return f"'{value}'::uuid"
         if isinstance(value, list):
             # Quote value as an ARRAY constructor. This is better than using
             # an array literal because it carries the information that this is
@@ -852,7 +852,8 @@ class Cursor(object):
             if not value:  # exception for empty array
                 return "'{}'"
             q = self._quote
-            return 'ARRAY[%s]' % (','.join(str(q(v)) for v in value),)
+            v = ','.join(str(q(v)) for v in value)
+            return f'ARRAY[{v}]'
         if isinstance(value, tuple):
             # Quote as a ROW constructor.  This is better than using a record
             # literal because it carries the information that this is a record
@@ -860,12 +861,13 @@ class Cursor(object):
             # this usable with the IN syntax as well.  It is only necessary
             # when the records has a single column which is not really useful.
             q = self._quote
-            return '(%s)' % (','.join(str(q(v)) for v in value),)
+            v = ','.join(str(q(v)) for v in value)
+            return f'({v})'
         try:  # noinspection PyUnresolvedReferences
             value = value.__pg_repr__()
         except AttributeError:
             raise InterfaceError(
-                'Do not know how to adapt type %s' % (type(value),))
+                f'Do not know how to adapt type {type(value)}')
         if isinstance(value, (tuple, list)):
             value = self._quote(value)
         return value
@@ -979,10 +981,9 @@ class Cursor(object):
             raise  # database provides error message
         except Error as err:
             # noinspection PyTypeChecker
-            raise _db_error(
-                "Error in '%s': '%s' " % (sql, err), InterfaceError)
+            raise _db_error(f"Error in '{sql}': '{err}'", InterfaceError)
         except Exception as err:
-            raise _op_error("Internal error in '%s': %s" % (sql, err))
+            raise _op_error(f"Internal error in '{sql}': {err}")
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
             self._description = True  # fetch on demand
@@ -1049,8 +1050,9 @@ class Cursor(object):
         The procedure may also provide a result set as output. These can be
         requested through the standard fetch methods of the cursor.
         """
-        n = parameters and len(parameters) or 0
-        query = 'select * from "%s"(%s)' % (procname, ','.join(n * ['%s']))
+        n = len(parameters) if parameters else 0
+        s = ','.join(n * ['%s'])
+        query = f'select * from "{procname}"({s})'
         self.execute(query, parameters)
         return parameters
 
@@ -1088,7 +1090,7 @@ class Cursor(object):
 
             if isinstance(stream, (bytes, str)):
                 if not isinstance(stream, input_type):
-                    raise ValueError("The input must be %s" % (type_name,))
+                    raise ValueError(f"The input must be {type_name}")
                 if not binary_format:
                     if isinstance(stream, str):
                         if not stream.endswith('\n'):
@@ -1106,8 +1108,7 @@ class Cursor(object):
                     for chunk in stream:
                         if not isinstance(chunk, input_type):
                             raise ValueError(
-                                "Input stream must consist of %s"
-                                % (type_name,))
+                                f"Input stream must consist of {type_name}")
                         if isinstance(chunk, str):
                             if not chunk.endswith('\n'):
                                 chunk += '\n'
@@ -1144,7 +1145,7 @@ class Cursor(object):
         else:
             table = '.'.join(map(
                 self.connection._cnx.escape_identifier, table.split('.', 1)))
-        operation = ['copy %s' % (table,)]
+        operation = [f'copy {table}']
         options = []
         params = []
         if format is not None:
@@ -1152,7 +1153,7 @@ class Cursor(object):
                 raise TypeError("The format option must be be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("Invalid format")
-            options.append('format %s' % (format,))
+            options.append(f'format {format}')
         if sep is not None:
             if not isinstance(sep, str):
                 raise TypeError("The sep option must be a string")
@@ -1173,10 +1174,11 @@ class Cursor(object):
             if not isinstance(columns, str):
                 columns = ','.join(map(
                     self.connection._cnx.escape_identifier, columns))
-            operation.append('(%s)' % (columns,))
+            operation.append(f'({columns})')
         operation.append("from stdin")
         if options:
-            operation.append('(%s)' % (','.join(options),))
+            options = ','.join(options)
+            operation.append(f'({options})')
         operation = ' '.join(operation)
 
         putdata = self._src.putdata
@@ -1226,11 +1228,11 @@ class Cursor(object):
         if table.lower().startswith('select '):
             if columns:
                 raise ValueError("Columns must be specified in the query")
-            table = '(%s)' % (table,)
+            table = f'({table})'
         else:
             table = '.'.join(map(
                 self.connection._cnx.escape_identifier, table.split('.', 1)))
-        operation = ['copy %s' % (table,)]
+        operation = [f'copy {table}']
         options = []
         params = []
         if format is not None:
@@ -1238,7 +1240,7 @@ class Cursor(object):
                 raise TypeError("The format option must be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("Invalid format")
-            options.append('format %s' % (format,))
+            options.append(f'format {format}')
         if sep is not None:
             if not isinstance(sep, str):
                 raise TypeError("The sep option must be a string")
@@ -1267,11 +1269,12 @@ class Cursor(object):
             if not isinstance(columns, str):
                 columns = ','.join(map(
                     self.connection._cnx.escape_identifier, columns))
-            operation.append('(%s)' % (columns,))
+            operation.append(f'({columns})')
 
         operation.append("to stdout")
         if options:
-            operation.append('(%s)' % (','.join(options),))
+            options = ','.join(options)
+            operation.append(f'({options})')
         operation = ' '.join(operation)
 
         getdata = self._src.getdata
@@ -1553,9 +1556,9 @@ def connect(dsn=None,
         for kw, value in kwargs:
             value = str(value)
             if not value or ' ' in value:
-                value = "'%s'" % (value.replace(
-                    '\\', '\\\\').replace("'", "\\'"))
-            dbname.append('%s=%s' % (kw, value))
+                value = value.replace('\\', '\\\\').replace("'", "\\'")
+                value = f"'{value}'"
+            dbname.append(f'{kw}={value}')
         dbname = ' '.join(dbname)
     # open the connection
     # noinspection PyArgumentList
@@ -1734,12 +1737,12 @@ class Hstore(dict):
         quote = cls._re_quote.search(s)
         s = cls._re_escape.sub(r'\\\1', s)
         if quote:
-            s = '"%s"' % (s,)
+            s = f'"{s}"'
         return s
 
     def __str__(self):
         q = self._quote
-        return ','.join('%s=>%s' % (q(k), q(v)) for k, v in self.items())
+        return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
 
 
 class Json:

@@ -49,7 +49,7 @@ except ImportError as e:
     if e:
         raise ImportError(
             "Cannot import shared library for PyGreSQL,\n"
-            "probably because no %s is installed.\n%s" % (libpq, e)) from e
+            f"probably because no {libpq} is installed.\n{e}") from e
 else:
     del version
 
@@ -148,7 +148,7 @@ def _timezone_as_offset(tz):
 
 def _oid_key(table):
     """Build oid key from a table name."""
-    return 'oid(%s)' % table
+    return f'oid({table})'
 
 
 class Bytea(bytes):
@@ -170,12 +170,12 @@ class Hstore(dict):
             return '""'
         s = s.replace('"', '\\"')
         if cls._re_quote.search(s):
-            s = '"%s"' % s
+            s = f'"{s}"'
         return s
 
     def __str__(self):
         q = self._quote
-        return ','.join('%s=>%s' % (q(k), q(v)) for k, v in self.items())
+        return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
 
 
 class Json:
@@ -220,9 +220,9 @@ class _SimpleTypes(dict):
             for key in keys:
                 self[key] = typ
                 if isinstance(key, str):
-                    self['_%s' % key] = '%s[]' % typ
+                    self[f'_{key}'] = f'{typ}[]'
                 elif not isinstance(key, tuple):
-                    self[List[key]] = '%s[]' % typ
+                    self[List[key]] = f'{typ}[]'
 
     @staticmethod
     def __missing__(key):
@@ -248,7 +248,7 @@ def _quote_if_unqualified(param, name):
     and must be quoted manually by the caller.
     """
     if isinstance(name, str) and '.' not in name:
-        return 'quote_ident(%s)' % (param,)
+        return f'quote_ident({param})'
     return param
 
 
@@ -266,7 +266,7 @@ class _ParameterList(list):
         if isinstance(value, Literal):
             return value
         self.append(value)
-        return '$%d' % len(self)
+        return f'${len(self)}'
 
 
 class Literal(str):
@@ -366,7 +366,7 @@ class Adapter:
             return str(v)
         if isinstance(v, dict):
             return str(Hstore(v))
-        raise TypeError('Hstore parameter %s has wrong type' % v)
+        raise TypeError(f'Hstore parameter {v} has wrong type')
 
     def _adapt_uuid(self, v):
         """Adapt a UUID parameter."""
@@ -381,14 +381,15 @@ class Adapter:
         """Adapt a text type array parameter."""
         if isinstance(v, list):
             adapt = cls._adapt_text_array
-            return '{%s}' % ','.join(adapt(v) for v in v)
+            return '{' + ','.join(adapt(v) for v in v) + '}'
         if v is None:
             return 'null'
         if not v:
             return '""'
         v = str(v)
         if cls._re_array_quote.search(v):
-            v = '"%s"' % cls._re_array_escape.sub(r'\\\1', v)
+            v = cls._re_array_escape.sub(r'\\\1', v)
+            v = f'"{v}"'
         return v
 
     _adapt_date_array = _adapt_text_array
@@ -398,7 +399,7 @@ class Adapter:
         """Adapt a boolean array parameter."""
         if isinstance(v, list):
             adapt = cls._adapt_bool_array
-            return '{%s}' % ','.join(adapt(v) for v in v)
+            return '{' + ','.join(adapt(v) for v in v) + '}'
         if v is None:
             return 'null'
         if isinstance(v, str):
@@ -412,7 +413,7 @@ class Adapter:
         """Adapt a numeric array parameter."""
         if isinstance(v, list):
             adapt = cls._adapt_num_array
-            return '{%s}' % ','.join(adapt(v) for v in v)
+            v = '{' + ','.join(adapt(v) for v in v) + '}'
         if not v and v != 0:
             return 'null'
         return str(v)
@@ -433,20 +434,21 @@ class Adapter:
         """Adapt a json array parameter."""
         if isinstance(v, list):
             adapt = self._adapt_json_array
-            return '{%s}' % ','.join(adapt(v) for v in v)
+            return '{' + ','.join(adapt(v) for v in v) + '}'
         if not v:
             return 'null'
         if not isinstance(v, str):
             v = self.db.encode_json(v)
         if self._re_array_quote.search(v):
-            v = '"%s"' % self._re_array_escape.sub(r'\\\1', v)
+            v = self._re_array_escape.sub(r'\\\1', v)
+            v = f'"{v}"'
         return v
 
     def _adapt_record(self, v, typ):
         """Adapt a record parameter with given type."""
         typ = self.get_attnames(typ).values()
         if len(typ) != len(v):
-            raise TypeError('Record parameter %s has wrong size' % v)
+            raise TypeError(f'Record parameter {v} has wrong size')
         adapt = self.adapt
         value = []
         for v, t in zip(v, typ):
@@ -462,9 +464,11 @@ class Adapter:
                 else:
                     v = str(v)
                 if self._re_record_quote.search(v):
-                    v = '"%s"' % self._re_record_escape.sub(r'\\\1', v)
+                    v = self._re_record_escape.sub(r'\\\1', v)
+                    v = f'"{v}"'
             value.append(v)
-        return '(%s)' % ','.join(value)
+        v = ','.join(value)
+        return f'({v})'
 
     def adapt(self, value, typ=None):
         """Adapt a value with known database type."""
@@ -483,10 +487,10 @@ class Adapter:
                     value = self._adapt_record(value, typ)
             elif simple.endswith('[]'):
                 if isinstance(value, list):
-                    adapt = getattr(self, '_adapt_%s_array' % simple[:-2])
+                    adapt = getattr(self, f'_adapt_{simple[:-2]}_array')
                     value = adapt(value)
             else:
-                adapt = getattr(self, '_adapt_%s' % simple)
+                adapt = getattr(self, f'_adapt_{simple}')
                 value = adapt(value)
         return value
 
@@ -541,7 +545,7 @@ class Adapter:
         if isinstance(value, UUID):
             return 'uuid'
         if isinstance(value, list):
-            return '%s[]' % (cls.guess_simple_base_type(value) or 'text',)
+            return (cls.guess_simple_base_type(value) or 'text') + '[]'
         if isinstance(value, tuple):
             simple_type = cls.simple_type
             guess = cls.guess_simple_type
@@ -578,7 +582,7 @@ class Adapter:
             value = str(value)
         if isinstance(value, (bytes, str)):
             value = self.db.escape_string(value)
-            return "'%s'" % value
+            return f"'{value}'"
         if isinstance(value, bool):
             return 'true' if value else 'false'
         if isinstance(value, float):
@@ -591,21 +595,21 @@ class Adapter:
             return value
         if isinstance(value, list):
             q = self.adapt_inline
-            s = '[%s]' if nested else 'ARRAY[%s]'
-            return s % ','.join(str(q(v, nested=True)) for v in value)
+            s = '[{}]' if nested else 'ARRAY[{}]'
+            return s.format(','.join(str(q(v, nested=True)) for v in value))
         if isinstance(value, tuple):
             q = self.adapt_inline
-            return '(%s)' % ','.join(str(q(v)) for v in value)
+            return '({})'.format(','.join(str(q(v)) for v in value))
         if isinstance(value, Json):
             value = self.db.escape_string(str(value))
-            return "'%s'::json" % value
+            return f"'{value}'::json"
         if isinstance(value, Hstore):
             value = self.db.escape_string(str(value))
-            return "'%s'::hstore" % value
+            return f"'{value}'::hstore"
         pg_repr = getattr(value, '__pg_repr__', None)
         if not pg_repr:
             raise InterfaceError(
-                'Do not know how to adapt type %s' % type(value))
+                f'Do not know how to adapt type {type(value)}')
         value = pg_repr()
         if isinstance(value, (tuple, list)):
             value = self.adapt_inline(value)
@@ -903,7 +907,7 @@ def cast_interval(value):
                         secs = -secs
                         usecs = -usecs
                 else:
-                    raise ValueError('Cannot parse interval: %s' % value)
+                    raise ValueError(f'Cannot parse interval: {value}')
     days += 365 * years + 30 * mons
     return timedelta(days=days, hours=hours, minutes=mins,
                      seconds=secs, microseconds=usecs)
@@ -946,7 +950,7 @@ class Typecasts(dict):
         but returns None when no special cast function exists.
         """
         if not isinstance(typ, str):
-            raise TypeError('Invalid type: %s' % typ)
+            raise TypeError('Invalid type: {typ}')
         cast = self.defaults.get(typ)
         if cast:
             # store default for faster access
@@ -992,13 +996,13 @@ class Typecasts(dict):
         if cast is None:
             for t in typ:
                 self.pop(t, None)
-                self.pop('_%s' % t, None)
+                self.pop(f'_{t}', None)
         else:
             if not callable(cast):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 self[t] = self._add_connection(cast)
-                self.pop('_%s' % t, None)
+                self.pop(f'_{t}', None)
 
     def reset(self, typ=None):
         """Reset the typecasts for the specified type(s) to their defaults.
@@ -1027,13 +1031,13 @@ class Typecasts(dict):
         if cast is None:
             for t in typ:
                 defaults.pop(t, None)
-                defaults.pop('_%s' % t, None)
+                defaults.pop(f'_{t}', None)
         else:
             if not callable(cast):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 defaults[t] = cast
-                defaults.pop('_%s' % t, None)
+                defaults.pop(f'_{t}', None)
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_attnames(self, typ):
@@ -1159,7 +1163,7 @@ class DbTypes(dict):
         except ProgrammingError:
             res = None
         if not res:
-            raise KeyError('Type %s could not be found' % (key,))
+            raise KeyError(f'Type {key} could not be found')
         res = res[0]
         typ = self.add(*res)
         self[typ.oid] = self[typ.pgtype] = typ
@@ -1224,7 +1228,7 @@ def _row_factory(names):
     try:
         return namedtuple('Row', names, rename=True)._make
     except ValueError:  # there is still a problem with the field names
-        names = ['column_%d' % (n,) for n in range(len(names))]
+        names = [f'column_{n}' for n in range(len(names))]
         return namedtuple('Row', names)._make
 
 
@@ -1335,7 +1339,7 @@ class NotificationHandler(object):
         """
         self.db = db
         self.event = event
-        self.stop_event = stop_event or 'stop_%s' % event
+        self.stop_event = stop_event or f'stop_{event}'
         self.listening = False
         self.callback = callback
         if arg_dict is None:
@@ -1356,15 +1360,15 @@ class NotificationHandler(object):
     def listen(self):
         """Start listening for the event and the stop event."""
         if not self.listening:
-            self.db.query('listen "%s"' % self.event)
-            self.db.query('listen "%s"' % self.stop_event)
+            self.db.query(f'listen "{self.event}"')
+            self.db.query(f'listen "{self.stop_event}"')
             self.listening = True
 
     def unlisten(self):
         """Stop listening for the event and the stop event."""
         if self.listening:
-            self.db.query('unlisten "%s"' % self.event)
-            self.db.query('unlisten "%s"' % self.stop_event)
+            self.db.query(f'unlisten "{self.event}"')
+            self.db.query(f'unlisten "{self.stop_event}"')
             self.listening = False
 
     def notify(self, db=None, stop=False, payload=None):
@@ -1382,9 +1386,10 @@ class NotificationHandler(object):
         if self.listening:
             if not db:
                 db = self.db
-            q = 'notify "%s"' % (self.stop_event if stop else self.event)
+            event = self.stop_event if stop else self.event
+            q = f'notify "{event}"'
             if payload:
-                q += ", '%s'" % payload
+                q += f", '{payload}'"
             return db.query(q)
 
     def __call__(self):
@@ -1420,8 +1425,9 @@ class NotificationHandler(object):
                     if event not in (self.event, self.stop_event):
                         self.unlisten()
                         raise _db_error(
-                            'Listening for "%s" and "%s", but notified of "%s"'
-                            % (self.event, self.stop_event, event))
+                            f'Listening for "{self.event}"'
+                            f' and "{self.stop_event}",'
+                            f' but notified of "{event}"')
                     if event == self.stop_event:
                         self.unlisten()
                     self.arg_dict.update(pid=pid, event=event, extra=extra)
@@ -1592,7 +1598,7 @@ class DB:
     @staticmethod
     def _list_params(params):
         """Create a human readable parameter list."""
-        return ', '.join('$%d=%r' % (n, v) for n, v in enumerate(params, 1))
+        return ', '.join(f'${n}={v!r}' for n, v in enumerate(params, 1))
 
     # Public methods
 
@@ -1735,7 +1741,7 @@ class DB:
                 params.append(param)
         else:
             for param in params:
-                q = 'SHOW %s' % (param,)
+                q = f'SHOW {param}'
                 value = self.db.query(q).singlescalar()
                 if values is None:
                     values = value
@@ -1813,9 +1819,9 @@ class DB:
         local = ' LOCAL' if local else ''
         for param, value in params.items():
             if value is None:
-                q = 'RESET%s %s' % (local, param)
+                q = f'RESET{local} {param}'
             else:
-                q = 'SET%s %s TO %s' % (local, param, value)
+                q = f'SET{local} {param} TO {value}'
             self._do_debug(q)
             self.db.query(q)
 
@@ -1919,7 +1925,9 @@ class DB:
         name. Note that prepared statements are also deallocated automatically
         when the current session ends.
         """
-        q = "DEALLOCATE %s" % (name or 'ALL',)
+        if not name:
+            name = 'ALL'
+        q = f"DEALLOCATE {name}"
         self._do_debug(q)
         return self.db.query(q)
 
@@ -1949,12 +1957,12 @@ class DB:
                  " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
                  " AND NOT a.attisdropped"
                  " WHERE i.indrelid OPERATOR(pg_catalog.=)"
-                 " %s::pg_catalog.regclass"
-                 " AND i.indisprimary ORDER BY a.attnum") % (
-                _quote_if_unqualified('$1', table),)
+                 " {}::pg_catalog.regclass"
+                 " AND i.indisprimary ORDER BY a.attnum").format(
+                _quote_if_unqualified('$1', table))
             pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
-                raise KeyError('Table %s has no primary key' % table)
+                raise KeyError(f'Table {table} has no primary key')
             # we want to use the order defined in the primary key index here,
             # not the order as defined by the columns in the table
             if len(pkey) > 1:
@@ -1984,18 +1992,18 @@ class DB:
         """
         where = []
         if kinds:
-            where.append("r.relkind IN (%s)" %
-                         ','.join("'%s'" % k for k in kinds))
+            where.append(
+                "r.relkind IN ({})".format(','.join(f"'{k}'" for k in kinds)))
         if not system:
             where.append("s.nspname NOT SIMILAR"
                          " TO 'pg/_%|information/_schema' ESCAPE '/'")
-        where = " WHERE %s" % ' AND '.join(where) if where else ''
+        where = " WHERE " + ' AND '.join(where) if where else ''
         q = ("SELECT pg_catalog.quote_ident(s.nspname) OPERATOR(pg_catalog.||)"
              " '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.relname)"
              " FROM pg_catalog.pg_class r"
              " JOIN pg_catalog.pg_namespace s"
-             " ON s.oid OPERATOR(pg_catalog.=) r.relnamespace%s"
-             " ORDER BY s.nspname, r.relname") % where
+             f" ON s.oid OPERATOR(pg_catalog.=) r.relnamespace{where}"
+             " ORDER BY s.nspname, r.relname")
         return [r[0] for r in self.db.query(q).getresult()]
 
     def get_tables(self, system=False):
@@ -2089,8 +2097,8 @@ class DB:
         try:  # ask cache
             ret = privileges[table, privilege]
         except KeyError:  # cache miss, ask the database
-            q = "SELECT pg_catalog.has_table_privilege(%s, $2)" % (
-                _quote_if_unqualified('$1', table),)
+            q = "SELECT pg_catalog.has_table_privilege({}, $2)".format(
+                _quote_if_unqualified('$1', table))
             q = self.db.query(q, (table, privilege))
             ret = q.singlescalar() == self._make_bool(True)
             privileges[table, privilege] = ret  # cache it
@@ -2130,7 +2138,7 @@ class DB:
                 if qoid and isinstance(row, dict) and 'oid' in row:
                     keyname = ('oid',)
                 else:
-                    raise _prg_error('Table %s has no primary key' % table)
+                    raise _prg_error(f'Table {table} has no primary key')
             else:  # the table has a primary key
                 # check whether all key columns have values
                 if isinstance(row, dict) and not set(keyname).issubset(row):
@@ -2151,22 +2159,23 @@ class DB:
         adapt = params.add
         col = self.escape_identifier
         what = 'oid, *' if qoid else '*'
-        where = ' AND '.join('%s OPERATOR(pg_catalog.=) %s' % (
+        where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
             col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
             del row['oid']
-        q = 'SELECT %s FROM %s WHERE %s LIMIT 1' % (
-            what, self._escape_qualified_name(table), where)
+        t = self._escape_qualified_name(table)
+        q = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
         if not res:
             # make where clause in error message better readable
             where = where.replace('OPERATOR(pg_catalog.=)', '=')
-            raise _db_error('No such record in %s\nwhere %s\nwith %s' % (
-                table, where, self._list_params(params)))
+            raise _db_error(
+                f'No such record in {table}\nwhere {where}\nwith '
+                + self._list_params(params))
         for n, value in res[0].items():
             if qoid and n == 'oid':
                 n = qoid
@@ -2208,8 +2217,8 @@ class DB:
             raise _prg_error('No column found that can be inserted')
         names, values = ', '.join(names), ', '.join(values)
         ret = 'oid, *' if qoid else '*'
-        q = 'INSERT INTO %s (%s) VALUES (%s) RETURNING %s' % (
-            self._escape_qualified_name(table), names, values, ret)
+        t = self._escape_qualified_name(table)
+        q = f'INSERT INTO {t} ({names}) VALUES ({values}) RETURNING {ret}'
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -2249,14 +2258,14 @@ class DB:
             try:
                 keyname = self.pkey(table, True)
             except KeyError:  # the table has no primary key
-                raise _prg_error('Table %s has no primary key' % table)
+                raise _prg_error(f'Table {table} has no primary key')
             # check whether all key columns have values
             if not set(keyname).issubset(row):
                 raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        where = ' AND '.join('%s OPERATOR(pg_catalog.=) %s' % (
+        where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
             col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
@@ -2266,13 +2275,14 @@ class DB:
         keyname = set(keyname)
         for n in attnames:
             if n in row and n not in keyname and n not in generated:
-                values.append('%s = %s' % (col(n), adapt(row[n], attnames[n])))
+                values.append('{} = {}'.format(
+                    col(n), adapt(row[n], attnames[n])))
         if not values:
             return row
         values = ', '.join(values)
         ret = 'oid, *' if qoid else '*'
-        q = 'UPDATE %s SET %s WHERE %s RETURNING %s' % (
-            self._escape_qualified_name(table), values, where, ret)
+        t = self._escape_qualified_name(table)
+        q = f'UPDATE {t} SET {values} WHERE {where} RETURNING {ret}'
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -2350,7 +2360,7 @@ class DB:
         try:
             keyname = self.pkey(table, True)
         except KeyError:
-            raise _prg_error('Table %s has no primary key' % table)
+            raise _prg_error(f'Table {table} has no primary key')
         target = ', '.join(col(k) for k in keyname)
         update = []
         keyname = set(keyname)
@@ -2360,15 +2370,15 @@ class DB:
                 value = kw.get(n, n in row)
                 if value:
                     if not isinstance(value, str):
-                        value = 'excluded.%s' % col(n)
-                    update.append('%s = %s' % (col(n), value))
+                        value = f'excluded.{col(n)}'
+                    update.append(f'{col(n)} = {value}')
         if not values:
             return row
-        do = 'update set %s' % ', '.join(update) if update else 'nothing'
+        do = 'update set ' + ', '.join(update) if update else 'nothing'
         ret = 'oid, *' if qoid else '*'
-        q = ('INSERT INTO %s AS included (%s) VALUES (%s)'
-             ' ON CONFLICT (%s) DO %s RETURNING %s') % (
-            self._escape_qualified_name(table), names, values, target, do, ret)
+        t = self._escape_qualified_name(table)
+        q = (f'INSERT INTO {t} AS included ({names}) VALUES ({values})'
+             f' ON CONFLICT ({target}) DO {do} RETURNING {ret}')
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -2435,21 +2445,21 @@ class DB:
             try:
                 keyname = self.pkey(table, True)
             except KeyError:  # the table has no primary key
-                raise _prg_error('Table %s has no primary key' % table)
+                raise _prg_error(f'Table {table} has no primary key')
             # check whether all key columns have values
             if not set(keyname).issubset(row):
                 raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        where = ' AND '.join('%s OPERATOR(pg_catalog.=) %s' % (
+        where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
             col(k), adapt(row[k], attnames[k])) for k in keyname)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
             del row['oid']
-        q = 'DELETE FROM %s WHERE %s' % (
-            self._escape_qualified_name(table), where)
+        t = self._escape_qualified_name(table)
+        q = f'DELETE FROM {t} WHERE {where}'
         self._do_debug(q, params)
         res = self.db.query(q, params)
         return int(res)
@@ -2499,7 +2509,7 @@ class DB:
                 t = t[:-1].rstrip()
             t = self._escape_qualified_name(t)
             if u:
-                t = 'ONLY %s' % t
+                t = f'ONLY {t}'
             tables.append(t)
         q = ['TRUNCATE', ', '.join(tables)]
         if restart:
@@ -2565,9 +2575,9 @@ class DB:
                 order = ', '.join(map(str, order))
             q.extend(['ORDER BY', order])
         if limit:
-            q.append('LIMIT %d' % limit)
+            q.append(f'LIMIT {limit}')
         if offset:
-            q.append('OFFSET %d' % offset)
+            q.append(f'OFFSET {offset}')
         q = ' '.join(q)
         self._do_debug(q)
         q = self.db.query(q)
@@ -2603,7 +2613,7 @@ class DB:
             try:
                 keyname = self.pkey(table, True)
             except (KeyError, ProgrammingError):
-                raise _prg_error('Table %s has no primary key' % table)
+                raise _prg_error(f'Table {table} has no primary key')
         if isinstance(keyname, str):
             keyname = [keyname]
         elif not isinstance(keyname, (list, tuple)):
@@ -2627,9 +2637,9 @@ class DB:
                 order = ', '.join(map(str, order))
             q.extend(['ORDER BY', order])
         if limit:
-            q.append('LIMIT %d' % limit)
+            q.append(f'LIMIT {limit}')
         if offset:
-            q.append('OFFSET %d' % offset)
+            q.append(f'OFFSET {offset}')
         q = ' '.join(q)
         self._do_debug(q)
         q = self.db.query(q)
