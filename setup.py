@@ -107,8 +107,6 @@ class build_pg_ext(build_ext):
         ('strict', None, "count all compiler warnings as errors"),
         ('direct-access', None, "enable direct access functions"),
         ('no-direct-access', None, "disable direct access functions"),
-        ('direct-access', None, "enable direct access functions"),
-        ('no-direct-access', None, "disable direct access functions"),
         ('large-objects', None, "enable large object support"),
         ('no-large-objects', None, "disable large object support"),
         ('default-vars', None, "enable default variables use"),
