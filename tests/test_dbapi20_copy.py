@@ -11,10 +11,7 @@ These tests need a database to test against.
 
 import unittest
 
-try:   # noinspection PyCompatibility
-    from collections.abc import Iterable
-except ImportError:  # Python < 3.3
-    from collections import Iterable
+from collections.abc import Iterable
 
 import pgdb  # the module under test
 
@@ -29,15 +26,13 @@ except NameError:  # Python >= 3.0
 class InputStream:
 
     def __init__(self, data):
-        if isinstance(data, unicode):
+        if isinstance(data, str):
             data = data.encode('utf-8')
         self.data = data or b''
         self.sizes = []
 
     def __str__(self):
-        data = self.data
-        if str is unicode:  # Python >= 3.0
-            data = data.decode('utf-8')
+        data = self.data.decode('utf-8')
         return data
 
     def __len__(self):
@@ -60,16 +55,14 @@ class OutputStream:
         self.sizes = []
 
     def __str__(self):
-        data = self.data
-        if str is unicode:  # Python >= 3.0
-            data = data.decode('utf-8')
+        data = self.data.decode('utf-8')
         return data
 
     def __len__(self):
         return len(self.data)
 
     def write(self, data):
-        if isinstance(data, unicode):
+        if isinstance(data, str):
             data = data.encode('utf-8')
         self.data += data
         self.sizes.append(len(data))

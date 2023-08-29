@@ -4,7 +4,7 @@ import gc
 import sys
 import unittest
 
-from datetime import date, time, datetime, timedelta
+from datetime import date, time, datetime, timedelta, timezone
 from uuid import UUID as Uuid
 
 import pgdb
@@ -16,11 +16,6 @@ except (ImportError, ValueError, SystemError):
     import dbapi20
 
 from .config import dbname, dbhost, dbport, dbuser, dbpasswd
-
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    long
-except NameError:  # Python >= 3.0
-    long = int
 
 
 class PgBitString:
@@ -492,7 +487,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             self.assertIsInstance(row0[1], bytes)
             self.assertIsInstance(row0[2], bool)
             self.assertIsInstance(row0[3], int)
-            self.assertIsInstance(row0[4], long)
+            self.assertIsInstance(row0[4], int)
             self.assertIsInstance(row0[5], float)
             self.assertIsInstance(row0[6], Decimal)
             self.assertIsInstance(row0[7], Decimal)
@@ -600,8 +595,8 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                         "tz timetz, tsz timestamptz)" % table)
             for n in range(3):
                 values = [dt.date(), dt.time(), dt, dt.time(), dt]
-                values[3] = values[3].replace(tzinfo=pgdb.timezone.utc)
-                values[4] = values[4].replace(tzinfo=pgdb.timezone.utc)
+                values[3] = values[3].replace(tzinfo=timezone.utc)
+                values[4] = values[4].replace(tzinfo=timezone.utc)
                 if n == 0:  # input as objects
                     params = values
                 if n == 1:  # input as text
@@ -609,7 +604,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                 elif n == 2:  # input using type helpers
                     d = (dt.year, dt.month, dt.day)
                     t = (dt.hour, dt.minute, dt.second, dt.microsecond)
-                    z = (pgdb.timezone.utc,)
+                    z = (timezone.utc,)
                     params = [pgdb.Date(*d), pgdb.Time(*t),
                               pgdb.Timestamp(*(d + t)), pgdb.Time(*(t + z)),
                               pgdb.Timestamp(*(d + t + z))]
@@ -1000,8 +995,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             output4 = cur.fetchone()[0]
         finally:
             con.close()
-        if str is bytes:  # Python < 3.0
-            s = s.encode('utf8')
         self.assertIsInstance(output1, str)
         self.assertEqual(output1, s)
         self.assertIsInstance(output2, str)
@@ -1033,8 +1026,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             output4 = cur.fetchone()[0]
         finally:
             con.close()
-        if str is bytes:  # Python < 3.0
-            s = s.encode('latin1')
         self.assertIsInstance(output1, str)
         self.assertEqual(output1, s)
         self.assertIsInstance(output2, str)
@@ -1347,10 +1338,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(row, data)
 
     def test_set_row_factory_size(self):
-        try:
-            from functools import lru_cache
-        except ImportError:  # Python < 3.2
-            lru_cache = None
+        from functools import lru_cache
         queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
         con = self._connect()
         cur = con.cursor()
@@ -1366,12 +1354,11 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
                     else:
                         self.assertEqual(r, (1, 2, 3))
                         self.assertEqual(r._fields, ('a', 'b', 'c'))
-            if lru_cache:
-                info = pgdb._row_factory.cache_info()
-                self.assertEqual(info.maxsize, maxsize)
-                self.assertEqual(info.hits + info.misses, 6)
-                self.assertEqual(
-                    info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
+            info = pgdb._row_factory.cache_info()
+            self.assertEqual(info.maxsize, maxsize)
+            self.assertEqual(info.hits + info.misses, 6)
+            self.assertEqual(
+                info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
 
     def test_memory_leaks(self):
         ids = set()
@@ -1384,9 +1371,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         gc.collect()
         objs[:] = gc.get_objects()
         objs[:] = [obj for obj in objs if id(obj) not in ids]
-        if objs and sys.version_info[:3] in ((3, 5, 0), (3, 5, 1)):
-            # workaround for Python issue 26811
-            objs[:] = [obj for obj in objs if repr(obj) != '(<NULL>,)']
         self.assertEqual(len(objs), 0)
 
     def test_cve_2018_1058(self):

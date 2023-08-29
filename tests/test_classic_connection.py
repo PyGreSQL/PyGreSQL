@@ -15,30 +15,12 @@ import time
 import os
 
 from collections import namedtuple
-
-try:
-    # noinspection PyCompatibility
-    from collections.abc import Iterable
-except ImportError:  # Python < 3.3
-    from collections import Iterable
-
+from collections.abc import Iterable
 from decimal import Decimal
 
 import pg  # the module under test
 
 from .config import dbname, dbhost, dbport, dbuser, dbpasswd
-
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    long
-except NameError:  # Python >= 3.0
-    long = int
-
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    unicode
-except NameError:  # Python >= 3.0
-    unicode = str
-
-unicode_strings = str is not bytes
 
 windows = os.name == 'nt'
 
@@ -462,10 +444,10 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testGetresultLong(self):
         q = "select 9876543210"
-        result = long(9876543210)
-        self.assertIsInstance(result, long)
+        result = 9876543210
+        self.assertIsInstance(result, int)
         v = self.c.query(q).getresult()[0][0]
-        self.assertIsInstance(v, long)
+        self.assertIsInstance(v, int)
         self.assertEqual(v, result)
 
     def testGetresultDecimal(self):
@@ -506,10 +488,10 @@ class TestSimpleQueries(unittest.TestCase):
 
     def testDictresultLong(self):
         q = "select 9876543210 as longjohnsilver"
-        result = long(9876543210)
-        self.assertIsInstance(result, long)
+        result = 9876543210
+        self.assertIsInstance(result, int)
         v = self.c.query(q).dictresult()[0]['longjohnsilver']
-        self.assertIsInstance(v, long)
+        self.assertIsInstance(v, int)
         self.assertEqual(v, result)
 
     def testDictresultDecimal(self):
@@ -839,7 +821,7 @@ class TestSimpleQueries(unittest.TestCase):
         query = self.c.query
         q = query("select repeat('foo!', 8)")
         size = q.memsize()
-        self.assertIsInstance(size, long)
+        self.assertIsInstance(size, int)
         self.assertGreaterEqual(size, 32)
         self.assertLess(size, 8000)
         q = query("select repeat('foo!', 2000)")
@@ -875,8 +857,6 @@ class TestUnicodeQueries(unittest.TestCase):
     def testGetresultUtf8(self):
         result = u'Hello, wörld & мир!'
         q = u"select '%s'" % result
-        if not unicode_strings:
-            result = result.encode('utf8')
         # pass the query as unicode
         try:
             v = self.c.query(q).getresult()[0][0]
@@ -894,8 +874,6 @@ class TestUnicodeQueries(unittest.TestCase):
     def testDictresultUtf8(self):
         result = u'Hello, wörld & мир!'
         q = u"select '%s' as greeting" % result
-        if not unicode_strings:
-            result = result.encode('utf8')
         try:
             v = self.c.query(q).dictresult()[0]['greeting']
         except (pg.DataError, pg.NotSupportedError):
@@ -915,8 +893,6 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support latin1")
         result = u'Hello, wörld!'
         q = u"select '%s'" % result
-        if not unicode_strings:
-            result = result.encode('latin1')
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
@@ -932,8 +908,6 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support latin1")
         result = u'Hello, wörld!'
         q = u"select '%s' as greeting" % result
-        if not unicode_strings:
-            result = result.encode('latin1')
         v = self.c.query(q).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
@@ -949,8 +923,6 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support cyrillic")
         result = u'Hello, мир!'
         q = u"select '%s'" % result
-        if not unicode_strings:
-            result = result.encode('cyrillic')
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
@@ -966,8 +938,6 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support cyrillic")
         result = u'Hello, мир!'
         q = u"select '%s' as greeting" % result
-        if not unicode_strings:
-            result = result.encode('cyrillic')
         v = self.c.query(q).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
@@ -983,8 +953,6 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support latin9")
         result = u'smœrebrœd with pražská šunka (pay in ¢, £, €, or ¥)'
         q = u"select '%s'" % result
-        if not unicode_strings:
-            result = result.encode('latin9')
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
@@ -1000,8 +968,6 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support latin9")
         result = u'smœrebrœd with pražská šunka (pay in ¢, £, €, or ¥)'
         q = u"select '%s' as menu" % result
-        if not unicode_strings:
-            result = result.encode('latin9')
         v = self.c.query(q).dictresult()[0]['menu']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
@@ -1138,20 +1104,14 @@ class TestParamQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support latin1")
         r = query("select $1||', '||$2||'!'", ('Hello', u'wörld')).getresult()
-        if unicode_strings:
-            self.assertEqual(r, [('Hello, wörld!',)])
-        else:
-            self.assertEqual(r, [(u'Hello, wörld!'.encode('latin1'),)])
+        self.assertEqual(r, [('Hello, wörld!',)])
         self.assertRaises(
             UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', u'мир'))
         query('set client_encoding=iso_8859_1')
         r = query(
             "select $1||', '||$2||'!'", ('Hello', u'wörld')).getresult()
-        if unicode_strings:
-            self.assertEqual(r, [('Hello, wörld!',)])
-        else:
-            self.assertEqual(r, [(u'Hello, wörld!'.encode('latin1'),)])
+        self.assertEqual(r, [('Hello, wörld!',)])
         self.assertRaises(
             UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', u'мир'))
@@ -1173,10 +1133,7 @@ class TestParamQueries(unittest.TestCase):
             ('Hello', u'wörld'))
         r = query(
             "select $1||', '||$2||'!'", ('Hello', u'мир')).getresult()
-        if unicode_strings:
-            self.assertEqual(r, [('Hello, мир!',)])
-        else:
-            self.assertEqual(r, [(u'Hello, мир!'.encode('cyrillic'),)])
+        self.assertEqual(r, [('Hello, мир!',)])
         query('set client_encoding=sql_ascii')
         self.assertRaises(
             UnicodeError, query, "select $1||', '||$2||'!'",
@@ -1337,7 +1294,7 @@ class TestQueryResultTypes(unittest.TestCase):
         self.assert_proper_cast(0, 'xid', int)
 
     def testLong(self):
-        self.assert_proper_cast(0, 'bigint', long)
+        self.assert_proper_cast(0, 'bigint', int)
 
     def testFloat(self):
         self.assert_proper_cast(0, 'float', float)
@@ -1806,22 +1763,22 @@ class TestInserttable(unittest.TestCase):
         self.c.close()
 
     data = [
-        (-1, -1, long(-1), True, '1492-10-12', '08:30:00',
+        (-1, -1, -1, True, '1492-10-12', '08:30:00',
          -1.2345, -1.75, -1.875, '-1.25', '-', 'r?', '!u', 'xyz'),
-        (0, 0, long(0), False, '1607-04-14', '09:00:00',
+        (0, 0, 0, False, '1607-04-14', '09:00:00',
          0.0, 0.0, 0.0, '0.0', ' ', '0123', '4567', '890'),
-        (1, 1, long(1), True, '1801-03-04', '03:45:00',
+        (1, 1, 1, True, '1801-03-04', '03:45:00',
          1.23456, 1.75, 1.875, '1.25', 'x', 'bc', 'cdef', 'g'),
-        (2, 2, long(2), False, '1903-12-17', '11:22:00',
+        (2, 2, 2, False, '1903-12-17', '11:22:00',
          2.345678, 2.25, 2.125, '2.75', 'y', 'q', 'ijk', 'mnop\nstux!')]
 
     @classmethod
     def db_len(cls, s, encoding):
         # noinspection PyUnresolvedReferences
         if cls.has_encoding:
-            s = s if isinstance(s, unicode) else s.decode(encoding)
+            s = s if isinstance(s, str) else s.decode(encoding)
         else:
-            s = s.encode(encoding) if isinstance(s, unicode) else s
+            s = s.encode(encoding) if isinstance(s, str) else s
         return len(s)
 
     def get_back(self, encoding='utf-8'):
@@ -1835,7 +1792,7 @@ class TestInserttable(unittest.TestCase):
             if row[1] is not None:  # integer
                 self.assertIsInstance(row[1], int)
             if row[2] is not None:  # bigint
-                self.assertIsInstance(row[2], long)
+                self.assertIsInstance(row[2], int)
             if row[3] is not None:  # boolean
                 self.assertIsInstance(row[3], bool)
             if row[4] is not None:  # date
@@ -2039,7 +1996,7 @@ class TestInserttable(unittest.TestCase):
             ValueError, self.c.inserttable, 'test', [[33000]], ['i2'])
 
     def testInserttableMaxValues(self):
-        data = [(2 ** 15 - 1, int(2 ** 31 - 1), long(2 ** 31 - 1),
+        data = [(2 ** 15 - 1, 2 ** 31 - 1, 2 ** 31 - 1,
                  True, '2999-12-31', '11:59:59', 1e99,
                  1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
                  "1", "1234", "1234", "1234" * 100)]
@@ -2054,16 +2011,15 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
         row_unicode = (
-            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+            0, 0, 0, False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"käse сыр pont-l'évêque")
         row_bytes = tuple(
-            s.encode('utf-8') if isinstance(s, unicode) else s
+            s.encode('utf-8') if isinstance(s, str) else s
             for s in row_unicode)
         data = [row_bytes] * 2
         self.c.inserttable('test', data)
-        if unicode_strings:
-            data = [row_unicode] * 2
+        data = [row_unicode] * 2
         self.assertEqual(self.get_back(), data)
 
     def testInserttableUnicodeUtf8(self):
@@ -2074,16 +2030,11 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
         row_unicode = (
-            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+            0, 0, 0, False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"käse сыр pont-l'évêque")
         data = [row_unicode] * 2
         self.c.inserttable('test', data)
-        if not unicode_strings:
-            row_bytes = tuple(
-                s.encode('utf-8') if isinstance(s, unicode) else s
-                for s in row_unicode)
-            data = [row_bytes] * 2
         self.assertEqual(self.get_back(), data)
 
     def testInserttableUnicodeLatin1(self):
@@ -2095,22 +2046,17 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
         row_unicode = (
-            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+            0, 0, 0, False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"for käse and pont-l'évêque pay in €")
         data = [row_unicode]
         # cannot encode € sign with latin1 encoding
         self.assertRaises(UnicodeEncodeError, self.c.inserttable, 'test', data)
         row_unicode = tuple(
-            s.replace(u'€', u'¥') if isinstance(s, unicode) else s
+            s.replace(u'€', u'¥') if isinstance(s, str) else s
             for s in row_unicode)
         data = [row_unicode] * 2
         self.c.inserttable('test', data)
-        if not unicode_strings:
-            row_bytes = tuple(
-                s.encode('latin1') if isinstance(s, unicode) else s
-                for s in row_unicode)
-            data = [row_bytes] * 2
         self.assertEqual(self.get_back('latin1'), data)
 
     def testInserttableUnicodeLatin9(self):
@@ -2123,16 +2069,11 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
         row_unicode = (
-            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+            0, 0, 0, False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"for käse and pont-l'évêque pay in €")
         data = [row_unicode] * 2
         self.c.inserttable('test', data)
-        if not unicode_strings:
-            row_bytes = tuple(
-                s.encode('latin9') if isinstance(s, unicode) else s
-                for s in row_unicode)
-            data = [row_bytes] * 2
         self.assertEqual(self.get_back('latin9'), data)
 
     def testInserttableNoEncoding(self):
@@ -2140,7 +2081,7 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = u'€' if self.has_encoding else u'$'
         row_unicode = (
-            0, 0, long(0), False, u'1970-01-01', u'00:00:00',
+            0, 0, 0, False, u'1970-01-01', u'00:00:00',
             0.0, 0.0, 0.0, u'0.0',
             c, u'bäd', u'bäd', u"for käse and pont-l'évêque pay in €")
         data = [row_unicode]
@@ -2164,7 +2105,7 @@ class TestInserttable(unittest.TestCase):
                 return s
 
         s = '1\'2"3\b4\f5\n6\r7\t8\b9\\0'
-        s1 = s.encode('ascii') if unicode_strings else s.decode('ascii')
+        s1 = s.encode('ascii')
         s2 = S()
         data = [(t,) for t in (s, s1, s2)]
         self.c.inserttable('test', data, ['t'])
@@ -2596,7 +2537,7 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_decimal(decimal_class)
         self.assertNotIsInstance(r, decimal_class)
         self.assertIsInstance(r, int)
-        self.assertEqual(r, int(3425))
+        self.assertEqual(r, 3425)
 
     def testGetBool(self):
         use_bool = pg.get_bool()
@@ -2725,10 +2666,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertEqual(r, b'data')
 
     def testSetRowFactorySize(self):
-        try:
-            from functools import lru_cache
-        except ImportError:  # Python < 3.2
-            lru_cache = None
+        from functools import lru_cache
         queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
         query = self.c.query
         for maxsize in (None, 0, 1, 2, 3, 10, 1024):
@@ -2742,12 +2680,11 @@ class TestConfigFunctions(unittest.TestCase):
                     else:
                         self.assertEqual(r, (1, 2, 3))
                         self.assertEqual(r._fields, ('a', 'b', 'c'))
-            if lru_cache:
-                info = pg._row_factory.cache_info()
-                self.assertEqual(info.maxsize, maxsize)
-                self.assertEqual(info.hits + info.misses, 6)
-                self.assertEqual(
-                    info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
+            info = pg._row_factory.cache_info()
+            self.assertEqual(info.maxsize, maxsize)
+            self.assertEqual(info.hits + info.misses, 6)
+            self.assertEqual(
+                info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
 
 
 class TestStandaloneEscapeFunctions(unittest.TestCase):
@@ -2783,13 +2720,13 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'plain')
         r = f(u"das is' käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, u"das is'' käse".encode('utf-8'))
         r = f(u"that's cheesy")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u"that''s cheesy")
         r = f(r"It's bad to have a \ inside.")
         self.assertEqual(r, r"It''s bad to have a \\ inside.")
@@ -2801,13 +2738,13 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'plain')
         r = f(u"das is' käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b"das is'' k\\\\303\\\\244se")
         r = f(u"that's cheesy")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u"that''s cheesy")
         r = f(b'O\x00ps\xff!')
         self.assertEqual(r, b'O\\\\000ps\\\\377!')

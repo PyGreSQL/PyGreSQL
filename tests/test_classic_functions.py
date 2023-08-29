@@ -18,16 +18,6 @@ import pg  # the module under test
 
 from datetime import timedelta
 
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    long
-except NameError:  # Python >= 3.0
-    long = int
-
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    unicode
-except NameError:  # Python >= 3.0
-    unicode = str
-
 
 class TestHasConnect(unittest.TestCase):
     """Test existence of basic pg module functions."""
@@ -123,8 +113,8 @@ class TestHasConnect(unittest.TestCase):
     def testPqlibVersion(self):
         # noinspection PyUnresolvedReferences
         v = pg.get_pqlib_version()
-        self.assertIsInstance(v, long)
-        self.assertGreater(v, 90000)
+        self.assertIsInstance(v, int)
+        self.assertGreater(v, 100000)
         self.assertLess(v, 160000)
 
 
@@ -881,7 +871,7 @@ class TestEscapeFunctions(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'plain')
         r = f("that's cheese")
         self.assertIsInstance(r, str)
@@ -893,7 +883,7 @@ class TestEscapeFunctions(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
         r = f(u'plain')
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'plain')
         r = f("that's cheese")
         self.assertIsInstance(r, str)

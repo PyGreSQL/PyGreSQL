@@ -295,7 +295,7 @@ specified, all of them will be copied.
     :param str null: the textual representation of the ``NULL`` value,
         can also be an empty string (the default is ``'\\N'``)
     :param bool decode: whether decoded strings shall be returned
-        for non-binary formats (the default is True in Python 3)
+        for non-binary formats (the default is ``True``)
     :param list column: an optional list of column names
     :returns: a generator if stream is set to ``None``, otherwise the cursor
 

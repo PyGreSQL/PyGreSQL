@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Python DB API 2.0 driver compliance unit test suite.
 
 This software is Public Domain and may be used without restrictions.
@@ -8,23 +9,6 @@ __version__ = '1.15.0'
 
 import unittest
 import time
-
-try:  # noinspection PyUnresolvedReferences
-    _BaseException = StandardError  # noqa: F821
-except NameError:  # Python >= 3.0
-    _BaseException = Exception
-
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    unicode
-except NameError:  # Python >= 3.0
-    unicode = str
-
-
-def str2bytes(sval):
-    if str is not unicode and isinstance(sval, str):
-        # noinspection PyUnresolvedReferences
-        sval = sval.decode("latin1")
-    return sval.encode("latin1")  # python 3 make unicode into bytes
 
 
 class DatabaseAPI20Test(unittest.TestCase):
@@ -103,7 +87,7 @@ class DatabaseAPI20Test(unittest.TestCase):
                         pass
             finally:
                 con.close()
-        except _BaseException:
+        except Exception:
             pass
 
     def _connect(self):
@@ -151,8 +135,8 @@ class DatabaseAPI20Test(unittest.TestCase):
         # Make sure required exceptions exist, and are in the
         # defined hierarchy.
         sub = issubclass
-        self.assertTrue(sub(self.driver.Warning, _BaseException))
-        self.assertTrue(sub(self.driver.Error, _BaseException))
+        self.assertTrue(sub(self.driver.Warning, Exception))
+        self.assertTrue(sub(self.driver.Error, Exception))
 
         self.assertTrue(sub(self.driver.InterfaceError, self.driver.Error))
         self.assertTrue(sub(self.driver.DatabaseError, self.driver.Error))
@@ -805,8 +789,8 @@ class DatabaseAPI20Test(unittest.TestCase):
         self.assertEqual(str(t1), str(t2))
 
     def test_Binary(self):
-        self.driver.Binary(str2bytes('Something'))
-        self.driver.Binary(str2bytes(''))
+        self.driver.Binary(b'Something')
+        self.driver.Binary(b'')
 
     def test_STRING(self):
         self.assertTrue(hasattr(self.driver, 'STRING'),

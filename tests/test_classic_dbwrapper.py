@@ -21,6 +21,7 @@ import pg  # the module under test
 from collections import OrderedDict
 from decimal import Decimal
 from datetime import date, time, datetime, timedelta
+from io import StringIO
 from uuid import UUID
 from time import strftime
 from operator import itemgetter
@@ -28,21 +29,6 @@ from operator import itemgetter
 from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 debug = False  # let DB wrapper print debugging output
-
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    long
-except NameError:  # Python >= 3.0
-    long = int
-
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    unicode
-except NameError:  # Python >= 3.0
-    unicode = str
-
-if str is bytes:  # noinspection PyCompatibility,PyUnresolvedReferences
-    from StringIO import StringIO
-else:  # Python >= 3.0
-    from io import StringIO
 
 windows = os.name == 'nt'
 
@@ -523,13 +509,13 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b"'plain'")
         r = f(u"plain")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u"'plain'")
         r = f(u"that's käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, u"'that''s käse'".encode('utf-8'))
         r = f(u"that's käse")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u"'that''s käse'")
         self.assertEqual(f(r"It's fine to have a \ inside."),
                          r" E'It''s fine to have a \\ inside.'")
@@ -542,13 +528,13 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'"plain"')
         r = f(u"plain")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'"plain"')
         r = f(u"that's käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, u'"that\'s käse"'.encode('utf-8'))
         r = f(u"that's käse")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'"that\'s käse"')
         self.assertEqual(f(r"It's fine to have a \ inside."),
                          '"It\'s fine to have a \\ inside."')
@@ -561,13 +547,13 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b"plain")
         r = f(u"plain")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u"plain")
         r = f(u"that's käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, u"that''s käse".encode('utf-8'))
         r = f(u"that's käse")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u"that''s käse")
         self.assertEqual(f(r"It's fine to have a \ inside."),
                          r"It''s fine to have a \ inside.")
@@ -580,13 +566,13 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'\\x706c61696e')
         r = f(u'plain')
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'\\x706c61696e')
         r = f(u"das is' käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'\\x64617320697327206bc3a47365')
         r = f(u"das is' käse")
-        self.assertIsInstance(r, unicode)
+        self.assertIsInstance(r, str)
         self.assertEqual(r, u'\\x64617320697327206bc3a47365')
         self.assertEqual(f(b'O\x00ps\xff!'), b'\\x4f007073ff21')
 
@@ -623,7 +609,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertEqual(r, data)
         self.assertIsInstance(r['id'], int)
-        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['name'], str)
         self.assertIsInstance(r['price'], float)
         self.assertIsInstance(r['new'], bool)
         self.assertIsInstance(r['tags'], list)
@@ -1783,8 +1769,7 @@ class TestDBClass(unittest.TestCase):
             (dict(i2='', i4='', i8=''), dict(i2=None, i4=None, i8=None)),
             (dict(i2=0, i4=0, i8=0), dict(i2=0, i4=0, i8=0)),
             dict(i2=42, i4=123456, i8=9876543210),
-            dict(i2=2 ** 15 - 1,
-                 i4=int(2 ** 31 - 1), i8=long(2 ** 63 - 1)),
+            dict(i2=2 ** 15 - 1, i4=2 ** 31 - 1, i8=2 ** 63 - 1),
             dict(d=None), (dict(d=''), dict(d=None)),
             dict(d=Decimal(0)), (dict(d=0), dict(d=Decimal(0))),
             dict(f4=None, f8=None), dict(f4=0, f8=0),
@@ -2519,9 +2504,9 @@ class TestDBClass(unittest.TestCase):
         r['a'] = r['f'] = r['n'] = 1
         r['d'] = r['t'] = 'x'
         r['b'] = 't'
-        r['oid'] = long(1)
+        r['oid'] = 1
         r = clear(table, r)
-        result = dict(a=1, n=0, f=0, b=f, d='', t='', oid=long(1))
+        result = dict(a=1, n=0, f=0, b=f, d='', t='', oid=1)
         self.assertEqual(r, result)
 
     def testClearWithQuotedNames(self):
@@ -3455,7 +3440,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertEqual(r, data)
         self.assertIsInstance(r['id'], int)
-        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['name'], str)
         self.assertIsInstance(r['price'], float)
         self.assertIsInstance(r['new'], bool)
         self.assertIsInstance(r['tags'], list)
@@ -3472,7 +3457,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertEqual(r, data)
         self.assertIsInstance(r['id'], int)
-        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['name'], str)
         self.assertIsInstance(r['price'], float)
         self.assertIsInstance(r['new'], bool)
         self.assertIsInstance(r['tags'], list)
@@ -3525,7 +3510,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertEqual(r, data)
         self.assertIsInstance(r['id'], int)
-        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['name'], str)
         self.assertIsInstance(r['price'], float)
         self.assertIsInstance(r['new'], bool)
         self.assertIsInstance(r['tags'], list)
@@ -3542,7 +3527,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertEqual(r, data)
         self.assertIsInstance(r['id'], int)
-        self.assertIsInstance(r['name'], unicode)
+        self.assertIsInstance(r['name'], str)
         self.assertIsInstance(r['price'], float)
         self.assertIsInstance(r['new'], bool)
         self.assertIsInstance(r['tags'], list)
@@ -3578,8 +3563,7 @@ class TestDBClass(unittest.TestCase):
         data = dict(
             id=42, i2=[42, 1234, None, 0, -1],
             i4=[42, 123456789, None, 0, 1, -1],
-            i8=[long(42), long(123456789123456789), None,
-                long(0), long(1), long(-1)],
+            i8=[42, 123456789123456789, None, 0, 1, -1],
             d=[decimal(42), long_decimal, None,
                decimal(0), decimal(1), decimal(-1), -long_decimal],
             f4=[42.0, 1234.5, None, 0.0, 1.0, -1.0,
@@ -4053,10 +4037,7 @@ class TestDBClass(unittest.TestCase):
         timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
         for timezone in sorted(timezones):
             tz = '%+03d00' % timezones[timezone]
-            try:
-                tzinfo = datetime.strptime(tz, '%z').tzinfo
-            except ValueError:  # Python < 3.2
-                tzinfo = pg._get_timezone(tz)
+            tzinfo = datetime.strptime(tz, '%z').tzinfo
             self.db.set_parameter('timezone', timezone)
             d = time(15, 9, 26, tzinfo=tzinfo)
             q = "select $1::timetz"
@@ -4108,10 +4089,7 @@ class TestDBClass(unittest.TestCase):
         timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
         for timezone in sorted(timezones):
             tz = '%+03d00' % timezones[timezone]
-            try:
-                tzinfo = datetime.strptime(tz, '%z').tzinfo
-            except ValueError:  # Python < 3.2
-                tzinfo = pg._get_timezone(tz)
+            tzinfo = datetime.strptime(tz, '%z').tzinfo
             self.db.set_parameter('timezone', timezone)
             for datestyle in ('ISO', 'Postgres, MDY', 'Postgres, DMY',
                               'SQL, MDY', 'SQL, DMY', 'German'):
@@ -4546,20 +4524,14 @@ class TestDBClassAdapter(unittest.TestCase):
         value = {'one': "it's fine", 'two': 2}
         sql, params = format_query("select %s", (value,), 'hstore')
         self.assertEqual(sql, "select $1")
-        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
-            params[0] = ','.join(sorted(params[0].split(',')))
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
         value = pg.Hstore({'one': "it's fine", 'two': 2})
         sql, params = format_query("select %s", (value,), 'hstore')
         self.assertEqual(sql, "select $1")
-        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
-            params[0] = ','.join(sorted(params[0].split(',')))
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
         value = pg.Hstore({'one': "it's fine", 'two': 2})
         sql, params = format_query("select %s", [value], [pg.Hstore])
         self.assertEqual(sql, "select $1")
-        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
-            params[0] = ','.join(sorted(params[0].split(',')))
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
     def testAdaptQueryTypedWithUuid(self):
@@ -4658,8 +4630,6 @@ class TestDBClassAdapter(unittest.TestCase):
         value = pg.Hstore({'one': "it's fine", 'two': 2})
         sql, params = format_query("select %s", (value,))
         self.assertEqual(sql, "select $1")
-        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
-            params[0] = ','.join(sorted(params[0].split(',')))
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
     def testAdaptQueryUntypedDict(self):
@@ -4729,8 +4699,6 @@ class TestDBClassAdapter(unittest.TestCase):
         format_query = self.adapter.format_query
         value = pg.Hstore({'one': "it's fine", 'two': 2})
         sql, params = format_query("select %s", (value,), inline=True)
-        if sys.version_info[:2] < (3, 6):  # Python < 3.6 has unsorted dict
-            sql = sql[:8] + ','.join(sorted(sql[8:-9].split(','))) + sql[-9:]
         self.assertEqual(
             sql, "select 'one=>\"it''s fine\",two=>2'::hstore")
         self.assertEqual(params, [])
