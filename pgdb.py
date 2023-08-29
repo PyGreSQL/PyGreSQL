@@ -1142,7 +1142,7 @@ class Cursor(object):
         except Error as err:
             # noinspection PyTypeChecker
             raise _db_error(
-                "Error in '%s': '%s' " % (sql, err), InterfaceError)
+                "Error in '%s': '%s'" % (sql, err), InterfaceError)
         except Exception as err:
             raise _op_error("Internal error in '%s': %s" % (sql, err))
         # then initialize result raw count and description
