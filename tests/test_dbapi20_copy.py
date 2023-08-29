@@ -17,11 +17,6 @@ import pgdb  # the module under test
 
 from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
-try:  # noinspection PyUnboundLocalVariable,PyUnresolvedReferences
-    unicode
-except NameError:  # Python >= 3.0
-    unicode = str
-
 
 class InputStream:
 
@@ -248,26 +243,12 @@ class TestCopyFrom(TestCopy):
         self.check_table()
         self.check_rowcount()
 
-    if str is unicode:  # Python >= 3.0
-
-        def test_input_bytes(self):
-            self.copy_from(b'42\tHello, world!')
-            self.assertEqual(self.table_data, [(42, 'Hello, world!')])
-            self.truncate_table()
-            self.copy_from(self.data_text.encode('utf-8'))
-            self.check_table()
-
-    else:  # Python < 3.0
-
-        def test_input_unicode(self):
-            if not self.can_encode:
-                self.skipTest('database does not support utf8')
-            self.copy_from(u'43\tWürstel, Käse!')
-            self.assertEqual(self.table_data, [(43, 'Würstel, Käse!')])
-            self.truncate_table()
-            # noinspection PyUnresolvedReferences
-            self.copy_from(self.data_text.decode('utf-8'))
-            self.check_table()
+    def test_input_bytes(self):
+        self.copy_from(b'42\tHello, world!')
+        self.assertEqual(self.table_data, [(42, 'Hello, world!')])
+        self.truncate_table()
+        self.copy_from(self.data_text.encode('utf-8'))
+        self.check_table()
 
     def test_input_iterable(self):
         self.copy_from(self.data_text.splitlines())
@@ -281,12 +262,10 @@ class TestCopyFrom(TestCopy):
         self.copy_from('%s\n' % row for row in self.data_text.splitlines())
         self.check_table()
 
-    if str is unicode:  # Python >= 3.0
-
-        def test_input_iterable_bytes(self):
-            self.copy_from(row.encode('utf-8')
-                           for row in self.data_text.splitlines())
-            self.check_table()
+    def test_input_iterable_bytes(self):
+        self.copy_from(row.encode('utf-8')
+                        for row in self.data_text.splitlines())
+        self.check_table()
 
     def test_sep(self):
         stream = ('%d-%s' % row for row in self.data)
@@ -437,28 +416,14 @@ class TestCopyTo(TestCopy):
         ret = self.cursor.copy_to(None, 'public.copytest')
         self.assertEqual(''.join(ret), self.data_text)
 
-    if str is unicode:  # Python >= 3.0
-
-        def test_generator_bytes(self):
-            ret = self.copy_to(decode=False)
-            self.assertIsInstance(ret, Iterable)
-            rows = list(ret)
-            self.assertEqual(len(rows), 3)
-            rows = b''.join(rows)
-            self.assertIsInstance(rows, bytes)
-            self.assertEqual(rows, self.data_text.encode('utf-8'))
-
-    else:  # Python < 3.0
-
-        def test_generator_unicode(self):
-            ret = self.copy_to(decode=True)
-            self.assertIsInstance(ret, Iterable)
-            rows = list(ret)
-            self.assertEqual(len(rows), 3)
-            rows = ''.join(rows)
-            self.assertIsInstance(rows, unicode)
-            # noinspection PyUnresolvedReferences
-            self.assertEqual(rows, self.data_text.decode('utf-8'))
+    def test_generator_bytes(self):
+        ret = self.copy_to(decode=False)
+        self.assertIsInstance(ret, Iterable)
+        rows = list(ret)
+        self.assertEqual(len(rows), 3)
+        rows = b''.join(rows)
+        self.assertIsInstance(rows, bytes)
+        self.assertEqual(rows, self.data_text.encode('utf-8'))
 
     def test_rowcount_increment(self):
         ret = self.copy_to()
@@ -470,7 +435,7 @@ class TestCopyTo(TestCopy):
         ret_raw = b''.join(self.copy_to(decode=False))
         ret_decoded = ''.join(self.copy_to(decode=True))
         self.assertIsInstance(ret_raw, bytes)
-        self.assertIsInstance(ret_decoded, unicode)
+        self.assertIsInstance(ret_decoded, str)
         self.assertEqual(ret_decoded, ret_raw.decode('utf-8'))
         self.check_rowcount()
 
@@ -556,9 +521,7 @@ class TestCopyTo(TestCopy):
         ret = self.copy_to(stream)
         self.assertIs(ret, self.cursor)
         self.assertEqual(str(stream), self.data_text)
-        data = self.data_text
-        if str is unicode:  # Python >= 3.0
-            data = data.encode('utf-8')
+        data = self.data_text.encode('utf-8')
         sizes = [len(row) + 1 for row in data.splitlines()]
         self.assertEqual(stream.sizes, sizes)
         self.check_rowcount()
