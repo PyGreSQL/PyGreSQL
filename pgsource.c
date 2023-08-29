@@ -28,10 +28,10 @@ source_str(sourceObject *self)
             return format_result(self->result);
         case RESULT_DDL:
         case RESULT_DML:
-            return PyStr_FromString(PQcmdStatus(self->result));
+            return PyUnicode_FromString(PQcmdStatus(self->result));
         case RESULT_EMPTY:
         default:
-            return PyStr_FromString("(empty PostgreSQL source object)");
+            return PyUnicode_FromString("(empty PostgreSQL source object)");
     }
 }
 
@@ -65,7 +65,7 @@ _check_source_obj(sourceObject *self, int level)
 static PyObject *
 source_getattr(sourceObject *self, PyObject *nameobj)
 {
-    const char *name = PyStr_AsString(nameobj);
+    const char *name = PyUnicode_AsUTF8(nameobj);
 
     /* pg connection object */
     if (!strcmp(name, "pgcnx")) {
@@ -79,19 +79,19 @@ source_getattr(sourceObject *self, PyObject *nameobj)
 
     /* arraysize */
     if (!strcmp(name, "arraysize"))
-        return PyInt_FromLong(self->arraysize);
+        return PyLong_FromLong(self->arraysize);
 
     /* resulttype */
     if (!strcmp(name, "resulttype"))
-        return PyInt_FromLong(self->result_type);
+        return PyLong_FromLong(self->result_type);
 
     /* ntuples */
     if (!strcmp(name, "ntuples"))
-        return PyInt_FromLong(self->max_row);
+        return PyLong_FromLong(self->max_row);
 
     /* nfields */
     if (!strcmp(name, "nfields"))
-        return PyInt_FromLong(self->num_fields);
+        return PyLong_FromLong(self->num_fields);
 
     /* seeks name in methods (fallback) */
     return PyObject_GenericGetAttr((PyObject *) self, nameobj);
@@ -103,12 +103,12 @@ source_setattr(sourceObject *self, char *name, PyObject *v)
 {
     /* arraysize */
     if (!strcmp(name, "arraysize")) {
-        if (!PyInt_Check(v)) {
+        if (!PyLong_Check(v)) {
             PyErr_SetString(PyExc_TypeError, "arraysize must be integer");
             return -1;
         }
 
-        self->arraysize = PyInt_AsLong(v);
+        self->arraysize = PyLong_AsLong(v);
         return 0;
     }
 
@@ -227,7 +227,7 @@ source_execute(sourceObject *self, PyObject *sql)
                     self->result_type = RESULT_DDL;
                     num_rows = -1;
                 }
-                return PyInt_FromLong(num_rows);
+                return PyLong_FromLong(num_rows);
             }
 
         /* query failed */
@@ -272,7 +272,7 @@ source_oidstatus(sourceObject *self, PyObject *noargs)
         return Py_None;
     }
 
-    return PyInt_FromLong((long) oid);
+    return PyLong_FromLong((long) oid);
 }
 
 /* Fetch rows from last result. */
@@ -287,9 +287,7 @@ source_fetch(sourceObject *self, PyObject *args)
     PyObject *res_list;
     int i, k;
     long size;
-#if IS_PY3
     int encoding;
-#endif
 
     /* checks validity */
     if (!_check_source_obj(self, CHECK_RESULT | CHECK_DQL | CHECK_CNX)) {
@@ -313,9 +311,7 @@ source_fetch(sourceObject *self, PyObject *args)
     /* allocate list for result */
     if (!(res_list = PyList_New(0))) return NULL;
 
-#if IS_PY3
     encoding = self->encoding;
-#endif
 
     /* builds result */
     for (i = 0, k = self->current_row; i < size; ++i, ++k) {
@@ -336,15 +332,14 @@ source_fetch(sourceObject *self, PyObject *args)
             else {
                 char *s = PQgetvalue(self->result, k, j);
                 Py_ssize_t size = PQgetlength(self->result, k, j);
-#if IS_PY3
                 if (PQfformat(self->result, j) == 0) { /* textual format */
                     str = get_decoded_string(s, size, encoding);
                     if (!str) /* cannot decode */
                         str = PyBytes_FromStringAndSize(s, size);
                 }
-                else
-#endif
-                str = PyBytes_FromStringAndSize(s, size);
+                else {
+                    str = PyBytes_FromStringAndSize(s, size);
+                }
             }
             PyTuple_SET_ITEM(rowtuple, j, str);
         }
@@ -531,7 +526,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
 
             tmp = PQcmdTuples(result);
             num_rows = tmp[0] ? atol(tmp) : -1;
-            ret = PyInt_FromLong(num_rows);
+            ret = PyLong_FromLong(num_rows);
         }
         else {
             if (!errormsg) errormsg = PQerrorMessage(self->pgcnx->cnx);
@@ -602,7 +597,7 @@ source_getdata(sourceObject *self, PyObject *args)
 
             tmp = PQcmdTuples(result);
             num_rows = tmp[0] ? atol(tmp) : -1;
-            ret = PyInt_FromLong(num_rows);
+            ret = PyLong_FromLong(num_rows);
         }
         else {
             PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
@@ -634,11 +629,11 @@ _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
         return -1;
 
     /* gets field number */
-    if (PyStr_Check(param)) {
+    if (PyUnicode_Check(param)) {
         num = PQfnumber(self->result, PyBytes_AsString(param));
     }
-    else if (PyInt_Check(param)) {
-        num = (int) PyInt_AsLong(param);
+    else if (PyLong_Check(param)) {
+        num = (int) PyLong_AsLong(param);
     }
     else {
         PyErr_SetString(PyExc_TypeError, usage);
@@ -667,15 +662,15 @@ _source_buildinfo(sourceObject *self, int num)
     }
 
     /* affects field information */
-    PyTuple_SET_ITEM(result, 0, PyInt_FromLong(num));
+    PyTuple_SET_ITEM(result, 0, PyLong_FromLong(num));
     PyTuple_SET_ITEM(result, 1,
-        PyStr_FromString(PQfname(self->result, num)));
+        PyUnicode_FromString(PQfname(self->result, num)));
     PyTuple_SET_ITEM(result, 2,
-        PyInt_FromLong((long) PQftype(self->result, num)));
+        PyLong_FromLong((long) PQftype(self->result, num)));
     PyTuple_SET_ITEM(result, 3,
-        PyInt_FromLong(PQfsize(self->result, num)));
+        PyLong_FromLong(PQfsize(self->result, num)));
     PyTuple_SET_ITEM(result, 4,
-        PyInt_FromLong(PQfmod(self->result, num)));
+        PyLong_FromLong(PQfmod(self->result, num)));
 
     return result;
 }
@@ -751,7 +746,7 @@ source_field(sourceObject *self, PyObject *desc)
         return NULL;
     }
 
-    return PyStr_FromString(
+    return PyUnicode_FromString(
         PQgetvalue(self->result, self->current_row, num));
 }
 

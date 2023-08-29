@@ -13,7 +13,7 @@ static PyObject *
 notice_getattr(noticeObject *self, PyObject *nameobj)
 {
     PGresult const *res = self->res;
-    const char *name = PyStr_AsString(nameobj);
+    const char *name = PyUnicode_AsUTF8(nameobj);
     int fieldcode;
 
     if (!res) {
@@ -35,7 +35,7 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
 
     /* full message */
     if (!strcmp(name, "message")) {
-        return PyStr_FromString(PQresultErrorMessage(res));
+        return PyUnicode_FromString(PQresultErrorMessage(res));
     }
 
     /* other possible fields */
@@ -51,7 +51,7 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
     if (fieldcode) {
         char *s = PQresultErrorField(res, fieldcode);
         if (s) {
-            return PyStr_FromString(s);
+            return PyUnicode_FromString(s);
         }
         else {
             Py_INCREF(Py_None); return Py_None;

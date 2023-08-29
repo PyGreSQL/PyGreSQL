@@ -19,9 +19,6 @@
 /* The type definitions from <server/catalog/pg_type.h> */
 #include "pgtypes.h"
 
-/* Macros for single-source Python 2/3 compatibility */
-#include "py3c.h"
-
 static PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
                 *InternalError, *OperationalError, *ProgrammingError,
                 *IntegrityError, *DataError, *NotSupportedError,
@@ -237,7 +234,7 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
         pghost = PyBytes_AsString(pg_default_host);
 
     if ((pgport == -1) && (pg_default_port != Py_None))
-        pgport = (int) PyInt_AsLong(pg_default_port);
+        pgport = (int) PyLong_AsLong(pg_default_port);
 
     if ((!pgopt) && (pg_default_opt != Py_None))
         pgopt = PyBytes_AsString(pg_default_opt);
@@ -488,7 +485,7 @@ static PyObject *
 pg_get_datestyle(PyObject *self, PyObject *noargs)
 {
     if (date_format) {
-        return PyStr_FromString(date_format_to_style(date_format));
+        return PyUnicode_FromString(date_format_to_style(date_format));
     }
     else {
         Py_INCREF(Py_None); return Py_None;
@@ -507,7 +504,7 @@ pg_get_decimal_point(PyObject *self, PyObject *noargs)
 
     if (decimal_point) {
         s[0] = decimal_point; s[1] = '\0';
-        ret = PyStr_FromString(s);
+        ret = PyUnicode_FromString(s);
     }
     else {
         Py_INCREF(Py_None); ret = Py_None;
@@ -804,7 +801,7 @@ pg_set_defhost(PyObject *self, PyObject *args)
     old = pg_default_host;
 
     if (tmp) {
-        pg_default_host = PyStr_FromString(tmp);
+        pg_default_host = PyUnicode_FromString(tmp);
     }
     else {
         Py_INCREF(Py_None);
@@ -847,7 +844,7 @@ pg_set_defbase(PyObject *self, PyObject *args)
     old = pg_default_base;
 
     if (tmp) {
-        pg_default_base = PyStr_FromString(tmp);
+        pg_default_base = PyUnicode_FromString(tmp);
     }
     else {
         Py_INCREF(Py_None);
@@ -890,7 +887,7 @@ pg_setdefopt(PyObject *self, PyObject *args)
     old = pg_default_opt;
 
     if (tmp) {
-        pg_default_opt = PyStr_FromString(tmp);
+        pg_default_opt = PyUnicode_FromString(tmp);
     }
     else {
         Py_INCREF(Py_None);
@@ -934,7 +931,7 @@ pg_set_defuser(PyObject *self, PyObject *args)
     old = pg_default_user;
 
     if (tmp) {
-        pg_default_user = PyStr_FromString(tmp);
+        pg_default_user = PyUnicode_FromString(tmp);
     }
     else {
         Py_INCREF(Py_None);
@@ -962,7 +959,7 @@ pg_set_defpasswd(PyObject *self, PyObject *args)
     }
 
     if (tmp) {
-        pg_default_passwd = PyStr_FromString(tmp);
+        pg_default_passwd = PyUnicode_FromString(tmp);
     }
     else {
         Py_INCREF(Py_None);
@@ -1006,7 +1003,7 @@ pg_set_defport(PyObject *self, PyObject *args)
     old = pg_default_port;
 
     if (port != -1) {
-        pg_default_port = PyInt_FromLong(port);
+        pg_default_port = PyLong_FromLong(port);
     }
     else {
         Py_INCREF(Py_None);
@@ -1250,7 +1247,9 @@ static struct PyModuleDef moduleDef = {
 };
 
 /* Initialization function for the module */
-MODULE_INIT_FUNC(_pg)
+PyMODINIT_FUNC PyInit__pg(void);
+
+PyMODINIT_FUNC PyInit__pg(void)
 {
     PyObject *mod, *dict, *s;
 
@@ -1259,18 +1258,10 @@ MODULE_INIT_FUNC(_pg)
     mod = PyModule_Create(&moduleDef);
 
     /* Initialize here because some Windows platforms get confused otherwise */
-#if IS_PY3
     connType.tp_base = noticeType.tp_base =
         queryType.tp_base = sourceType.tp_base = &PyBaseObject_Type;
 #ifdef LARGE_OBJECTS
     largeType.tp_base = &PyBaseObject_Type;
-#endif
-#else
-    connType.ob_type = noticeType.ob_type =
-        queryType.ob_type = sourceType.ob_type = &PyType_Type;
-#ifdef LARGE_OBJECTS
-    largeType.ob_type = &PyType_Type;
-#endif
 #endif
 
     if (PyType_Ready(&connType)
@@ -1288,10 +1279,10 @@ MODULE_INIT_FUNC(_pg)
     dict = PyModule_GetDict(mod);
 
     /* Exceptions as defined by DB-API 2.0 */
-    Error = PyErr_NewException("pg.Error", PyExc_StandardError, NULL);
+    Error = PyErr_NewException("pg.Error", PyExc_Exception, NULL);
     PyDict_SetItemString(dict, "Error", Error);
 
-    Warning = PyErr_NewException("pg.Warning", PyExc_StandardError, NULL);
+    Warning = PyErr_NewException("pg.Warning", PyExc_Exception, NULL);
     PyDict_SetItemString(dict, "Warning", Warning);
 
     InterfaceError = PyErr_NewException(
@@ -1339,39 +1330,39 @@ MODULE_INIT_FUNC(_pg)
     PyDict_SetItemString(dict, "MultipleResultsError", MultipleResultsError);
 
     /* Make the version available */
-    s = PyStr_FromString(PyPgVersion);
+    s = PyUnicode_FromString(PyPgVersion);
     PyDict_SetItemString(dict, "version", s);
     PyDict_SetItemString(dict, "__version__", s);
     Py_DECREF(s);
 
     /* Result types for queries */
-    PyDict_SetItemString(dict, "RESULT_EMPTY", PyInt_FromLong(RESULT_EMPTY));
-    PyDict_SetItemString(dict, "RESULT_DML", PyInt_FromLong(RESULT_DML));
-    PyDict_SetItemString(dict, "RESULT_DDL", PyInt_FromLong(RESULT_DDL));
-    PyDict_SetItemString(dict, "RESULT_DQL", PyInt_FromLong(RESULT_DQL));
+    PyDict_SetItemString(dict, "RESULT_EMPTY", PyLong_FromLong(RESULT_EMPTY));
+    PyDict_SetItemString(dict, "RESULT_DML", PyLong_FromLong(RESULT_DML));
+    PyDict_SetItemString(dict, "RESULT_DDL", PyLong_FromLong(RESULT_DDL));
+    PyDict_SetItemString(dict, "RESULT_DQL", PyLong_FromLong(RESULT_DQL));
 
     /* Transaction states */
-    PyDict_SetItemString(dict, "TRANS_IDLE", PyInt_FromLong(PQTRANS_IDLE));
-    PyDict_SetItemString(dict, "TRANS_ACTIVE", PyInt_FromLong(PQTRANS_ACTIVE));
-    PyDict_SetItemString(dict, "TRANS_INTRANS", PyInt_FromLong(PQTRANS_INTRANS));
-    PyDict_SetItemString(dict, "TRANS_INERROR", PyInt_FromLong(PQTRANS_INERROR));
-    PyDict_SetItemString(dict, "TRANS_UNKNOWN", PyInt_FromLong(PQTRANS_UNKNOWN));
+    PyDict_SetItemString(dict, "TRANS_IDLE", PyLong_FromLong(PQTRANS_IDLE));
+    PyDict_SetItemString(dict, "TRANS_ACTIVE", PyLong_FromLong(PQTRANS_ACTIVE));
+    PyDict_SetItemString(dict, "TRANS_INTRANS", PyLong_FromLong(PQTRANS_INTRANS));
+    PyDict_SetItemString(dict, "TRANS_INERROR", PyLong_FromLong(PQTRANS_INERROR));
+    PyDict_SetItemString(dict, "TRANS_UNKNOWN", PyLong_FromLong(PQTRANS_UNKNOWN));
 
     /* Polling results */
-    PyDict_SetItemString(dict, "POLLING_OK", PyInt_FromLong(PGRES_POLLING_OK));
-    PyDict_SetItemString(dict, "POLLING_FAILED", PyInt_FromLong(PGRES_POLLING_FAILED));
-    PyDict_SetItemString(dict, "POLLING_READING", PyInt_FromLong(PGRES_POLLING_READING));
-    PyDict_SetItemString(dict, "POLLING_WRITING", PyInt_FromLong(PGRES_POLLING_WRITING));
+    PyDict_SetItemString(dict, "POLLING_OK", PyLong_FromLong(PGRES_POLLING_OK));
+    PyDict_SetItemString(dict, "POLLING_FAILED", PyLong_FromLong(PGRES_POLLING_FAILED));
+    PyDict_SetItemString(dict, "POLLING_READING", PyLong_FromLong(PGRES_POLLING_READING));
+    PyDict_SetItemString(dict, "POLLING_WRITING", PyLong_FromLong(PGRES_POLLING_WRITING));
 
 #ifdef LARGE_OBJECTS
     /* Create mode for large objects */
-    PyDict_SetItemString(dict, "INV_READ", PyInt_FromLong(INV_READ));
-    PyDict_SetItemString(dict, "INV_WRITE", PyInt_FromLong(INV_WRITE));
+    PyDict_SetItemString(dict, "INV_READ", PyLong_FromLong(INV_READ));
+    PyDict_SetItemString(dict, "INV_WRITE", PyLong_FromLong(INV_WRITE));
 
     /* Position flags for lo_lseek */
-    PyDict_SetItemString(dict, "SEEK_SET", PyInt_FromLong(SEEK_SET));
-    PyDict_SetItemString(dict, "SEEK_CUR", PyInt_FromLong(SEEK_CUR));
-    PyDict_SetItemString(dict, "SEEK_END", PyInt_FromLong(SEEK_END));
+    PyDict_SetItemString(dict, "SEEK_SET", PyLong_FromLong(SEEK_SET));
+    PyDict_SetItemString(dict, "SEEK_CUR", PyLong_FromLong(SEEK_CUR));
+    PyDict_SetItemString(dict, "SEEK_END", PyLong_FromLong(SEEK_END));
 #endif /* LARGE_OBJECTS */
 
 #ifdef DEFAULT_VARS

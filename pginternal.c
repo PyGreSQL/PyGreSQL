@@ -247,11 +247,10 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
             break;
 
         default:  /* PYGRES_TEXT */
-#if IS_PY3
             obj = get_decoded_string(s, size, encoding);
-            if (!obj) /* cannot decode */
-#endif
-            obj = PyBytes_FromStringAndSize(s, size);
+            if (!obj) { /* cannot decode */
+                obj = PyBytes_FromStringAndSize(s, size);
+            }
     }
 
     return obj;
@@ -296,7 +295,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
                 *t++ = *s++;
             }
             *t = '\0';
-            obj = PyInt_FromString(buf, NULL, 10);
+            obj = PyLong_FromString(buf, NULL, 10);
             break;
 
         case PYGRES_LONG:
@@ -312,7 +311,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
             break;
 
         case PYGRES_FLOAT:
-            tmp_obj = PyStr_FromStringAndSize(s, size);
+            tmp_obj = PyUnicode_FromStringAndSize(s, size);
             obj = PyFloat_FromString(tmp_obj);
             Py_DECREF(tmp_obj);
             break;
@@ -336,7 +335,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
                 obj = PyObject_CallFunction(decimal, "(s)", buf);
             }
             else {
-                tmp_obj = PyStr_FromString(buf);
+                tmp_obj = PyUnicode_FromString(buf);
                 obj = PyFloat_FromString(tmp_obj);
                 Py_DECREF(tmp_obj);
 
@@ -344,7 +343,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
             break;
 
         case PYGRES_DECIMAL:
-            tmp_obj = PyStr_FromStringAndSize(s, size);
+            tmp_obj = PyUnicode_FromStringAndSize(s, size);
             obj = decimal ? PyObject_CallFunctionObjArgs(
                 decimal, tmp_obj, NULL) : PyFloat_FromString(tmp_obj);
             Py_DECREF(tmp_obj);
@@ -353,7 +352,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
         case PYGRES_BOOL:
             /* convert to bool only if bool_as_text is not set */
             if (bool_as_text) {
-                obj = PyStr_FromString(*s == 't' ? "t" : "f");
+                obj = PyUnicode_FromString(*s == 't' ? "t" : "f");
             }
             else {
                 obj = *s == 't' ? Py_True : Py_False;
@@ -363,7 +362,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 
         default:
             /* other types should never be passed, use cast_sized_text */
-            obj = PyStr_FromStringAndSize(s, size);
+            obj = PyUnicode_FromStringAndSize(s, size);
     }
 
     return obj;
@@ -381,15 +380,12 @@ cast_unsized_simple(char *s, int type)
     switch (type) { /* this must be the PyGreSQL internal type */
 
         case PYGRES_INT:
-            obj = PyInt_FromString(s, NULL, 10);
-            break;
-
         case PYGRES_LONG:
             obj = PyLong_FromString(s, NULL, 10);
             break;
 
         case PYGRES_FLOAT:
-            tmp_obj = PyStr_FromString(s);
+            tmp_obj = PyUnicode_FromString(s);
             obj = PyFloat_FromString(tmp_obj);
             Py_DECREF(tmp_obj);
             break;
@@ -416,7 +412,7 @@ cast_unsized_simple(char *s, int type)
                 obj = PyObject_CallFunction(decimal, "(s)", s);
             }
             else {
-                tmp_obj = PyStr_FromString(s);
+                tmp_obj = PyUnicode_FromString(s);
                 obj = PyFloat_FromString(tmp_obj);
                 Py_DECREF(tmp_obj);
             }
@@ -425,7 +421,7 @@ cast_unsized_simple(char *s, int type)
         case PYGRES_BOOL:
             /* convert to bool only if bool_as_text is not set */
             if (bool_as_text) {
-                obj = PyStr_FromString(*s == 't' ? "t" : "f");
+                obj = PyUnicode_FromString(*s == 't' ? "t" : "f");
             }
             else {
                 obj = *s == 't' ? Py_True : Py_False;
@@ -435,7 +431,7 @@ cast_unsized_simple(char *s, int type)
 
         default:
             /* other types should never be passed, use cast_sized_text */
-            obj = PyStr_FromString(s);
+            obj = PyUnicode_FromString(s);
     }
 
     return obj;
@@ -613,12 +609,11 @@ cast_array(char *s, Py_ssize_t size, int encoding,
                         element = cast_sized_simple(estr, esize, type);
                 }
                 else { /* external casting of base type */
-#if IS_PY3
                     element = encoding == pg_encoding_ascii ? NULL :
                         get_decoded_string(estr, esize, encoding);
-                    if (!element) /* no decoding necessary or possible */
-#endif
-                    element = PyBytes_FromStringAndSize(estr, esize);
+                    if (!element) { /* no decoding necessary or possible */
+                        element = PyBytes_FromStringAndSize(estr, esize);
+                    }
                     if (element && cast) {
                         PyObject *tmp = element;
                         element = PyObject_CallFunctionObjArgs(
@@ -768,12 +763,11 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                     element = cast_sized_simple(estr, esize, etype);
             }
             else { /* external casting of base type */
-#if IS_PY3
                 element = encoding == pg_encoding_ascii ? NULL :
                     get_decoded_string(estr, esize, encoding);
-                if (!element) /* no decoding necessary or possible */
-#endif
-                element = PyBytes_FromStringAndSize(estr, esize);
+                if (!element) { /* no decoding necessary or possible */
+                    element = PyBytes_FromStringAndSize(estr, esize);
+                }
                 if (element && cast) {
                     if (len) {
                         PyObject *ecast = PySequence_GetItem(cast, i);
@@ -1065,17 +1059,15 @@ set_error_msg_and_state(PyObject *type,
 {
     PyObject *err_obj, *msg_obj, *sql_obj = NULL;
 
-#if IS_PY3
     if (encoding == -1) /* unknown */
         msg_obj = PyUnicode_DecodeLocale(msg, NULL);
     else
         msg_obj = get_decoded_string(msg, (Py_ssize_t) strlen(msg), encoding);
     if (!msg_obj) /* cannot decode */
-#endif
-    msg_obj = PyBytes_FromString(msg);
+        msg_obj = PyBytes_FromString(msg);
 
     if (sqlstate) {
-        sql_obj = PyStr_FromStringAndSize(sqlstate, 5);
+        sql_obj = PyUnicode_FromStringAndSize(sqlstate, 5);
     }
     else {
         Py_INCREF(Py_None); sql_obj = Py_None;
@@ -1139,7 +1131,7 @@ get_ssl_attributes(PGconn *cnx) {
         const char *val = PQsslAttribute(cnx, *s);
 
         if (val) {
-            PyObject * val_obj = PyStr_FromString(val);
+            PyObject * val_obj = PyUnicode_FromString(val);
 
             PyDict_SetItemString(attr_dict, *s, val_obj);
             Py_DECREF(val_obj);
@@ -1280,7 +1272,7 @@ format_result(const PGresult *res)
                 /* create the footer */
                 sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
                 /* return the result */
-                result = PyStr_FromString(buffer);
+                result = PyUnicode_FromString(buffer);
                 PyMem_Free(buffer);
                 return result;
             }
@@ -1293,7 +1285,7 @@ format_result(const PGresult *res)
         }
     }
     else
-        return PyStr_FromString("(nothing selected)");
+        return PyUnicode_FromString("(nothing selected)");
 }
 
 /* Internal function converting a Postgres datestyles to date formats. */

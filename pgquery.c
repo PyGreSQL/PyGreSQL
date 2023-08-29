@@ -168,7 +168,7 @@ _get_async_result(queryObject *self, int keep) {
                    are additional statements following this one, so we return
                    an empty string where query() would return None. */
                 Py_DECREF(result);
-                result = PyStr_FromString("");
+                result = PyUnicode_FromString("");
             }
             return result;
         }
@@ -266,7 +266,7 @@ static char query_ntuples__doc__[] =
 static PyObject *
 query_ntuples(queryObject *self, PyObject *noargs)
 {
-    return PyInt_FromLong(self->max_row);
+    return PyLong_FromLong(self->max_row);
 }
 
 /* List field names from query result. */
@@ -285,7 +285,7 @@ query_listfields(queryObject *self, PyObject *noargs)
     if (fieldstuple) {
         for (i = 0; i < self->num_fields; ++i) {
             name = PQfname(self->result, i);
-            str = PyStr_FromString(name);
+            str = PyUnicode_FromString(name);
             PyTuple_SET_ITEM(fieldstuple, i, str);
         }
     }
@@ -317,7 +317,7 @@ query_fieldname(queryObject *self, PyObject *args)
 
     /* gets fields name and builds object */
     name = PQfname(self->result, i);
-    return PyStr_FromString(name);
+    return PyUnicode_FromString(name);
 }
 
 /* Get field number from name in last result. */
@@ -343,7 +343,7 @@ query_fieldnum(queryObject *self, PyObject *args)
         return NULL;
     }
 
-    return PyInt_FromLong(num);
+    return PyLong_FromLong(num);
 }
 
 /* Build a tuple with info for query field with given number. */
@@ -353,10 +353,10 @@ _query_build_field_info(PGresult *res, int col_num) {
 
     info = PyTuple_New(4);
     if (info) {
-        PyTuple_SET_ITEM(info, 0, PyStr_FromString(PQfname(res, col_num)));
-        PyTuple_SET_ITEM(info, 1, PyInt_FromLong((long) PQftype(res, col_num)));
-        PyTuple_SET_ITEM(info, 2, PyInt_FromLong(PQfsize(res, col_num)));
-        PyTuple_SET_ITEM(info, 3, PyInt_FromLong(PQfmod(res, col_num)));
+        PyTuple_SET_ITEM(info, 0, PyUnicode_FromString(PQfname(res, col_num)));
+        PyTuple_SET_ITEM(info, 1, PyLong_FromLong((long) PQftype(res, col_num)));
+        PyTuple_SET_ITEM(info, 2, PyLong_FromLong(PQfsize(res, col_num)));
+        PyTuple_SET_ITEM(info, 3, PyLong_FromLong(PQfmod(res, col_num)));
     }
     return info;
 }
@@ -383,13 +383,13 @@ query_fieldinfo(queryObject *self, PyObject *args)
         /* gets field number */
         if (PyBytes_Check(field)) {
             num = PQfnumber(self->result, PyBytes_AsString(field));
-        } else if (PyStr_Check(field)) {
+        } else if (PyUnicode_Check(field)) {
             PyObject *tmp = get_encoded_string(field, self->encoding);
             if (!tmp) return NULL;
             num = PQfnumber(self->result, PyBytes_AsString(tmp));
             Py_DECREF(tmp);
-        } else if (PyInt_Check(field)) {
-            num = (int) PyInt_AsLong(field);
+        } else if (PyLong_Check(field)) {
+            num = (int) PyLong_AsLong(field);
         } else {
             PyErr_SetString(PyExc_TypeError,
                             "Field should be given as column number or name");
@@ -980,8 +980,7 @@ static PyTypeObject queryType = {
     PyObject_GenericGetAttr,     /* tp_getattro */
     0,                           /* tp_setattro */
     0,                           /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT
-        |Py_TPFLAGS_HAVE_ITER,   /* tp_flags */
+    Py_TPFLAGS_DEFAULT,          /* tp_flags */
     query__doc__,                /* tp_doc */
     0,                           /* tp_traverse */
     0,                           /* tp_clear */

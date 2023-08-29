@@ -31,7 +31,7 @@ large_str(largeObject *self)
     sprintf(str, self->lo_fd >= 0 ?
             "Opened large object, oid %ld" :
             "Closed large object, oid %ld", (long) self->lo_oid);
-    return PyStr_FromString(str);
+    return PyUnicode_FromString(str);
 }
 
 /* Check validity of large object. */
@@ -67,7 +67,7 @@ _check_lo_obj(largeObject *self, int level)
 static PyObject *
 large_getattr(largeObject *self, PyObject *nameobj)
 {
-    const char *name = PyStr_AsString(nameobj);
+    const char *name = PyUnicode_AsUTF8(nameobj);
 
     /* list postgreSQL large object fields */
 
@@ -85,7 +85,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
     /* large object oid */
     if (!strcmp(name, "oid")) {
         if (_check_lo_obj(self, 0))
-            return PyInt_FromLong((long) self->lo_oid);
+            return PyLong_FromLong((long) self->lo_oid);
         PyErr_Clear();
         Py_INCREF(Py_None);
         return Py_None;
@@ -93,7 +93,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
 
     /* error (status) message */
     if (!strcmp(name, "error"))
-        return PyStr_FromString(PQerrorMessage(self->pgcnx->cnx));
+        return PyUnicode_FromString(PQerrorMessage(self->pgcnx->cnx));
 
     /* seeks name in methods (fallback) */
     return PyObject_GenericGetAttr((PyObject *) self, nameobj);
@@ -285,7 +285,7 @@ large_seek(largeObject *self, PyObject *args)
     }
 
     /* returns position */
-    return PyInt_FromLong(ret);
+    return PyLong_FromLong(ret);
 }
 
 /* Get large object size. */
@@ -325,7 +325,7 @@ large_size(largeObject *self, PyObject *noargs)
     }
 
     /* returns size */
-    return PyInt_FromLong(end);
+    return PyLong_FromLong(end);
 }
 
 /* Get large object cursor position. */
@@ -350,7 +350,7 @@ large_tell(largeObject *self, PyObject *noargs)
     }
 
     /* returns size */
-    return PyInt_FromLong(start);
+    return PyLong_FromLong(start);
 }
 
 /* Export large object as unix file. */

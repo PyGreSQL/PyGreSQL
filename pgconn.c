@@ -26,7 +26,7 @@ conn_dealloc(connObject *self)
 static PyObject *
 conn_getattr(connObject *self, PyObject *nameobj)
 {
-    const char *name = PyStr_AsString(nameobj);
+    const char *name = PyUnicode_AsUTF8(nameobj);
 
     /*
      * Although we could check individually, there are only a few
@@ -47,49 +47,49 @@ conn_getattr(connObject *self, PyObject *nameobj)
         char *r = PQhost(self->cnx);
         if (!r || r[0] == '/') /* Pg >= 9.6 can return a Unix socket path */
             r = "localhost";
-        return PyStr_FromString(r);
+        return PyUnicode_FromString(r);
     }
 
     /* postmaster port */
     if (!strcmp(name, "port"))
-        return PyInt_FromLong(atol(PQport(self->cnx)));
+        return PyLong_FromLong(atol(PQport(self->cnx)));
 
     /* selected database */
     if (!strcmp(name, "db"))
-        return PyStr_FromString(PQdb(self->cnx));
+        return PyUnicode_FromString(PQdb(self->cnx));
 
     /* selected options */
     if (!strcmp(name, "options"))
-        return PyStr_FromString(PQoptions(self->cnx));
+        return PyUnicode_FromString(PQoptions(self->cnx));
 
     /* error (status) message */
     if (!strcmp(name, "error"))
-        return PyStr_FromString(PQerrorMessage(self->cnx));
+        return PyUnicode_FromString(PQerrorMessage(self->cnx));
 
     /* connection status : 1 - OK, 0 - BAD */
     if (!strcmp(name, "status"))
-        return PyInt_FromLong(PQstatus(self->cnx) == CONNECTION_OK ? 1 : 0);
+        return PyLong_FromLong(PQstatus(self->cnx) == CONNECTION_OK ? 1 : 0);
 
     /* provided user name */
     if (!strcmp(name, "user"))
-        return PyStr_FromString(PQuser(self->cnx));
+        return PyUnicode_FromString(PQuser(self->cnx));
 
     /* protocol version */
     if (!strcmp(name, "protocol_version"))
-        return PyInt_FromLong(PQprotocolVersion(self->cnx));
+        return PyLong_FromLong(PQprotocolVersion(self->cnx));
 
     /* backend version */
     if (!strcmp(name, "server_version"))
-        return PyInt_FromLong(PQserverVersion(self->cnx));
+        return PyLong_FromLong(PQserverVersion(self->cnx));
 
     /* descriptor number of connection socket */
     if (!strcmp(name, "socket")) {
-        return PyInt_FromLong(PQsocket(self->cnx));
+        return PyLong_FromLong(PQsocket(self->cnx));
     }
 
     /* PID of backend process */
     if (!strcmp(name, "backend_pid")) {
-        return PyInt_FromLong(PQbackendPID(self->cnx));
+        return PyLong_FromLong(PQbackendPID(self->cnx));
     }
 
     /* whether the connection uses SSL */
@@ -183,7 +183,7 @@ _conn_non_query_result(int status, PGresult* result, PGconn *cnx)
                     char *ret = PQcmdTuples(result);
 
                     if (ret[0]) {  /* return number of rows affected */
-                        PyObject *obj = PyStr_FromString(ret);
+                        PyObject *obj = PyUnicode_FromString(ret);
                         PQclear(result);
                         return obj;
                     }
@@ -193,7 +193,7 @@ _conn_non_query_result(int status, PGresult* result, PGconn *cnx)
                 }
                 /* for a single insert, return the oid */
                 PQclear(result);
-                return PyInt_FromLong((long) oid);
+                return PyLong_FromLong((long) oid);
             }
         case PGRES_COPY_OUT: /* no data will be received */
         case PGRES_COPY_IN:
@@ -325,7 +325,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
                     return NULL;
                 }
                 *s++ = str_obj;
-                *p = PyStr_AsString(str_obj);
+                *p = PyUnicode_AsUTF8(str_obj);
             }
         }
 
@@ -614,7 +614,7 @@ conn_getline(connObject *self, PyObject *noargs)
     }
     /* for backward compatibility, convert terminating newline to zero byte */
     if (*line) line[strlen(line) - 1] = '\0';
-    str = PyStr_FromString(line);
+    str = PyUnicode_FromString(line);
     PQfreemem(line);
     return str;
 }
@@ -947,9 +947,9 @@ conn_inserttable(connObject *self, PyObject *args)
                     Py_DECREF(s);
                 }
             }
-            else if (PyInt_Check(item) || PyLong_Check(item)) {
+            else if (PyLong_Check(item)) {
                 PyObject* s = PyObject_Str(item);
-                const char* t = PyStr_AsString(s);
+                const char* t = PyUnicode_AsUTF8(s);
 
                 while (*t && bufsiz) {
                     *bufpt++ = *t++; --bufsiz;
@@ -958,7 +958,7 @@ conn_inserttable(connObject *self, PyObject *args)
             }
             else {
                 PyObject* s = PyObject_Repr(item);
-                const char* t = PyStr_AsString(s);
+                const char* t = PyUnicode_AsUTF8(s);
 
                 while (*t && bufsiz) {
                     switch (*t) {
@@ -1036,7 +1036,7 @@ conn_inserttable(connObject *self, PyObject *args)
     } else {
         long ntuples = atol(PQcmdTuples(result));
         PQclear(result);
-        return PyInt_FromLong(ntuples);
+        return PyLong_FromLong(ntuples);
     }
 }
 
@@ -1052,7 +1052,7 @@ conn_transaction(connObject *self, PyObject *noargs)
         return NULL;
     }
 
-    return PyInt_FromLong(PQtransactionStatus(self->cnx));
+    return PyLong_FromLong(PQtransactionStatus(self->cnx));
 }
 
 /* Get parameter setting. */
@@ -1079,7 +1079,7 @@ conn_parameter(connObject *self, PyObject *args)
     name = PQparameterStatus(self->cnx, name);
 
     if (name)
-        return PyStr_FromString(name);
+        return PyUnicode_FromString(name);
 
     /* unknown parameter, return None */
     Py_INCREF(Py_None);
@@ -1107,7 +1107,7 @@ conn_date_format(connObject *self, PyObject *noargs)
         self->date_format = fmt; /* cache the result */
     }
 
-    return PyStr_FromString(fmt);
+    return PyUnicode_FromString(fmt);
 }
 
 #ifdef ESCAPING_FUNCS
@@ -1450,7 +1450,7 @@ conn_cancel(connObject *self, PyObject *noargs)
     }
 
     /* request that the server abandon processing of the current command */
-    return PyInt_FromLong((long) PQrequestCancel(self->cnx));
+    return PyLong_FromLong((long) PQrequestCancel(self->cnx));
 }
 
 /* Get connection socket. */
@@ -1465,7 +1465,7 @@ conn_fileno(connObject *self, PyObject *noargs)
         return NULL;
     }
 
-    return PyInt_FromLong((long) PQsocket(self->cnx));
+    return PyLong_FromLong((long) PQsocket(self->cnx));
 }
 
 /* Set external typecast callback function. */
@@ -1536,7 +1536,7 @@ conn_poll(connObject *self, PyObject *noargs)
         return NULL;
     }
 
-    return PyInt_FromLong(rc);
+    return PyLong_FromLong(rc);
 }
 
 /* Set notice receiver callback function. */
@@ -1632,7 +1632,7 @@ conn_get_notify(connObject *self, PyObject *noargs)
     else {
         PyObject *notify_result, *tmp;
 
-        if (!(tmp = PyStr_FromString(notify->relname))) {
+        if (!(tmp = PyUnicode_FromString(notify->relname))) {
             return NULL;
         }
 
@@ -1642,7 +1642,7 @@ conn_get_notify(connObject *self, PyObject *noargs)
 
         PyTuple_SET_ITEM(notify_result, 0, tmp);
 
-        if (!(tmp = PyInt_FromLong(notify->be_pid))) {
+        if (!(tmp = PyLong_FromLong(notify->be_pid))) {
             Py_DECREF(notify_result);
             return NULL;
         }
@@ -1650,7 +1650,7 @@ conn_get_notify(connObject *self, PyObject *noargs)
         PyTuple_SET_ITEM(notify_result, 1, tmp);
 
         /* extra exists even in old versions that did not support it */
-        if (!(tmp = PyStr_FromString(notify->extra))) {
+        if (!(tmp = PyUnicode_FromString(notify->extra))) {
             Py_DECREF(notify_result);
             return NULL;
         }
