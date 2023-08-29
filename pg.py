@@ -96,13 +96,7 @@ from functools import partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 from uuid import UUID
-
-try:
-    # noinspection PyUnresolvedReferences
-    from typing import Dict, List, Union  # noqa: F401
-    has_typing = True
-except ImportError:  # Python < 3.5
-    has_typing = False
+from typing import Dict, List, Union  # noqa: F401
 
 try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
     long
@@ -342,9 +336,6 @@ class _SimpleTypes(dict):
                  bytes, unicode, basestring]
     }  # type: Dict[str, List[Union[str, type]]]
 
-    if long is not int:  # Python 2 has a separate long type
-        _type_aliases['num'].append(long)
-
     # noinspection PyMissingConstructor
     def __init__(self):
         """Initialize type mapping."""
@@ -354,7 +345,7 @@ class _SimpleTypes(dict):
                 self[key] = typ
                 if isinstance(key, str):
                     self['_%s' % key] = '%s[]' % typ
-                elif has_typing and not isinstance(key, tuple):
+                elif not isinstance(key, tuple):
                     self[List[key]] = '%s[]' % typ
 
     @staticmethod

@@ -730,7 +730,7 @@ the connection and its status. These attributes are:
 
 .. attribute:: Connection.server_version
 
-    the backend version (int, e.g. 90305 for 9.3.5)
+    the backend version (int, e.g. 150400 for 15.4)
 
 .. versionadded:: 4.0
 

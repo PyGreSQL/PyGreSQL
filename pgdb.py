@@ -1008,10 +1008,7 @@ class Cursor(object):
             if not value:  # exception for empty array
                 return "'{}'"
             q = self._quote
-            try:
-                return 'ARRAY[%s]' % (','.join(str(q(v)) for v in value),)
-            except UnicodeEncodeError:  # Python 2 with non-ascii values
-                return u'ARRAY[%s]' % (','.join(unicode(q(v)) for v in value),)
+            return 'ARRAY[%s]' % (','.join(str(q(v)) for v in value),)
         if isinstance(value, tuple):
             # Quote as a ROW constructor.  This is better than using a record
             # literal because it carries the information that this is a record
@@ -1019,10 +1016,7 @@ class Cursor(object):
             # this usable with the IN syntax as well.  It is only necessary
             # when the records has a single column which is not really useful.
             q = self._quote
-            try:
-                return '(%s)' % (','.join(str(q(v)) for v in value),)
-            except UnicodeEncodeError:  # Python 2 with non-ascii values
-                return u'(%s)' % (','.join(unicode(q(v)) for v in value),)
+            return '(%s)' % (','.join(str(q(v)) for v in value),)
         try:  # noinspection PyUnresolvedReferences
             value = value.__pg_repr__()
         except AttributeError:
@@ -1472,8 +1466,8 @@ class Cursor(object):
             raise StopIteration
         return res
 
-    # Note that since Python 2.6 the iterator protocol uses __next()__
-    # instead of next(), we keep it only for backward compatibility of pgdb.
+    # Note that the iterator protocol now uses __next()__ instead of next(),
+    # but we keep it for backward compatibility of pgdb.
     next = __next__
 
     @staticmethod

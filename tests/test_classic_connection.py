@@ -297,8 +297,7 @@ class TestConnectObject(unittest.TestCase):
             members.remove('memsize')
         query_members = [
             a for a in dir(query)
-            if not a.startswith('__')
-            and a != 'next']  # this is only needed in Python 2
+            if not a.startswith('__')]
         self.assertEqual(members, query_members)
 
     def testMethodEndcopy(self):

@@ -26,7 +26,7 @@ PostgreSQL                          Python
 char, bpchar, name, text, varchar  str
 bool                               bool
 bytea                              bytes
-int2, int4, int8, oid, serial      int [#int8]_
+int2, int4, int8, oid, serial      int
 int2vector                         list of int
 float4, float8                     float
 numeric, money                     Decimal
@@ -44,8 +44,6 @@ record                             tuple
 .. note::
 
     Elements of arrays and records will also be converted accordingly.
-
-    .. [#int8] int8 is converted to long in Python 2
 
     .. [#array] The first element of the array will always be the first element
        of the Python list, no matter what the lower bound of the PostgreSQL

@@ -6,7 +6,7 @@
 #
 # Please see the LICENSE.TXT file for specific restrictions.
 
-"""Setup script for PyGreSQL version 5.2.5
+"""Setup script for PyGreSQL version 6.0
 
 PyGreSQL is an open-source Python module that interfaces to a
 PostgreSQL database. It wraps the lower level C API library libpq
@@ -26,8 +26,8 @@ Prerequisites to be installed:
 * PostgreSQL pg_config tool (usually included in the devel package)
   (the Windows installer has it as part of the database server feature)
 
-PyGreSQL currently supports Python versions 2.7 and 3.5 to 3.11,
-and PostgreSQL versions 9.0 to 9.6 and 10 to 15.
+PyGreSQL currently supports Python versions 3.7 to 3.11,
+and PostgreSQL versions 10 to 15.
 
 Use as follows:
 python setup.py build_ext # to build the module
@@ -52,10 +52,9 @@ from distutils.command.build_ext import build_ext
 from distutils.ccompiler import get_default_compiler
 from distutils.sysconfig import get_python_inc, get_python_lib
 
-version = '5.2.5'
+version = '6.0'
 
-if not (sys.version_info[:2] == (2, 7)
-        or (3, 5) <= sys.version_info[:2] < (4, 0)):
+if not (3, 7) <= sys.version_info[:2] < (4, 0):
     raise Exception(
         "Sorry, PyGreSQL %s does not support this Python version" % version)
 
@@ -84,7 +83,7 @@ def pg_version():
     match = re.search(r'(\d+)\.(\d+)', pg_config('version'))
     if match:
         return tuple(map(int, match.groups()))
-    return 9, 0
+    return 10, 0
 
 
 pg_version = pg_version()
@@ -146,7 +145,7 @@ class build_pg_ext(build_ext):
         self.pqlib_info = None
         self.ssl_info = None
         self.memory_size = None
-        supported = pg_version >= (9, 0)
+        supported = pg_version >= (10, 0)
         if not supported:
             warnings.warn(
                 "PyGreSQL does not support the installed PostgreSQL version.")
@@ -162,33 +161,15 @@ class build_pg_ext(build_ext):
             define_macros.append(('LARGE_OBJECTS', None))
         if self.default_vars is None or self.default_vars:
             define_macros.append(('DEFAULT_VARS', None))
-        wanted = self.escaping_funcs
-        supported = pg_version >= (9, 0)
-        if wanted or (wanted is None and supported):
+        if self.escaping_funcs is None or self.escaping_funcs:
             define_macros.append(('ESCAPING_FUNCS', None))
-            if not supported:
-                warnings.warn(
-                    "The installed PostgreSQL version"
-                    " does not support the newer string escaping functions.")
-        wanted = self.pqlib_info
-        supported = pg_version >= (9, 1)
-        if wanted or (wanted is None and supported):
+        if self.pqlib_info is None or self.pqlib_info:
             define_macros.append(('PQLIB_INFO', None))
-            if not supported:
-                warnings.warn(
-                    "The installed PostgreSQL version"
-                    " does not support PQLib info functions.")
-        wanted = self.ssl_info
-        supported = pg_version >= (9, 5)
-        if wanted or (wanted is None and supported):
+        if self.ssl_info is None or self.ssl_info:
             define_macros.append(('SSL_INFO', None))
-            if not supported:
-                warnings.warn(
-                    "The installed PostgreSQL version"
-                    " does not support SSL info functions.")
         wanted = self.memory_size
         supported = pg_version >= (12, 0)
-        if wanted or (wanted is None and supported):
+        if (wanted is None and supported) or wanted:
             define_macros.append(('MEMORY_SIZE', None))
             if not supported:
                 warnings.warn(
@@ -243,11 +224,7 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: C",
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
