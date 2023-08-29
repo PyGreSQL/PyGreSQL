@@ -68,15 +68,3 @@ do
     psql -c "create extension hstore" test_latin9
     psql -c "create extension hstore" test_cyrillic
 done
-
-export PGHOST=pg15
-export PGPORT=5432
-export PGDATABASE=test
-export PGUSER=test
-export PGPASSWORD=test
-
-export PYGRESQL_DB=$PGDATABASE
-export PYGRESQL_HOST=$PGHOST
-export PYGRESQL_PORT=$PGPORT
-export PYGRESQL_USER=$PGUSER
-export PYGRESQL_PASSWD=$PGPASSWORD
