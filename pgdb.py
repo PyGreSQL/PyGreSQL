@@ -90,10 +90,9 @@ except ImportError as e:
     else:
         libpq += 'so'
     if e:
-        # note: we could use "raise from e" here in Python 3
         raise ImportError(
             "Cannot import shared library for PyGreSQL,\n"
-            "probably because no %s is installed.\n%s" % (libpq, e))
+            "probably because no %s is installed.\n%s" % (libpq, e)) from e
 
 __version__ = version
 
@@ -114,121 +113,19 @@ __all__ = [
     'get_typecast', 'set_typecast', 'reset_typecast',
     'version', '__version__']
 
-from datetime import date, time, datetime, timedelta, tzinfo
+from datetime import date, time, datetime, timedelta
 from time import localtime
 from decimal import Decimal as StdDecimal
 from uuid import UUID as Uuid
 from math import isnan, isinf
-try:  # noinspection PyCompatibility
-    from collections.abc import Iterable
-except ImportError:  # Python < 3.3
-    from collections import Iterable
 from collections import namedtuple
-from functools import partial
+from collections.abc import Iterable
+from inspect import signature
+from functools import lru_cache, partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 
 Decimal = StdDecimal
-
-try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
-    long
-except NameError:  # Python >= 3.0
-    long = int
-
-try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
-    unicode
-except NameError:  # Python >= 3.0
-    unicode = str
-
-try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
-    basestring
-except NameError:  # Python >= 3.0
-    basestring = (str, bytes)
-
-try:
-    from functools import lru_cache
-except ImportError:  # Python < 3.2
-    from functools import update_wrapper
-    try:  # noinspection PyCompatibility
-        from _thread import RLock
-    except ImportError:
-        class RLock:  # for builds without threads
-            def __enter__(self):
-                pass
-
-            def __exit__(self, exctype, excinst, exctb):
-                pass
-
-    def lru_cache(maxsize=128):
-        """Simplified functools.lru_cache decorator for one argument."""
-
-        def decorator(function):
-            sentinel = object()
-            cache = {}
-            get = cache.get
-            lock = RLock()
-            root = []
-            root_full = [root, False]
-            root[:] = [root, root, None, None]
-
-            if maxsize == 0:
-
-                def wrapper(arg):
-                    res = function(arg)
-                    return res
-
-            elif maxsize is None:
-
-                def wrapper(arg):
-                    res = get(arg, sentinel)
-                    if res is not sentinel:
-                        return res
-                    res = function(arg)
-                    cache[arg] = res
-                    return res
-
-            else:
-
-                def wrapper(arg):
-                    with lock:
-                        link = get(arg)
-                        if link is not None:
-                            root = root_full[0]
-                            prv, nxt, _arg, res = link
-                            prv[1] = nxt
-                            nxt[0] = prv
-                            last = root[0]
-                            last[1] = root[0] = link
-                            link[0] = last
-                            link[1] = root
-                            return res
-                    res = function(arg)
-                    with lock:
-                        root, full = root_full
-                        if arg in cache:
-                            pass
-                        elif full:
-                            oldroot = root
-                            oldroot[2] = arg
-                            oldroot[3] = res
-                            root = root_full[0] = oldroot[1]
-                            oldarg = root[2]
-                            oldres = root[3]  # noqa F481 (keep reference)
-                            root[2] = root[3] = None
-                            del cache[oldarg]
-                            cache[arg] = oldroot
-                        else:
-                            last = root[0]
-                            link = [last, root, arg, res]
-                            last[1] = root[0] = cache[arg] = link
-                            if len(cache) >= maxsize:
-                                root_full[1] = True
-                    return res
-
-            wrapper.__wrapped__ = function
-            return update_wrapper(wrapper, function)
-
-        return decorator
 
 
 # *** Module Constants ***
@@ -249,51 +146,9 @@ shortcutmethods = 1
 
 # *** Internal Type Handling ***
 
-try:    # noinspection PyUnresolvedReferences
-    from inspect import signature
-except ImportError:  # Python < 3.3
-    from inspect import getargspec
+def get_args(func):
+    return list(signature(func).parameters)
 
-    def get_args(func):
-        return getargspec(func).args
-else:
-
-    def get_args(func):
-        return list(signature(func).parameters)
-
-try:
-    from datetime import timezone
-except ImportError:  # Python < 3.2
-
-    class timezone(tzinfo):
-        """Simple timezone implementation."""
-
-        def __init__(self, offset, name=None):
-            self.offset = offset
-            if not name:
-                minutes = self.offset.days * 1440 + self.offset.seconds // 60
-                if minutes < 0:
-                    hours, minutes = divmod(-minutes, 60)
-                    hours = -hours
-                else:
-                    hours, minutes = divmod(minutes, 60)
-                name = 'UTC%+03d:%02d' % (hours, minutes)
-            self.name = name
-
-        def utcoffset(self, dt):
-            return self.offset
-
-        def tzname(self, dt):
-            return self.name
-
-        def dst(self, dt):
-            return None
-
-    timezone.utc = timezone(timedelta(0), 'UTC')
-
-    _has_timezone = False
-else:
-    _has_timezone = True
 
 # time zones used in Postgres timestamptz output
 _timezones = dict(CET='+0100', EET='+0200', EST='-0500',
@@ -307,14 +162,6 @@ def _timezone_as_offset(tz):
             return tz + '00'
         return tz.replace(':', '')
     return _timezones.get(tz, '+0000')
-
-
-def _get_timezone(tz):
-    tz = _timezone_as_offset(tz)
-    minutes = 60 * int(tz[1:3]) + int(tz[3:5])
-    if tz[0] == '-':
-        minutes = -minutes
-    return timezone(timedelta(minutes=minutes), tz)
 
 
 def decimal_type(decimal_type=None):
@@ -385,12 +232,9 @@ def cast_timetz(value):
     else:
         tz = '+0000'
     fmt = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
-    if _has_timezone:
-        value += _timezone_as_offset(tz)
-        fmt += '%z'
-        return datetime.strptime(value, fmt).timetz()
-    return datetime.strptime(value, fmt).timetz().replace(
-        tzinfo=_get_timezone(tz))
+    value += _timezone_as_offset(tz)
+    fmt += '%z'
+    return datetime.strptime(value, fmt).timetz()
 
 
 def cast_timestamp(value, connection):
@@ -445,12 +289,9 @@ def cast_timestamptz(value, connection):
         if len(value[0]) > 10:
             return datetime.max
         fmt = [fmt, '%H:%M:%S.%f' if len(value[1]) > 8 else '%H:%M:%S']
-    if _has_timezone:
-        value.append(_timezone_as_offset(tz))
-        fmt.append('%z')
-        return datetime.strptime(' '.join(value), ' '.join(fmt))
-    return datetime.strptime(' '.join(value), ' '.join(fmt)).replace(
-        tzinfo=_get_timezone(tz))
+    value.append(_timezone_as_offset(tz))
+    fmt.append('%z')
+    return datetime.strptime(' '.join(value), ' '.join(fmt))
 
 
 _re_interval_sql_standard = regex(
@@ -555,7 +396,7 @@ class Typecasts(dict):
         'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
-        'int2': int, 'int4': int, 'serial': int, 'int8': long, 'oid': int,
+        'int2': int, 'int4': int, 'serial': int, 'int8': int, 'oid': int,
         'hstore': cast_hstore, 'json': jsondecode, 'jsonb': jsondecode,
         'float4': float, 'float8': float,
         'numeric': Decimal, 'money': cast_money,
@@ -611,7 +452,7 @@ class Typecasts(dict):
 
     def set(self, typ, cast):
         """Set a typecast function for the specified database type(s)."""
-        if isinstance(typ, basestring):
+        if isinstance(typ, str):
             typ = [typ]
         if cast is None:
             for t in typ:
@@ -634,7 +475,7 @@ class Typecasts(dict):
             self.clear()
             self.update(defaults)
         else:
-            if isinstance(typ, basestring):
+            if isinstance(typ, str):
                 typ = [typ]
             for t in typ:
                 cast = defaults.get(t)
@@ -967,11 +808,9 @@ class Cursor(object):
             return 'NULL'
         if isinstance(value, (Hstore, Json)):
             value = str(value)
-        if isinstance(value, basestring):
+        if isinstance(value, (bytes, str)):
             if isinstance(value, Binary):
-                value = self._cnx.escape_bytea(value)
-                if bytes is not str:  # Python >= 3.0
-                    value = value.decode('ascii')
+                value = self._cnx.escape_bytea(value).decode('ascii')
             else:
                 value = self._cnx.escape_string(value)
             return "'%s'" % (value,)
@@ -981,7 +820,7 @@ class Cursor(object):
             if isnan(value):
                 return "'NaN'"
             return value
-        if isinstance(value, (int, long, Decimal, Literal)):
+        if isinstance(value, (int, Decimal, Literal)):
             return value
         if isinstance(value, datetime):
             if value.tzinfo:
@@ -1237,10 +1076,10 @@ class Cursor(object):
                 input_type = bytes
                 type_name = 'byte strings'
             else:
-                input_type = basestring
+                input_type = (bytes, str)
                 type_name = 'strings'
 
-            if isinstance(stream, basestring):
+            if isinstance(stream, (bytes, str)):
                 if not isinstance(stream, input_type):
                     raise ValueError("The input must be %s" % (type_name,))
                 if not binary_format:
@@ -1291,7 +1130,7 @@ class Cursor(object):
                 def chunks():
                     yield read()
 
-        if not table or not isinstance(table, basestring):
+        if not table or not isinstance(table, str):
             raise TypeError("Need a table to copy to")
         if table.lower().startswith('select '):
             raise ValueError("Must specify a table, not a query")
@@ -1302,13 +1141,13 @@ class Cursor(object):
         options = []
         params = []
         if format is not None:
-            if not isinstance(format, basestring):
+            if not isinstance(format, str):
                 raise TypeError("The format option must be be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("Invalid format")
             options.append('format %s' % (format,))
         if sep is not None:
-            if not isinstance(sep, basestring):
+            if not isinstance(sep, str):
                 raise TypeError("The sep option must be a string")
             if format == 'binary':
                 raise ValueError(
@@ -1319,12 +1158,12 @@ class Cursor(object):
             options.append('delimiter %s')
             params.append(sep)
         if null is not None:
-            if not isinstance(null, basestring):
+            if not isinstance(null, str):
                 raise TypeError("The null option must be a string")
             options.append('null %s')
             params.append(null)
         if columns:
-            if not isinstance(columns, basestring):
+            if not isinstance(columns, str):
                 columns = ','.join(map(
                     self.connection._cnx.escape_identifier, columns))
             operation.append('(%s)' % (columns,))
@@ -1375,7 +1214,7 @@ class Cursor(object):
                 write = stream.write
             except AttributeError:
                 raise TypeError("Need an output stream to copy to")
-        if not table or not isinstance(table, basestring):
+        if not table or not isinstance(table, str):
             raise TypeError("Need a table to copy to")
         if table.lower().startswith('select '):
             if columns:
@@ -1388,13 +1227,13 @@ class Cursor(object):
         options = []
         params = []
         if format is not None:
-            if not isinstance(format, basestring):
+            if not isinstance(format, str):
                 raise TypeError("The format option must be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("Invalid format")
             options.append('format %s' % (format,))
         if sep is not None:
-            if not isinstance(sep, basestring):
+            if not isinstance(sep, str):
                 raise TypeError("The sep option must be a string")
             if binary_format:
                 raise ValueError(
@@ -1405,15 +1244,12 @@ class Cursor(object):
             options.append('delimiter %s')
             params.append(sep)
         if null is not None:
-            if not isinstance(null, basestring):
+            if not isinstance(null, str):
                 raise TypeError("The null option must be a string")
             options.append('null %s')
             params.append(null)
         if decode is None:
-            if format == 'binary':
-                decode = False
-            else:
-                decode = str is unicode
+            decode = format != 'binary'
         else:
             if not isinstance(decode, (int, bool)):
                 raise TypeError("The decode option must be a boolean")
@@ -1421,7 +1257,7 @@ class Cursor(object):
                 raise ValueError(
                     "The decode option is not allowed with binary format")
         if columns:
-            if not isinstance(columns, basestring):
+            if not isinstance(columns, str):
                 columns = ','.join(map(
                     self.connection._cnx.escape_identifier, columns))
             operation.append('(%s)' % (columns,))
@@ -1730,12 +1566,12 @@ class Type(frozenset):
     """
 
     def __new__(cls, values):
-        if isinstance(values, basestring):
+        if isinstance(values, str):
             values = values.split()
         return super(Type, cls).__new__(cls, values)
 
     def __eq__(self, other):
-        if isinstance(other, basestring):
+        if isinstance(other, str):
             if other.startswith('_'):
                 other = other[1:]
             return other in self
@@ -1743,7 +1579,7 @@ class Type(frozenset):
             return super(Type, self).__eq__(other)
 
     def __ne__(self, other):
-        if isinstance(other, basestring):
+        if isinstance(other, str):
             if other.startswith('_'):
                 other = other[1:]
             return other not in self
@@ -1755,13 +1591,13 @@ class ArrayType:
     """Type class for PostgreSQL array types."""
 
     def __eq__(self, other):
-        if isinstance(other, basestring):
+        if isinstance(other, str):
             return other.startswith('_')
         else:
             return isinstance(other, ArrayType)
 
     def __ne__(self, other):
-        if isinstance(other, basestring):
+        if isinstance(other, str):
             return not other.startswith('_')
         else:
             return not isinstance(other, ArrayType)
@@ -1774,7 +1610,7 @@ class RecordType:
         if isinstance(other, TypeCode):
             # noinspection PyUnresolvedReferences
             return other.type == 'c'
-        elif isinstance(other, basestring):
+        elif isinstance(other, str):
             return other == 'record'
         else:
             return isinstance(other, RecordType)
@@ -1783,7 +1619,7 @@ class RecordType:
         if isinstance(other, TypeCode):
             # noinspection PyUnresolvedReferences
             return other.type != 'c'
-        elif isinstance(other, basestring):
+        elif isinstance(other, str):
             return other != 'record'
         else:
             return not isinstance(other, RecordType)
@@ -1884,7 +1720,7 @@ class Hstore(dict):
     def _quote(cls, s):
         if s is None:
             return 'NULL'
-        if not isinstance(s, basestring):
+        if not isinstance(s, str):
             s = str(s)
         if not s:
             return '""'
@@ -1908,7 +1744,7 @@ class Json:
 
     def __str__(self):
         obj = self.obj
-        if isinstance(obj, basestring):
+        if isinstance(obj, str):
             return obj
         return self.encode(obj)
 

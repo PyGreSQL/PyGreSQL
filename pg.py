@@ -46,10 +46,9 @@ except ImportError as e:
     else:
         libpq += 'so'
     if e:
-        # note: we could use "raise from e" here in Python 3
         raise ImportError(
             "Cannot import shared library for PyGreSQL,\n"
-            "probably because no %s is installed.\n%s" % (libpq, e))
+            "probably because no %s is installed.\n%s" % (libpq, e)) from e
 
 __version__ = version
 
@@ -85,165 +84,24 @@ import select
 import warnings
 import weakref
 
-from datetime import date, time, datetime, timedelta, tzinfo
+from datetime import date, time, datetime, timedelta
 from decimal import Decimal
 from math import isnan, isinf
 from collections import namedtuple, OrderedDict
+from inspect import signature
 from operator import itemgetter
-from functools import partial
+from functools import lru_cache, partial
 from re import compile as regex
 from json import loads as jsondecode, dumps as jsonencode
 from uuid import UUID
 from typing import Dict, List, Union  # noqa: F401
 
-try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
-    long
-except NameError:  # Python >= 3.0
-    long = int
-
-try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
-    unicode
-except NameError:  # Python >= 3.0
-    unicode = str
-
-try:  # noinspection PyUnresolvedReferences,PyUnboundLocalVariable
-    basestring
-except NameError:  # Python >= 3.0
-    basestring = (str, bytes)
-
-try:
-    from functools import lru_cache
-except ImportError:  # Python < 3.2
-    from functools import update_wrapper
-    try:  # noinspection PyCompatibility
-        from _thread import RLock
-    except ImportError:
-        class RLock:  # for builds without threads
-            def __enter__(self):
-                pass
-
-            def __exit__(self, exctype, excinst, exctb):
-                pass
-
-    def lru_cache(maxsize=128):
-        """Simplified functools.lru_cache decorator for one argument."""
-
-        def decorator(function):
-            sentinel = object()
-            cache = {}
-            get = cache.get
-            lock = RLock()
-            root = []
-            root_full = [root, False]
-            root[:] = [root, root, None, None]
-
-            if maxsize == 0:
-
-                def wrapper(arg):
-                    res = function(arg)
-                    return res
-
-            elif maxsize is None:
-
-                def wrapper(arg):
-                    res = get(arg, sentinel)
-                    if res is not sentinel:
-                        return res
-                    res = function(arg)
-                    cache[arg] = res
-                    return res
-
-            else:
-
-                def wrapper(arg):
-                    with lock:
-                        link = get(arg)
-                        if link is not None:
-                            root = root_full[0]
-                            prv, nxt, _arg, res = link
-                            prv[1] = nxt
-                            nxt[0] = prv
-                            last = root[0]
-                            last[1] = root[0] = link
-                            link[0] = last
-                            link[1] = root
-                            return res
-                    res = function(arg)
-                    with lock:
-                        root, full = root_full
-                        if arg in cache:
-                            pass
-                        elif full:
-                            oldroot = root
-                            oldroot[2] = arg
-                            oldroot[3] = res
-                            root = root_full[0] = oldroot[1]
-                            oldarg = root[2]
-                            oldres = root[3]  # noqa F481 (keep reference)
-                            root[2] = root[3] = None
-                            del cache[oldarg]
-                            cache[arg] = oldroot
-                        else:
-                            last = root[0]
-                            link = [last, root, arg, res]
-                            last[1] = root[0] = cache[arg] = link
-                            if len(cache) >= maxsize:
-                                root_full[1] = True
-                    return res
-
-            wrapper.__wrapped__ = function
-            return update_wrapper(wrapper, function)
-
-        return decorator
-
 
 # Auxiliary classes and functions that are independent of a DB connection:
 
-try:  # noinspection PyUnresolvedReferences
-    from inspect import signature
-except ImportError:  # Python < 3.3
-    from inspect import getargspec
+def get_args(func):
+    return list(signature(func).parameters)
 
-    def get_args(func):
-        return getargspec(func).args
-else:
-
-    def get_args(func):
-        return list(signature(func).parameters)
-
-try:
-    from datetime import timezone
-except ImportError:  # Python < 3.2
-
-    class timezone(tzinfo):
-        """Simple timezone implementation."""
-
-        def __init__(self, offset, name=None):
-            self.offset = offset
-            if not name:
-                minutes = self.offset.days * 1440 + self.offset.seconds // 60
-                if minutes < 0:
-                    hours, minutes = divmod(-minutes, 60)
-                    hours = -hours
-                else:
-                    hours, minutes = divmod(minutes, 60)
-                name = 'UTC%+03d:%02d' % (hours, minutes)
-            self.name = name
-
-        def utcoffset(self, dt):
-            return self.offset
-
-        def tzname(self, dt):
-            return self.name
-
-        def dst(self, dt):
-            return None
-
-    timezone.utc = timezone(timedelta(0), 'UTC')
-
-    _has_timezone = False
-else:
-    _has_timezone = True
 
 # time zones used in Postgres timestamptz output
 _timezones = dict(CET='+0100', EET='+0200', EST='-0500',
@@ -257,14 +115,6 @@ def _timezone_as_offset(tz):
             return tz + '00'
         return tz.replace(':', '')
     return _timezones.get(tz, '+0000')
-
-
-def _get_timezone(tz):
-    tz = _timezone_as_offset(tz)
-    minutes = 60 * int(tz[1:3]) + int(tz[3:5])
-    if tz[0] == '-':
-        minutes = -minutes
-    return timezone(timedelta(minutes=minutes), tz)
 
 
 def _oid_key(table):
@@ -285,7 +135,7 @@ class Hstore(dict):
     def _quote(cls, s):
         if s is None:
             return 'NULL'
-        if not isinstance(s, basestring):
+        if not isinstance(s, str):
             s = str(s)
         if not s:
             return '""'
@@ -308,7 +158,7 @@ class Json:
 
     def __str__(self):
         obj = self.obj
-        if isinstance(obj, basestring):
+        if isinstance(obj, str):
             return obj
         return self.encode(obj)
 
@@ -330,8 +180,7 @@ class _SimpleTypes(dict):
         'int': ['cid', 'int2', 'int4', 'int8', 'oid', 'xid', int],
         'hstore': [Hstore], 'json': ['jsonb', Json], 'uuid': [UUID],
         'num': ['numeric', Decimal], 'money': [],
-        'text': ['bpchar', 'char', 'name', 'varchar',
-                 bytes, unicode, basestring]
+        'text': ['bpchar', 'char', 'name', 'varchar', bytes, str]
     }  # type: Dict[str, List[Union[str, type]]]
 
     # noinspection PyMissingConstructor
@@ -369,7 +218,7 @@ def _quote_if_unqualified(param, name):
     (could be a qualified name or just a name with a dot in it)
     and must be quoted manually by the caller.
     """
-    if isinstance(name, basestring) and '.' not in name:
+    if isinstance(name, str) and '.' not in name:
         return 'quote_ident(%s)' % (param,)
     return param
 
@@ -440,7 +289,7 @@ class Adapter:
     @classmethod
     def _adapt_bool(cls, v):
         """Adapt a boolean parameter."""
-        if isinstance(v, basestring):
+        if isinstance(v, str):
             if not v:
                 return None
             v = v.lower() in cls._bool_true_values
@@ -451,7 +300,7 @@ class Adapter:
         """Adapt a date parameter."""
         if not v:
             return None
-        if isinstance(v, basestring) and v.lower() in cls._date_literals:
+        if isinstance(v, str) and v.lower() in cls._date_literals:
             return Literal(v)
         return v
 
@@ -472,7 +321,7 @@ class Adapter:
         """Adapt a json parameter."""
         if not v:
             return None
-        if isinstance(v, basestring):
+        if isinstance(v, str):
             return v
         if isinstance(v, Json):
             return str(v)
@@ -482,7 +331,7 @@ class Adapter:
         """Adapt a hstore parameter."""
         if not v:
             return None
-        if isinstance(v, basestring):
+        if isinstance(v, str):
             return v
         if isinstance(v, Hstore):
             return str(v)
@@ -494,7 +343,7 @@ class Adapter:
         """Adapt a UUID parameter."""
         if not v:
             return None
-        if isinstance(v, basestring):
+        if isinstance(v, str):
             return v
         return str(v)
 
@@ -523,7 +372,7 @@ class Adapter:
             return '{%s}' % ','.join(adapt(v) for v in v)
         if v is None:
             return 'null'
-        if isinstance(v, basestring):
+        if isinstance(v, str):
             if not v:
                 return 'null'
             v = v.lower() in cls._bool_true_values
@@ -558,7 +407,7 @@ class Adapter:
             return '{%s}' % ','.join(adapt(v) for v in v)
         if not v:
             return 'null'
-        if not isinstance(v, basestring):
+        if not isinstance(v, str):
             v = self.db.encode_json(v)
         if self._re_array_quote.search(v):
             v = '"%s"' % self._re_array_escape.sub(r'\\\1', v)
@@ -642,11 +491,11 @@ class Adapter:
             return _simple_type_dict[type(value)]
         except KeyError:
             pass
-        if isinstance(value, basestring):
+        if isinstance(value, (bytes, str)):
             return 'text'
         if isinstance(value, bool):
             return 'bool'
-        if isinstance(value, (int, long)):
+        if isinstance(value, int):
             return 'int'
         if isinstance(value, float):
             return 'float'
@@ -695,12 +544,10 @@ class Adapter:
         if isinstance(value, Literal):
             return value
         if isinstance(value, Bytea):
-            value = self.db.escape_bytea(value)
-            if bytes is not str:  # Python >= 3.0
-                value = value.decode('ascii')
+            value = self.db.escape_bytea(value).decode('ascii')
         elif isinstance(value, (datetime, date, time, timedelta)):
             value = str(value)
-        if isinstance(value, basestring):
+        if isinstance(value, (bytes, str)):
             value = self.db.escape_string(value)
             return "'%s'" % value
         if isinstance(value, bool):
@@ -711,7 +558,7 @@ class Adapter:
             if isnan(value):
                 return "'NaN'"
             return value
-        if isinstance(value, (int, long, Decimal)):
+        if isinstance(value, (int, Decimal)):
             return value
         if isinstance(value, list):
             q = self.adapt_inline
@@ -767,7 +614,7 @@ class Adapter:
             else:
                 add = params.add
                 if types:
-                    if isinstance(types, basestring):
+                    if isinstance(types, str):
                         types = types.split()
                     if (not isinstance(types, (list, tuple))
                             or len(types) != len(values)):
@@ -884,12 +731,9 @@ def cast_timetz(value):
     else:
         tz = '+0000'
     fmt = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
-    if _has_timezone:
-        value += _timezone_as_offset(tz)
-        fmt += '%z'
-        return datetime.strptime(value, fmt).timetz()
-    return datetime.strptime(value, fmt).timetz().replace(
-        tzinfo=_get_timezone(tz))
+    value += _timezone_as_offset(tz)
+    fmt += '%z'
+    return datetime.strptime(value, fmt).timetz()
 
 
 def cast_timestamp(value, connection):
@@ -944,12 +788,9 @@ def cast_timestamptz(value, connection):
         if len(value[0]) > 10:
             return datetime.max
         fmt = [fmt, '%H:%M:%S.%f' if len(value[1]) > 8 else '%H:%M:%S']
-    if _has_timezone:
-        value.append(_timezone_as_offset(tz))
-        fmt.append('%z')
-        return datetime.strptime(' '.join(value), ' '.join(fmt))
-    return datetime.strptime(' '.join(value), ' '.join(fmt)).replace(
-        tzinfo=_get_timezone(tz))
+    value.append(_timezone_as_offset(tz))
+    fmt.append('%z')
+    return datetime.strptime(' '.join(value), ' '.join(fmt))
 
 
 _re_interval_sql_standard = regex(
@@ -1057,7 +898,7 @@ class Typecasts(dict):
         'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
-        'int2': int, 'int4': int, 'serial': int, 'int8': long, 'oid': int,
+        'int2': int, 'int4': int, 'serial': int, 'int8': int, 'oid': int,
         'hstore': cast_hstore, 'json': cast_json, 'jsonb': cast_json,
         'float4': float, 'float8': float,
         'numeric': cast_num, 'money': cast_money,
@@ -1117,7 +958,7 @@ class Typecasts(dict):
 
     def set(self, typ, cast):
         """Set a typecast function for the specified database type(s)."""
-        if isinstance(typ, basestring):
+        if isinstance(typ, str):
             typ = [typ]
         if cast is None:
             for t in typ:
@@ -1138,7 +979,7 @@ class Typecasts(dict):
         if typ is None:
             self.clear()
         else:
-            if isinstance(typ, basestring):
+            if isinstance(typ, str):
                 typ = [typ]
             for t in typ:
                 self.pop(t, None)
@@ -1151,7 +992,7 @@ class Typecasts(dict):
     @classmethod
     def set_default(cls, typ, cast):
         """Set a default typecast function for the given database type(s)."""
-        if isinstance(typ, basestring):
+        if isinstance(typ, str):
             typ = [typ]
         defaults = cls.defaults
         if cast is None:
@@ -1716,7 +1557,7 @@ class DB:
         """Print a debug message"""
         if self.debug:
             s = '\n'.join(str(arg) for arg in args)
-            if isinstance(self.debug, basestring):
+            if isinstance(self.debug, str):
                 print(self.debug % s)
             elif hasattr(self.debug, 'write'):
                 # noinspection PyCallingNonCallable
@@ -1858,7 +1699,7 @@ class DB:
         By passing the special name 'all' as the parameter, you can get a dict
         of all existing configuration parameters.
         """
-        if isinstance(parameter, basestring):
+        if isinstance(parameter, str):
             parameter = [parameter]
             values = None
         elif isinstance(parameter, (list, tuple)):
@@ -1875,7 +1716,7 @@ class DB:
         params = {} if isinstance(values, dict) else []
         for key in parameter:
             param = key.strip().lower() if isinstance(
-                key, basestring) else None
+                key, (bytes, str)) else None
             if not param:
                 raise TypeError('Invalid parameter')
             if param == 'all':
@@ -1923,7 +1764,7 @@ class DB:
         have no effect if it is executed outside a transaction, since the
         transaction will end immediately.
         """
-        if isinstance(parameter, basestring):
+        if isinstance(parameter, str):
             parameter = {parameter: value}
         elif isinstance(parameter, (list, tuple)):
             if isinstance(value, (list, tuple)):
@@ -1935,7 +1776,7 @@ class DB:
                 value = set(value)
                 if len(value) == 1:
                     value = value.pop()
-            if not (value is None or isinstance(value, basestring)):
+            if not (value is None or isinstance(value, str)):
                 raise ValueError(
                     'A single value must be specified'
                     ' when parameter is a set')
@@ -1953,7 +1794,7 @@ class DB:
         params = {}
         for key, value in parameter.items():
             param = key.strip().lower() if isinstance(
-                key, basestring) else None
+                key, str) else None
             if not param:
                 raise TypeError('Invalid parameter')
             if param == 'all':
@@ -2272,7 +2113,7 @@ class DB:
             table = table[:-1].rstrip()
         attnames = self.get_attnames(table)
         qoid = _oid_key(table) if 'oid' in attnames else None
-        if keyname and isinstance(keyname, basestring):
+        if keyname and isinstance(keyname, str):
             keyname = (keyname,)
         if qoid and isinstance(row, dict) and qoid in row and 'oid' not in row:
             row['oid'] = row[qoid]
@@ -2513,7 +2354,7 @@ class DB:
             if n not in keyname and n not in generated:
                 value = kw.get(n, n in row)
                 if value:
-                    if not isinstance(value, basestring):
+                    if not isinstance(value, str):
                         value = 'excluded.%s' % col(n)
                     update.append('%s = %s' % (col(n), value))
         if not values:
@@ -2631,7 +2472,7 @@ class DB:
         can be specified after the table name to explicitly indicate that
         descendant tables are included.
         """
-        if isinstance(table, basestring):
+        if isinstance(table, str):
             only = {table: only}
             table = [table]
         elif isinstance(table, (list, tuple)):
@@ -2764,7 +2605,7 @@ class DB:
                 keyname = self.pkey(table, True)
             except (KeyError, ProgrammingError):
                 raise _prg_error('Table %s has no primary key' % table)
-        if isinstance(keyname, basestring):
+        if isinstance(keyname, str):
             keyname = [keyname]
         elif not isinstance(keyname, (list, tuple)):
             raise KeyError('The keyname must be a string, list or tuple')
