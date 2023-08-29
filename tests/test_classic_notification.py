@@ -21,14 +21,6 @@ from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 
 debug = False  # let DB wrapper print debugging output
 
-try:
-    from .LOCAL_PyGreSQL import *  # noqa: F401
-except (ImportError, ValueError):
-    try:
-        from LOCAL_PyGreSQL import *  # noqa: F401
-    except ImportError:
-        pass
-
 
 def DB():
     """Create a DB wrapper object connecting to the test database."""

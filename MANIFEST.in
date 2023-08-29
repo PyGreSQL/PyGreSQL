@@ -9,7 +9,6 @@ include LICENSE.txt
 include tox.ini
 
 recursive-include tests *.py
-exclude tests/LOCAL_PyGreSQL.py
 
 include docs/Makefile
 include docs/make.bat
