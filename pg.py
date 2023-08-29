@@ -21,7 +21,7 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 """
 
 try:
-    from _pg import *
+    from _pg import version
 except ImportError as e:
     import os
     libpq = 'libpq.'
@@ -35,10 +35,11 @@ except ImportError as e:
             for path in paths:
                 with os.add_dll_directory(os.path.abspath(path)):
                     try:
-                        from _pg import *
+                        from _pg import version
                     except ImportError:
                         pass
                     else:
+                        del version
                         e = None
                         break
         if paths:
@@ -49,6 +50,34 @@ except ImportError as e:
         raise ImportError(
             "Cannot import shared library for PyGreSQL,\n"
             "probably because no %s is installed.\n%s" % (libpq, e)) from e
+else:
+    del version
+
+# import objects from extension module
+from _pg import (
+    Error, Warning,
+    DataError, DatabaseError,
+    IntegrityError, InterfaceError, InternalError,
+    InvalidResultError, MultipleResultsError,
+    NoResultError, NotSupportedError,
+    OperationalError, ProgrammingError,
+    INV_READ, INV_WRITE,
+    POLLING_OK, POLLING_FAILED, POLLING_READING, POLLING_WRITING,
+    SEEK_CUR, SEEK_END, SEEK_SET,
+    TRANS_ACTIVE, TRANS_IDLE, TRANS_INERROR,
+    TRANS_INTRANS, TRANS_UNKNOWN,
+    cast_array, cast_hstore, cast_record,
+    connect, escape_bytea, escape_string, unescape_bytea,
+    get_array, get_bool, get_bytea_escaped,
+    get_datestyle, get_decimal, get_decimal_point,
+    get_defbase, get_defhost, get_defopt, get_defport, get_defuser,
+    get_jsondecode, get_pqlib_version,
+    set_array, set_bool, set_bytea_escaped,
+    set_datestyle, set_decimal, set_decimal_point,
+    set_defbase, set_defhost, set_defopt,
+    set_defpasswd, set_defport, set_defuser,
+    set_jsondecode, set_query_helpers,
+    version)
 
 __version__ = version
 
@@ -72,7 +101,7 @@ __all__ = [
     'get_array', 'get_bool', 'get_bytea_escaped',
     'get_datestyle', 'get_decimal', 'get_decimal_point',
     'get_defbase', 'get_defhost', 'get_defopt', 'get_defport', 'get_defuser',
-    'get_jsondecode', 'get_typecast',
+    'get_jsondecode', 'get_pqlib_version', 'get_typecast',
     'set_array', 'set_bool', 'set_bytea_escaped',
     'set_datestyle', 'set_decimal', 'set_decimal_point',
     'set_defbase', 'set_defhost', 'set_defopt',

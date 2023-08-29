@@ -65,7 +65,7 @@ Basic usage:
 """
 
 try:
-    from _pg import *
+    from _pg import version
 except ImportError as e:
     import os
     libpq = 'libpq.'
@@ -79,10 +79,11 @@ except ImportError as e:
             for path in paths:
                 with os.add_dll_directory(os.path.abspath(path)):
                     try:
-                        from _pg import *
+                        from _pg import version
                     except ImportError:
                         pass
                     else:
+                        del version
                         e = None
                         break
         if paths:
@@ -93,6 +94,19 @@ except ImportError as e:
         raise ImportError(
             "Cannot import shared library for PyGreSQL,\n"
             "probably because no %s is installed.\n%s" % (libpq, e)) from e
+else:
+    del version
+
+# import objects from extension module
+from _pg import (
+    Error, Warning,
+    DataError, DatabaseError,
+    IntegrityError, InterfaceError, InternalError,
+    NotSupportedError, OperationalError, ProgrammingError,
+    cast_array, cast_hstore, cast_record,
+    RESULT_DQL,
+    connect, unescape_bytea,
+    version)
 
 __version__ = version
 

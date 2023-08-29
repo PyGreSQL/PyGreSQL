@@ -264,7 +264,7 @@ class TestCopyFrom(TestCopy):
 
     def test_input_iterable_bytes(self):
         self.copy_from(row.encode('utf-8')
-                        for row in self.data_text.splitlines())
+                       for row in self.data_text.splitlines())
         self.check_table()
 
     def test_sep(self):

@@ -2666,7 +2666,6 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertEqual(r, b'data')
 
     def testSetRowFactorySize(self):
-        from functools import lru_cache
         queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
         query = self.c.query
         for maxsize in (None, 0, 1, 2, 3, 10, 1024):

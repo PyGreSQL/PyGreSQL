@@ -6,7 +6,10 @@ from functools import partial
 from time import sleep
 from threading import Thread
 
-from pg import *
+from pg import (
+    DB, NotificationHandler,
+    Error, DatabaseError, IntegrityError,
+    NotSupportedError, ProgrammingError)
 
 from .config import dbname, dbhost, dbport, dbuser, dbpasswd
 

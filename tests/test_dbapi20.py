@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import gc
-import sys
 import unittest
 
 from datetime import date, time, datetime, timedelta, timezone
@@ -1338,7 +1337,6 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
         self.assertEqual(row, data)
 
     def test_set_row_factory_size(self):
-        from functools import lru_cache
         queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
         con = self._connect()
         cur = con.cursor()
