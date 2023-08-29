@@ -1126,19 +1126,11 @@ class DbTypes(dict):
         self._typecasts = Typecasts()
         self._typecasts.get_attnames = self.get_attnames
         self._typecasts.connection = self._db
-        if db.server_version < 80400:
-            # very old remote databases (not officially supported)
-            self._query_pg_type = (
-                "SELECT oid, typname, oid::pg_catalog.regtype,"
-                " typlen, typtype, null as typcategory, typdelim, typrelid"
-                " FROM pg_catalog.pg_type"
-                " WHERE oid OPERATOR(pg_catalog.=) %s::pg_catalog.regtype")
-        else:
-            self._query_pg_type = (
-                "SELECT oid, typname, oid::pg_catalog.regtype,"
-                " typlen, typtype, typcategory, typdelim, typrelid"
-                " FROM pg_catalog.pg_type"
-                " WHERE oid OPERATOR(pg_catalog.=) %s::pg_catalog.regtype")
+        self._query_pg_type = (
+            "SELECT oid, typname, oid::pg_catalog.regtype,"
+            " typlen, typtype, typcategory, typdelim, typrelid"
+            " FROM pg_catalog.pg_type"
+            " WHERE oid OPERATOR(pg_catalog.=) {}::pg_catalog.regtype")
 
     def add(self, oid, pgtype, regtype,
             typlen, typtype, category, delim, relid):
@@ -1162,7 +1154,7 @@ class DbTypes(dict):
     def __missing__(self, key):
         """Get the type info from the database if it is not cached."""
         try:
-            q = self._query_pg_type % (_quote_if_unqualified('$1', key),)
+            q = self._query_pg_type.format(_quote_if_unqualified('$1', key))
             res = self._db.query(q, (key,)).getresult()
         except ProgrammingError:
             res = None
@@ -1493,33 +1485,17 @@ class DB:
         self._privileges = {}
         self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
-        if db.server_version < 80400:
-            # very old remote databases (not officially supported)
-            self._query_attnames = (
-                "SELECT a.attname,"
-                " t.oid, t.typname, t.oid::pg_catalog.regtype,"
-                " t.typlen, t.typtype, null as typcategory,"
-                " t.typdelim, t.typrelid"
-                " FROM pg_catalog.pg_attribute a"
-                " JOIN pg_catalog.pg_type t"
-                " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
-                " WHERE a.attrelid OPERATOR(pg_catalog.=)"
-                " %s::pg_catalog.regclass"
-                " AND %s AND NOT a.attisdropped ORDER BY a.attnum")
-        else:
-            self._query_attnames = (
-                "SELECT a.attname,"
-                " t.oid, t.typname, t.oid::pg_catalog.regtype,"
-                " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid"
-                " FROM pg_catalog.pg_attribute a"
-                " JOIN pg_catalog.pg_type t"
-                " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
-                " WHERE a.attrelid OPERATOR(pg_catalog.=)"
-                " %s::pg_catalog.regclass"
-                " AND %s AND NOT a.attisdropped ORDER BY a.attnum")
-        if db.server_version < 100000:
-            self._query_generated = None
-        elif db.server_version < 120000:
+        self._query_attnames = (
+            "SELECT a.attname,"
+            " t.oid, t.typname, t.oid::pg_catalog.regtype,"
+            " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid"
+            " FROM pg_catalog.pg_attribute a"
+            " JOIN pg_catalog.pg_type t"
+            " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
+            " WHERE a.attrelid OPERATOR(pg_catalog.=)"
+            " {}::pg_catalog.regclass"
+            " AND {} AND NOT a.attisdropped ORDER BY a.attnum")
+        if db.server_version < 120000:
             self._query_generated = (
                 "a.attidentity OPERATOR(pg_catalog.=) 'a'"
             )
@@ -2052,8 +2028,9 @@ class DB:
         except KeyError:  # cache miss, check the database
             q = "a.attnum OPERATOR(pg_catalog.>) 0"
             if with_oid:
-                q = "(%s OR a.attname OPERATOR(pg_catalog.=) 'oid')" % q
-            q = self._query_attnames % (_quote_if_unqualified('$1', table), q)
+                q = f"({q} OR a.attname OPERATOR(pg_catalog.=) 'oid')"
+            q = self._query_attnames.format(
+                _quote_if_unqualified('$1', table), q)
             names = self.db.query(q, (table,)).getresult()
             types = self.dbtypes
             names = ((name[0], types.add(*name[1:])) for name in names)
@@ -2070,9 +2047,6 @@ class DB:
         be flushed. This may be necessary after the database schema or
         the search path has been changed.
         """
-        query_generated = self._query_generated
-        if not query_generated:
-            return frozenset()
         generated = self._generated
         if flush:
             generated.clear()
@@ -2080,8 +2054,10 @@ class DB:
         try:  # cache lookup
             names = generated[table]
         except KeyError:  # cache miss, check the database
-            q = "a.attnum OPERATOR(pg_catalog.>) 0 AND " + query_generated
-            q = self._query_attnames % (_quote_if_unqualified('$1', table), q)
+            q = "a.attnum OPERATOR(pg_catalog.>) 0"
+            q = f"{q} AND {self._query_generated}"
+            q = self._query_attnames.format(
+                _quote_if_unqualified('$1', table), q)
             names = self.db.query(q, (table,)).getresult()
             names = frozenset(name[0] for name in names)
             generated[table] = names  # cache it
@@ -2394,13 +2370,7 @@ class DB:
              ' ON CONFLICT (%s) DO %s RETURNING %s') % (
             self._escape_qualified_name(table), names, values, target, do, ret)
         self._do_debug(q, params)
-        try:
-            q = self.db.query(q, params)
-        except ProgrammingError:
-            if self.server_version < 90500:
-                raise _prg_error(
-                    'Upsert operation is not supported by PostgreSQL version')
-            raise  # re-raise original error
+        q = self.db.query(q, params)
         res = q.dictresult()
         if res:  # may be empty with "do nothing"
             for n, value in res[0].items():

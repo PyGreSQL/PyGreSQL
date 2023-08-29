@@ -176,7 +176,7 @@ class TestConnectObject(unittest.TestCase):
     def testAttributeServerVersion(self):
         server_version = self.connection.server_version
         self.assertIsInstance(server_version, int)
-        self.assertTrue(90000 <= server_version < 160000)
+        self.assertTrue(100000 <= server_version < 160000)
 
     def testAttributeSocket(self):
         socket = self.connection.socket
@@ -2704,11 +2704,7 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         query = db.query
         query('set client_encoding=sql_ascii')
         query('set standard_conforming_strings=off')
-        try:
-            query('set bytea_output=escape')
-        except pg.ProgrammingError:
-            if db.server_version >= 90000:
-                raise  # ignore for older server versions
+        query('set bytea_output=escape')
         db.close()
         cls.cls_set_up = True
 

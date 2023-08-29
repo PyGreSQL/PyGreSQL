@@ -629,17 +629,10 @@ class TypeCache(dict):
         self._typecasts = LocalTypecasts()
         self._typecasts.get_fields = self.get_fields
         self._typecasts.connection = cnx
-        if cnx.server_version < 80400:
-            # older remote databases (not officially supported)
-            self._query_pg_type = (
-                "SELECT oid, typname,"
-                " typlen, typtype, null as typcategory, typdelim, typrelid"
-                " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) %s")
-        else:
-            self._query_pg_type = (
-                "SELECT oid, typname,"
-                " typlen, typtype, typcategory, typdelim, typrelid"
-                " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) %s")
+        self._query_pg_type = (
+            "SELECT oid, typname,"
+            " typlen, typtype, typcategory, typdelim, typrelid"
+            " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) {}")
 
     def __missing__(self, key):
         """Get the type info from the database if it is not cached."""
@@ -650,7 +643,7 @@ class TypeCache(dict):
                 key = '"%s"' % (key,)
             oid = "'%s'::pg_catalog.regtype" % (self._escape_string(key),)
         try:
-            self._src.execute(self._query_pg_type % (oid,))
+            self._src.execute(self._query_pg_type.format(oid))
         except ProgrammingError:
             res = None
         else:

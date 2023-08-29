@@ -254,7 +254,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testAttributeServerVersion(self):
         server_version = self.db.server_version
         self.assertIsInstance(server_version, int)
-        self.assertTrue(90000 <= server_version < 160000)
+        self.assertTrue(100000 <= server_version < 160000)
         self.assertEqual(server_version, self.db.db.server_version)
 
     def testAttributeSocket(self):
@@ -456,11 +456,7 @@ class TestDBClass(unittest.TestCase):
         query("set lc_monetary='C'")
         query("set datestyle='ISO,YMD'")
         query('set standard_conforming_strings=on')
-        try:
-            query('set bytea_output=hex')
-        except pg.ProgrammingError:
-            if self.db.server_version >= 90000:
-                raise  # ignore for older server versions
+        query('set bytea_output=hex')
 
     def tearDown(self):
         self.doCleanups()
@@ -1951,13 +1947,7 @@ class TestDBClass(unittest.TestCase):
         r = query(q).getresult()
         self.assertEqual(r, [(1234, 'abcd')])
         r = dict(i4=5678, v4='efgh')
-        try:
-            insert('test_view', r)
-        except (pg.OperationalError, pg.NotSupportedError) as error:
-            if self.db.server_version < 90300:
-                # must setup rules in older PostgreSQL versions
-                self.skipTest('database cannot insert into view')
-            self.fail(str(error))
+        insert('test_view', r)
         self.assertNotIn('i2', r)
         self.assertEqual(r['i4'], 5678)
         self.assertNotIn('i8', r)
@@ -2203,12 +2193,7 @@ class TestDBClass(unittest.TestCase):
         table = 'upsert_test_table'
         self.createTable(table, 'n integer primary key, t text')
         s = dict(n=1, t='x')
-        try:
-            r = upsert(table, s)
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90500:
-                self.skipTest('database does not support upsert')
-            self.fail(str(error))
+        r = upsert(table, s)
         self.assertIs(r, s)
         self.assertEqual(r['n'], 1)
         self.assertEqual(r['t'], 'x')
@@ -2296,12 +2281,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('m', self.db.get_attnames('test_table', flush=True))
         self.assertEqual('n', self.db.pkey('test_table', flush=True))
         s = dict(n=2)
-        try:
-            r = upsert('test_table', s)
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90500:
-                self.skipTest('database does not support upsert')
-            self.fail(str(error))
+        r = upsert('test_table', s)
         self.assertIs(r, s)
         self.assertEqual(r['n'], 2)
         self.assertIsNone(r['m'])
@@ -2366,12 +2346,7 @@ class TestDBClass(unittest.TestCase):
         self.createTable(
             table, 'n integer, m integer, t text, primary key (n, m)')
         s = dict(n=1, m=2, t='x')
-        try:
-            r = upsert(table, s)
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90500:
-                self.skipTest('database does not support upsert')
-            self.fail(str(error))
+        r = upsert(table, s)
         self.assertIs(r, s)
         self.assertEqual(r['n'], 1)
         self.assertEqual(r['m'], 2)
@@ -2433,12 +2408,7 @@ class TestDBClass(unittest.TestCase):
         self.createTable(table, '"Prime!" smallint primary key,'
                                 ' "much space" integer, "Questions?" text')
         s = {'Prime!': 31, 'much space': 9009, 'Questions?': 'Yes.'}
-        try:
-            r = upsert(table, s)
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90500:
-                self.skipTest('database does not support upsert')
-            self.fail(str(error))
+        r = upsert(table, s)
         self.assertIs(r, s)
         self.assertEqual(r['Prime!'], 31)
         self.assertEqual(r['much space'], 9009)
@@ -2456,8 +2426,6 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, [(31, 9009, 'No.')])
 
     def testUpsertWithGeneratedColumns(self):
-        if self.db.server_version < 90500:
-            self.skipTest('database does not support upsert')
         upsert = self.db.upsert
         get = self.db.get
         server_version = self.db.server_version
@@ -3378,12 +3346,7 @@ class TestDBClass(unittest.TestCase):
         self.createTable('bytea_test', 'n smallint primary key, data bytea')
         s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
         r = dict(n=7, data=s)
-        try:
-            r = self.db.upsert('bytea_test', r)
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90500:
-                self.skipTest('database does not support upsert')
-            self.fail(str(error))
+        r = self.db.upsert('bytea_test', r)
         self.assertIsInstance(r, dict)
         self.assertIn('n', r)
         self.assertEqual(r['n'], 7)
@@ -3402,12 +3365,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsNone(r['data'])
 
     def testInsertGetJson(self):
-        try:
-            self.createTable('json_test', 'n smallint primary key, data json')
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90200:
-                self.skipTest('database does not support json')
-            self.fail(str(error))
+        self.createTable('json_test', 'n smallint primary key, data json')
         jsondecode = pg.get_jsondecode()
         # insert null value
         r = self.db.insert('json_test', n=0, data=None)
@@ -3471,13 +3429,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r[0][0], r[1][0])
 
     def testInsertGetJsonb(self):
-        try:
-            self.createTable('jsonb_test',
-                             'n smallint primary key, data jsonb')
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90400:
-                self.skipTest('database does not support jsonb')
-            self.fail(str(error))
+        self.createTable('jsonb_test',
+                         'n smallint primary key, data jsonb')
         jsondecode = pg.get_jsondecode()
         # insert null value
         r = self.db.insert('jsonb_test', n=0, data=None)
@@ -3703,13 +3656,7 @@ class TestDBClass(unittest.TestCase):
             self.assertNotEqual(r['data'], data)
 
     def testArrayOfJson(self):
-        try:
-            self.createTable(
-                'arraytest', 'id serial primary key, data json[]')
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90200:
-                self.skipTest('database does not support json')
-            self.fail(str(error))
+        self.createTable('arraytest', 'id serial primary key, data json[]')
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'json[]')
         data = [dict(id=815, name='John Doe'), dict(id=816, name='Jane Roe')]
@@ -3751,13 +3698,7 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(r, '{NULL,NULL}')
 
     def testArrayOfJsonb(self):
-        try:
-            self.createTable(
-                'arraytest', 'id serial primary key, data jsonb[]')
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90400:
-                self.skipTest('database does not support jsonb')
-            self.fail(str(error))
+        self.createTable('arraytest', 'id serial primary key, data jsonb[]')
         r = self.db.get_attnames('arraytest')
         self.assertEqual(r['data'], 'jsonb[]' if self.regtypes else 'json[]')
         data = [dict(id=815, name='John Doe'), dict(id=816, name='Jane Roe')]
@@ -3941,13 +3882,7 @@ class TestDBClass(unittest.TestCase):
 
     def testRecordInsertJson(self):
         query = self.db.query
-        try:
-            query('create type test_person_type as'
-                  ' (name text, data json)')
-        except pg.ProgrammingError as error:
-            if self.db.server_version < 90200:
-                self.skipTest('database does not support json')
-            self.fail(str(error))
+        query('create type test_person_type as (name text, data json)')
         self.addCleanup(query, 'drop type test_person_type')
         self.createTable('test_person', 'person test_person_type',
                          temporary=False)

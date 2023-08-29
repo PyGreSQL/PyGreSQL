@@ -749,10 +749,10 @@ the connection and its status. These attributes are:
 
      this is True if the connection uses SSL, False if not
 
-.. versionadded:: 5.1 (needs PostgreSQL >= 9.5)
+.. versionadded:: 5.1
 
 .. attribute:: Connection.ssl_attributes
 
      SSL-related information about the connection (dict)
 
-.. versionadded:: 5.1 (needs PostgreSQL >= 9.5)
+.. versionadded:: 5.1

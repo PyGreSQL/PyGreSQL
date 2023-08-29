@@ -81,9 +81,9 @@ get_pqlib_version -- get the version of libpq
 
 The number is formed by converting the major, minor, and revision numbers of
 the libpq version into two-decimal-digit numbers and appending them together.
-For example, version 9.1.2 will be returned as 90102.
+For example, version 15.4 will be returned as 150400.
 
-.. versionadded:: 5.2 (needs PostgreSQL >= 9.1)
+.. versionadded:: 5.2
 
 get/set_defhost -- default server host
 --------------------------------------
