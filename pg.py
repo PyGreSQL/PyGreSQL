@@ -20,8 +20,6 @@ This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
 """
 
-from __future__ import print_function, division
-
 try:
     from _pg import *
 except ImportError as e:

@@ -64,8 +64,6 @@ Basic usage:
     connection.close() # close the connection
 """
 
-from __future__ import print_function, division
-
 try:
     from _pg import *
 except ImportError as e:
