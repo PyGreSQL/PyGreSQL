@@ -16,7 +16,7 @@ The preferred way to use this module is as follows::
         for r in db.query(  # just for example
                 "SELECT foo, bar FROM foo_bar_table WHERE foo !~ bar"
                 ).dictresult():
-            print('%(foo)s %(bar)s' % r)
+            print('{foo} {bar}'.format(**r))
 
 This class can be subclassed as in this example::
 

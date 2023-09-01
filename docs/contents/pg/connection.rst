@@ -157,7 +157,7 @@ Examples::
     s = con1.query("begin; set transaction isolation level repeatable read;"
                    "select pg_export_snapshot();").single()
     con2.query("begin; set transaction isolation level repeatable read;"
-               "set transaction snapshot '%s'" % (s,))
+               f"set transaction snapshot '{s}'")
     q1 = con1.send_query("select a,b,c from x where d=e")
     q2 = con2.send_query("select e,f from y where g")
     r1 = q1.getresult()

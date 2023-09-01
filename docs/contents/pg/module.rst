@@ -289,8 +289,8 @@ which takes connection properties into account.
 Example::
 
     name = input("Name? ")
-    phone = con.query("select phone from employees where name='%s'"
-        % escape_string(name)).getresult()
+    phone = con.query("select phone from employees"
+                      f" where name='{escape_string(name)}'").singlescalar()
 
 escape_bytea -- escape binary data for use within SQL
 -----------------------------------------------------
@@ -315,8 +315,8 @@ which takes connection properties into account.
 Example::
 
     picture = open('garfield.gif', 'rb').read()
-    con.query("update pictures set img='%s' where name='Garfield'"
-        % escape_bytea(picture))
+    con.query(f"update pictures set img='{escape_bytea(picture)}'"
+              " where name='Garfield'")
 
 unescape_bytea -- unescape data that has been retrieved as text
 ---------------------------------------------------------------

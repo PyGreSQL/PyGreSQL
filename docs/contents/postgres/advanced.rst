@@ -27,7 +27,7 @@ all data fields from cities)::
     ...         "'Las Vegas', 2.583E+5, 2174",
     ...         "'Mariposa', 1200, 1953"]),
     ...     ('capitals', [
-    ...         "'Sacramento',3.694E+5,30,'CA'",
+    ...         "'Sacramento', 3.694E+5,30, 'CA'",
     ...         "'Madison', 1.913E+5, 845, 'WI'"])]
 
 Now, let's populate the tables::
@@ -37,11 +37,11 @@ Now, let's populate the tables::
     ...         "'Las Vegas', 2.583E+5, 2174"
     ...         "'Mariposa', 1200, 1953"],
     ...     'capitals', [
-    ...         "'Sacramento',3.694E+5,30,'CA'",
+    ...         "'Sacramento', 3.694E+5,30, 'CA'",
     ...         "'Madison', 1.913E+5, 845, 'WI'"]]
     >>> for table, rows in data:
     ...     for row in rows:
-    ...         query("INSERT INTO %s VALUES (%s)" % (table, row))
+    ...         query(f"INSERT INTO {table} VALUES (row)")
     >>> print(query("SELECT * FROM cities"))
         name     |population|altitude
     -------------+----------+--------

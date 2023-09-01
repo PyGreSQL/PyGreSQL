@@ -209,7 +209,7 @@ to hold our values, like this one::
     ...         self.price = price
     ...
     ...     def __str__(self):
-    ...         return '%s (from %s, at $%s)' % (
+    ...         return '{} (from {}, at ${})'.format(
     ...             self.name, self.supplier_id, self.price)
 
 But when we try to insert an instance of this class in the same way, we
@@ -231,7 +231,7 @@ with the name ``__pg_repr__``, like this::
     ...     ...
     ...
     ...     def __str__(self):
-    ...         return '%s (from %s, at $%s)' % (
+    ...         return '{} (from {}, at ${})'.format(
     ...             self.name, self.supplier_id, self.price)
     ...
     ...     def __pg_repr__(self):

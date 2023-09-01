@@ -56,7 +56,7 @@ version = '6.0'
 
 if not (3, 7) <= sys.version_info[:2] < (4, 0):
     raise Exception(
-        "Sorry, PyGreSQL %s does not support this Python version" % version)
+        f"Sorry, PyGreSQL {version} does not support this Python version")
 
 # For historical reasons, PyGreSQL does not install itself as a single
 # "pygresql" package, but as two top-level modules "pg", providing the
@@ -69,12 +69,12 @@ c_sources = ['pgmodule.c']
 
 def pg_config(s):
     """Retrieve information about installed version of PostgreSQL."""
-    f = os.popen('pg_config --%s' % s)
+    f = os.popen(f'pg_config --{s}')
     d = f.readline().strip()
     if f.close() is not None:
         raise Exception("pg_config tool is not available.")
     if not d:
-        raise Exception("Could not get %s information." % s)
+        raise Exception(f"Could not get {s} information.")
     return d
 
 

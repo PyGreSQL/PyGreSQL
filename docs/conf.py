@@ -68,7 +68,7 @@ nitpick_ignore = [
 html_theme = 'alabaster'
 html_static_path = ['_static']
 
-html_title = 'PyGreSQL %s' % version
+html_title = f'PyGreSQL {version}'
 
 html_logo = '_static/pygresql.png'
 html_favicon = '_static/favicon.ico'
