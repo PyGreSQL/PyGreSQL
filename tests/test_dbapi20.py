@@ -2,19 +2,13 @@
 
 import gc
 import unittest
-
-from datetime import date, time, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from uuid import UUID as Uuid
 
 import pgdb
 
-try:
-    from . import dbapi20
-except (ImportError, ValueError, SystemError):
-    # noinspection PyUnresolvedReferences
-    import dbapi20
-
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from . import dbapi20
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 
 class PgBitString:
@@ -27,7 +21,7 @@ class PgBitString:
         return f"B'{self.value:b}'"
 
 
-class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
+class TestPgDb(dbapi20.DatabaseAPI20Test):
 
     driver = pgdb
     connect_args = ()
@@ -38,7 +32,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
     lower_func = 'lower'  # For stored procedure test
 
     def setUp(self):
-        dbapi20.DatabaseAPI20Test.setUp(self)
+        super().setUp()
         try:
             con = self._connect()
             con.close()
@@ -52,7 +46,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
             db.query('create database ' + dbname)
 
     def tearDown(self):
-        dbapi20.DatabaseAPI20Test.tearDown(self)
+        super().tearDown()
 
     def test_version(self):
         v = pgdb.version
@@ -542,7 +536,7 @@ class test_PyGreSQL(dbapi20.DatabaseAPI20Test):
 
     def test_float(self):
         nan, inf = float('nan'), float('inf')
-        from math import isnan, isinf
+        from math import isinf, isnan
         self.assertTrue(isnan(nan) and not isinf(nan))
         self.assertTrue(isinf(inf) and not isnan(inf))
         values = [0, 1, 0.03125, -42.53125, nan, inf, -inf,

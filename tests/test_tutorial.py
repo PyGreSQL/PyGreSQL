@@ -5,7 +5,7 @@ import unittest
 from pg import DB
 from pgdb import connect
 
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 
 class TestClassicTutorial(unittest.TestCase):

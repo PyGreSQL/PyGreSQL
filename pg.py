@@ -150,7 +150,6 @@ __all__ = [
     'version', '__version__']
 
 import select
-import warnings
 import weakref
 from collections import OrderedDict, namedtuple
 from datetime import date, datetime, time, timedelta
