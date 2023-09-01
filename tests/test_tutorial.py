@@ -12,7 +12,7 @@ class TestClassicTutorial(unittest.TestCase):
     """Test the First Steps Tutorial for the classic interface."""
 
     def setUp(self):
-        """Setup test tables or empty them if they already exist."""
+        """Set up test tables or empty them if they already exist."""
         db = DB(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
         db.query("set datestyle to 'iso'")
         db.query("set default_with_oids=false")
@@ -107,7 +107,7 @@ class TestDbApi20Tutorial(unittest.TestCase):
     """Test the First Steps Tutorial for the DB-API 2.0 interface."""
 
     def setUp(self):
-        """Setup test tables or empty them if they already exist."""
+        """Set up test tables or empty them if they already exist."""
         host = f"{dbhost or ''}:{dbport or -1}"
         con = connect(database=dbname, host=host,
                       user=dbuser, password=dbpasswd)

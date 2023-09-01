@@ -9,9 +9,8 @@ Some modernization of the code has been done by the PyGreSQL team.
 
 __version__ = '1.15.0'
 
-import unittest
 import time
-
+import unittest
 from typing import Any, Dict, Tuple
 
 
@@ -462,7 +461,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             con.close()
 
     def test_next(self):
-        """Extension for getting the next row"""
+        """Test extension for getting the next row."""
         con = self._connect()
         try:
             cur = con.cursor()

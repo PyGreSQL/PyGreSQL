@@ -45,6 +45,7 @@
 				"njpwerner.autodocstring",
 				"redhat.vscode-yaml",
 				"eamodio.gitlens",
+				"charliermarsh.ruff",
 				"streetsidesoftware.code-spell-checker",
 				"lextudio.restructuredtext"
 			]

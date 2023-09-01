@@ -1,17 +1,21 @@
 #!/usr/bin/python
 
 import unittest
-
 from functools import partial
-from time import sleep
 from threading import Thread
+from time import sleep
 
 from pg import (
-    DB, NotificationHandler,
-    Error, DatabaseError, IntegrityError,
-    NotSupportedError, ProgrammingError)
+    DB,
+    DatabaseError,
+    Error,
+    IntegrityError,
+    NotificationHandler,
+    NotSupportedError,
+    ProgrammingError,
+)
 
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 
 def open_db():
@@ -28,7 +32,7 @@ class UtilityTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Recreate test tables and schemas"""
+        """Recreate test tables and schemas."""
         db = open_db()
         try:
             db.query("DROP VIEW _test_vschema")
@@ -56,7 +60,7 @@ class UtilityTest(unittest.TestCase):
         db.close()
 
     def setUp(self):
-        """Setup test tables or empty them if they already exist."""
+        """Set up test tables or empty them if they already exist."""
         db = open_db()
         db.query("TRUNCATE TABLE _test_schema")
         for t in ('_test1', '_test2'):
@@ -64,12 +68,12 @@ class UtilityTest(unittest.TestCase):
         db.close()
 
     def test_invalid_name(self):
-        """Make sure that invalid table names are caught"""
+        """Make sure that invalid table names are caught."""
         db = open_db()
         self.assertRaises(NotSupportedError, db.get_attnames, 'x.y.z')
 
     def test_schema(self):
-        """Does it differentiate the same table name in different schemas"""
+        """Check differentiation of same table name in different schemas."""
         db = open_db()
         # see if they differentiate the table names properly
         self.assertEqual(

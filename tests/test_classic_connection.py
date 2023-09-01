@@ -9,18 +9,17 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
-import unittest
+import os
 import threading
 import time
-import os
-
+import unittest
 from collections import namedtuple
 from collections.abc import Iterable
 from decimal import Decimal
 
 import pg  # the module under test
 
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 windows = os.name == 'nt'
 
@@ -284,7 +283,7 @@ class TestConnectObject(unittest.TestCase):
     def testMethodEndcopy(self):
         try:
             self.connection.endcopy()
-        except IOError:
+        except OSError:
             pass
 
     def testMethodClose(self):
@@ -864,7 +863,7 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support utf8")
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('utf8')
+        q = q.encode()
         # pass the query as bytes
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, str)
@@ -879,7 +878,7 @@ class TestUnicodeQueries(unittest.TestCase):
             self.skipTest("database does not support utf8")
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('utf8')
+        q = q.encode()
         v = self.c.query(q).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
@@ -2013,7 +2012,7 @@ class TestInserttable(unittest.TestCase):
             0.0, 0.0, 0.0, '0.0',
             c, 'bäd', 'bäd', "käse сыр pont-l'évêque")
         row_bytes = tuple(
-            s.encode('utf-8') if isinstance(s, str) else s
+            s.encode() if isinstance(s, str) else s
             for s in row_unicode)
         data = [row_bytes] * 2
         self.c.inserttable('test', data)
@@ -2098,7 +2097,7 @@ class TestInserttable(unittest.TestCase):
              None, 'c', 'v4', None, 'text')])
 
     def testInserttableSpecialChars(self):
-        class S(object):
+        class S:
             def __repr__(self):
                 return s
 
@@ -2187,7 +2186,7 @@ class TestDirectSocketAccess(unittest.TestCase):
             self.skipTest('database does not support utf8')
         query("copy test from stdin")
         try:
-            putline("47\tkäse\n".encode('utf8'))
+            putline("47\tkäse\n".encode())
             putline("35\twürstel\n")
         finally:
             self.c.endcopy()
@@ -2212,7 +2211,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         finally:
             try:
                 self.c.endcopy()
-            except IOError:
+            except OSError:
                 pass
 
     def testGetlineBytesAndUnicode(self):
@@ -2222,7 +2221,7 @@ class TestDirectSocketAccess(unittest.TestCase):
             query("select 'käse+würstel'")
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest('database does not support utf8')
-        data = [(54, 'käse'.encode('utf8')), (73, 'würstel')]
+        data = [(54, 'käse'.encode()), (73, 'würstel')]
         self.c.inserttable('test', data)
         query("copy test to stdout")
         try:
@@ -2236,7 +2235,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         finally:
             try:
                 self.c.endcopy()
-            except IOError:
+            except OSError:
                 pass
 
     def testParameterChecks(self):
@@ -2715,9 +2714,9 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         r = f('plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        r = f("das is' käse".encode('utf-8'))
+        r = f("das is' käse".encode())
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "das is'' käse".encode('utf-8'))
+        self.assertEqual(r, "das is'' käse".encode())
         r = f("that's cheesy")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s cheesy")
@@ -2733,7 +2732,7 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         r = f('plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, 'plain')
-        r = f("das is' käse".encode('utf-8'))
+        r = f("das is' käse".encode())
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b"das is'' k\\\\303\\\\244se")
         r = f("that's cheesy")

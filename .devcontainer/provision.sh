@@ -27,9 +27,15 @@ sudo apt-get install -y python3.9 python3.9-dev python3.9-distutils
 sudo apt-get install -y python3.10 python3.10-dev python3.10-distutils
 sudo apt-get install -y python3.11 python3.11-dev python3.11-distutils
 
-# install testing tool
+# install build and testing tool
 
-sudo apt-get install -y tox
+python3.7 -m pip install build
+python3.8 -m pip install build
+python3.9 -m pip install build
+python3.10 -m pip install build
+python3.11 -m pip install build
+
+sudo apt-get install -y tox python3-poetry
 
 # install PostgreSQL client tools
 

@@ -10,24 +10,23 @@ These tests need a database to test against.
 """
 
 import unittest
-
 from collections.abc import Iterable
 
 import pgdb  # the module under test
 
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 
 class InputStream:
 
     def __init__(self, data):
         if isinstance(data, str):
-            data = data.encode('utf-8')
+            data = data.encode()
         self.data = data or b''
         self.sizes = []
 
     def __str__(self):
-        data = self.data.decode('utf-8')
+        data = self.data.decode()
         return data
 
     def __len__(self):
@@ -50,7 +49,7 @@ class OutputStream:
         self.sizes = []
 
     def __str__(self):
-        data = self.data.decode('utf-8')
+        data = self.data.decode()
         return data
 
     def __len__(self):
@@ -58,7 +57,7 @@ class OutputStream:
 
     def write(self, data):
         if isinstance(data, str):
-            data = data.encode('utf-8')
+            data = data.encode()
         self.data += data
         self.sizes.append(len(data))
 
@@ -188,10 +187,10 @@ class TestCopyFrom(TestCopy):
     """Test the copy_from method."""
 
     def tearDown(self):
-        super(TestCopyFrom, self).tearDown()
+        super().tearDown()
         self.setUp()
         self.truncate_table()
-        super(TestCopyFrom, self).tearDown()
+        super().tearDown()
 
     def copy_from(self, stream, **options):
         return self.cursor.copy_from(stream, 'copytest', **options)
@@ -202,7 +201,7 @@ class TestCopyFrom(TestCopy):
 
     def test_bad_params(self):
         call = self.cursor.copy_from
-        call('0\t', 'copytest'), self.cursor
+        call('0\t', 'copytest')
         call('1\t', 'copytest',
              format='text', sep='\t', null='', columns=['id', 'name'])
         self.assertRaises(TypeError, call)
@@ -247,7 +246,7 @@ class TestCopyFrom(TestCopy):
         self.copy_from(b'42\tHello, world!')
         self.assertEqual(self.table_data, [(42, 'Hello, world!')])
         self.truncate_table()
-        self.copy_from(self.data_text.encode('utf-8'))
+        self.copy_from(self.data_text.encode())
         self.check_table()
 
     def test_input_iterable(self):
@@ -263,7 +262,7 @@ class TestCopyFrom(TestCopy):
         self.check_table()
 
     def test_input_iterable_bytes(self):
-        self.copy_from(row.encode('utf-8')
+        self.copy_from(row.encode()
                        for row in self.data_text.splitlines())
         self.check_table()
 
@@ -368,7 +367,7 @@ class TestCopyTo(TestCopy):
 
     @classmethod
     def setUpClass(cls):
-        super(TestCopyTo, cls).setUpClass()
+        super().setUpClass()
         con = cls.connect()
         cur = con.cursor()
         cur.execute("set client_encoding=utf8")
@@ -423,7 +422,7 @@ class TestCopyTo(TestCopy):
         self.assertEqual(len(rows), 3)
         rows = b''.join(rows)
         self.assertIsInstance(rows, bytes)
-        self.assertEqual(rows, self.data_text.encode('utf-8'))
+        self.assertEqual(rows, self.data_text.encode())
 
     def test_rowcount_increment(self):
         ret = self.copy_to()
@@ -436,7 +435,7 @@ class TestCopyTo(TestCopy):
         ret_decoded = ''.join(self.copy_to(decode=True))
         self.assertIsInstance(ret_raw, bytes)
         self.assertIsInstance(ret_decoded, str)
-        self.assertEqual(ret_decoded, ret_raw.decode('utf-8'))
+        self.assertEqual(ret_decoded, ret_raw.decode())
         self.check_rowcount()
 
     def test_sep(self):
@@ -521,7 +520,7 @@ class TestCopyTo(TestCopy):
         ret = self.copy_to(stream)
         self.assertIs(ret, self.cursor)
         self.assertEqual(str(stream), self.data_text)
-        data = self.data_text.encode('utf-8')
+        data = self.data_text.encode()
         sizes = [len(row) + 1 for row in data.splitlines()]
         self.assertEqual(stream.sizes, sizes)
         self.check_rowcount()

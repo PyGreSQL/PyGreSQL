@@ -22,5 +22,5 @@ jobs:
         with:
           python-version: 3.11
       - name: Run quality checks
-        run: tox -e flake8,docs
+        run: tox -e ruff,docs
         timeout-minutes: 5

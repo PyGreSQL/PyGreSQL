@@ -6,7 +6,6 @@ Welcome to PyGreSQL
 
     about
     copyright
-    announce
     download/index
     contents/index
     community/index

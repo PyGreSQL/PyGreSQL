@@ -3,10 +3,8 @@ Download information
 
 .. include:: download.rst
 
-News, Changes and Future Development
-------------------------------------
-
-See the :doc:`../announce` for current news.
+Changes and Future Development
+------------------------------
 
 For a list of all changes in the current version |version|
 and in past versions, have a look at the :doc:`../contents/changelog`.

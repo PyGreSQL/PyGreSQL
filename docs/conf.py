@@ -10,7 +10,7 @@ project = 'PyGreSQL'
 author = 'The PyGreSQL team'
 copyright = '2023, ' + author
 
-version = release = '5.2.5'
+version = release = '6.0'
 
 language = 'en'
 

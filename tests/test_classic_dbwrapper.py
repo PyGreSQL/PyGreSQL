@@ -9,24 +9,23 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
-import unittest
-import os
-import sys
 import gc
 import json
+import os
+import sys
 import tempfile
+import unittest
+from collections import OrderedDict
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from io import StringIO
+from operator import itemgetter
+from time import strftime
+from uuid import UUID
 
 import pg  # the module under test
 
-from collections import OrderedDict
-from decimal import Decimal
-from datetime import date, time, datetime, timedelta
-from io import StringIO
-from uuid import UUID
-from time import strftime
-from operator import itemgetter
-
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 debug = False  # let DB wrapper print debugging output
 
@@ -337,7 +336,7 @@ class TestDBClassBasic(unittest.TestCase):
     def testMethodEndcopy(self):
         try:
             self.db.endcopy()
-        except IOError:
+        except OSError:
             pass
 
     def testMethodClose(self):
@@ -507,9 +506,9 @@ class TestDBClass(unittest.TestCase):
         r = f("plain")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "'plain'")
-        r = f("that's käse".encode('utf-8'))
+        r = f("that's käse".encode())
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "'that''s käse'".encode('utf-8'))
+        self.assertEqual(r, "'that''s käse'".encode())
         r = f("that's käse")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "'that''s käse'")
@@ -526,9 +525,9 @@ class TestDBClass(unittest.TestCase):
         r = f("plain")
         self.assertIsInstance(r, str)
         self.assertEqual(r, '"plain"')
-        r = f("that's käse".encode('utf-8'))
+        r = f("that's käse".encode())
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, '"that\'s käse"'.encode('utf-8'))
+        self.assertEqual(r, '"that\'s käse"'.encode())
         r = f("that's käse")
         self.assertIsInstance(r, str)
         self.assertEqual(r, '"that\'s käse"')
@@ -545,9 +544,9 @@ class TestDBClass(unittest.TestCase):
         r = f("plain")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "plain")
-        r = f("that's käse".encode('utf-8'))
+        r = f("that's käse".encode())
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "that''s käse".encode('utf-8'))
+        self.assertEqual(r, "that''s käse".encode())
         r = f("that's käse")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s käse")
@@ -564,7 +563,7 @@ class TestDBClass(unittest.TestCase):
         r = f('plain')
         self.assertIsInstance(r, str)
         self.assertEqual(r, '\\x706c61696e')
-        r = f("das is' käse".encode('utf-8'))
+        r = f("das is' käse".encode())
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'\\x64617320697327206bc3a47365')
         r = f("das is' käse")
@@ -582,10 +581,10 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, b'plain')
         r = f(b"das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "das is' käse".encode('utf8'))
+        self.assertEqual(r, "das is' käse".encode())
         r = f("das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "das is' käse".encode('utf8'))
+        self.assertEqual(r, "das is' käse".encode())
         self.assertEqual(f(r'O\\000ps\\377!'), b'O\\000ps\\377!')
         self.assertEqual(f(r'\\x706c61696e'), b'\\x706c61696e')
         self.assertEqual(f(r'\\x746861742773206be47365'),
@@ -4320,11 +4319,11 @@ class TestDBClassNonStdOpts(TestDBClass):
         db = DB()
         cls.regtypes = not db.use_regtypes()
         db.close()
-        super(TestDBClassNonStdOpts, cls).setUpClass()
+        super().setUpClass()
 
     @classmethod
     def tearDownClass(cls):
-        super(TestDBClassNonStdOpts, cls).tearDownClass()
+        super().tearDownClass()
         cls.reset_option('jsondecode')
         cls.reset_option('bool')
         cls.reset_option('array')

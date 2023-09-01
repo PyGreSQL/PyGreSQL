@@ -24,7 +24,7 @@ class PgBitString:
         self.value = value
 
     def __pg_repr__(self):
-        return "B'{0:b}'".format(self.value)
+        return f"B'{self.value:b}'"
 
 
 class test_PyGreSQL(dbapi20.DatabaseAPI20Test):

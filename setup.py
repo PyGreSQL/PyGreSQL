@@ -1,41 +1,11 @@
 #!/usr/bin/python
-#
-# PyGreSQL - a Python interface for the PostgreSQL database.
-#
-# Copyright (c) 2023 by the PyGreSQL Development Team
-#
-# Please see the LICENSE.TXT file for specific restrictions.
 
-"""Setup script for PyGreSQL version 6.0
+"""Driver script for building PyGreSQL using setuptools.
 
-PyGreSQL is an open-source Python module that interfaces to a
-PostgreSQL database. It wraps the lower level C API library libpq
-to allow easy use of the powerful PostgreSQL features from Python.
+You can build the PyGreSQL distribution like this:
 
-Authors and history:
-* PyGreSQL written 1997 by D'Arcy J.M. Cain <darcy@druid.net>
-* based on code written 1995 by Pascal Andre <andre@chimay.via.ecp.fr>
-* setup script created 2000 by Mark Alexander <mwa@gate.net>
-* improved 2000 by Jeremy Hylton <jeremy@cnri.reston.va.us>
-* improved 2001 by Gerhard Haering <gerhard@bigfoot.de>
-* improved 2006 to 2018 by Christoph Zwerschke <cito@online.de>
-
-Prerequisites to be installed:
-* Python including devel package (header files and distutils)
-* PostgreSQL libs and devel packages (header file of the libpq client)
-* PostgreSQL pg_config tool (usually included in the devel package)
-  (the Windows installer has it as part of the database server feature)
-
-PyGreSQL currently supports Python versions 3.7 to 3.11,
-and PostgreSQL versions 10 to 15.
-
-Use as follows:
-python setup.py build_ext # to build the module
-python setup.py install   # to install it
-
-See docs.python.org/doc/install/ for more information on
-using distutils to install Python programs.
-
+    pip install build
+    python -m build -C strict -C memory-size
 """
 
 import os
@@ -43,14 +13,11 @@ import platform
 import re
 import sys
 import warnings
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
-from distutils.extension import Extension
-from distutils.command.build_ext import build_ext
 from distutils.ccompiler import get_default_compiler
 from distutils.sysconfig import get_python_inc, get_python_lib
+
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
 version = '6.0'
 
@@ -63,9 +30,7 @@ if not (3, 7) <= sys.version_info[:2] < (4, 0):
 # classic interface, and "pgdb" for the modern DB-API 2.0 interface.
 # These two top-level Python modules share the same C extension "_pg".
 
-py_modules = ['pg', 'pgdb']
 c_sources = ['pgmodule.c']
-
 
 def pg_config(s):
     """Retrieve information about installed version of PostgreSQL."""
@@ -118,6 +83,7 @@ class build_pg_ext(build_ext):
         return self.compiler or get_default_compiler()
 
     def initialize_options(self):
+        """Initialize the supported options with default values."""
         build_ext.initialize_options(self)
         self.strict = False
         self.memory_size = None
@@ -157,45 +123,10 @@ class build_pg_ext(build_ext):
 setup(
     name="PyGreSQL",
     version=version,
-    description="Python PostgreSQL Interfaces",
-    long_description=__doc__.split('\n\n', 2)[1],  # first passage
-    long_description_content_type='text/plain',
-    keywords="pygresql postgresql database api dbapi",
-    author="D'Arcy J. M. Cain",
-    author_email="darcy@PyGreSQL.org",
-    url="http://www.pygresql.org",
-    download_url="http://www.pygresql.org/download/",
-    project_urls={
-        "Documentation": "https://pygresql.org/contents/",
-        "Issue Tracker": "https://github.com/PyGreSQL/PyGreSQL/issues/",
-        "Mailing List": "https://mail.vex.net/mailman/listinfo/pygresql",
-        "Source Code": "https://github.com/PyGreSQL/PyGreSQL"},
-    platforms=["any"],
-    license="PostgreSQL",
-    py_modules=py_modules,
     ext_modules=[Extension(
         '_pg', c_sources,
         include_dirs=include_dirs, library_dirs=library_dirs,
         define_macros=define_macros, undef_macros=undef_macros,
         libraries=libraries, extra_compile_args=extra_compile_args)],
-    zip_safe=False,
     cmdclass=dict(build_ext=build_pg_ext),
-    test_suite='tests.discover',
-    classifiers=[
-        "Development Status :: 6 - Mature",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: PostgreSQL License",
-        "Operating System :: OS Independent",
-        "Programming Language :: C",
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
-        "Programming Language :: SQL",
-        "Topic :: Database",
-        "Topic :: Database :: Front-Ends",
-        "Topic :: Software Development :: Libraries :: Python Modules"]
 )

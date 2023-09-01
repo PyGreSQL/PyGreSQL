@@ -9,13 +9,13 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
-import unittest
-import tempfile
 import os
+import tempfile
+import unittest
 
 import pg  # the module under test
 
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 windows = os.name == 'nt'
 
@@ -151,11 +151,11 @@ class TestLargeObjects(unittest.TestCase):
         if self.obj.oid:
             try:
                 self.obj.close()
-            except (SystemError, IOError):
+            except (SystemError, OSError):
                 pass
             try:
                 self.obj.unlink()
-            except (SystemError, IOError):
+            except (SystemError, OSError):
                 pass
         del self.obj
         try:
@@ -270,12 +270,12 @@ class TestLargeObjects(unittest.TestCase):
     def testWriteUtf8Bytes(self):
         read = self.obj.read
         self.obj.open(pg.INV_WRITE)
-        self.obj.write('käse'.encode('utf8'))
+        self.obj.write('käse'.encode())
         self.obj.close()
         self.obj.open(pg.INV_READ)
         r = read(80)
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r.decode('utf8'), 'käse')
+        self.assertEqual(r.decode(), 'käse')
 
     def testWriteUtf8String(self):
         read = self.obj.read
@@ -285,7 +285,7 @@ class TestLargeObjects(unittest.TestCase):
         self.obj.open(pg.INV_READ)
         r = read(80)
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r.decode('utf8'), 'käse')
+        self.assertEqual(r.decode(), 'käse')
 
     def testSeek(self):
         seek = self.obj.seek

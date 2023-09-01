@@ -66,7 +66,7 @@ Basic usage:
 
 try:
     from _pg import version
-except ImportError as e:
+except ImportError as e:  # noqa: F841
     import os
     libpq = 'libpq.'
     if os.name == 'nt':
@@ -99,14 +99,24 @@ else:
 
 # import objects from extension module
 from _pg import (
-    Error, Warning,
-    DataError, DatabaseError,
-    IntegrityError, InterfaceError, InternalError,
-    NotSupportedError, OperationalError, ProgrammingError,
-    cast_array, cast_hstore, cast_record,
     RESULT_DQL,
-    connect, unescape_bytea,
-    version)
+    DatabaseError,
+    DataError,
+    Error,
+    IntegrityError,
+    InterfaceError,
+    InternalError,
+    NotSupportedError,
+    OperationalError,
+    ProgrammingError,
+    Warning,
+    cast_array,
+    cast_hstore,
+    cast_record,
+    connect,
+    unescape_bytea,
+    version,
+)
 
 __version__ = version
 
@@ -127,17 +137,18 @@ __all__ = [
     'get_typecast', 'set_typecast', 'reset_typecast',
     'version', '__version__']
 
-from datetime import date, time, datetime, timedelta
-from time import localtime
-from decimal import Decimal as StdDecimal
-from uuid import UUID as Uuid
-from math import isnan, isinf
 from collections import namedtuple
 from collections.abc import Iterable
-from inspect import signature
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal as StdDecimal
 from functools import lru_cache, partial
+from inspect import signature
+from json import dumps as jsonencode
+from json import loads as jsondecode
+from math import isinf, isnan
 from re import compile as regex
-from json import loads as jsondecode, dumps as jsonencode
+from time import localtime
+from uuid import UUID as Uuid
 
 Decimal = StdDecimal
 
@@ -623,7 +634,7 @@ class TypeCache(dict):
 
     def __init__(self, cnx):
         """Initialize type cache for connection."""
-        super(TypeCache, self).__init__()
+        super().__init__()
         self._escape_string = cnx.escape_string
         self._src = cnx.source()
         self._typecasts = LocalTypecasts()
@@ -726,7 +737,7 @@ class _quotedict(dict):
 
     def __getitem__(self, key):
         # noinspection PyUnresolvedReferences
-        return self.quote(super(_quotedict, self).__getitem__(key))
+        return self.quote(super().__getitem__(key))
 
 
 # *** Error Messages ***
@@ -777,7 +788,7 @@ def set_row_factory_size(maxsize):
 
 # *** Cursor Object ***
 
-class Cursor(object):
+class Cursor:
     """Cursor object."""
 
     def __init__(self, dbcnx):
@@ -1369,7 +1380,7 @@ CursorDescription = namedtuple('CursorDescription', (
 
 # *** Connection Objects ***
 
-class Connection(object):
+class Connection:
     """Connection object."""
 
     # expose the exceptions as attributes on the connection object
@@ -1576,25 +1587,28 @@ class Type(frozenset):
     """
 
     def __new__(cls, values):
+        """Create new type object."""
         if isinstance(values, str):
             values = values.split()
-        return super(Type, cls).__new__(cls, values)
+        return super().__new__(cls, values)
 
     def __eq__(self, other):
+        """Check whether types are considered equal."""
         if isinstance(other, str):
             if other.startswith('_'):
                 other = other[1:]
             return other in self
         else:
-            return super(Type, self).__eq__(other)
+            return super().__eq__(other)
 
     def __ne__(self, other):
+        """Check whether types are not considered equal."""
         if isinstance(other, str):
             if other.startswith('_'):
                 other = other[1:]
             return other not in self
         else:
-            return super(Type, self).__ne__(other)
+            return super().__ne__(other)
 
 
 class ArrayType:
@@ -1741,6 +1755,7 @@ class Hstore(dict):
         return s
 
     def __str__(self):
+        """Create a printable representation of the hstore value."""
         q = self._quote
         return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
 
@@ -1749,10 +1764,12 @@ class Json:
     """Construct a wrapper for holding an object serializable to JSON."""
 
     def __init__(self, obj, encode=None):
+        """Initialize the JSON object."""
         self.obj = obj
         self.encode = encode or jsonencode
 
     def __str__(self):
+        """Create a printable representation of the JSON object."""
         obj = self.obj
         if isinstance(obj, str):
             return obj
@@ -1763,9 +1780,11 @@ class Literal:
     """Construct a wrapper for holding a literal SQL string."""
 
     def __init__(self, sql):
+        """Initialize literal SQL string."""
         self.sql = sql
 
     def __str__(self):
+        """Return a printable representation of the SQL string."""
         return self.sql
 
     __pg_repr__ = __str__

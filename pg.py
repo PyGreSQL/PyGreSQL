@@ -22,7 +22,7 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 
 try:
     from _pg import version
-except ImportError as e:
+except ImportError as e:  # noqa: F841
     import os
     libpq = 'libpq.'
     if os.name == 'nt':
@@ -55,29 +55,69 @@ else:
 
 # import objects from extension module
 from _pg import (
-    Error, Warning,
-    DataError, DatabaseError,
-    IntegrityError, InterfaceError, InternalError,
-    InvalidResultError, MultipleResultsError,
-    NoResultError, NotSupportedError,
-    OperationalError, ProgrammingError,
-    INV_READ, INV_WRITE,
-    POLLING_OK, POLLING_FAILED, POLLING_READING, POLLING_WRITING,
-    SEEK_CUR, SEEK_END, SEEK_SET,
-    TRANS_ACTIVE, TRANS_IDLE, TRANS_INERROR,
-    TRANS_INTRANS, TRANS_UNKNOWN,
-    cast_array, cast_hstore, cast_record,
-    connect, escape_bytea, escape_string, unescape_bytea,
-    get_array, get_bool, get_bytea_escaped,
-    get_datestyle, get_decimal, get_decimal_point,
-    get_defbase, get_defhost, get_defopt, get_defport, get_defuser,
-    get_jsondecode, get_pqlib_version,
-    set_array, set_bool, set_bytea_escaped,
-    set_datestyle, set_decimal, set_decimal_point,
-    set_defbase, set_defhost, set_defopt,
-    set_defpasswd, set_defport, set_defuser,
-    set_jsondecode, set_query_helpers,
-    version)
+    INV_READ,
+    INV_WRITE,
+    POLLING_FAILED,
+    POLLING_OK,
+    POLLING_READING,
+    POLLING_WRITING,
+    SEEK_CUR,
+    SEEK_END,
+    SEEK_SET,
+    TRANS_ACTIVE,
+    TRANS_IDLE,
+    TRANS_INERROR,
+    TRANS_INTRANS,
+    TRANS_UNKNOWN,
+    DatabaseError,
+    DataError,
+    Error,
+    IntegrityError,
+    InterfaceError,
+    InternalError,
+    InvalidResultError,
+    MultipleResultsError,
+    NoResultError,
+    NotSupportedError,
+    OperationalError,
+    ProgrammingError,
+    Warning,
+    cast_array,
+    cast_hstore,
+    cast_record,
+    connect,
+    escape_bytea,
+    escape_string,
+    get_array,
+    get_bool,
+    get_bytea_escaped,
+    get_datestyle,
+    get_decimal,
+    get_decimal_point,
+    get_defbase,
+    get_defhost,
+    get_defopt,
+    get_defport,
+    get_defuser,
+    get_jsondecode,
+    get_pqlib_version,
+    set_array,
+    set_bool,
+    set_bytea_escaped,
+    set_datestyle,
+    set_decimal,
+    set_decimal_point,
+    set_defbase,
+    set_defhost,
+    set_defopt,
+    set_defpasswd,
+    set_defport,
+    set_defuser,
+    set_jsondecode,
+    set_query_helpers,
+    unescape_bytea,
+    version,
+)
 
 __version__ = version
 
@@ -112,19 +152,18 @@ __all__ = [
 import select
 import warnings
 import weakref
-
-from datetime import date, time, datetime, timedelta
+from collections import OrderedDict, namedtuple
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from math import isnan, isinf
-from collections import namedtuple, OrderedDict
-from inspect import signature
-from operator import itemgetter
 from functools import lru_cache, partial
+from inspect import signature
+from json import dumps as jsonencode
+from json import loads as jsondecode
+from math import isinf, isnan
+from operator import itemgetter
 from re import compile as regex
-from json import loads as jsondecode, dumps as jsonencode
-from uuid import UUID
 from typing import Dict, List, Union  # noqa: F401
-
+from uuid import UUID
 
 # Auxiliary classes and functions that are independent of a DB connection:
 
@@ -174,6 +213,7 @@ class Hstore(dict):
         return s
 
     def __str__(self):
+        """Create a printable representation of the hstore value."""
         q = self._quote
         return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
 
@@ -182,10 +222,12 @@ class Json:
     """Wrapper class for marking Json values."""
 
     def __init__(self, obj, encode=None):
+        """Initialize the JSON object."""
         self.obj = obj
         self.encode = encode or jsonencode
 
     def __str__(self):
+        """Create a printable representation of the JSON object."""
         obj = self.obj
         if isinstance(obj, str):
             return obj
@@ -313,6 +355,7 @@ class Adapter:
     _re_array_escape = _re_record_escape = regex(r'(["\\])')
 
     def __init__(self, db):
+        """Initialize the adapter object with the given connection."""
         self.db = weakref.proxy(db)
 
     @classmethod
@@ -1124,7 +1167,7 @@ class DbTypes(dict):
 
     def __init__(self, db):
         """Initialize type cache for connection."""
-        super(DbTypes, self).__init__()
+        super().__init__()
         self._db = weakref.proxy(db)
         self._regtypes = False
         self._typecasts = Typecasts()
@@ -1315,7 +1358,7 @@ set_query_helpers(_dictiter, _namediter, _namednext, _scalariter)
 
 # The notification handler
 
-class NotificationHandler(object):
+class NotificationHandler:
     """A PostgreSQL client-side asynchronous notification handler."""
 
     def __init__(self, db, event, callback=None,
@@ -1348,6 +1391,7 @@ class NotificationHandler(object):
         self.timeout = timeout
 
     def __del__(self):
+        """Delete the notification handler."""
         self.unlisten()
 
     def close(self):
@@ -1440,7 +1484,10 @@ class NotificationHandler(object):
 
 
 def pgnotify(*args, **kw):
-    """Same as NotificationHandler, under the traditional name."""
+    """Create a notification handler.
+
+    Same as NotificationHandler, under the traditional name.
+    """
     warnings.warn("pgnotify is deprecated, use NotificationHandler instead",
                   DeprecationWarning, stacklevel=2)
     return NotificationHandler(*args, **kw)
@@ -1454,7 +1501,7 @@ class DB:
     db = None  # invalid fallback for underlying connection
 
     def __init__(self, *args, **kw):
-        """Create a new connection
+        """Create a new connection.
 
         You can pass either the connection parameters or an existing
         _pg or pgdb connection. This allows you to use the methods
@@ -1519,6 +1566,7 @@ class DB:
         self.debug = None
 
     def __getattr__(self, name):
+        """Get the specified attritbute of the connection."""
         # All undefined members are same as in underlying connection:
         if self.db:
             return getattr(self.db, name)
@@ -1526,6 +1574,7 @@ class DB:
             raise _int_error('Connection is not valid')
 
     def __dir__(self):
+        """List all attributes of the connection."""
         # Custom dir function including the attributes of the connection:
         attrs = set(self.__class__.__dict__)
         attrs.update(self.__dict__)
@@ -1547,6 +1596,7 @@ class DB:
             self.rollback()
 
     def __del__(self):
+        """Delete the connection."""
         try:
             db = self.db
         except AttributeError:
@@ -1565,7 +1615,7 @@ class DB:
     # Auxiliary methods
 
     def _do_debug(self, *args):
-        """Print a debug message"""
+        """Print a debug message."""
         if self.debug:
             s = '\n'.join(str(arg) for arg in args)
             if isinstance(self.debug, str):
@@ -1918,7 +1968,7 @@ class DB:
         return self.db.describe_prepared(name)
 
     def delete_prepared(self, name=None):
-        """Delete a prepared SQL statement
+        """Delete a prepared SQL statement.
 
         This deallocates a previously prepared SQL statement with the given
         name, or deallocates all prepared statements if you do not specify a
@@ -2275,8 +2325,7 @@ class DB:
         keyname = set(keyname)
         for n in attnames:
             if n in row and n not in keyname and n not in generated:
-                values.append('{} = {}'.format(
-                    col(n), adapt(row[n], attnames[n])))
+                values.append(f'{col(n)} = {adapt(row[n], attnames[n])}')
         if not values:
             return row
         values = ', '.join(values)
@@ -2294,7 +2343,7 @@ class DB:
         return row
 
     def upsert(self, table, row=None, **kw):
-        """Insert a row into a database table with conflict resolution
+        """Insert a row into a database table with conflict resolution.
 
         This method inserts a row into a table, but instead of raising a
         ProgrammingError exception in case a row with the same primary key

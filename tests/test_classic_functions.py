@@ -9,14 +9,12 @@ Contributed by Christoph Zwerschke.
 These tests do not need a database to test against.
 """
 
-import unittest
-
 import json
 import re
+import unittest
+from datetime import timedelta
 
 import pg  # the module under test
-
-from datetime import timedelta
 
 
 class TestHasConnect(unittest.TestCase):
@@ -900,10 +898,10 @@ class TestEscapeFunctions(unittest.TestCase):
         self.assertEqual(r, b'plain')
         r = f(b"das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "das is' käse".encode('utf-8'))
+        self.assertEqual(r, "das is' käse".encode())
         r = f("das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "das is' käse".encode('utf-8'))
+        self.assertEqual(r, "das is' käse".encode())
         r = f(b'O\\000ps\\377!')
         self.assertEqual(r, b'O\x00ps\xff!')
         r = f('O\\000ps\\377!')
