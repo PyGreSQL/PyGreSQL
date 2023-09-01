@@ -38,7 +38,7 @@ class TestModuleConstants(unittest.TestCase):
             try:
                 value = getattr(pg, name)
             except AttributeError:
-                self.fail('Module constant %s is missing' % name)
+                self.fail(f'Module constant {name} is missing')
             self.assertIsInstance(value, int)
 
 
@@ -187,10 +187,10 @@ class TestLargeObjects(unittest.TestCase):
         self.obj.write(data)
         oid = self.obj.oid
         r = str(self.obj)
-        self.assertEqual(r, 'Opened large object, oid %d' % oid)
+        self.assertEqual(r, f'Opened large object, oid {oid}')
         self.obj.close()
         r = str(self.obj)
-        self.assertEqual(r, 'Closed large object, oid %d' % oid)
+        self.assertEqual(r, f'Closed large object, oid {oid}')
 
     def testRepr(self):
         r = repr(self.obj)
@@ -260,22 +260,22 @@ class TestLargeObjects(unittest.TestCase):
     def testWriteLatin1Bytes(self):
         read = self.obj.read
         self.obj.open(pg.INV_WRITE)
-        self.obj.write(u'käse'.encode('latin1'))
+        self.obj.write('käse'.encode('latin1'))
         self.obj.close()
         self.obj.open(pg.INV_READ)
         r = read(80)
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r.decode('latin1'), u'käse')
+        self.assertEqual(r.decode('latin1'), 'käse')
 
     def testWriteUtf8Bytes(self):
         read = self.obj.read
         self.obj.open(pg.INV_WRITE)
-        self.obj.write(u'käse'.encode('utf8'))
+        self.obj.write('käse'.encode('utf8'))
         self.obj.close()
         self.obj.open(pg.INV_READ)
         r = read(80)
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r.decode('utf8'), u'käse')
+        self.assertEqual(r.decode('utf8'), 'käse')
 
     def testWriteUtf8String(self):
         read = self.obj.read
@@ -285,7 +285,7 @@ class TestLargeObjects(unittest.TestCase):
         self.obj.open(pg.INV_READ)
         r = read(80)
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r.decode('utf8'), u'käse')
+        self.assertEqual(r.decode('utf8'), 'käse')
 
     def testSeek(self):
         seek = self.obj.seek
@@ -367,7 +367,7 @@ class TestLargeObjects(unittest.TestCase):
         unlink = self.obj.unlink
         self.obj.open(pg.INV_WRITE)
         self.obj.close()
-        self.pgcnx.query('select lo_unlink(%d)' % self.obj.oid)
+        self.pgcnx.query(f'select lo_unlink({self.obj.oid})')
         self.assertRaises(IOError, unlink)
 
     def testSize(self):
@@ -446,7 +446,7 @@ class TestLargeObjects(unittest.TestCase):
         f = tempfile.NamedTemporaryFile()
         self.obj.open(pg.INV_WRITE)
         self.obj.close()
-        self.pgcnx.query('select lo_unlink(%d)' % self.obj.oid)
+        self.pgcnx.query(f'select lo_unlink({self.obj.oid})')
         self.assertRaises(IOError, export, f.name)
         f.close()
 

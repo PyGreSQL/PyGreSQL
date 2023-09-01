@@ -88,7 +88,7 @@ class TestSyncNotification(unittest.TestCase):
         handler = self.db.notification_handler(
             event, callback, arg_dict, 0, stop_event)
         self.assertEqual(handler.event, event)
-        self.assertEqual(handler.stop_event, stop_event or 'stop_%s' % event)
+        self.assertEqual(handler.stop_event, stop_event or f'stop_{event}')
         self.assertIs(handler.callback, callback)
         if arg_dict is None:
             self.assertEqual(handler.arg_dict, {})
@@ -224,7 +224,7 @@ class TestAsyncNotification(unittest.TestCase):
         self.handler = handler
         self.assertIsInstance(handler, pg.NotificationHandler)
         self.assertEqual(handler.event, event)
-        self.assertEqual(handler.stop_event, stop_event or 'stop_%s' % event)
+        self.assertEqual(handler.stop_event, stop_event or f'stop_{event}')
         self.event = handler.event
         self.assertIs(handler.callback, callback)
         if arg_dict is None:
@@ -277,9 +277,9 @@ class TestAsyncNotification(unittest.TestCase):
         if stop:
             event = self.handler.stop_event
             self.stopped = True
-        q = 'notify "%s"' % event
+        q = f'notify "{event}"'
         if payload:
-            q += ", '%s'" % payload
+            q += f", '{payload}'"
         arg_dict = self.arg_dict.copy()
         arg_dict.update(event=event, pid=1, extra=payload or '')
         self.db.query(q)
@@ -370,14 +370,14 @@ class TestAsyncNotification(unittest.TestCase):
     def testNotifyWithFivePayloads(self):
         self.start_handler('gimme_5', {'test': 'Gimme 5'})
         for count in range(5):
-            self.notify_query(payload="Round %d" % count)
+            self.notify_query(payload=f"Round {count}")
         self.assertEqual(len(self.sent), 5)
         self.receive(stop=True)
 
     def testReceiveImmediately(self):
         self.start_handler('immediate', {'test': 'immediate'})
         for count in range(3):
-            self.notify_query(payload="Round %d" % count)
+            self.notify_query(payload=f"Round {count}")
             self.receive()
         self.receive(stop=True)
 
@@ -385,7 +385,7 @@ class TestAsyncNotification(unittest.TestCase):
         self.start_handler('test_transaction', {'transaction': True})
         self.db.begin()
         for count in range(3):
-            self.notify_query(payload='Round %d' % count)
+            self.notify_query(payload=f'Round {count}')
         self.db.commit()
         self.receive(stop=True)
 

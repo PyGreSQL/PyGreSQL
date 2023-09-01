@@ -48,11 +48,11 @@ class UtilityTest(unittest.TestCase):
             except Exception:
                 pass
             try:
-                db.query("DROP TABLE %s._test_schema" % (t,))
+                db.query(f"DROP TABLE {t}._test_schema")
             except Exception:
                 pass
-            db.query("CREATE TABLE %s._test_schema"
-                     " (%s int PRIMARY KEY)" % (t, t))
+            db.query(f"CREATE TABLE {t}._test_schema"
+                     f" ({t} int PRIMARY KEY)")
         db.close()
 
     def setUp(self):
@@ -60,7 +60,7 @@ class UtilityTest(unittest.TestCase):
         db = open_db()
         db.query("TRUNCATE TABLE _test_schema")
         for t in ('_test1', '_test2'):
-            db.query("TRUNCATE TABLE %s._test_schema" % t)
+            db.query(f"TRUNCATE TABLE {t}._test_schema")
         db.close()
 
     def test_invalid_name(self):

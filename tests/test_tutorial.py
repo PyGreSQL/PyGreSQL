@@ -108,7 +108,7 @@ class TestDbApi20Tutorial(unittest.TestCase):
 
     def setUp(self):
         """Setup test tables or empty them if they already exist."""
-        host = '%s:%d' % (dbhost or '', dbport or -1)
+        host = f"{dbhost or ''}:{dbport or -1}"
         con = connect(database=dbname, host=host,
                       user=dbuser, password=dbpasswd)
         cur = con.cursor()

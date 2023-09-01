@@ -278,7 +278,7 @@ class TestParseArray(unittest.TestCase):
     def testParserTooDeeplyNested(self):
         f = pg.cast_array
         for n in 3, 5, 9, 12, 16, 32, 64, 256:
-            r = '%sa,b,c%s' % ('{' * n, '}' * n)
+            r = '{' * n + 'a,b,c' + '}' * n
             if n > 16:  # hard coded maximum depth
                 self.assertRaises(ValueError, f, r)
             else:
@@ -302,7 +302,7 @@ class TestParseArray(unittest.TestCase):
         self.assertEqual(f('{a}', str), ['a'])
 
         def cast(s):
-            return '%s is ok' % s
+            return f'{s} is ok'
         self.assertEqual(f('{a}', cast), ['a is ok'])
 
     def testParserDelim(self):
@@ -528,7 +528,8 @@ class TestParseRecord(unittest.TestCase):
     def testParserManyElements(self):
         f = pg.cast_record
         for n in 3, 5, 9, 12, 16, 32, 64, 256:
-            r = '(%s)' % ','.join(map(str, range(n)))
+            r = ','.join(map(str, range(n)))
+            r = f'({r})'
             r = f(r, int)
             self.assertEqual(r, tuple(range(n)))
 
@@ -544,7 +545,7 @@ class TestParseRecord(unittest.TestCase):
         self.assertEqual(f('(a)', str), ('a',))
 
         def cast(s):
-            return '%s is ok' % s
+            return f'{s} is ok'
         self.assertEqual(f('(a)', cast), ('a is ok',))
 
     def testParserCastNonUniform(self):
@@ -571,11 +572,11 @@ class TestParseRecord(unittest.TestCase):
             (1, 'a', 2, 'b', 3, 'c'))
 
         def cast1(s):
-            return '%s is ok' % s
+            return f'{s} is ok'
         self.assertEqual(f('(a)', [cast1]), ('a is ok',))
 
         def cast2(s):
-            return 'and %s is ok, too' % s
+            return f'and {s} is ok, too'
         self.assertEqual(
             f('(a,b)', [cast1, cast2]), ('a is ok', 'and b is ok, too'))
         self.assertRaises(ValueError, f, '(a)', [cast1, cast2])
@@ -870,9 +871,9 @@ class TestEscapeFunctions(unittest.TestCase):
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
-        r = f(u'plain')
+        r = f('plain')
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u'plain')
+        self.assertEqual(r, 'plain')
         r = f("that's cheese")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s cheese")
@@ -882,9 +883,9 @@ class TestEscapeFunctions(unittest.TestCase):
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
-        r = f(u'plain')
+        r = f('plain')
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u'plain')
+        self.assertEqual(r, 'plain')
         r = f("that's cheese")
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s cheese")
@@ -894,18 +895,18 @@ class TestEscapeFunctions(unittest.TestCase):
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
-        r = f(u'plain')
+        r = f('plain')
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
         r = f(b"das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, u"das is' käse".encode('utf-8'))
-        r = f(u"das is' k\\303\\244se")
+        self.assertEqual(r, "das is' käse".encode('utf-8'))
+        r = f("das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, u"das is' käse".encode('utf-8'))
+        self.assertEqual(r, "das is' käse".encode('utf-8'))
         r = f(b'O\\000ps\\377!')
         self.assertEqual(r, b'O\x00ps\xff!')
-        r = f(u'O\\000ps\\377!')
+        r = f('O\\000ps\\377!')
         self.assertEqual(r, b'O\x00ps\xff!')
 
 

@@ -100,7 +100,7 @@ class TestCopy(unittest.TestCase):
 
     @staticmethod
     def connect():
-        host = '%s:%d' % (dbhost or '', dbport or -1)
+        host = f"{dbhost or ''}:{dbport or -1}"
         return pgdb.connect(database=dbname, host=host,
                             user=dbuser, password=dbpasswd)
 
@@ -163,11 +163,11 @@ class TestCopy(unittest.TestCase):
 
     @property
     def data_text(self):
-        return ''.join('%d\t%s\n' % row for row in self.data)
+        return ''.join('{}\t{}\n'.format(*row) for row in self.data)
 
     @property
     def data_csv(self):
-        return ''.join('%d,%s\n' % row for row in self.data)
+        return ''.join('{},{}\n'.format(*row) for row in self.data)
 
     def truncate_table(self):
         self.cursor.execute("truncate table copytest")
@@ -259,7 +259,7 @@ class TestCopyFrom(TestCopy):
         self.assertRaises(IOError, self.copy_from, [None])
 
     def test_input_iterable_with_newlines(self):
-        self.copy_from('%s\n' % row for row in self.data_text.splitlines())
+        self.copy_from(f'{row}\n' for row in self.data_text.splitlines())
         self.check_table()
 
     def test_input_iterable_bytes(self):
@@ -268,7 +268,7 @@ class TestCopyFrom(TestCopy):
         self.check_table()
 
     def test_sep(self):
-        stream = ('%d-%s' % row for row in self.data)
+        stream = ('{}-{}'.format(*row) for row in self.data)
         self.copy_from(stream, sep='-')
         self.check_table()
 
@@ -311,7 +311,7 @@ class TestCopyFrom(TestCopy):
         self.check_table()
 
     def test_csv_with_sep(self):
-        stream = ('%d;"%s"\n' % row for row in self.data)
+        stream = ('{};"{}"\n'.format(*row) for row in self.data)
         self.copy_from(stream, format='csv', sep=';')
         self.check_table()
         self.check_rowcount()
@@ -326,7 +326,7 @@ class TestCopyFrom(TestCopy):
             ValueError, self.copy_from, '', format='binary', sep='\t')
 
     def test_binary_with_unicode(self):
-        self.assertRaises(ValueError, self.copy_from, u'', format='binary')
+        self.assertRaises(ValueError, self.copy_from, '', format='binary')
 
     def test_query(self):
         self.assertRaises(ValueError, self.cursor.copy_from, '', "select null")
@@ -441,10 +441,10 @@ class TestCopyTo(TestCopy):
 
     def test_sep(self):
         ret = list(self.copy_to(sep='-'))
-        self.assertEqual(ret, ['%d-%s\n' % row for row in self.data])
+        self.assertEqual(ret, ['{}-{}\n'.format(*row) for row in self.data])
 
     def test_null(self):
-        data = ['%d\t%s\n' % row for row in self.data]
+        data = ['{}\t{}\n'.format(*row) for row in self.data]
         self.cursor.execute('insert into copytest values(4, null)')
         try:
             ret = list(self.copy_to())
@@ -457,8 +457,8 @@ class TestCopyTo(TestCopy):
             self.cursor.execute('delete from copytest where id=4')
 
     def test_columns(self):
-        data_id = ''.join('%d\n' % row[0] for row in self.data)
-        data_name = ''.join('%s\n' % row[1] for row in self.data)
+        data_id = ''.join(f'{row[0]}\n' for row in self.data)
+        data_name = ''.join(f'{row[1]}\n' for row in self.data)
         ret = ''.join(self.copy_to(columns='id'))
         self.assertEqual(ret, data_id)
         ret = ''.join(self.copy_to(columns=['id']))
@@ -513,7 +513,7 @@ class TestCopyTo(TestCopy):
         rows = list(ret)
         self.assertEqual(len(rows), 1)
         self.assertIsInstance(rows[0], str)
-        self.assertEqual(rows[0], '%s!\n' % self.data[1][1])
+        self.assertEqual(rows[0], f'{self.data[1][1]}!\n')
         self.check_rowcount(1)
 
     def test_file(self):

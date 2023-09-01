@@ -466,15 +466,15 @@ class TestDBClass(unittest.TestCase):
                     temporary=True, oids=None, values=None):
         query = self.db.query
         if '"' not in table or '.' in table:
-            table = '"%s"' % table
+            table = f'"{table}"'
         if not temporary:
-            q = 'drop table if exists %s cascade' % table
+            q = f'drop table if exists {table} cascade'
             query(q)
             self.addCleanup(query, q)
         temporary = 'temporary table' if temporary else 'table'
         as_query = definition.startswith(('as ', 'AS '))
         if not as_query and not definition.startswith('('):
-            definition = '(%s)' % definition
+            definition = f'({definition})'
         with_oids = 'with oids' if oids else (
             'without oids' if self.oids else '')
         q = ['create', temporary, table]
@@ -488,8 +488,8 @@ class TestDBClass(unittest.TestCase):
             for params in values:
                 if not isinstance(params, (list, tuple)):
                     params = [params]
-                values = ', '.join('$%d' % (n + 1) for n in range(len(params)))
-                q = "insert into %s values (%s)" % (table, values)
+                values = ', '.join(f'${n + 1}' for n in range(len(params)))
+                q = f"insert into {table} values ({values})"
                 query(q, params)
 
     def testClassName(self):
@@ -504,15 +504,15 @@ class TestDBClass(unittest.TestCase):
         r = f(b"plain")
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b"'plain'")
-        r = f(u"plain")
+        r = f("plain")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u"'plain'")
-        r = f(u"that's käse".encode('utf-8'))
+        self.assertEqual(r, "'plain'")
+        r = f("that's käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, u"'that''s käse'".encode('utf-8'))
-        r = f(u"that's käse")
+        self.assertEqual(r, "'that''s käse'".encode('utf-8'))
+        r = f("that's käse")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u"'that''s käse'")
+        self.assertEqual(r, "'that''s käse'")
         self.assertEqual(f(r"It's fine to have a \ inside."),
                          r" E'It''s fine to have a \\ inside.'")
         self.assertEqual(f('No "quotes" must be escaped.'),
@@ -523,15 +523,15 @@ class TestDBClass(unittest.TestCase):
         r = f(b"plain")
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'"plain"')
-        r = f(u"plain")
+        r = f("plain")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u'"plain"')
-        r = f(u"that's käse".encode('utf-8'))
+        self.assertEqual(r, '"plain"')
+        r = f("that's käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, u'"that\'s käse"'.encode('utf-8'))
-        r = f(u"that's käse")
+        self.assertEqual(r, '"that\'s käse"'.encode('utf-8'))
+        r = f("that's käse")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u'"that\'s käse"')
+        self.assertEqual(r, '"that\'s käse"')
         self.assertEqual(f(r"It's fine to have a \ inside."),
                          '"It\'s fine to have a \\ inside."')
         self.assertEqual(f('All "quotes" must be escaped.'),
@@ -542,15 +542,15 @@ class TestDBClass(unittest.TestCase):
         r = f(b"plain")
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b"plain")
-        r = f(u"plain")
+        r = f("plain")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u"plain")
-        r = f(u"that's käse".encode('utf-8'))
+        self.assertEqual(r, "plain")
+        r = f("that's käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, u"that''s käse".encode('utf-8'))
-        r = f(u"that's käse")
+        self.assertEqual(r, "that''s käse".encode('utf-8'))
+        r = f("that's käse")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u"that''s käse")
+        self.assertEqual(r, "that''s käse")
         self.assertEqual(f(r"It's fine to have a \ inside."),
                          r"It''s fine to have a \ inside.")
 
@@ -561,15 +561,15 @@ class TestDBClass(unittest.TestCase):
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'\\x706c61696e')
-        r = f(u'plain')
+        r = f('plain')
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u'\\x706c61696e')
-        r = f(u"das is' käse".encode('utf-8'))
+        self.assertEqual(r, '\\x706c61696e')
+        r = f("das is' käse".encode('utf-8'))
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'\\x64617320697327206bc3a47365')
-        r = f(u"das is' käse")
+        r = f("das is' käse")
         self.assertIsInstance(r, str)
-        self.assertEqual(r, u'\\x64617320697327206bc3a47365')
+        self.assertEqual(r, '\\x64617320697327206bc3a47365')
         self.assertEqual(f(b'O\x00ps\xff!'), b'\\x4f007073ff21')
 
     def testUnescapeBytea(self):
@@ -577,15 +577,15 @@ class TestDBClass(unittest.TestCase):
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
-        r = f(u'plain')
+        r = f('plain')
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'plain')
         r = f(b"das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, u"das is' käse".encode('utf8'))
-        r = f(u"das is' k\\303\\244se")
+        self.assertEqual(r, "das is' käse".encode('utf8'))
+        r = f("das is' k\\303\\244se")
         self.assertIsInstance(r, bytes)
-        self.assertEqual(r, u"das is' käse".encode('utf8'))
+        self.assertEqual(r, "das is' käse".encode('utf8'))
         self.assertEqual(f(r'O\\000ps\\377!'), b'O\\000ps\\377!')
         self.assertEqual(f(r'\\x706c61696e'), b'\\x706c61696e')
         self.assertEqual(f(r'\\x746861742773206be47365'),
@@ -848,7 +848,7 @@ class TestDBClass(unittest.TestCase):
         values = [(2, "World!"), (1, "Hello")]
         self.createTable(table, "n smallint, t varchar",
                          temporary=True, oids=False, values=values)
-        r = self.db.query('select t from "%s" order by n' % table).getresult()
+        r = self.db.query(f'select t from "{table}" order by n').getresult()
         r = ', '.join(row[0] for row in r)
         self.assertEqual(r, "Hello, World!")
 
@@ -859,10 +859,10 @@ class TestDBClass(unittest.TestCase):
         values = [(2, "World!"), (1, "Hello")]
         self.createTable(table, "n smallint, t varchar",
                          temporary=True, oids=True, values=values)
-        r = self.db.query('select t from "%s" order by n' % table).getresult()
+        r = self.db.query(f'select t from "{table}" order by n').getresult()
         r = ', '.join(row[0] for row in r)
         self.assertEqual(r, "Hello, World!")
-        r = self.db.query('select oid from "%s" limit 1' % table).getresult()
+        r = self.db.query(f'select oid from "{table}" limit 1').getresult()
         self.assertIsInstance(r[0][0], int)
 
     def testQuery(self):
@@ -1131,56 +1131,56 @@ class TestDBClass(unittest.TestCase):
         pkey = self.db.pkey
         self.assertRaises(KeyError, pkey, 'test')
         for t in ('pkeytest', 'primary key test'):
-            self.createTable('%s0' % t, 'a smallint')
-            self.createTable('%s1' % t, 'b smallint primary key')
-            self.createTable('%s2' % t, 'c smallint, d smallint primary key')
+            self.createTable(f'{t}0', 'a smallint')
+            self.createTable(f'{t}1', 'b smallint primary key')
+            self.createTable(f'{t}2', 'c smallint, d smallint primary key')
             self.createTable(
-                '%s3' % t,
+                f'{t}3',
                 'e smallint, f smallint, g smallint, h smallint, i smallint,'
                 ' primary key (f, h)')
             self.createTable(
-                '%s4' % t,
+                f'{t}4',
                 'e smallint, f smallint, g smallint, h smallint, i smallint,'
                 ' primary key (h, f)')
             self.createTable(
-                '%s5' % t, 'more_than_one_letter varchar primary key')
+                f'{t}5', 'more_than_one_letter varchar primary key')
             self.createTable(
-                '%s6' % t, '"with space" date primary key')
+                f'{t}6', '"with space" date primary key')
             self.createTable(
-                '%s7' % t,
+                f'{t}7',
                 'a_very_long_column_name varchar, "with space" date, "42" int,'
                 ' primary key (a_very_long_column_name, "with space", "42")')
-            self.assertRaises(KeyError, pkey, '%s0' % t)
-            self.assertEqual(pkey('%s1' % t), 'b')
-            self.assertEqual(pkey('%s1' % t, True), ('b',))
-            self.assertEqual(pkey('%s1' % t, composite=False), 'b')
-            self.assertEqual(pkey('%s1' % t, composite=True), ('b',))
-            self.assertEqual(pkey('%s2' % t), 'd')
-            self.assertEqual(pkey('%s2' % t, composite=True), ('d',))
-            r = pkey('%s3' % t)
+            self.assertRaises(KeyError, pkey, f'{t}0')
+            self.assertEqual(pkey(f'{t}1'), 'b')
+            self.assertEqual(pkey(f'{t}1', True), ('b',))
+            self.assertEqual(pkey(f'{t}1', composite=False), 'b')
+            self.assertEqual(pkey(f'{t}1', composite=True), ('b',))
+            self.assertEqual(pkey(f'{t}2'), 'd')
+            self.assertEqual(pkey(f'{t}2', composite=True), ('d',))
+            r = pkey(f'{t}3')
             self.assertIsInstance(r, tuple)
             self.assertEqual(r, ('f', 'h'))
-            r = pkey('%s3' % t, composite=False)
+            r = pkey(f'{t}3', composite=False)
             self.assertIsInstance(r, tuple)
             self.assertEqual(r, ('f', 'h'))
-            r = pkey('%s4' % t)
+            r = pkey(f'{t}4')
             self.assertIsInstance(r, tuple)
             self.assertEqual(r, ('h', 'f'))
-            self.assertEqual(pkey('%s5' % t), 'more_than_one_letter')
-            self.assertEqual(pkey('%s6' % t), 'with space')
-            r = pkey('%s7' % t)
+            self.assertEqual(pkey(f'{t}5'), 'more_than_one_letter')
+            self.assertEqual(pkey(f'{t}6'), 'with space')
+            r = pkey(f'{t}7')
             self.assertIsInstance(r, tuple)
             self.assertEqual(r, (
                 'a_very_long_column_name', 'with space', '42'))
             # a newly added primary key will be detected
-            query('alter table "%s0" add primary key (a)' % t)
-            self.assertEqual(pkey('%s0' % t), 'a')
+            query(f'alter table "{t}0" add primary key (a)')
+            self.assertEqual(pkey(f'{t}0'), 'a')
             # a changed primary key will not be detected,
             # indicating that the internal cache is operating
-            query('alter table "%s1" rename column b to x' % t)
-            self.assertEqual(pkey('%s1' % t), 'b')
+            query(f'alter table "{t}1" rename column b to x')
+            self.assertEqual(pkey(f'{t}1'), 'b')
             # we get the changed primary key when the cache is flushed
-            self.assertEqual(pkey('%s1' % t, flush=True), 'x')
+            self.assertEqual(pkey(f'{t}1', flush=True), 'x')
 
     def testGetDatabases(self):
         databases = self.db.get_databases()
@@ -1197,7 +1197,7 @@ class TestDBClass(unittest.TestCase):
                   'averyveryveryveryveryveryveryreallyreallylongtablename',
                   'b0', 'b3', 'x', 'xXx', 'xx', 'y', 'z')
         for t in tables:
-            self.db.query('drop table if exists "%s" cascade' % t)
+            self.db.query(f'drop table if exists "{t}" cascade')
         before_tables = get_tables()
         self.assertIsInstance(before_tables, list)
         for t in before_tables:
@@ -1212,8 +1212,8 @@ class TestDBClass(unittest.TestCase):
             self.createTable(t, 'as select 0', temporary=False)
         current_tables = get_tables()
         new_tables = [t for t in current_tables if t not in before_tables]
-        expected_new_tables = ['public.%s' % (
-            '"%s"' % t if ' ' in t or t != t.lower() else t) for t in tables]
+        expected_new_tables = ['public.' + (
+            f'"{t}"' if ' ' in t or t != t.lower() else t) for t in tables]
         self.assertEqual(new_tables, expected_new_tables)
         self.doCleanups()
         after_tables = get_tables()
@@ -1513,8 +1513,8 @@ class TestDBClass(unittest.TestCase):
         table = 'test_get_generated_2'
         self.createTable(table, 'i int primary key')
         self.assertFalse(get_generated(table))
-        query('alter table %s alter column i'
-              ' add generated always as identity' % table)
+        query(f'alter table {table} alter column i'
+              ' add generated always as identity')
         self.assertFalse(get_generated(table))
         self.assertEqual(get_generated(table, flush=True), {'i'})
 
@@ -1573,8 +1573,8 @@ class TestDBClass(unittest.TestCase):
         r = get(table, s, ('n', 't'))
         self.assertIs(r, s)
         self.assertEqual(r, dict(n=1, t='x'))
-        query('alter table "%s" alter n set not null' % table)
-        query('alter table "%s" add primary key (n)' % table)
+        query(f'alter table "{table}" alter n set not null')
+        query(f'alter table "{table}" add primary key (n)')
         r = get(table, 2)
         self.assertIsInstance(r, dict)
         self.assertEqual(r, dict(n=2, t='y'))
@@ -1605,7 +1605,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(pg.ProgrammingError, get, table, 2)
         self.assertRaises(KeyError, get, table, {}, 'oid')
         r = get(table, 2, 'n')
-        qoid = 'oid(%s)' % table
+        qoid = f'oid({table})'
         self.assertIn(qoid, r)
         oid = r[qoid]
         self.assertIsInstance(oid, int)
@@ -1632,8 +1632,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(get(table, r, 'n')['t'], 'z')
         self.assertEqual(get(table, 1, 'n')['t'], 'x')
         self.assertEqual(get(table, r, 'oid')['t'], 'z')
-        query('alter table "%s" alter n set not null' % table)
-        query('alter table "%s" add primary key (n)' % table)
+        query(f'alter table "{table}" alter n set not null')
+        query(f'alter table "{table}" add primary key (n)')
         self.assertEqual(get(table, 3)['t'], 'z')
         self.assertEqual(get(table, 1)['t'], 'x')
         self.assertEqual(get(table, 2)['t'], 'y')
@@ -1836,10 +1836,10 @@ class TestDBClass(unittest.TestCase):
                     ts = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
                 expect['ts'] = ts
             self.assertEqual(data, expect)
-            data = query('select * from "%s"' % table).dictresult()[0]
+            data = query(f'select * from "{table}"').dictresult()[0]
             data = dict(item for item in data.items() if item[0] in expect)
             self.assertEqual(data, expect)
-            query('truncate table "%s"' % table)
+            query(f'truncate table "{table}"')
 
     def testInsertWithOids(self):
         if not self.oids:
@@ -1923,7 +1923,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['Prime!'], 11)
         self.assertEqual(r['much space'], 2002)
         self.assertEqual(r['Questions?'], 'What?')
-        r = query('select * from "%s" limit 2' % table).dictresult()
+        r = query(f'select * from "{table}" limit 2').dictresult()
         self.assertEqual(len(r), 1)
         r = r[0]
         self.assertEqual(r['Prime!'], 11)
@@ -1995,7 +1995,7 @@ class TestDBClass(unittest.TestCase):
         r['t'] = 'u'
         s = update(table, r)
         self.assertEqual(s, r)
-        q = 'select t from "%s" where n=2' % table
+        q = f'select t from "{table}" where n=2'
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 'u')
 
@@ -2091,7 +2091,7 @@ class TestDBClass(unittest.TestCase):
         r['t'] = 'u'
         s = update(table, r)
         self.assertEqual(s, r)
-        q = 'select t from "%s" where n=2' % table
+        q = f'select t from "{table}" where n=2'
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 'u')
 
@@ -2107,20 +2107,20 @@ class TestDBClass(unittest.TestCase):
         self.assertIs(r, s)
         self.assertEqual(r['n'], 2)
         self.assertEqual(r['t'], 'd')
-        q = 'select t from "%s" where n=2' % table
+        q = f'select t from "{table}" where n=2'
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 'd')
         s.update(dict(n=4, t='e'))
         r = update(table, s)
         self.assertEqual(r['n'], 4)
         self.assertEqual(r['t'], 'e')
-        q = 'select t from "%s" where n=2' % table
+        q = f'select t from "{table}" where n=2'
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 'd')
-        q = 'select t from "%s" where n=4' % table
+        q = f'select t from "{table}" where n=4'
         r = query(q).getresult()
         self.assertEqual(len(r), 0)
-        query('drop table "%s"' % table)
+        query(f'drop table "{table}"')
         table = 'update_test_table_2'
         self.createTable(table,
                          'n integer, m integer, t text, primary key (n, m)',
@@ -2129,7 +2129,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(KeyError, update, table, dict(n=2, t='b'))
         self.assertEqual(update(table,
                                 dict(n=2, m=2, t='x'))['t'], 'x')
-        q = 'select t from "%s" where n=2 order by m' % table
+        q = f'select t from "{table}" where n=2 order by m'
         r = [r[0] for r in query(q).getresult()]
         self.assertEqual(r, ['c', 'x'])
 
@@ -2146,7 +2146,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['Prime!'], 13)
         self.assertEqual(r['much space'], 7007)
         self.assertEqual(r['Questions?'], 'When?')
-        r = query('select * from "%s" limit 2' % table).dictresult()
+        r = query(f'select * from "{table}" limit 2').dictresult()
         self.assertEqual(len(r), 1)
         r = r[0]
         self.assertEqual(r['Prime!'], 13)
@@ -2173,7 +2173,7 @@ class TestDBClass(unittest.TestCase):
         self.createTable(table, table_def)
         i, d = 35, 1001
         j = i + 7
-        r = query('insert into %s (i, d) values (%d, %d)' % (table, i, d))
+        r = query(f'insert into {table} (i, d) values ({i}, {d})')
         self.assertEqual(r, '1')
         r = get(table, d)
         self.assertIsInstance(r, dict)
@@ -2202,7 +2202,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIs(r, s)
         self.assertEqual(r['n'], 2)
         self.assertEqual(r['t'], 'y')
-        q = 'select n, t from "%s" order by n limit 3' % table
+        q = f'select n, t from "{table}" order by n limit 3'
         r = query(q).getresult()
         self.assertEqual(r, [(1, 'x'), (2, 'y')])
         s.update(t='z')
@@ -2357,7 +2357,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['n'], 1)
         self.assertEqual(r['m'], 3)
         self.assertEqual(r['t'], 'y')
-        q = 'select n, m, t from "%s" order by n, m limit 3' % table
+        q = f'select n, m, t from "{table}" order by n, m limit 3'
         r = query(q).getresult()
         self.assertEqual(r, [(1, 2, 'x'), (1, 3, 'y')])
         s.update(t='z')
@@ -2413,7 +2413,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['Prime!'], 31)
         self.assertEqual(r['much space'], 9009)
         self.assertEqual(r['Questions?'], 'Yes.')
-        q = 'select * from "%s" limit 2' % table
+        q = f'select * from "{table}" limit 2'
         r = query(q).getresult()
         self.assertEqual(r, [(31, 9009, 'Yes.')])
         s.update({'Questions?': 'No.'})
@@ -2506,7 +2506,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(s, 1)
         s = delete(table, r)
         self.assertEqual(s, 0)
-        r = query('select * from "%s"' % table).dictresult()
+        r = query(f'select * from "{table}"').dictresult()
         self.assertEqual(len(r), 1)
         r = r[0]
         result = {'n': 2, 't': 'y'}
@@ -2574,7 +2574,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('m', self.db.get_attnames('test_table', flush=True))
         self.assertEqual('n', self.db.pkey('test_table', flush=True))
         for i in range(5):
-            query("insert into test_table values (%d, %d)" % (i + 1, i + 2))
+            query(f"insert into test_table values ({i + 1}, {i + 2})")
         s = dict(m=2)
         self.assertRaises(KeyError, delete, 'test_table', s)
         s = dict(m=2, oid=oid)
@@ -2625,10 +2625,10 @@ class TestDBClass(unittest.TestCase):
                          values=enumerate('abc', start=1))
         self.assertRaises(KeyError, self.db.delete, table, dict(t='b'))
         self.assertEqual(self.db.delete(table, dict(n=2)), 1)
-        r = query('select t from "%s" where n=2' % table).getresult()
+        r = query(f'select t from "{table}" where n=2').getresult()
         self.assertEqual(r, [])
         self.assertEqual(self.db.delete(table, dict(n=2)), 0)
-        r = query('select t from "%s" where n=3' % table).getresult()[0][0]
+        r = query(f'select t from "{table}" where n=3').getresult()[0][0]
         self.assertEqual(r, 'c')
         table = 'delete_test_table_2'
         self.createTable(
@@ -2637,16 +2637,16 @@ class TestDBClass(unittest.TestCase):
                     for n in range(3) for m in range(2)])
         self.assertRaises(KeyError, self.db.delete, table, dict(n=2, t='b'))
         self.assertEqual(self.db.delete(table, dict(n=2, m=2)), 1)
-        r = [r[0] for r in query('select t from "%s" where n=2'
-                                 ' order by m' % table).getresult()]
+        r = [r[0] for r in query(f'select t from "{table}" where n=2'
+                                 ' order by m').getresult()]
         self.assertEqual(r, ['c'])
         self.assertEqual(self.db.delete(table, dict(n=2, m=2)), 0)
-        r = [r[0] for r in query('select t from "%s" where n=3'
-                                 ' order by m' % table).getresult()]
+        r = [r[0] for r in query(f'select t from "{table}" where n=3'
+                                 ' order by m').getresult()]
         self.assertEqual(r, ['e', 'f'])
         self.assertEqual(self.db.delete(table, dict(n=3, m=1)), 1)
-        r = [r[0] for r in query('select t from "%s" where n=3'
-                                 ' order by m' % table).getresult()]
+        r = [r[0] for r in query(f'select t from "{table}" where n=3'
+                                 f' order by m').getresult()]
         self.assertEqual(r, ['f'])
 
     def testDeleteWithQuotedNames(self):
@@ -2660,12 +2660,12 @@ class TestDBClass(unittest.TestCase):
         r = {'Prime!': 17}
         r = delete(table, r)
         self.assertEqual(r, 0)
-        r = query('select count(*) from "%s"' % table).getresult()
+        r = query(f'select count(*) from "{table}"').getresult()
         self.assertEqual(r[0][0], 1)
         r = {'Prime!': 19}
         r = delete(table, r)
         self.assertEqual(r, 1)
-        r = query('select count(*) from "%s"' % table).getresult()
+        r = query(f'select count(*) from "{table}"').getresult()
         self.assertEqual(r[0][0], 0)
 
     def testDeleteReferenced(self):
@@ -2718,7 +2718,7 @@ class TestDBClass(unittest.TestCase):
         r = self.db.get(table, 2)
         self.assertEqual(r['t'], 'two')
         self.db.delete(table, r)
-        r = self.db.query('select n, t from %s order by 1' % table).getresult()
+        r = self.db.query(f'select n, t from {table} order by 1').getresult()
         self.assertEqual(r, [(1, 'one'), (3, 'three')])
 
     def testTruncate(self):
@@ -2798,16 +2798,16 @@ class TestDBClass(unittest.TestCase):
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, 0))
         for n in range(3):
-            query("insert into test_parent (n) values (%d)" % n)
-            query("insert into test_child (n) values (%d)" % n)
+            query(f"insert into test_parent (n) values ({n})")
+            query(f"insert into test_child (n) values ({n})")
         r = query(q).getresult()[0]
         self.assertEqual(r, (3, 3))
         truncate('test_parent', cascade=True)
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, 0))
         for n in range(3):
-            query("insert into test_parent (n) values (%d)" % n)
-            query("insert into test_child (n) values (%d)" % n)
+            query(f"insert into test_parent (n) values ({n})")
+            query(f"insert into test_child (n) values ({n})")
         r = query(q).getresult()[0]
         self.assertEqual(r, (3, 3))
         truncate('test_child')
@@ -2859,8 +2859,8 @@ class TestDBClass(unittest.TestCase):
         self.createTable('test_child_2', 'm smallint) inherits (test_parent_2')
         for t in '', '_2':
             for n in range(3):
-                query("insert into test_parent%s (n) values (1)" % t)
-                query("insert into test_child%s (n, m) values (2, 3)" % t)
+                query(f"insert into test_parent{t} (n) values (1)")
+                query(f"insert into test_child{t} (n, m) values (2, 3)")
         q = ("select (select count(*) from test_parent),"
              " (select count(*) from test_child),"
              " (select count(*) from test_parent_2),"
@@ -2883,17 +2883,17 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         table = "test table for truncate()"
         self.createTable(table, 'n smallint', temporary=False, values=[1] * 3)
-        q = 'select count(*) from "%s"' % table
+        q = f'select count(*) from "{table}"'
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 3)
         truncate(table)
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 0)
         for i in range(3):
-            query('insert into "%s" values (1)' % table)
+            query(f'insert into "{table}" values (1)')
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 3)
-        truncate('public."%s"' % table)
+        truncate(f'public."{table}"')
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 0)
 
@@ -2975,10 +2975,10 @@ class TestDBClass(unittest.TestCase):
         r = get_as_list(table, what='name', limit=1, scalar=True)
         self.assertIsInstance(r, list)
         self.assertEqual(r, expected[:1])
-        query('alter table "%s" drop constraint "%s_pkey"' % (table, table))
+        query(f'alter table "{table}" drop constraint "{table}_pkey"')
         self.assertRaises(KeyError, self.db.pkey, table, flush=True)
         names.insert(1, (1, 'Snowball'))
-        query('insert into "%s" values ($1, $2)' % table, (1, 'Snowball'))
+        query(f'insert into "{table}" values ($1, $2)', (1, 'Snowball'))
         r = get_as_list(table)
         self.assertIsInstance(r, list)
         self.assertEqual(r, names)
@@ -2990,7 +2990,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, list)
         self.assertEqual(set(r), set(names))
         # test with arbitrary from clause
-        from_table = '(select lower(name) as n2 from "%s") as t2' % table
+        from_table = f'(select lower(name) as n2 from "{table}") as t2'
         r = get_as_list(from_table)
         self.assertIsInstance(r, list)
         r = {row[0] for row in r}
@@ -3157,7 +3157,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, expected)
         self.assertNotIsInstance(self, OrderedDict)
         # test with arbitrary from clause
-        from_table = '(select id, lower(name) as n2 from "%s") as t2' % table
+        from_table = f'(select id, lower(name) as n2 from "{table}") as t2'
         # primary key must be passed explicitly in this case
         self.assertRaises(pg.ProgrammingError, get_as_dict, from_table)
         r = get_as_dict(from_table, 'id')
@@ -3165,7 +3165,7 @@ class TestDBClass(unittest.TestCase):
         expected = OrderedDict((row[0], (row[2].lower(),)) for row in colors)
         self.assertEqual(r, expected)
         # test without a primary key
-        query('alter table "%s" drop constraint "%s_pkey"' % (table, table))
+        query(f'alter table "{table}" drop constraint "{table}_pkey"')
         self.assertRaises(KeyError, self.db.pkey, table, flush=True)
         self.assertRaises(pg.ProgrammingError, get_as_dict, table)
         r = get_as_dict(table, keyname='id')
@@ -3173,7 +3173,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertEqual(r, expected)
         r = (1, '#007fff', 'Azure')
-        query('insert into "%s" values ($1, $2, $3)' % table, r)
+        query(f'insert into "{table}" values ($1, $2, $3)', r)
         # the last entry will win
         expected[1] = r[1:]
         r = get_as_dict(table, keyname='id')
@@ -3971,7 +3971,7 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
         for timezone in sorted(timezones):
-            tz = '%+03d00' % timezones[timezone]
+            tz = f'{timezones[timezone]:+03d}00'
             tzinfo = datetime.strptime(tz, '%z').tzinfo
             self.db.set_parameter('timezone', timezone)
             d = time(15, 9, 26, tzinfo=tzinfo)
@@ -4023,7 +4023,7 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
         for timezone in sorted(timezones):
-            tz = '%+03d00' % timezones[timezone]
+            tz = f'{timezones[timezone]:+03d}00'
             tzinfo = datetime.strptime(tz, '%z').tzinfo
             self.db.set_parameter('timezone', timezone)
             for datestyle in ('ISO', 'Postgres, MDY', 'Postgres, DMY',
@@ -4174,7 +4174,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIs(dbtypes.get_typecast('int4'), int)
         self.assertNotIn('circle', dbtypes)
         self.assertIsNone(dbtypes.get_typecast('circle'))
-        squared_circle = lambda v: 'Squared Circle: %s' % v  # noqa: E731
+        squared_circle = lambda v: f'Squared Circle: {v}'  # noqa: E731
         dbtypes.set_typecast('circle', squared_circle)
         self.assertIs(dbtypes.get_typecast('circle'), squared_circle)
         r = self.db.query("select '0,0,1'::circle").getresult()[0][0]
@@ -4199,7 +4199,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIs(get_typecast('bool'), pg.cast_bool)
         cast_circle = get_typecast('circle')
         self.addCleanup(set_typecast, 'circle', cast_circle)
-        squared_circle = lambda v: 'Squared Circle: %s' % v  # noqa: E731
+        squared_circle = lambda v: f'Squared Circle: {v}'  # noqa: E731
         self.assertNotIn('circle', dbtypes)
         set_typecast('circle', squared_circle)
         self.assertNotIn('circle', dbtypes)
@@ -4698,23 +4698,23 @@ class TestSchemas(unittest.TestCase):
         query = db.query
         for num_schema in range(5):
             if num_schema:
-                schema = "s%d" % num_schema
-                query("drop schema if exists %s cascade" % (schema,))
+                schema = f"s{num_schema}"
+                query(f"drop schema if exists {schema} cascade")
                 try:
-                    query("create schema %s" % (schema,))
+                    query(f"create schema {schema}")
                 except pg.ProgrammingError:
                     raise RuntimeError(
                         "The test user cannot create schemas.\n"
-                        "Grant create on database %s to the user"
-                        " for running these tests." % dbname)
+                        f"Grant create on database {dbname} to the user"
+                        " for running these tests.")
             else:
                 schema = "public"
-                query("drop table if exists %s.t" % (schema,))
-                query("drop table if exists %s.t%d" % (schema, num_schema))
-            query("create table %s.t %s as select 1 as n, %d as d"
-                  % (schema, cls.with_oids, num_schema))
-            query("create table %s.t%d %s as select 1 as n, %d as d"
-                  % (schema, num_schema, cls.with_oids, num_schema))
+                query(f"drop table if exists {schema}.t")
+                query(f"drop table if exists {schema}.t{num_schema}")
+            query(f"create table {schema}.t {cls.with_oids}"
+                  f" as select 1 as n, {num_schema} as d")
+            query(f"create table {schema}.t{num_schema} {cls.with_oids}"
+                  f" as select 1 as n, {num_schema} as d")
         db.close()
         cls.cls_set_up = True
 
@@ -4724,12 +4724,12 @@ class TestSchemas(unittest.TestCase):
         query = db.query
         for num_schema in range(5):
             if num_schema:
-                schema = "s%d" % num_schema
-                query("drop schema %s cascade" % (schema,))
+                schema = f"s{num_schema}"
+                query(f"drop schema {schema} cascade")
             else:
                 schema = "public"
-                query("drop table %s.t" % (schema,))
-                query("drop table %s.t%d" % (schema, num_schema))
+                query(f"drop table {schema}.t")
+                query(f"drop table {schema}.t{num_schema}")
         db.close()
 
     def setUp(self):
@@ -4763,7 +4763,7 @@ class TestSchemas(unittest.TestCase):
         self.assertEqual(r, result)
         query("drop table if exists s3.t3m")
         self.addCleanup(query, "drop table s3.t3m")
-        query("create table s3.t3m %s as select 1 as m" % (self.with_oids,))
+        query(f"create table s3.t3m {self.with_oids} as select 1 as m")
         result_m = {'m': 'int'}
         if self.with_oids:
             result_m['oid'] = 'int'
@@ -4824,7 +4824,7 @@ class TestSchemas(unittest.TestCase):
         q = "column_name"
         if self.db.server_version < 110000:
             q += "::text"  # old version does not have sql_identifier array
-        q = "select array_agg(%s) from information_schema.columns" % q
+        q = f"select array_agg({q}) from information_schema.columns"
         q += " where table_schema in ('s1', 's2', 's3', 's4')"
         r = self.db.query(q).onescalar()
         self.assertIsInstance(r, list)
