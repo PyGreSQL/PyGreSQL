@@ -1483,16 +1483,6 @@ class NotificationHandler:
                 self.callback(None)
 
 
-def pgnotify(*args, **kw):
-    """Create a notification handler.
-
-    Same as NotificationHandler, under the traditional name.
-    """
-    warnings.warn("pgnotify is deprecated, use NotificationHandler instead",
-                  DeprecationWarning, stacklevel=2)
-    return NotificationHandler(*args, **kw)
-
-
 # The actual PostgreSQL database connection interface:
 
 class DB:

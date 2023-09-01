@@ -11,12 +11,12 @@ These tests need a database to test against.
 
 import unittest
 import warnings
-from time import sleep
 from threading import Thread
+from time import sleep
 
 import pg  # the module under test
 
-from .config import dbname, dbhost, dbport, dbuser, dbpasswd
+from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 
 debug = False  # let DB wrapper print debugging output
 
@@ -27,36 +27,6 @@ def DB():
     if debug:
         db.debug = debug
     return db
-
-
-class TestPyNotifyAlias(unittest.TestCase):
-    """Test alternative ways of creating a NotificationHandler."""
-
-    def callback(self):
-        self.fail('Callback should not be called in this test')
-
-    def testPgNotify(self):
-        db = DB()
-        arg_dict = {}
-        args = ('test_event', self.callback, arg_dict)
-        kwargs = dict(timeout=2, stop_event='test_stop')
-        with warnings.catch_warnings(record=True) as warn_msgs:
-            warnings.simplefilter("always")
-            # noinspection PyDeprecation
-            handler1 = pg.pgnotify(db, *args, **kwargs)
-            self.assertEqual(len(warn_msgs), 1)
-            warn_msg = warn_msgs[0]
-            self.assertTrue(issubclass(warn_msg.category, DeprecationWarning))
-            self.assertIn('deprecated', str(warn_msg.message))
-        self.assertIsInstance(handler1, pg.NotificationHandler)
-        handler2 = db.notification_handler(*args, **kwargs)
-        self.assertIsInstance(handler2, pg.NotificationHandler)
-        self.assertIs(handler1.db, handler2.db)
-        self.assertEqual(handler1.event, handler2.event)
-        self.assertIs(handler1.callback, handler2.callback)
-        self.assertIs(handler1.arg_dict, handler2.arg_dict)
-        self.assertEqual(handler1.timeout, handler2.timeout)
-        self.assertEqual(handler1.stop_event, handler2.stop_event)
 
 
 class TestSyncNotification(unittest.TestCase):
