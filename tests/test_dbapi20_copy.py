@@ -11,6 +11,7 @@ These tests need a database to test against.
 
 import unittest
 from collections.abc import Iterable
+from typing import Sequence, Tuple
 
 import pgdb  # the module under test
 
@@ -154,9 +155,10 @@ class TestCopy(unittest.TestCase):
         except Exception:
             pass
 
-    data = [(1935, 'Luciano Pavarotti'),
-            (1941, 'Plácido Domingo'),
-            (1946, 'José Carreras')]
+    data: Sequence[Tuple[int, str]] = [
+        (1935, 'Luciano Pavarotti'),
+        (1941, 'Plácido Domingo'),
+        (1946, 'José Carreras')]
 
     can_encode = True
 
@@ -447,11 +449,11 @@ class TestCopyTo(TestCopy):
         self.cursor.execute('insert into copytest values(4, null)')
         try:
             ret = list(self.copy_to())
-            self.assertEqual(ret, data + ['4\t\\N\n'])
+            self.assertEqual(ret, [*data, '4\t\\N\n'])
             ret = list(self.copy_to(null='Nix'))
-            self.assertEqual(ret, data + ['4\tNix\n'])
+            self.assertEqual(ret, [*data, '4\tNix\n'])
             ret = list(self.copy_to(null=''))
-            self.assertEqual(ret, data + ['4\t\n'])
+            self.assertEqual(ret, [*data, '4\t\n'])
         finally:
             self.cursor.execute('delete from copytest where id=4')
 

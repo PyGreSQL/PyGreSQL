@@ -20,6 +20,22 @@ This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
 """
 
+import select
+import weakref
+from collections import OrderedDict, namedtuple
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from functools import lru_cache, partial
+from inspect import signature
+from json import dumps as jsonencode
+from json import loads as jsondecode
+from math import isinf, isnan
+from operator import itemgetter
+from re import compile as regex
+from types import MappingProxyType
+from typing import ClassVar, Dict, List, Mapping, Type, Union
+from uuid import UUID
+
 try:
     from _pg import version
 except ImportError as e:  # noqa: F841
@@ -149,21 +165,6 @@ __all__ = [
     'set_jsondecode', 'set_query_helpers', 'set_typecast',
     'version', '__version__']
 
-import select
-import weakref
-from collections import OrderedDict, namedtuple
-from datetime import date, datetime, time, timedelta
-from decimal import Decimal
-from functools import lru_cache, partial
-from inspect import signature
-from json import dumps as jsonencode
-from json import loads as jsondecode
-from math import isinf, isnan
-from operator import itemgetter
-from re import compile as regex
-from typing import Dict, List, Union  # noqa: F401
-from uuid import UUID
-
 # Auxiliary classes and functions that are independent of a DB connection:
 
 def get_args(func):
@@ -239,7 +240,7 @@ class _SimpleTypes(dict):
     The corresponding Python types and simple names are also mapped.
     """
 
-    _type_aliases = {
+    _type_aliases: Mapping[str, List[Union[str, type]]] = MappingProxyType({
         'bool': [bool],
         'bytea': [Bytea],
         'date': ['interval', 'time', 'timetz', 'timestamp', 'timestamptz',
@@ -251,13 +252,13 @@ class _SimpleTypes(dict):
         'hstore': [Hstore], 'json': ['jsonb', Json], 'uuid': [UUID],
         'num': ['numeric', Decimal], 'money': [],
         'text': ['bpchar', 'char', 'name', 'varchar', bytes, str]
-    }  # type: Dict[str, List[Union[str, type]]]
+    })
 
     # noinspection PyMissingConstructor
     def __init__(self):
         """Initialize type mapping."""
         for typ, keys in self._type_aliases.items():
-            keys = [typ] + keys
+            keys = [typ, *keys]
             for key in keys:
                 self[key] = typ
                 if isinstance(key, str):
@@ -969,7 +970,7 @@ class Typecasts(dict):
 
     # the default cast functions
     # (str functions are ignored but have been added for faster access)
-    defaults = {
+    defaults: ClassVar[Dict[str, Type]] = {
         'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,

@@ -11,7 +11,7 @@ __version__ = '1.15.0'
 
 import time
 import unittest
-from typing import Any, Dict, Tuple
+from typing import Any, Mapping, Tuple
 
 
 class DatabaseAPI20Test(unittest.TestCase):
@@ -41,7 +41,7 @@ class DatabaseAPI20Test(unittest.TestCase):
     # method is to be found
     driver: Any = None
     connect_args: Tuple = ()  # List of arguments to pass to connect
-    connect_kw_args: Dict[str, Any] = {}  # Keyword arguments for connect
+    connect_kw_args: Mapping[str, Any] = {}  # Keyword arguments for connect
     table_prefix = 'dbapi20test_'  # If you need to specify a prefix for tables
 
     ddl1 = f'create table {table_prefix}booze (name varchar(20))'
@@ -502,14 +502,14 @@ class DatabaseAPI20Test(unittest.TestCase):
         finally:
             con.close()
 
-    samples = [
+    samples = (
         'Carlton Cold',
         'Carlton Draft',
         'Mountain Goat',
         'Redback',
         'Victoria Bitter',
         'XXXX'
-    ]
+    )
 
     def _populate(self):
         """Return a list of SQL commands to setup the DB for fetching tests."""

@@ -67,15 +67,15 @@ class build_pg_ext(build_ext):  # noqa: N801
 
     description = "build the PyGreSQL C extension"
 
-    user_options = build_ext.user_options + [
+    user_options = [*build_ext.user_options,  # noqa: RUF012
         ('strict', None, "count all compiler warnings as errors"),
         ('memory-size', None, "enable memory size function"),
         ('no-memory-size', None, "disable memory size function")]
 
-    boolean_options = build_ext.boolean_options + [
+    boolean_options = [*build_ext.boolean_options,  # noqa: RUF012
         'strict', 'memory-size']
 
-    negative_opt = {
+    negative_opt = {  # noqa: RUF012
         'no-memory-size': 'memory-size'}
 
     def get_compiler(self):

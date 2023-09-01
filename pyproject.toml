@@ -49,6 +49,7 @@ select = [
   "N",   # pep8-naming
   "UP",  # pyupgrade
   "D",   # pydocstyle
+  "RUF", # ruff
 ]
 exclude = [
     "__pycache__",

@@ -101,15 +101,15 @@ Example for using a type constructor::
 Type objects
 ------------
 
-.. class:: Type
+.. class:: DbType
 
 The :attr:`Cursor.description` attribute returns information about each
 of the result columns of a query.  The *type_code* must compare equal to one
-of the :class:`Type` objects defined below.  Type objects can be equal to
+of the :class:`DbType` objects defined below.  Type objects can be equal to
 more than one type code (e.g. :class:`DATETIME` is equal to the type codes
 for ``date``, ``time`` and ``timestamp`` columns).
 
-The pgdb module exports the following :class:`Type` objects as part of the
+The pgdb module exports the following :class:`DbType` objects as part of the
 DB-API 2 standard:
 
 .. object:: STRING

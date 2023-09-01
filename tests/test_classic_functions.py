@@ -13,6 +13,7 @@ import json
 import re
 import unittest
 from datetime import timedelta
+from typing import Any, Sequence, Tuple, Type
 
 import pg  # the module under test
 
@@ -119,7 +120,7 @@ class TestHasConnect(unittest.TestCase):
 class TestParseArray(unittest.TestCase):
     """Test the array parser."""
 
-    test_strings = [
+    test_strings: Sequence[Tuple[str, Type, Any]] = [
         ('', str, ValueError),
         ('{}', None, []),
         ('{}', str, []),
@@ -353,7 +354,7 @@ class TestParseArray(unittest.TestCase):
 class TestParseRecord(unittest.TestCase):
     """Test the record parser."""
 
-    test_strings = [
+    test_strings: Sequence[Tuple[str, Type, Any]] = [
         ('', None, ValueError),
         ('', str, ValueError),
         ('(', None, ValueError),
@@ -634,7 +635,7 @@ class TestParseRecord(unittest.TestCase):
 class TestParseHStore(unittest.TestCase):
     """Test the hstore parser."""
 
-    test_strings = [
+    test_strings: Sequence[Tuple[str, Any]] = [
         ('', {}),
         ('=>', ValueError),
         ('""=>', ValueError),
@@ -683,7 +684,7 @@ class TestParseHStore(unittest.TestCase):
 class TestCastInterval(unittest.TestCase):
     """Test the interval typecast function."""
 
-    intervals = [
+    intervals: Sequence[Tuple[Tuple[int, ...], Tuple[str, ...]]] = [
         ((0, 0, 0, 1, 0, 0, 0),
             ('1:00:00', '01:00:00', '@ 1 hour', 'PT1H')),
         ((0, 0, 0, -1, 0, 0, 0),

@@ -7,6 +7,7 @@ Version 6.0 (to be released)
   and PostgreSQL older than version 10 (released October 2017).
 - Removed deprecated function `pg.pgnotify()`.
 - Removed the deprecated method `ntuples()` of the `pg.Query` object.
+- Renamed `pgdb.Type` to `pgdb.DbType` to avoid confusion with `typing.Type`.
 - Modernized code and tools for development, testing, linting and building.
 
 Version 5.2.5 (2023-08-28)

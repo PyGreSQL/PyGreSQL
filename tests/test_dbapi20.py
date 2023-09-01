@@ -3,6 +3,7 @@
 import gc
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
+from typing import Any, Mapping
 from uuid import UUID as Uuid  # noqa: N811
 
 import pgdb
@@ -25,7 +26,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
 
     driver = pgdb
     connect_args = ()
-    connect_kw_args = {
+    connect_kw_args: Mapping[str, Any] = {
         'database': dbname, 'host': f"{dbhost or ''}:{dbport or -1}",
         'user': dbuser, 'password': dbpasswd}
 
@@ -1323,7 +1324,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         data = ('hello', 'world')
         con = self._connect()
         cur = con.cursor()
-        cur.build_row_factory = lambda: tuple  # noqa: E731
+        cur.build_row_factory = lambda: tuple
         cur.execute("select %s, %s", data)
         row = cur.fetchone()
         self.assertEqual(row, data)

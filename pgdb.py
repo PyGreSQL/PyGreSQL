@@ -64,6 +64,20 @@ Basic usage:
     connection.close() # close the connection
 """
 
+from collections import namedtuple
+from collections.abc import Iterable
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal as StdDecimal
+from functools import lru_cache, partial
+from inspect import signature
+from json import dumps as jsonencode
+from json import loads as jsondecode
+from math import isinf, isnan
+from re import compile as regex
+from time import localtime
+from typing import ClassVar, Dict, Type
+from uuid import UUID as Uuid  # noqa: N811
+
 try:
     from _pg import version
 except ImportError as e:  # noqa: F841
@@ -136,19 +150,6 @@ __all__ = [
     'apilevel', 'connect', 'paramstyle', 'threadsafety',
     'get_typecast', 'set_typecast', 'reset_typecast',
     'version', '__version__']
-
-from collections import namedtuple
-from collections.abc import Iterable
-from datetime import date, datetime, time, timedelta
-from decimal import Decimal as StdDecimal
-from functools import lru_cache, partial
-from inspect import signature
-from json import dumps as jsonencode
-from json import loads as jsondecode
-from math import isinf, isnan
-from re import compile as regex
-from time import localtime
-from uuid import UUID as Uuid  # noqa: N811
 
 Decimal = StdDecimal
 
@@ -417,7 +418,7 @@ class Typecasts(dict):
 
     # the default cast functions
     # (str functions are ignored but have been added for faster access)
-    defaults = {
+    defaults: ClassVar[Dict[str, Type]] = {
         'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
@@ -1579,7 +1580,7 @@ def connect(dsn=None,
 
 # *** Types Handling ***
 
-class Type(frozenset):
+class DbType(frozenset):
     """Type class for a couple of PostgreSQL data types.
 
     PostgreSQL is object-oriented: types are dynamic.
@@ -1651,30 +1652,30 @@ class RecordType:
 
 # Mandatory type objects defined by DB-API 2 specs:
 
-STRING = Type('char bpchar name text varchar')
-BINARY = Type('bytea')
-NUMBER = Type('int2 int4 serial int8 float4 float8 numeric money')
-DATETIME = Type('date time timetz timestamp timestamptz interval'
+STRING = DbType('char bpchar name text varchar')
+BINARY = DbType('bytea')
+NUMBER = DbType('int2 int4 serial int8 float4 float8 numeric money')
+DATETIME = DbType('date time timetz timestamp timestamptz interval'
                 ' abstime reltime')  # these are very old
-ROWID = Type('oid')
+ROWID = DbType('oid')
 
 
 # Additional type objects (more specific):
 
-BOOL = Type('bool')
-SMALLINT = Type('int2')
-INTEGER = Type('int2 int4 int8 serial')
-LONG = Type('int8')
-FLOAT = Type('float4 float8')
-NUMERIC = Type('numeric')
-MONEY = Type('money')
-DATE = Type('date')
-TIME = Type('time timetz')
-TIMESTAMP = Type('timestamp timestamptz')
-INTERVAL = Type('interval')
-UUID = Type('uuid')
-HSTORE = Type('hstore')
-JSON = Type('json jsonb')
+BOOL = DbType('bool')
+SMALLINT = DbType('int2')
+INTEGER = DbType('int2 int4 int8 serial')
+LONG = DbType('int8')
+FLOAT = DbType('float4 float8')
+NUMERIC = DbType('numeric')
+MONEY = DbType('money')
+DATE = DbType('date')
+TIME = DbType('time timetz')
+TIMESTAMP = DbType('timestamp timestamptz')
+INTERVAL = DbType('interval')
+UUID = DbType('uuid')
+HSTORE = DbType('hstore')
+JSON = DbType('json jsonb')
 
 # Type object for arrays (also equate to their base types):
 

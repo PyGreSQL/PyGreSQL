@@ -16,6 +16,7 @@ import unittest
 from collections import namedtuple
 from collections.abc import Iterable
 from decimal import Decimal
+from typing import Sequence, Tuple
 
 import pg  # the module under test
 
@@ -1743,7 +1744,7 @@ class TestInserttable(unittest.TestCase):
         self.c.query("truncate table test")
         self.c.close()
 
-    data = [
+    data: Sequence[Tuple] = [
         (-1, -1, -1, True, '1492-10-12', '08:30:00',
          -1.2345, -1.75, -1.875, '-1.25', '-', 'r?', '!u', 'xyz'),
         (0, 0, 0, False, '1607-04-14', '09:00:00',
@@ -1825,7 +1826,7 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.get_back(), self.data)
 
     def test_inserttable_with_different_row_sizes(self):
-        data = self.data[:-1] + [self.data[-1][:-1]]
+        data = [*self.data[:-1], (self.data[-1][:-1],)]
         try:
             self.c.inserttable('test', data)
         except TypeError as e:
@@ -2107,10 +2108,10 @@ class TestInserttable(unittest.TestCase):
 
     def test_insert_table_small_int_overflow(self):
         rest_row = self.data[2][1:]
-        data = [(32000,) + rest_row]
+        data = [(32000, *rest_row)]
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
-        data = [(33000,) + rest_row]
+        data = [(33000, *rest_row)]
         try:
             self.c.inserttable('test', data)
         except ValueError as e:
