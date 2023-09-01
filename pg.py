@@ -950,7 +950,7 @@ class Typecasts(dict):
         but returns None when no special cast function exists.
         """
         if not isinstance(typ, str):
-            raise TypeError('Invalid type: {typ}')
+            raise TypeError(f'Invalid type: {typ}')
         cast = self.defaults.get(typ)
         if cast:
             # store default for faster access
@@ -2257,8 +2257,8 @@ class DB:
         else:  # try using the primary key
             try:
                 keyname = self.pkey(table, True)
-            except KeyError:  # the table has no primary key
-                raise _prg_error(f'Table {table} has no primary key')
+            except KeyError as e:  # the table has no primary key
+                raise _prg_error(f'Table {table} has no primary key') from e
             # check whether all key columns have values
             if not set(keyname).issubset(row):
                 raise KeyError('Missing value for primary key in row')
@@ -2359,8 +2359,8 @@ class DB:
         names, values = ', '.join(names), ', '.join(values)
         try:
             keyname = self.pkey(table, True)
-        except KeyError:
-            raise _prg_error(f'Table {table} has no primary key')
+        except KeyError as e:
+            raise _prg_error(f'Table {table} has no primary key') from e
         target = ', '.join(col(k) for k in keyname)
         update = []
         keyname = set(keyname)
@@ -2444,8 +2444,8 @@ class DB:
         else:  # try using the primary key
             try:
                 keyname = self.pkey(table, True)
-            except KeyError:  # the table has no primary key
-                raise _prg_error(f'Table {table} has no primary key')
+            except KeyError as e:  # the table has no primary key
+                raise _prg_error(f'Table {table} has no primary key') from e
             # check whether all key columns have values
             if not set(keyname).issubset(row):
                 raise KeyError('Missing value for primary key in row')
@@ -2612,8 +2612,8 @@ class DB:
         if not keyname:
             try:
                 keyname = self.pkey(table, True)
-            except (KeyError, ProgrammingError):
-                raise _prg_error(f'Table {table} has no primary key')
+            except (KeyError, ProgrammingError) as e:
+                raise _prg_error(f'Table {table} has no primary key') from e
         if isinstance(keyname, str):
             keyname = [keyname]
         elif not isinstance(keyname, (list, tuple)):

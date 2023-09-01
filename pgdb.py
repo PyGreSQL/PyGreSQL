@@ -865,9 +865,9 @@ class Cursor(object):
             return f'({v})'
         try:  # noinspection PyUnresolvedReferences
             value = value.__pg_repr__()
-        except AttributeError:
+        except AttributeError as e:
             raise InterfaceError(
-                f'Do not know how to adapt type {type(value)}')
+                f'Do not know how to adapt type {type(value)}') from e
         if isinstance(value, (tuple, list)):
             value = self._quote(value)
         return value
@@ -965,8 +965,8 @@ class Cursor(object):
                     self._src.execute(sql)
                 except DatabaseError:
                     raise  # database provides error message
-                except Exception:
-                    raise _op_error("Can't start transaction")
+                except Exception as e:
+                    raise _op_error("Can't start transaction") from e
                 else:
                     self._dbcnx._tnx = True
             for parameters in seq_of_parameters:
@@ -983,7 +983,7 @@ class Cursor(object):
             # noinspection PyTypeChecker
             raise _db_error(f"Error in '{sql}': '{err}'", InterfaceError)
         except Exception as err:
-            raise _op_error(f"Internal error in '{sql}': {err}")
+            raise _op_error(f"Internal error in '{sql}': {err}") from err
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:
             self._description = True  # fetch on demand
@@ -1027,7 +1027,7 @@ class Cursor(object):
         except DatabaseError:
             raise
         except Error as err:
-            raise _db_error(str(err))
+            raise _db_error(str(err)) from err
         row_factory = self.row_factory
         coltypes = self.coltypes
         if len(result) > 5:

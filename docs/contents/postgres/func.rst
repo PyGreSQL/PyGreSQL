@@ -62,7 +62,7 @@ Before we create more sophisticated functions, let's populate an EMP table::
     ...     "'Bill', 4200, 36, 'shoe'",
     ...     "'Ginger', 4800, 30, 'candy'"]
     >>> for emp in emps:
-    ...     query("INSERT INTO EMP VALUES (%s)" % emp)
+    ...     query(f"INSERT INTO EMP VALUES ({emp})")
 
 Every INSERT statement will return a '1' indicating that it has inserted
 one row into the EMP table.
