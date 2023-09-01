@@ -5,6 +5,8 @@ Version 6.0 (to be released)
 ----------------------------
 - Removed support for Python versions older than 3.7 (released June 2017)
   and PostgreSQL older than version 10 (released October 2017).
+- Removed deprecated function `pg.pgnotify()`.
+- Removed the deprecated method `ntuples()` of the `pg.Query` object.
 - Modernized code and tools for development, testing, linting and building.
 
 Version 5.2.5 (2023-08-28)

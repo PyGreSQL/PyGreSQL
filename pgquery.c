@@ -260,16 +260,6 @@ query_memsize(queryObject *self, PyObject *noargs)
 #endif /* MEMORY_SIZE */
 }
 
-/* Get number of rows. */
-static char query_ntuples__doc__[] =
-"ntuples() -- return number of tuples returned by query";
-
-static PyObject *
-query_ntuples(queryObject *self, PyObject *noargs)
-{
-    return PyLong_FromLong(self->max_row);
-}
-
 /* List field names from query result. */
 static char query_listfields__doc__[] =
 "listfields() -- List field names from result";
@@ -948,8 +938,6 @@ static struct PyMethodDef query_methods[] = {
         METH_NOARGS, query_listfields__doc__},
     {"fieldinfo", (PyCFunction) query_fieldinfo,
         METH_VARARGS, query_fieldinfo__doc__},
-    {"ntuples", (PyCFunction) query_ntuples,
-        METH_NOARGS, query_ntuples__doc__},
     {"memsize", (PyCFunction) query_memsize,
         METH_NOARGS, query_memsize__doc__},
     {NULL, NULL}

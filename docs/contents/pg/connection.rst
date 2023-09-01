@@ -114,10 +114,10 @@ result codes: if :meth:`Connection.query` returns `None`, the result-returning
 methods will return an empty string (`''`). It's still necessary to call a
 result-returning method until it returns `None`.
 
-:meth:`Query.listfields`, :meth:`Query.fieldname`, :meth:`Query.fieldnum`,
-and :meth:`Query.ntuples` only work after a call to a result-returning method
-with a non-`None` return value. :meth:`Query.ntuples` returns only the number
-of rows returned by the previous result-returning method.
+:meth:`Query.listfields`, :meth:`Query.fieldname` and :meth:`Query.fieldnum`
+only work after a call to a result-returning method with a non-``None`` return
+value. Calling ``len()`` on a :class:`Query` object returns the number of rows
+of the previous result-returning method.
 
 If multiple semi-colon-delimited statements are passed to
 :meth:`Connection.query`, only the results of the last statement are returned

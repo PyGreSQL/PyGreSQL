@@ -10,7 +10,6 @@ These tests need a database to test against.
 """
 
 import unittest
-import warnings
 from threading import Thread
 from time import sleep
 

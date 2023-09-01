@@ -268,7 +268,7 @@ class TestConnectObject(unittest.TestCase):
         query = self.connection.query("select true where false")
         members = '''
             dictiter dictresult fieldinfo fieldname fieldnum getresult
-            listfields memsize namediter namedresult ntuples
+            listfields memsize namediter namedresult
             one onedict onenamed onescalar scalariter scalarresult
             single singledict singlenamed singlescalar
             '''.split()
@@ -711,22 +711,6 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertRaises(IndexError, f, '"Foobar"')
         self.assertRaises(IndexError, f, -1)
         self.assertRaises(IndexError, f, 4)
-
-    def testNtuples(self):  # deprecated
-        q = "select 1 where false"
-        r = self.c.query(q).ntuples()
-        self.assertIsInstance(r, int)
-        self.assertEqual(r, 0)
-        q = ("select 1 as a, 2 as b, 3 as c, 4 as d"
-             " union select 5 as a, 6 as b, 7 as c, 8 as d")
-        r = self.c.query(q).ntuples()
-        self.assertIsInstance(r, int)
-        self.assertEqual(r, 2)
-        q = ("select 1 union select 2 union select 3"
-             " union select 4 union select 5 union select 6")
-        r = self.c.query(q).ntuples()
-        self.assertIsInstance(r, int)
-        self.assertEqual(r, 6)
 
     def testLen(self):
         q = "select 1 where false"

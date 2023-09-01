@@ -400,22 +400,6 @@ negative value if it is of variable size, and a type-specific modifier value.
 
 .. versionadded:: 5.2
 
-ntuples -- return number of tuples in query object
---------------------------------------------------
-
-.. method:: Query.ntuples()
-
-    Return number of tuples in query object
-
-    :returns: number of tuples in :class:`Query`
-    :rtype: int
-    :raises TypeError: Too many arguments.
-
-This method returns the number of tuples in the query result.
-
-.. deprecated:: 5.1
-   You can use the normal :func:`len` function instead.
-
 memsize -- return number of bytes allocated by query result
 -----------------------------------------------------------
 
