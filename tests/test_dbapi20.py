@@ -3,7 +3,7 @@
 import gc
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
-from uuid import UUID as Uuid
+from uuid import UUID as Uuid  # noqa: N811
 
 import pgdb
 
@@ -436,7 +436,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertRaises(pgdb.OperationalError, cur.fetchone)
 
     def test_fetch_2_rows(self):
-        Decimal = pgdb.decimal_type()
+        Decimal = pgdb.decimal_type()  # noqa: N806
         values = ('test', pgdb.Binary(b'\xff\x52\xb2'),
                   True, 5, 6, 5.7, Decimal('234.234234'), Decimal('75.45'),
                   pgdb.Date(2011, 7, 17), pgdb.Time(15, 47, 42),
@@ -1169,10 +1169,10 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
-    def help_nextset_setUp(self, _cur):
+    def help_nextset_setup(self, _cur):
         pass  # helper not needed
 
-    def help_nextset_tearDown(self, _cur):
+    def help_nextset_teardown(self, _cur):
         pass  # helper not needed
 
     def test_nextset(self):
@@ -1200,7 +1200,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         table = self.table_prefix + 'booze'
         con1 = self._connect()
         cur1 = con1.cursor()
-        self.executeDDL1(cur1)
+        self.execute_ddl1(cur1)
         con1.commit()
         con2 = self._connect()
         cur2 = con2.cursor()
@@ -1220,7 +1220,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         con1 = self._connect()
         con1.autocommit = True
         cur1 = con1.cursor()
-        self.executeDDL1(cur1)
+        self.execute_ddl1(cur1)
         con2 = self._connect()
         cur2 = con2.cursor()
         cur2.execute(f"select name from {table}")

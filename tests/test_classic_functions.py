@@ -20,59 +20,59 @@ import pg  # the module under test
 class TestHasConnect(unittest.TestCase):
     """Test existence of basic pg module functions."""
 
-    def testhasPgError(self):
+    def testhas_pg_error(self):
         self.assertTrue(issubclass(pg.Error, Exception))
 
-    def testhasPgWarning(self):
+    def testhas_pg_warning(self):
         self.assertTrue(issubclass(pg.Warning, Exception))
 
-    def testhasPgInterfaceError(self):
+    def testhas_pg_interface_error(self):
         self.assertTrue(issubclass(pg.InterfaceError, pg.Error))
 
-    def testhasPgDatabaseError(self):
+    def testhas_pg_database_error(self):
         self.assertTrue(issubclass(pg.DatabaseError, pg.Error))
 
-    def testhasPgInternalError(self):
+    def testhas_pg_internal_error(self):
         self.assertTrue(issubclass(pg.InternalError, pg.DatabaseError))
 
-    def testhasPgOperationalError(self):
+    def testhas_pg_operational_error(self):
         self.assertTrue(issubclass(pg.OperationalError, pg.DatabaseError))
 
-    def testhasPgProgrammingError(self):
+    def testhas_pg_programming_error(self):
         self.assertTrue(issubclass(pg.ProgrammingError, pg.DatabaseError))
 
-    def testhasPgIntegrityError(self):
+    def testhas_pg_integrity_error(self):
         self.assertTrue(issubclass(pg.IntegrityError, pg.DatabaseError))
 
-    def testhasPgDataError(self):
+    def testhas_pg_data_error(self):
         self.assertTrue(issubclass(pg.DataError, pg.DatabaseError))
 
-    def testhasPgNotSupportedError(self):
+    def testhas_pg_not_supported_error(self):
         self.assertTrue(issubclass(pg.NotSupportedError, pg.DatabaseError))
 
-    def testhasPgInvalidResultError(self):
+    def testhas_pg_invalid_result_error(self):
         self.assertTrue(issubclass(pg.InvalidResultError, pg.DataError))
 
-    def testhasPgNoResultError(self):
+    def testhas_pg_no_result_error(self):
         self.assertTrue(issubclass(pg.NoResultError, pg.InvalidResultError))
 
-    def testhasPgMultipleResultsError(self):
+    def testhas_pg_multiple_results_error(self):
         self.assertTrue(
             issubclass(pg.MultipleResultsError, pg.InvalidResultError))
 
-    def testhasConnect(self):
+    def testhas_connect(self):
         self.assertTrue(callable(pg.connect))
 
-    def testhasEscapeString(self):
+    def testhas_escape_string(self):
         self.assertTrue(callable(pg.escape_string))
 
-    def testhasEscapeBytea(self):
+    def testhas_escape_bytea(self):
         self.assertTrue(callable(pg.escape_bytea))
 
-    def testhasUnescapeBytea(self):
+    def testhas_unescape_bytea(self):
         self.assertTrue(callable(pg.unescape_bytea))
 
-    def testDefHost(self):
+    def test_def_host(self):
         d0 = pg.get_defhost()
         d1 = 'pgtesthost'
         pg.set_defhost(d1)
@@ -80,7 +80,7 @@ class TestHasConnect(unittest.TestCase):
         pg.set_defhost(d0)
         self.assertEqual(pg.get_defhost(), d0)
 
-    def testDefPort(self):
+    def test_def_port(self):
         d0 = pg.get_defport()
         d1 = 1234
         pg.set_defport(d1)
@@ -92,7 +92,7 @@ class TestHasConnect(unittest.TestCase):
             d0 = None
         self.assertEqual(pg.get_defport(), d0)
 
-    def testDefOpt(self):
+    def test_def_opt(self):
         d0 = pg.get_defopt()
         d1 = '-h pgtesthost -p 1234'
         pg.set_defopt(d1)
@@ -100,7 +100,7 @@ class TestHasConnect(unittest.TestCase):
         pg.set_defopt(d0)
         self.assertEqual(pg.get_defopt(), d0)
 
-    def testDefBase(self):
+    def test_def_base(self):
         d0 = pg.get_defbase()
         d1 = 'pgtestdb'
         pg.set_defbase(d1)
@@ -108,7 +108,7 @@ class TestHasConnect(unittest.TestCase):
         pg.set_defbase(d0)
         self.assertEqual(pg.get_defbase(), d0)
 
-    def testPqlibVersion(self):
+    def test_pqlib_version(self):
         # noinspection PyUnresolvedReferences
         v = pg.get_pqlib_version()
         self.assertIsInstance(v, int)
@@ -216,7 +216,7 @@ class TestParseArray(unittest.TestCase):
         ('[3:5]={{1,2,3},{4,5,6}}', int, ValueError),
         ('[1:1][-2:-1][3:5]={{1,2,3},{4,5,6}}', int, ValueError)]
 
-    def testParserParams(self):
+    def test_parser_params(self):
         f = pg.cast_array
         self.assertRaises(TypeError, f)
         self.assertRaises(TypeError, f, None)
@@ -235,13 +235,13 @@ class TestParseArray(unittest.TestCase):
         self.assertEqual(f('{}', str), [])
         self.assertEqual(f('{}', str, b';'), [])
 
-    def testParserSimple(self):
+    def test_parser_simple(self):
         r = pg.cast_array('{a,b,c}')
         self.assertIsInstance(r, list)
         self.assertEqual(len(r), 3)
         self.assertEqual(r, ['a', 'b', 'c'])
 
-    def testParserNested(self):
+    def test_parser_nested(self):
         f = pg.cast_array
         r = f('{{a,b,c}}')
         self.assertIsInstance(r, list)
@@ -273,7 +273,7 @@ class TestParseArray(unittest.TestCase):
             r = r[0]
         self.assertEqual(r, 'abc')
 
-    def testParserTooDeeplyNested(self):
+    def test_parser_too_deeply_nested(self):
         f = pg.cast_array
         for n in 3, 5, 9, 12, 16, 32, 64, 256:
             r = '{' * n + 'a,b,c' + '}' * n
@@ -288,7 +288,7 @@ class TestParseArray(unittest.TestCase):
                 self.assertEqual(len(r), 3)
                 self.assertEqual(r, ['a', 'b', 'c'])
 
-    def testParserCast(self):
+    def test_parser_cast(self):
         f = pg.cast_array
         self.assertEqual(f('{1}'), ['1'])
         self.assertEqual(f('{1}', None), ['1'])
@@ -303,7 +303,7 @@ class TestParseArray(unittest.TestCase):
             return f'{s} is ok'
         self.assertEqual(f('{a}', cast), ['a is ok'])
 
-    def testParserDelim(self):
+    def test_parser_delim(self):
         f = pg.cast_array
         self.assertEqual(f('{1,2}'), ['1', '2'])
         self.assertEqual(f('{1,2}', delim=b','), ['1', '2'])
@@ -311,7 +311,7 @@ class TestParseArray(unittest.TestCase):
         self.assertEqual(f('{1;2}', delim=b';'), ['1', '2'])
         self.assertEqual(f('{1,2}', delim=b';'), ['1,2'])
 
-    def testParserWithData(self):
+    def test_parser_with_data(self):
         f = pg.cast_array
         for string, cast, expected in self.test_strings:
             if expected is ValueError:
@@ -319,7 +319,7 @@ class TestParseArray(unittest.TestCase):
             else:
                 self.assertEqual(f(string, cast), expected)
 
-    def testParserWithoutCast(self):
+    def test_parser_without_cast(self):
         f = pg.cast_array
 
         for string, cast, expected in self.test_strings:
@@ -330,7 +330,7 @@ class TestParseArray(unittest.TestCase):
             else:
                 self.assertEqual(f(string), expected)
 
-    def testParserWithDifferentDelimiter(self):
+    def test_parser_with_different_delimiter(self):
         f = pg.cast_array
 
         def replace_comma(value):
@@ -491,7 +491,7 @@ class TestParseRecord(unittest.TestCase):
         ('(fuzzy dice,"42","1.9375")', (str, int, float),
             ('fuzzy dice', 42, 1.9375))]
 
-    def testParserParams(self):
+    def test_parser_params(self):
         f = pg.cast_record
         self.assertRaises(TypeError, f)
         self.assertRaises(TypeError, f, None)
@@ -510,20 +510,20 @@ class TestParseRecord(unittest.TestCase):
         self.assertEqual(f('()', str), (None,))
         self.assertEqual(f('()', str, b';'), (None,))
 
-    def testParserSimple(self):
+    def test_parser_simple(self):
         r = pg.cast_record('(a,b,c)')
         self.assertIsInstance(r, tuple)
         self.assertEqual(len(r), 3)
         self.assertEqual(r, ('a', 'b', 'c'))
 
-    def testParserNested(self):
+    def test_parser_nested(self):
         f = pg.cast_record
         self.assertRaises(ValueError, f, '((a,b,c))')
         self.assertRaises(ValueError, f, '((a,b),(c,d))')
         self.assertRaises(ValueError, f, '((a),(b),(c))')
         self.assertRaises(ValueError, f, '(((((((abc)))))))')
 
-    def testParserManyElements(self):
+    def test_parser_many_elements(self):
         f = pg.cast_record
         for n in 3, 5, 9, 12, 16, 32, 64, 256:
             r = ','.join(map(str, range(n)))
@@ -531,7 +531,7 @@ class TestParseRecord(unittest.TestCase):
             r = f(r, int)
             self.assertEqual(r, tuple(range(n)))
 
-    def testParserCastUniform(self):
+    def test_parser_cast_uniform(self):
         f = pg.cast_record
         self.assertEqual(f('(1)'), ('1',))
         self.assertEqual(f('(1)', None), ('1',))
@@ -546,7 +546,7 @@ class TestParseRecord(unittest.TestCase):
             return f'{s} is ok'
         self.assertEqual(f('(a)', cast), ('a is ok',))
 
-    def testParserCastNonUniform(self):
+    def test_parser_cast_non_uniform(self):
         f = pg.cast_record
         self.assertEqual(f('(1)', []), ('1',))
         self.assertEqual(f('(1)', [None]), ('1',))
@@ -583,7 +583,7 @@ class TestParseRecord(unittest.TestCase):
             f('(1,2,3,4,5,6)', [int, float, str, None, cast1, cast2]),
             (1, 2.0, '3', '4', '5 is ok', 'and 6 is ok, too'))
 
-    def testParserDelim(self):
+    def test_parser_delim(self):
         f = pg.cast_record
         self.assertEqual(f('(1,2)'), ('1', '2'))
         self.assertEqual(f('(1,2)', delim=b','), ('1', '2'))
@@ -591,7 +591,7 @@ class TestParseRecord(unittest.TestCase):
         self.assertEqual(f('(1;2)', delim=b';'), ('1', '2'))
         self.assertEqual(f('(1,2)', delim=b';'), ('1,2',))
 
-    def testParserWithData(self):
+    def test_parser_with_data(self):
         f = pg.cast_record
         for string, cast, expected in self.test_strings:
             if expected is ValueError:
@@ -599,7 +599,7 @@ class TestParseRecord(unittest.TestCase):
             else:
                 self.assertEqual(f(string, cast), expected)
 
-    def testParserWithoutCast(self):
+    def test_parser_without_cast(self):
         f = pg.cast_record
 
         for string, cast, expected in self.test_strings:
@@ -610,7 +610,7 @@ class TestParseRecord(unittest.TestCase):
             else:
                 self.assertEqual(f(string), expected)
 
-    def testParserWithDifferentDelimiter(self):
+    def test_parser_with_different_delimiter(self):
         f = pg.cast_record
 
         def replace_comma(value):
@@ -665,7 +665,7 @@ class TestParseHStore(unittest.TestCase):
         (r'k\=\>v=>"k=>v"', {'k=>v': 'k=>v'}),
         ('a\\,b=>a,b=>a', {'a,b': 'a', 'b': 'a'})]
 
-    def testParser(self):
+    def test_parser(self):
         f = pg.cast_hstore
 
         self.assertRaises(TypeError, f)
@@ -842,7 +842,7 @@ class TestCastInterval(unittest.TestCase):
              '@ 10 mons 3 days -3 hours -55 mins -5.999993 secs ago',
              'P-10M-3DT3H55M5.999993S'))]
 
-    def testCastInterval(self):
+    def test_cast_interval(self):
         for result, values in self.intervals:
             f = pg.cast_interval
             years, mons, days, hours, mins, secs, usecs = result
@@ -864,7 +864,7 @@ class TestEscapeFunctions(unittest.TestCase):
 
     """
 
-    def testEscapeString(self):
+    def test_escape_string(self):
         f = pg.escape_string
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
@@ -876,7 +876,7 @@ class TestEscapeFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s cheese")
 
-    def testEscapeBytea(self):
+    def test_escape_bytea(self):
         f = pg.escape_bytea
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
@@ -888,7 +888,7 @@ class TestEscapeFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertEqual(r, "that''s cheese")
 
-    def testUnescapeBytea(self):
+    def test_unescape_bytea(self):
         f = pg.unescape_bytea
         r = f(b'plain')
         self.assertIsInstance(r, bytes)
@@ -916,10 +916,10 @@ class TestConfigFunctions(unittest.TestCase):
 
     """
 
-    def testGetDatestyle(self):
+    def test_get_datestyle(self):
         self.assertIsNone(pg.get_datestyle())
 
-    def testSetDatestyle(self):
+    def test_set_datestyle(self):
         datestyle = pg.get_datestyle()
         try:
             pg.set_datestyle('ISO, YMD')
@@ -939,12 +939,12 @@ class TestConfigFunctions(unittest.TestCase):
         finally:
             pg.set_datestyle(datestyle)
 
-    def testGetDecimalPoint(self):
+    def test_get_decimal_point(self):
         r = pg.get_decimal_point()
         self.assertIsInstance(r, str)
         self.assertEqual(r, '.')
 
-    def testSetDecimalPoint(self):
+    def test_set_decimal_point(self):
         point = pg.get_decimal_point()
         try:
             pg.set_decimal_point('*')
@@ -957,11 +957,11 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertEqual(r, point)
 
-    def testGetDecimal(self):
+    def test_get_decimal(self):
         r = pg.get_decimal()
         self.assertIs(r, pg.Decimal)
 
-    def testSetDecimal(self):
+    def test_set_decimal(self):
         decimal_class = pg.Decimal
         try:
             pg.set_decimal(int)
@@ -972,12 +972,12 @@ class TestConfigFunctions(unittest.TestCase):
         r = pg.get_decimal()
         self.assertIs(r, decimal_class)
 
-    def testGetBool(self):
+    def test_get_bool(self):
         r = pg.get_bool()
         self.assertIsInstance(r, bool)
         self.assertIs(r, True)
 
-    def testSetBool(self):
+    def test_set_bool(self):
         use_bool = pg.get_bool()
         try:
             pg.set_bool(False)
@@ -995,12 +995,12 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, use_bool)
 
-    def testGetByteaEscaped(self):
+    def test_get_bytea_escaped(self):
         r = pg.get_bytea_escaped()
         self.assertIsInstance(r, bool)
         self.assertIs(r, False)
 
-    def testSetByteaEscaped(self):
+    def test_set_bytea_escaped(self):
         bytea_escaped = pg.get_bytea_escaped()
         try:
             pg.set_bytea_escaped(True)
@@ -1018,12 +1018,12 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, bytea_escaped)
 
-    def testGetJsondecode(self):
+    def test_get_jsondecode(self):
         r = pg.get_jsondecode()
         self.assertTrue(callable(r))
         self.assertIs(r, json.loads)
 
-    def testSetJsondecode(self):
+    def test_set_jsondecode(self):
         jsondecode = pg.get_jsondecode()
         try:
             pg.set_jsondecode(None)
@@ -1042,7 +1042,7 @@ class TestConfigFunctions(unittest.TestCase):
 class TestModuleConstants(unittest.TestCase):
     """Test the existence of the documented module constants."""
 
-    def testVersion(self):
+    def test_version(self):
         v = pg.version
         self.assertIsInstance(v, str)
         # make sure the version conforms to PEP440

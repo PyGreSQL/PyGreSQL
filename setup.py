@@ -62,7 +62,7 @@ undef_macros = []
 extra_compile_args = ['-O2', '-funsigned-char', '-Wall', '-Wconversion']
 
 
-class build_pg_ext(build_ext):
+class build_pg_ext(build_ext):  # noqa: N801
     """Customized build_ext command for PyGreSQL."""
 
     description = "build the PyGreSQL C extension"

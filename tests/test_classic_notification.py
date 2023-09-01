@@ -20,7 +20,7 @@ from .config import dbhost, dbname, dbpasswd, dbport, dbuser
 debug = False  # let DB wrapper print debugging output
 
 
-def DB():
+def DB():  # noqa: N802
     """Create a DB wrapper object connecting to the test database."""
     db = pg.DB(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
     if debug:
@@ -67,7 +67,7 @@ class TestSyncNotification(unittest.TestCase):
         self.assertFalse(handler.listening)
         return handler
 
-    def testCloseHandler(self):
+    def test_close_handler(self):
         handler = self.get_handler()
         self.assertIs(handler.db, self.db)
         handler.close()
@@ -75,7 +75,7 @@ class TestSyncNotification(unittest.TestCase):
         self.db = None
         self.assertIs(handler.db, None)
 
-    def testDeleteHandler(self):
+    def test_delete_handler(self):
         handler = self.get_handler('test_del')
         self.assertIs(handler.db, self.db)
         handler.listen()
@@ -88,7 +88,7 @@ class TestSyncNotification(unittest.TestCase):
             n += 1
         self.assertEqual(n, 2)
 
-    def testNotify(self):
+    def test_notify(self):
         handler = self.get_handler()
         handler.listen()
         self.assertRaises(TypeError, handler.notify, invalid=True)
@@ -98,7 +98,7 @@ class TestSyncNotification(unittest.TestCase):
         self.db.close()
         self.db = None
 
-    def testNotifyWithArgsAndPayload(self):
+    def test_notify_with_args_and_payload(self):
         arg_dict = {'foo': 'bar'}
         handler = self.get_handler(arg_dict=arg_dict)
         self.assertEqual(handler.timeout, 0)
@@ -127,7 +127,7 @@ class TestSyncNotification(unittest.TestCase):
         self.assertFalse(handler.listening)
         handler.unlisten()
 
-    def testNotifyWrongEvent(self):
+    def test_notify_wrong_event(self):
         handler = self.get_handler('good_event')
         self.assertEqual(handler.timeout, 0)
         handler.listen()
@@ -274,39 +274,39 @@ class TestAsyncNotification(unittest.TestCase):
         self.sent = []
         self.assertEqual(self.handler.listening, not self.stopped)
 
-    def testNotifyHandlerEmpty(self):
+    def test_notify_handler_empty(self):
         self.start_handler()
         self.notify_handler(stop=True)
         self.assertEqual(len(self.sent), 1)
         self.receive()
 
-    def testNotifyQueryEmpty(self):
+    def test_notify_query_empty(self):
         self.start_handler()
         self.notify_query(stop=True)
         self.assertEqual(len(self.sent), 1)
         self.receive()
 
-    def testNotifyHandlerOnce(self):
+    def test_notify_handler_once(self):
         self.start_handler()
         self.notify_handler()
         self.assertEqual(len(self.sent), 1)
         self.receive()
         self.receive(stop=True)
 
-    def testNotifyQueryOnce(self):
+    def test_notify_query_once(self):
         self.start_handler()
         self.notify_query()
         self.receive()
         self.notify_query(stop=True)
         self.receive()
 
-    def testNotifyWithArgs(self):
+    def test_notify_with_args(self):
         arg_dict = {'test': 42, 'more': 43, 'less': 41}
         self.start_handler('test_args', arg_dict)
         self.notify_query()
         self.receive(stop=True)
 
-    def testNotifySeveralTimes(self):
+    def test_notify_several_times(self):
         arg_dict = {'test': 1}
         self.start_handler(arg_dict=arg_dict)
         for count in range(3):
@@ -321,36 +321,36 @@ class TestAsyncNotification(unittest.TestCase):
             self.notify_query()
         self.receive(stop=True)
 
-    def testNotifyOnceWithPayload(self):
+    def test_notify_once_with_payload(self):
         self.start_handler()
         self.notify_query(payload='test_payload')
         self.receive(stop=True)
 
-    def testNotifyWithArgsAndPayload(self):
+    def test_notify_with_args_and_payload(self):
         self.start_handler(arg_dict={'foo': 'bar'})
         self.notify_query(payload='baz')
         self.receive(stop=True)
 
-    def testNotifyQuotedNames(self):
+    def test_notify_quoted_names(self):
         self.start_handler('Hello, World!')
         self.notify_query(payload='How do you do?')
         self.receive(stop=True)
 
-    def testNotifyWithFivePayloads(self):
+    def test_notify_with_five_payloads(self):
         self.start_handler('gimme_5', {'test': 'Gimme 5'})
         for count in range(5):
             self.notify_query(payload=f"Round {count}")
         self.assertEqual(len(self.sent), 5)
         self.receive(stop=True)
 
-    def testReceiveImmediately(self):
+    def test_receive_immediately(self):
         self.start_handler('immediate', {'test': 'immediate'})
         for count in range(3):
             self.notify_query(payload=f"Round {count}")
             self.receive()
         self.receive(stop=True)
 
-    def testNotifyDistinctInTransaction(self):
+    def test_notify_distinct_in_transaction(self):
         self.start_handler('test_transaction', {'transaction': True})
         self.db.begin()
         for count in range(3):
@@ -358,7 +358,7 @@ class TestAsyncNotification(unittest.TestCase):
         self.db.commit()
         self.receive(stop=True)
 
-    def testNotifySameInTransaction(self):
+    def test_notify_same_in_transaction(self):
         self.start_handler('test_transaction', {'transaction': True})
         self.db.begin()
         for count in range(3):
@@ -369,7 +369,7 @@ class TestAsyncNotification(unittest.TestCase):
         self.sent = self.sent[:1]
         self.receive(stop=True)
 
-    def testNotifyNoTimeout(self):
+    def test_notify_no_timeout(self):
         # noinspection PyTypeChecker
         self.start_handler(timeout=None)
         self.assertIsNone(self.handler.timeout)
@@ -378,20 +378,20 @@ class TestAsyncNotification(unittest.TestCase):
         self.assertFalse(self.timeout)
         self.receive(stop=True)
 
-    def testNotifyZeroTimeout(self):
+    def test_notify_zero_timeout(self):
         self.start_handler(timeout=0)
         self.assertEqual(self.handler.timeout, 0)
         self.assertTrue(self.handler.listening)
         self.assertFalse(self.timeout)
 
-    def testNotifyWithoutTimeout(self):
+    def test_notify_without_timeout(self):
         self.start_handler(timeout=1)
         self.assertEqual(self.handler.timeout, 1)
         sleep(0.02)
         self.assertFalse(self.timeout)
         self.receive(stop=True)
 
-    def testNotifyWithTimeout(self):
+    def test_notify_with_timeout(self):
         # noinspection PyTypeChecker
         self.start_handler(timeout=0.01)
         sleep(0.02)

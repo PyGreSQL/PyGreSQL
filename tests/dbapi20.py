@@ -55,10 +55,10 @@ class DatabaseAPI20Test(unittest.TestCase):
 
     # Some drivers may need to override these helpers, for example adding
     # a 'commit' after the execute.
-    def executeDDL1(self, cursor):
+    def execute_ddl1(self, cursor):
         cursor.execute(self.ddl1)
 
-    def executeDDL2(self, cursor):
+    def execute_ddl2(self, cursor):
         cursor.execute(self.ddl2)
 
     def setUp(self):
@@ -134,7 +134,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         except AttributeError:
             self.fail("Driver doesn't define paramstyle")
 
-    def test_Exceptions(self):
+    def test_exceptions(self):
         # Make sure required exceptions exist, and are in the
         # defined hierarchy.
         sub = issubclass
@@ -149,7 +149,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         self.assertTrue(sub(self.driver.ProgrammingError, self.driver.Error))
         self.assertTrue(sub(self.driver.NotSupportedError, self.driver.Error))
 
-    def test_ExceptionsAsConnectionAttributes(self):
+    def test_exceptions_as_connection_attributes(self):
         # OPTIONAL EXTENSION
         # Test for the optional DB API 2.0 extension, where the exceptions
         # are exposed as attributes on the Connection object
@@ -202,7 +202,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             # the documented transaction isolation level
             cur1 = con.cursor()
             cur2 = con.cursor()
-            self.executeDDL1(cur1)
+            self.execute_ddl1(cur1)
             cur1.execute(f"{self.insert} into {self.table_prefix}booze"
                          " values ('Victoria Bitter')")
             cur2.execute(f"select name from {self.table_prefix}booze")
@@ -217,7 +217,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         con = self._connect()
         try:
             cur = con.cursor()
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             self.assertIsNone(
                 cur.description,
                 'cursor.description should be none after executing a'
@@ -238,7 +238,7 @@ class DatabaseAPI20Test(unittest.TestCase):
                 f' Got: {cur.description[0][1]!r}')
 
             # Make sure self.description gets reset
-            self.executeDDL2(cur)
+            self.execute_ddl2(cur)
             self.assertIsNone(
                 cur.description,
                 'cursor.description not being set to None when executing'
@@ -250,7 +250,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         con = self._connect()
         try:
             cur = con.cursor()
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             self.assertIn(
                 cur.rowcount, (-1, 0),  # Bug #543885
                 'cursor.rowcount should be -1 or 0 after executing no-result'
@@ -266,7 +266,7 @@ class DatabaseAPI20Test(unittest.TestCase):
                 cur.rowcount, (-1, 1),
                 'cursor.rowcount should == number of rows returned, or'
                 ' set to -1 after executing a select statement')
-            self.executeDDL2(cur)
+            self.execute_ddl2(cur)
             self.assertIn(
                 cur.rowcount, (-1, 0),  # Bug #543885
                 'cursor.rowcount should be -1 or 0 after executing no-result'
@@ -303,7 +303,7 @@ class DatabaseAPI20Test(unittest.TestCase):
 
         # cursor.execute should raise an Error if called after connection
         # closed
-        self.assertRaises(self.driver.Error, self.executeDDL1, cur)
+        self.assertRaises(self.driver.Error, self.execute_ddl1, cur)
 
         # connection.commit should raise an Error if called after connection'
         # closed.'
@@ -325,7 +325,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             con.close()
 
     def _paraminsert(self, cur):
-        self.executeDDL2(cur)
+        self.execute_ddl2(cur)
         table_prefix = self.table_prefix
         insert = f"{self.insert} into {table_prefix}barflys values"
         cur.execute(
@@ -384,7 +384,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         con = self._connect()
         try:
             cur = con.cursor()
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             table_prefix = self.table_prefix
             insert = f'{self.insert} into {table_prefix}booze values'
             largs = [("Cooper's",), ("Boag's",)]
@@ -428,7 +428,7 @@ class DatabaseAPI20Test(unittest.TestCase):
 
             # cursor.fetchone should raise an Error if called after
             # executing a query that cannot return rows
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             self.assertRaises(self.driver.Error, cur.fetchone)
 
             cur.execute(f'select name from {self.table_prefix}booze')
@@ -474,7 +474,7 @@ class DatabaseAPI20Test(unittest.TestCase):
 
             # cursor.next should raise an Error if called after
             # executing a query that cannot return rows
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             self.assertRaises(self.driver.Error, cur.next)
 
             # cursor.next should return None if a query retrieves no rows
@@ -527,7 +527,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             # issuing a query
             self.assertRaises(self.driver.Error, cur.fetchmany, 4)
 
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             for sql in self._populate():
                 cur.execute(sql)
 
@@ -588,7 +588,7 @@ class DatabaseAPI20Test(unittest.TestCase):
                 ' called after the whole result set has been fetched')
             self.assertIn(cur.rowcount, (-1, 6))
 
-            self.executeDDL2(cur)
+            self.execute_ddl2(cur)
             cur.execute(f'select name from {self.table_prefix}barflys')
             r = cur.fetchmany()  # Should get empty sequence
             self.assertEqual(
@@ -609,7 +609,7 @@ class DatabaseAPI20Test(unittest.TestCase):
             # as a select)
             self.assertRaises(self.driver.Error, cur.fetchall)
 
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             for sql in self._populate():
                 cur.execute(sql)
 
@@ -635,7 +635,7 @@ class DatabaseAPI20Test(unittest.TestCase):
                 ' after the whole result set has been fetched')
             self.assertIn(cur.rowcount, (-1, len(self.samples)))
 
-            self.executeDDL2(cur)
+            self.execute_ddl2(cur)
             cur.execute(f'select name from {self.table_prefix}barflys')
             rows = cur.fetchall()
             self.assertIn(cur.rowcount, (-1, 0))
@@ -651,7 +651,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         con = self._connect()
         try:
             cur = con.cursor()
-            self.executeDDL1(cur)
+            self.execute_ddl1(cur)
             for sql in self._populate():
                 cur.execute(sql)
 
@@ -680,7 +680,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         finally:
             con.close()
 
-    def help_nextset_setUp(self, cur):
+    def help_nextset_setup(self, cur):
         """Set up nextset test.
 
         Should create a procedure called deleteme that returns two result sets,
@@ -696,7 +696,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         # """
         # cur.execute(sql)
 
-    def help_nextset_tearDown(self, cur):
+    def help_nextset_teardown(self, cur):
         """Clean up after nextset test.
 
         If cleaning up is needed after test_nextset.
@@ -717,7 +717,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         #         self.executeDDL1(cur)
         #         for sql in self._populate():
         #             cur.execute(sql)
-        #         self.help_nextset_setUp(cur)
+        #         self.help_nextset_setup(cur)
         #         cur.callproc('deleteme')
         #         number_of_rows = cur.fetchone()
         #         self.assertEqual(number_of_rows[0], len(self.samples))
@@ -727,7 +727,7 @@ class DatabaseAPI20Test(unittest.TestCase):
         #         self.assertIsNone(
         #             cur.nextset(), 'No more return sets, should return None')
         #     finally:
-        #         self.help_nextset_tearDown(cur)
+        #         self.help_nextset_teardown(cur)
         # finally:
         #     con.close()
 
@@ -765,11 +765,11 @@ class DatabaseAPI20Test(unittest.TestCase):
         # Real test for setoutputsize is driver dependant
         raise NotImplementedError('Driver needed to override this test')
 
-    def test_None(self):
+    def test_none(self):
         con = self._connect()
         try:
             cur = con.cursor()
-            self.executeDDL2(cur)
+            self.execute_ddl2(cur)
             # inserting NULL to the second column, because some drivers might
             # need the first one to be primary key, which means it needs
             # to have a non-NULL value
@@ -783,21 +783,21 @@ class DatabaseAPI20Test(unittest.TestCase):
         finally:
             con.close()
 
-    def test_Date(self):
+    def test_date(self):
         d1 = self.driver.Date(2002, 12, 25)
         d2 = self.driver.DateFromTicks(
             time.mktime((2002, 12, 25, 0, 0, 0, 0, 0, 0)))
         # Can we assume this? API doesn't specify, but it seems implied
         self.assertEqual(str(d1), str(d2))
 
-    def test_Time(self):
+    def test_time(self):
         t1 = self.driver.Time(13, 45, 30)
         t2 = self.driver.TimeFromTicks(
             time.mktime((2001, 1, 1, 13, 45, 30, 0, 0, 0)))
         # Can we assume this? API doesn't specify, but it seems implied
         self.assertEqual(str(t1), str(t2))
 
-    def test_Timestamp(self):
+    def test_timestamp(self):
         t1 = self.driver.Timestamp(2002, 12, 25, 13, 45, 30)
         t2 = self.driver.TimestampFromTicks(
             time.mktime((2002, 12, 25, 13, 45, 30, 0, 0, 0))
@@ -805,26 +805,26 @@ class DatabaseAPI20Test(unittest.TestCase):
         # Can we assume this? API doesn't specify, but it seems implied
         self.assertEqual(str(t1), str(t2))
 
-    def test_Binary(self):
+    def test_binary_string(self):
         self.driver.Binary(b'Something')
         self.driver.Binary(b'')
 
-    def test_STRING(self):
+    def test_string_type(self):
         self.assertTrue(hasattr(self.driver, 'STRING'),
                         'module.STRING must be defined')
 
-    def test_BINARY(self):
+    def test_binary_type(self):
         self.assertTrue(hasattr(self.driver, 'BINARY'),
                         'module.BINARY must be defined.')
 
-    def test_NUMBER(self):
+    def test_number_type(self):
         self.assertTrue(hasattr(self.driver, 'NUMBER'),
                         'module.NUMBER must be defined.')
 
-    def test_DATETIME(self):
+    def test_datetime_type(self):
         self.assertTrue(hasattr(self.driver, 'DATETIME'),
                         'module.DATETIME must be defined.')
 
-    def test_ROWID(self):
+    def test_rowid_type(self):
         self.assertTrue(hasattr(self.driver, 'ROWID'),
                         'module.ROWID must be defined.')

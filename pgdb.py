@@ -148,7 +148,7 @@ from json import loads as jsondecode
 from math import isinf, isnan
 from re import compile as regex
 from time import localtime
-from uuid import UUID as Uuid
+from uuid import UUID as Uuid  # noqa: N811
 
 Decimal = StdDecimal
 
@@ -729,7 +729,7 @@ class TypeCache(dict):
         return row_caster
 
 
-class _quotedict(dict):
+class _QuoteDict(dict):
     """Dictionary with auto quoting of its items.
 
     The quote attribute must be set to the desired quote function.
@@ -897,7 +897,7 @@ class Cursor:
             except (TypeError, ValueError):
                 return string  # silently accept unescaped quotes
         if isinstance(parameters, dict):
-            parameters = _quotedict(parameters)
+            parameters = _QuoteDict(parameters)
             parameters.quote = self._quote
         else:
             parameters = tuple(map(self._quote, parameters))
@@ -1687,34 +1687,35 @@ RECORD = RecordType()
 
 # Mandatory type helpers defined by DB-API 2 specs:
 
-def Date(year, month, day):
+def Date(year, month, day):  # noqa: N802
     """Construct an object holding a date value."""
     return date(year, month, day)
 
 
-def Time(hour, minute=0, second=0, microsecond=0, tzinfo=None):
+def Time(hour, minute=0, second=0, microsecond=0, tzinfo=None):  # noqa: N802
     """Construct an object holding a time value."""
     return time(hour, minute, second, microsecond, tzinfo)
 
 
-def Timestamp(year, month, day, hour=0, minute=0, second=0, microsecond=0,
+def Timestamp(year, month, day,    # noqa: N802
+              hour=0, minute=0, second=0, microsecond=0,
               tzinfo=None):
     """Construct an object holding a time stamp value."""
     return datetime(year, month, day, hour, minute, second, microsecond,
                     tzinfo)
 
 
-def DateFromTicks(ticks):
+def DateFromTicks(ticks):  # noqa: N802
     """Construct an object holding a date value from the given ticks value."""
     return Date(*localtime(ticks)[:3])
 
 
-def TimeFromTicks(ticks):
+def TimeFromTicks(ticks):  # noqa: N802
     """Construct an object holding a time value from the given ticks value."""
     return Time(*localtime(ticks)[3:6])
 
 
-def TimestampFromTicks(ticks):
+def TimestampFromTicks(ticks):  # noqa: N802
     """Construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*localtime(ticks)[:6])
 
@@ -1725,7 +1726,8 @@ class Binary(bytes):
 
 # Additional type helpers for PyGreSQL:
 
-def Interval(days, hours=0, minutes=0, seconds=0, microseconds=0):
+def Interval(days,  # noqa: N802
+             hours=0, minutes=0, seconds=0, microseconds=0):
     """Construct an object holding a time interval value."""
     return timedelta(days, hours=hours, minutes=minutes, seconds=seconds,
                      microseconds=microseconds)

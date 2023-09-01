@@ -46,6 +46,7 @@ select = [
   "E",   # pycodestyle
   "F",   # pyflakes
   "I",   # isort
+  "N",   # pep8-naming
   "UP",  # pyupgrade
   "D",   # pydocstyle
 ]

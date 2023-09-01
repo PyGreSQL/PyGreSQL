@@ -32,7 +32,7 @@ def connect():
 class TestModuleConstants(unittest.TestCase):
     """Test the existence of the documented module constants."""
 
-    def testLargeObjectIntConstants(self):
+    def test_large_object_int_constants(self):
         names = 'INV_READ INV_WRITE SEEK_SET SEEK_CUR SEEK_END'.split()
         for name in names:
             try:
@@ -53,7 +53,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.c.query('rollback')
         self.c.close()
 
-    def assertIsLargeObject(self, obj):
+    def assertIsLargeObject(self, obj):  # noqa: N802
         self.assertIsNotNone(obj)
         self.assertTrue(hasattr(obj, 'open'))
         self.assertTrue(hasattr(obj, 'close'))
@@ -66,14 +66,14 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.assertIsInstance(obj.error, str)
         self.assertFalse(obj.error)
 
-    def testLoCreate(self):
+    def test_lo_create(self):
         large_object = self.c.locreate(pg.INV_READ | pg.INV_WRITE)
         try:
             self.assertIsLargeObject(large_object)
         finally:
             del large_object
 
-    def testGetLo(self):
+    def test_get_lo(self):
         large_object = self.c.locreate(pg.INV_READ | pg.INV_WRITE)
         try:
             self.assertIsLargeObject(large_object)
@@ -103,7 +103,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
-    def testLoImport(self):
+    def test_lo_import(self):
         if windows:
             # NamedTemporaryFiles don't work well here
             fname = 'temp_test_pg_largeobj_import.txt'
@@ -164,24 +164,24 @@ class TestLargeObjects(unittest.TestCase):
             pass
         self.pgcnx.close()
 
-    def testClassName(self):
+    def test_class_name(self):
         self.assertEqual(self.obj.__class__.__name__, 'LargeObject')
 
-    def testModuleName(self):
+    def test_module_name(self):
         self.assertEqual(self.obj.__class__.__module__, 'pg')
 
-    def testOid(self):
+    def test_oid(self):
         self.assertIsInstance(self.obj.oid, int)
         self.assertNotEqual(self.obj.oid, 0)
 
-    def testPgcn(self):
+    def test_pgcn(self):
         self.assertIs(self.obj.pgcnx, self.pgcnx)
 
-    def testError(self):
+    def test_error(self):
         self.assertIsInstance(self.obj.error, str)
         self.assertEqual(self.obj.error, '')
 
-    def testStr(self):
+    def test_str(self):
         self.obj.open(pg.INV_WRITE)
         data = b'some object to be printed'
         self.obj.write(data)
@@ -192,11 +192,11 @@ class TestLargeObjects(unittest.TestCase):
         r = str(self.obj)
         self.assertEqual(r, f'Closed large object, oid {oid}')
 
-    def testRepr(self):
+    def test_repr(self):
         r = repr(self.obj)
         self.assertTrue(r.startswith('<pg.LargeObject object'), r)
 
-    def testOpen(self):
+    def test_open(self):
         # noinspection PyShadowingBuiltins
         open = self.obj.open
         # testing with invalid parameters
@@ -206,7 +206,7 @@ class TestLargeObjects(unittest.TestCase):
         # object is already open
         self.assertRaises(IOError, open, pg.INV_READ)
 
-    def testClose(self):
+    def test_close(self):
         close = self.obj.close
         # testing with invalid parameters
         self.assertRaises(TypeError, close, pg.INV_READ)
@@ -216,7 +216,7 @@ class TestLargeObjects(unittest.TestCase):
         close()
         self.assertRaises(IOError, close)
 
-    def testRead(self):
+    def test_read(self):
         read = self.obj.read
         # testing with invalid parameters
         self.assertRaises(TypeError, read)
@@ -240,7 +240,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertEqual(r, data[:8])
         self.obj.close()
 
-    def testWrite(self):
+    def test_write(self):
         write = self.obj.write
         # testing with invalid parameters
         self.assertRaises(TypeError, write)
@@ -257,7 +257,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
-    def testWriteLatin1Bytes(self):
+    def test_write_latin1_bytes(self):
         read = self.obj.read
         self.obj.open(pg.INV_WRITE)
         self.obj.write('käse'.encode('latin1'))
@@ -267,7 +267,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r.decode('latin1'), 'käse')
 
-    def testWriteUtf8Bytes(self):
+    def test_write_utf8_bytes(self):
         read = self.obj.read
         self.obj.open(pg.INV_WRITE)
         self.obj.write('käse'.encode())
@@ -277,7 +277,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r.decode(), 'käse')
 
-    def testWriteUtf8String(self):
+    def test_write_utf8_string(self):
         read = self.obj.read
         self.obj.open(pg.INV_WRITE)
         self.obj.write('käse')
@@ -287,7 +287,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r.decode(), 'käse')
 
-    def testSeek(self):
+    def test_seek(self):
         seek = self.obj.seek
         # testing with invalid parameters
         self.assertRaises(TypeError, seek)
@@ -323,7 +323,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'seek')
 
-    def testTell(self):
+    def test_tell(self):
         tell = self.obj.tell
         # testing with invalid parameters
         self.assertRaises(TypeError, tell, 0)
@@ -345,7 +345,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 5)
 
-    def testUnlink(self):
+    def test_unlink(self):
         unlink = self.obj.unlink
         # testing with invalid parameters
         self.assertRaises(TypeError, unlink, 0)
@@ -363,14 +363,14 @@ class TestLargeObjects(unittest.TestCase):
         # unlinking after object has been already unlinked
         self.assertRaises(pg.IntegrityError, unlink)
 
-    def testUnlinkInexistent(self):
+    def test_unlink_inexistent(self):
         unlink = self.obj.unlink
         self.obj.open(pg.INV_WRITE)
         self.obj.close()
         self.pgcnx.query(f'select lo_unlink({self.obj.oid})')
         self.assertRaises(IOError, unlink)
 
-    def testSize(self):
+    def test_size(self):
         size = self.obj.size
         # testing with invalid parameters
         self.assertRaises(TypeError, size, 0)
@@ -411,7 +411,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, len(data))
 
-    def testExport(self):
+    def test_export(self):
         export = self.obj.export
         # testing with invalid parameters
         self.assertRaises(TypeError, export)
@@ -441,7 +441,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
-    def testExportInExistent(self):
+    def test_export_in_existent(self):
         export = self.obj.export
         f = tempfile.NamedTemporaryFile()
         self.obj.open(pg.INV_WRITE)

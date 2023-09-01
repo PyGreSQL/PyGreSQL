@@ -48,7 +48,7 @@ def connect_nowait():
 class TestCanConnect(unittest.TestCase):
     """Test whether a basic connection to PostgreSQL is possible."""
 
-    def testCanConnect(self):
+    def test_can_connect(self):
         try:
             connection = connect()
             rc = connection.poll()
@@ -65,7 +65,7 @@ class TestCanConnect(unittest.TestCase):
         except pg.Error:
             self.fail('Cannot close the database connection')
 
-    def testCanConnectNoWait(self):
+    def test_can_connect_no_wait(self):
         try:
             connection = connect_nowait()
             rc = connection.poll()
@@ -104,21 +104,21 @@ class TestConnectObject(unittest.TestCase):
             return False
         return callable(getattr(self.connection, attribute))
 
-    def testClassName(self):
+    def test_class_name(self):
         self.assertEqual(self.connection.__class__.__name__, 'Connection')
 
-    def testModuleName(self):
+    def test_module_name(self):
         self.assertEqual(self.connection.__class__.__module__, 'pg')
 
-    def testStr(self):
+    def test_str(self):
         r = str(self.connection)
         self.assertTrue(r.startswith('<pg.Connection object'), r)
 
-    def testRepr(self):
+    def test_repr(self):
         r = repr(self.connection)
         self.assertTrue(r.startswith('<pg.Connection object'), r)
 
-    def testAllConnectAttributes(self):
+    def test_all_connect_attributes(self):
         attributes = '''backend_pid db error host options port
             protocol_version server_version socket
             ssl_attributes ssl_in_use status user'''.split()
@@ -127,7 +127,7 @@ class TestConnectObject(unittest.TestCase):
             if not a.startswith('__') and not self.is_method(a)]
         self.assertEqual(attributes, connection_attributes)
 
-    def testAllConnectMethods(self):
+    def test_all_connect_methods(self):
         methods = '''
             cancel close date_format describe_prepared endcopy
             escape_bytea escape_identifier escape_literal escape_string
@@ -142,15 +142,15 @@ class TestConnectObject(unittest.TestCase):
             if not a.startswith('__') and self.is_method(a)]
         self.assertEqual(methods, connection_methods)
 
-    def testAttributeDb(self):
+    def test_attribute_db(self):
         self.assertEqual(self.connection.db, dbname)
 
-    def testAttributeError(self):
+    def test_attribute_error(self):
         error = self.connection.error
         self.assertTrue(not error or 'krb5_' in error)
 
     @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
-    def testAttributeHost(self):
+    def test_attribute_host(self):
         if dbhost and not dbhost.startswith('/'):
             host = dbhost
         else:
@@ -158,70 +158,70 @@ class TestConnectObject(unittest.TestCase):
         self.assertIsInstance(self.connection.host, str)
         self.assertEqual(self.connection.host, host)
 
-    def testAttributeOptions(self):
+    def test_attribute_options(self):
         no_options = ''
         self.assertEqual(self.connection.options, no_options)
 
-    def testAttributePort(self):
+    def test_attribute_port(self):
         def_port = 5432
         self.assertIsInstance(self.connection.port, int)
         self.assertEqual(self.connection.port, dbport or def_port)
 
-    def testAttributeProtocolVersion(self):
+    def test_attribute_protocol_version(self):
         protocol_version = self.connection.protocol_version
         self.assertIsInstance(protocol_version, int)
         self.assertTrue(2 <= protocol_version < 4)
 
-    def testAttributeServerVersion(self):
+    def test_attribute_server_version(self):
         server_version = self.connection.server_version
         self.assertIsInstance(server_version, int)
         self.assertTrue(100000 <= server_version < 160000)
 
-    def testAttributeSocket(self):
+    def test_attribute_socket(self):
         socket = self.connection.socket
         self.assertIsInstance(socket, int)
         self.assertGreaterEqual(socket, 0)
 
-    def testAttributeBackendPid(self):
+    def test_attribute_backend_pid(self):
         backend_pid = self.connection.backend_pid
         self.assertIsInstance(backend_pid, int)
         self.assertGreaterEqual(backend_pid, 1)
 
-    def testAttributeSslInUse(self):
+    def test_attribute_ssl_in_use(self):
         ssl_in_use = self.connection.ssl_in_use
         self.assertIsInstance(ssl_in_use, bool)
         self.assertFalse(ssl_in_use)
 
-    def testAttributeSslAttributes(self):
+    def test_attribute_ssl_attributes(self):
         ssl_attributes = self.connection.ssl_attributes
         self.assertIsInstance(ssl_attributes, dict)
         self.assertEqual(ssl_attributes, {
             'cipher': None, 'compression': None, 'key_bits': None,
             'library': None, 'protocol': None})
 
-    def testAttributeStatus(self):
+    def test_attribute_status(self):
         status_ok = 1
         self.assertIsInstance(self.connection.status, int)
         self.assertEqual(self.connection.status, status_ok)
 
-    def testAttributeUser(self):
+    def test_attribute_user(self):
         no_user = 'Deprecated facility'
         user = self.connection.user
         self.assertTrue(user)
         self.assertIsInstance(user, str)
         self.assertNotEqual(user, no_user)
 
-    def testMethodQuery(self):
+    def test_method_query(self):
         query = self.connection.query
         query("select 1+1")
         query("select 1+$1", (1,))
         query("select 1+$1+$2", (2, 3))
         query("select 1+$1+$2", [2, 3])
 
-    def testMethodQueryEmpty(self):
+    def test_method_query_empty(self):
         self.assertRaises(ValueError, self.connection.query, '')
 
-    def testMethodSendQuerySingle(self):
+    def test_method_send_query_single(self):
         query = self.connection.send_query
         for q, args, result in (
                 ("select 1+1 as a", (), 2),
@@ -242,7 +242,7 @@ class TestConnectObject(unittest.TestCase):
             self.assertEqual(pgq.dictresult()[0]['a'], result)
             self.assertIsNone(pgq.dictresult())
 
-    def testMethodSendQueryMultiple(self):
+    def test_method_send_query_multiple(self):
         query = self.connection.send_query
 
         pgq = query("select 1+1; select 'pg';")
@@ -260,11 +260,11 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(pgq.dictresult()[0]['a'], 'pg')
         self.assertIsNone(pgq.dictresult())
 
-    def testMethodSendQueryEmpty(self):
+    def test_method_send_query_empty(self):
         query = self.connection.send_query('')
         self.assertRaises(ValueError, query.getresult)
 
-    def testAllQueryMembers(self):
+    def test_all_query_members(self):
         query = self.connection.query("select true where false")
         members = '''
             dictiter dictresult fieldinfo fieldname fieldnum getresult
@@ -280,13 +280,13 @@ class TestConnectObject(unittest.TestCase):
             if not a.startswith('__')]
         self.assertEqual(members, query_members)
 
-    def testMethodEndcopy(self):
+    def test_method_endcopy(self):
         try:
             self.connection.endcopy()
         except OSError:
             pass
 
-    def testMethodClose(self):
+    def test_method_close(self):
         self.connection.close()
         try:
             self.connection.reset()
@@ -303,7 +303,7 @@ class TestConnectObject(unittest.TestCase):
             self.fail('Query should give an error for a closed connection')
         self.connection = connect()
 
-    def testMethodReset(self):
+    def test_method_reset(self):
         query = self.connection.query
         # check that client encoding gets reset
         encoding = query('show client_encoding').getresult()[0][0].upper()
@@ -317,12 +317,12 @@ class TestConnectObject(unittest.TestCase):
         self.assertNotEqual(new_encoding, changed_encoding)
         self.assertEqual(new_encoding, encoding)
 
-    def testMethodCancel(self):
+    def test_method_cancel(self):
         r = self.connection.cancel()
         self.assertIsInstance(r, int)
         self.assertEqual(r, 1)
 
-    def testCancelLongRunningThread(self):
+    def test_cancel_long_running_thread(self):
         errors = []
 
         def sleep():
@@ -347,12 +347,12 @@ class TestConnectObject(unittest.TestCase):
         self.assertLessEqual(t2 - t1, 3)  # time should be under 3 seconds
         self.assertTrue(errors)
 
-    def testMethodFileNo(self):
+    def test_method_file_no(self):
         r = self.connection.fileno()
         self.assertIsInstance(r, int)
         self.assertGreaterEqual(r, 0)
 
-    def testMethodTransaction(self):
+    def test_method_transaction(self):
         transaction = self.connection.transaction
         self.assertRaises(TypeError, transaction, None)
         self.assertEqual(transaction(), pg.TRANS_IDLE)
@@ -361,7 +361,7 @@ class TestConnectObject(unittest.TestCase):
         self.connection.query('rollback')
         self.assertEqual(transaction(), pg.TRANS_IDLE)
 
-    def testMethodParameter(self):
+    def test_method_parameter(self):
         parameter = self.connection.parameter
         query = self.connection.query
         self.assertRaises(TypeError, parameter)
@@ -395,15 +395,15 @@ class TestSimpleQueries(unittest.TestCase):
         self.doCleanups()
         self.c.close()
 
-    def testClassName(self):
+    def test_class_name(self):
         r = self.c.query("select 1")
         self.assertEqual(r.__class__.__name__, 'Query')
 
-    def testModuleName(self):
+    def test_module_name(self):
         r = self.c.query("select 1")
         self.assertEqual(r.__class__.__module__, 'pg')
 
-    def testStr(self):
+    def test_str(self):
         q = ("select 1 as a, 'hello' as h, 'w' as world"
              " union select 2, 'xyz', 'uvw'")
         r = self.c.query(q)
@@ -415,23 +415,23 @@ class TestSimpleQueries(unittest.TestCase):
             '2|xyz  |uvw  \n'
             '(2 rows)')
 
-    def testRepr(self):
+    def test_repr(self):
         r = repr(self.c.query("select 1"))
         self.assertTrue(r.startswith('<pg.Query object'), r)
 
-    def testSelect0(self):
+    def test_select0(self):
         q = "select 0"
         self.c.query(q)
 
-    def testSelect0Semicolon(self):
+    def test_select0_semicolon(self):
         q = "select 0;"
         self.c.query(q)
 
-    def testSelectDotSemicolon(self):
+    def test_select_dot_semicolon(self):
         q = "select .;"
         self.assertRaises(pg.DatabaseError, self.c.query, q)
 
-    def testGetresult(self):
+    def test_getresult(self):
         q = "select 0"
         result = [(0,)]
         r = self.c.query(q).getresult()
@@ -441,7 +441,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v[0], int)
         self.assertEqual(r, result)
 
-    def testGetresultLong(self):
+    def test_getresult_long(self):
         q = "select 9876543210"
         result = 9876543210
         self.assertIsInstance(result, int)
@@ -449,21 +449,21 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v, int)
         self.assertEqual(v, result)
 
-    def testGetresultDecimal(self):
+    def test_getresult_decimal(self):
         q = "select 98765432109876543210"
         result = Decimal(98765432109876543210)
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, Decimal)
         self.assertEqual(v, result)
 
-    def testGetresultString(self):
+    def test_getresult_string(self):
         result = 'Hello, world!'
         q = f"select '{result}'"
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testGetresultAsync(self):
+    def test_getresult_async(self):
         q = "select 0"
         result = [(0,)]
         query = self.c.send_query(q)
@@ -475,7 +475,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
         self.assertIsNone(query.getresult())
 
-    def testDictresult(self):
+    def test_dictresult(self):
         q = "select 0 as alias0"
         result = [{'alias0': 0}]
         r = self.c.query(q).dictresult()
@@ -485,7 +485,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v['alias0'], int)
         self.assertEqual(r, result)
 
-    def testDictresultLong(self):
+    def test_dictresult_long(self):
         q = "select 9876543210 as longjohnsilver"
         result = 9876543210
         self.assertIsInstance(result, int)
@@ -493,21 +493,21 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(v, int)
         self.assertEqual(v, result)
 
-    def testDictresultDecimal(self):
+    def test_dictresult_decimal(self):
         q = "select 98765432109876543210 as longjohnsilver"
         result = Decimal(98765432109876543210)
         v = self.c.query(q).dictresult()[0]['longjohnsilver']
         self.assertIsInstance(v, Decimal)
         self.assertEqual(v, result)
 
-    def testDictresultString(self):
+    def test_dictresult_string(self):
         result = 'Hello, world!'
         q = f"select '{result}' as greeting"
         v = self.c.query(q).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testDictresultAsync(self):
+    def test_dictresult_async(self):
         q = "select 0 as alias0"
         result = [{'alias0': 0}]
         query = self.c.send_query(q)
@@ -519,7 +519,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(r, result)
         self.assertIsNone(query.dictresult())
 
-    def testNamedresult(self):
+    def test_namedresult(self):
         q = "select 0 as alias0"
         result = [(0,)]
         r = self.c.query(q).namedresult()
@@ -528,7 +528,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields, ('alias0',))
         self.assertEqual(v.alias0, 0)
 
-    def testNamedresultWithGoodFieldnames(self):
+    def test_namedresult_with_good_fieldnames(self):
         q = 'select 1 as snake_case_alias, 2 as "CamelCaseAlias"'
         result = [(1, 2)]
         r = self.c.query(q).namedresult()
@@ -536,7 +536,7 @@ class TestSimpleQueries(unittest.TestCase):
         v = r[0]
         self.assertEqual(v._fields, ('snake_case_alias', 'CamelCaseAlias'))
 
-    def testNamedresultWithBadFieldnames(self):
+    def test_namedresult_with_bad_fieldnames(self):
         r = namedtuple('Bad', ['?'] * 6, rename=True)
         # noinspection PyUnresolvedReferences
         fields = r._fields
@@ -549,7 +549,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields[:6], fields)
         self.assertEqual(v._fields[6], 'and_a_good_one')
 
-    def testNamedresultAsync(self):
+    def test_namedresult_async(self):
         q = "select 0 as alias0"
         query = self.c.send_query(q)
         result = [(0,)]
@@ -561,7 +561,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsNone(query.namedresult())
         self.assertIsNone(query.namedresult())
 
-    def testListFieldsAfterSecondGetResultAsync(self):
+    def test_list_fields_after_second_get_result_async(self):
         q = "select 1 as one"
         query = self.c.send_query(q)
         self.assertEqual(query.getresult(), [(1,)])
@@ -571,19 +571,19 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsNone(query.getresult())
         self.assertEqual(query.listfields(), ())
 
-    def testGet3Cols(self):
+    def test_get3_cols(self):
         q = "select 1,2,3"
         result = [(1, 2, 3)]
         r = self.c.query(q).getresult()
         self.assertEqual(r, result)
 
-    def testGet3DictCols(self):
+    def test_get3_dict_cols(self):
         q = "select 1 as a,2 as b,3 as c"
         result = [dict(a=1, b=2, c=3)]
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
-    def testGet3NamedCols(self):
+    def test_get3_named_cols(self):
         q = "select 1 as a,2 as b,3 as c"
         result = [(1, 2, 3)]
         r = self.c.query(q).namedresult()
@@ -592,20 +592,20 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields, ('a', 'b', 'c'))
         self.assertEqual(v.b, 2)
 
-    def testGet3Rows(self):
+    def test_get3_rows(self):
         q = "select 3 union select 1 union select 2 order by 1"
         result = [(1,), (2,), (3,)]
         r = self.c.query(q).getresult()
         self.assertEqual(r, result)
 
-    def testGet3DictRows(self):
+    def test_get3_dict_rows(self):
         q = ("select 3 as alias3"
              " union select 1 union select 2 order by 1")
         result = [{'alias3': 1}, {'alias3': 2}, {'alias3': 3}]
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
-    def testGet3NamedRows(self):
+    def test_get3_named_rows(self):
         q = ("select 3 as alias3"
              " union select 1 union select 2 order by 1")
         result = [(1,), (2,), (3,)]
@@ -614,7 +614,7 @@ class TestSimpleQueries(unittest.TestCase):
         for v in r:
             self.assertEqual(v._fields, ('alias3',))
 
-    def testDictresultNames(self):
+    def test_dictresult_names(self):
         q = "select 'MixedCase' as MixedCaseAlias"
         result = [{'mixedcasealias': 'MixedCase'}]
         r = self.c.query(q).dictresult()
@@ -624,7 +624,7 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).dictresult()
         self.assertEqual(r, result)
 
-    def testNamedresultNames(self):
+    def test_namedresult_names(self):
         q = "select 'MixedCase' as MixedCaseAlias"
         result = [('MixedCase',)]
         r = self.c.query(q).namedresult()
@@ -639,7 +639,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields, ('MixedCaseAlias',))
         self.assertEqual(v.MixedCaseAlias, 'MixedCase')
 
-    def testBigGetresult(self):
+    def test_big_getresult(self):
         num_cols = 100
         num_rows = 100
         q = "select " + ','.join(map(str, range(num_cols)))
@@ -648,7 +648,7 @@ class TestSimpleQueries(unittest.TestCase):
         result = [tuple(range(num_cols))] * num_rows
         self.assertEqual(r, result)
 
-    def testListfields(self):
+    def test_listfields(self):
         q = ('select 0 as a, 0 as b, 0 as c,'
              ' 0 as c, 0 as b, 0 as a,'
              ' 0 as lowercase, 0 as UPPERCASE,'
@@ -662,14 +662,14 @@ class TestSimpleQueries(unittest.TestCase):
                   'a_long_name_with_underscores', 'A long name with Blanks')
         self.assertEqual(r, result)
 
-    def testFieldname(self):
+    def test_fieldname(self):
         q = "select 0 as z, 0 as a, 0 as x, 0 as y"
         r = self.c.query(q).fieldname(2)
         self.assertEqual(r, 'x')
         r = self.c.query(q).fieldname(3)
         self.assertEqual(r, 'y')
 
-    def testFieldnum(self):
+    def test_fieldnum(self):
         q = "select 1 as x"
         self.assertRaises(ValueError, self.c.query(q).fieldnum, 'y')
         q = "select 1 as x"
@@ -684,7 +684,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 3)
 
-    def testFieldInfoName(self):
+    def test_field_info_name(self):
         q = ('select true as FooBar, 42::smallint as "FooBar",'
              ' 4.2::numeric(4,2) as foo_bar, \'baz\'::char(3) as "Foo Bar"')
         f = self.c.query(q).fieldinfo
@@ -712,7 +712,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertRaises(IndexError, f, -1)
         self.assertRaises(IndexError, f, 4)
 
-    def testLen(self):
+    def test_len(self):
         q = "select 1 where false"
         self.assertEqual(len(self.c.query(q)), 0)
         q = ("select 1 as a, 2 as b, 3 as c, 4 as d"
@@ -722,7 +722,7 @@ class TestSimpleQueries(unittest.TestCase):
              " union select 4 union select 5 union select 6")
         self.assertEqual(len(self.c.query(q)), 6)
 
-    def testQuery(self):
+    def test_query(self):
         query = self.c.query
         query("drop table if exists test_table")
         self.addCleanup(query, "drop table test_table")
@@ -759,7 +759,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
 
-    def testQueryWithOids(self):
+    def test_query_with_oids(self):
         if self.c.server_version >= 120000:
             self.skipTest("database does not support tables with oids")
         query = self.c.query
@@ -797,7 +797,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
 
-    def testMemSize(self):
+    def test_mem_size(self):
         # noinspection PyUnresolvedReferences
         if pg.get_pqlib_version() < 120000:
             self.skipTest("pqlib does not support memsize()")
@@ -823,21 +823,21 @@ class TestUnicodeQueries(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
-    def testGetresulAscii(self):
+    def test_getresul_ascii(self):
         result = 'Hello, world!'
         q = f"select '{result}'"
         v = self.c.query(q).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testDictresulAscii(self):
+    def test_dictresul_ascii(self):
         result = 'Hello, world!'
         q = f"select '{result}' as greeting"
         v = self.c.query(q).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testGetresultUtf8(self):
+    def test_getresult_utf8(self):
         result = 'Hello, wörld & мир!'
         q = f"select '{result}'"
         # pass the query as unicode
@@ -853,7 +853,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testDictresultUtf8(self):
+    def test_dictresult_utf8(self):
         result = 'Hello, wörld & мир!'
         q = f"select '{result}' as greeting"
         try:
@@ -867,7 +867,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testGetresultLatin1(self):
+    def test_getresult_latin1(self):
         try:
             self.c.query('set client_encoding=latin1')
         except (pg.DataError, pg.NotSupportedError):
@@ -882,7 +882,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testDictresultLatin1(self):
+    def test_dictresult_latin1(self):
         try:
             self.c.query('set client_encoding=latin1')
         except (pg.DataError, pg.NotSupportedError):
@@ -897,7 +897,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testGetresultCyrillic(self):
+    def test_getresult_cyrillic(self):
         try:
             self.c.query('set client_encoding=iso_8859_5')
         except (pg.DataError, pg.NotSupportedError):
@@ -912,7 +912,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testDictresultCyrillic(self):
+    def test_dictresult_cyrillic(self):
         try:
             self.c.query('set client_encoding=iso_8859_5')
         except (pg.DataError, pg.NotSupportedError):
@@ -927,7 +927,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testGetresultLatin9(self):
+    def test_getresult_latin9(self):
         try:
             self.c.query('set client_encoding=latin9')
         except (pg.DataError, pg.NotSupportedError):
@@ -942,7 +942,7 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
-    def testDictresultLatin9(self):
+    def test_dictresult_latin9(self):
         try:
             self.c.query('set client_encoding=latin9')
         except (pg.DataError, pg.NotSupportedError):
@@ -968,7 +968,7 @@ class TestParamQueries(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
-    def testQueryWithNoneParam(self):
+    def test_query_with_none_param(self):
         self.assertRaises(TypeError, self.c.query, "select $1", None)
         self.assertRaises(TypeError, self.c.query, "select $1+$2", None, None)
         self.assertEqual(
@@ -978,8 +978,9 @@ class TestParamQueries(unittest.TestCase):
         self.assertEqual(
             self.c.query("select $1::text", [[None]]).getresult(), [(None,)])
 
-    def testQueryWithBoolParams(self, bool_enabled=None):
+    def test_query_with_bool_params(self, bool_enabled=None):
         query = self.c.query
+        bool_enabled_default = None
         if bool_enabled is not None:
             bool_enabled_default = pg.get_bool()
             pg.set_bool(bool_enabled)
@@ -1003,13 +1004,12 @@ class TestParamQueries(unittest.TestCase):
             self.assertEqual(query(q, (True,)).getresult(), r_true)
         finally:
             if bool_enabled is not None:
-                # noinspection PyUnboundLocalVariable
                 pg.set_bool(bool_enabled_default)
 
-    def testQueryWithBoolParamsNotDefault(self):
-        self.testQueryWithBoolParams(bool_enabled=not pg.get_bool())
+    def test_query_with_bool_params_not_default(self):
+        self.test_query_with_bool_params(bool_enabled=not pg.get_bool())
 
-    def testQueryWithIntParams(self):
+    def test_query_with_int_params(self):
         query = self.c.query
         self.assertEqual(query("select 1+1").getresult(), [(2,)])
         self.assertEqual(query("select 1+$1", (1,)).getresult(), [(2,)])
@@ -1031,7 +1031,7 @@ class TestParamQueries(unittest.TestCase):
             query("select 0+$1+$2+$3+$4+$5+$6", list(range(6))).getresult(),
             [(15,)])
 
-    def testQueryWithStrParams(self):
+    def test_query_with_str_params(self):
         query = self.c.query
         self.assertEqual(
             query("select $1||', world!'", ('Hello',)).getresult(),
@@ -1064,7 +1064,7 @@ class TestParamQueries(unittest.TestCase):
                   ('Hello', 'w\xc3\xb6rld')).getresult(),
             [('Hello, w\xc3\xb6rld!',)])
 
-    def testQueryWithUnicodeParams(self):
+    def test_query_with_unicode_params(self):
         query = self.c.query
         try:
             query('set client_encoding=utf8')
@@ -1076,7 +1076,7 @@ class TestParamQueries(unittest.TestCase):
             query("select $1||', '||$2||'!'", ('Hello', 'wörld')).getresult(),
             [('Hello, wörld!',)])
 
-    def testQueryWithUnicodeParamsLatin1(self):
+    def test_query_with_unicode_params_latin1(self):
         query = self.c.query
         try:
             query('set client_encoding=latin1')
@@ -1101,7 +1101,7 @@ class TestParamQueries(unittest.TestCase):
             UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', 'wörld'))
 
-    def testQueryWithUnicodeParamsCyrillic(self):
+    def test_query_with_unicode_params_cyrillic(self):
         query = self.c.query
         try:
             query('set client_encoding=iso_8859_5')
@@ -1120,7 +1120,7 @@ class TestParamQueries(unittest.TestCase):
             UnicodeError, query, "select $1||', '||$2||'!'",
             ('Hello', 'мир!'))
 
-    def testQueryWithMixedParams(self):
+    def test_query_with_mixed_params(self):
         self.assertEqual(
             self.c.query(
                 "select $1+2,$2||', world!'", (1, 'Hello')).getresult(),
@@ -1131,17 +1131,17 @@ class TestParamQueries(unittest.TestCase):
                 (4711, None, 'Hello!')).getresult(),
             [(4711, None, 'Hello!')])
 
-    def testQueryWithDuplicateParams(self):
+    def test_query_with_duplicate_params(self):
         self.assertRaises(
             pg.ProgrammingError, self.c.query, "select $1+$1", (1,))
         self.assertRaises(
             pg.ProgrammingError, self.c.query, "select $1+$1", (1, 2))
 
-    def testQueryWithZeroParams(self):
+    def test_query_with_zero_params(self):
         self.assertEqual(
             self.c.query("select 1+1", []).getresult(), [(2,)])
 
-    def testQueryWithGarbage(self):
+    def test_query_with_garbage(self):
         garbage = r"'\{}+()-#[]oo324"
         self.assertEqual(
             self.c.query("select $1::text AS garbage",
@@ -1159,38 +1159,38 @@ class TestPreparedQueries(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
-    def testEmptyPreparedStatement(self):
+    def test_empty_prepared_statement(self):
         self.c.prepare('', '')
         self.assertRaises(ValueError, self.c.query_prepared, '')
 
-    def testInvalidPreparedStatement(self):
+    def test_invalid_prepared_statement(self):
         self.assertRaises(pg.ProgrammingError, self.c.prepare, '', 'bad')
 
-    def testDuplicatePreparedStatement(self):
+    def test_duplicate_prepared_statement(self):
         self.assertIsNone(self.c.prepare('q', 'select 1'))
         self.assertRaises(pg.ProgrammingError, self.c.prepare, 'q', 'select 2')
 
-    def testNonExistentPreparedStatement(self):
+    def test_non_existent_prepared_statement(self):
         self.assertRaises(
             pg.OperationalError, self.c.query_prepared, 'does-not-exist')
 
-    def testUnnamedQueryWithoutParams(self):
+    def test_unnamed_query_without_params(self):
         self.assertIsNone(self.c.prepare('', "select 'anon'"))
         self.assertEqual(self.c.query_prepared('').getresult(), [('anon',)])
         self.assertEqual(self.c.query_prepared('').getresult(), [('anon',)])
 
-    def testNamedQueryWithoutParams(self):
+    def test_named_query_without_params(self):
         self.assertIsNone(self.c.prepare('hello', "select 'world'"))
         self.assertEqual(
             self.c.query_prepared('hello').getresult(), [('world',)])
 
-    def testMultipleNamedQueriesWithoutParams(self):
+    def test_multiple_named_queries_without_params(self):
         self.assertIsNone(self.c.prepare('query17', "select 17"))
         self.assertIsNone(self.c.prepare('query42', "select 42"))
         self.assertEqual(self.c.query_prepared('query17').getresult(), [(17,)])
         self.assertEqual(self.c.query_prepared('query42').getresult(), [(42,)])
 
-    def testUnnamedQueryWithParams(self):
+    def test_unnamed_query_with_params(self):
         self.assertIsNone(self.c.prepare('', "select $1 || ', ' || $2"))
         self.assertEqual(
             self.c.query_prepared('', ['hello', 'world']).getresult(),
@@ -1199,7 +1199,7 @@ class TestPreparedQueries(unittest.TestCase):
         self.assertEqual(
             self.c.query_prepared('', [17, -5, 29]).getresult(), [(42,)])
 
-    def testMultipleNamedQueriesWithParams(self):
+    def test_multiple_named_queries_with_params(self):
         self.assertIsNone(self.c.prepare('q1', "select $1 || '!'"))
         self.assertIsNone(self.c.prepare('q2', "select $1 || '-' || $2"))
         self.assertEqual(
@@ -1209,21 +1209,21 @@ class TestPreparedQueries(unittest.TestCase):
             self.c.query_prepared('q2', ['he', 'lo']).getresult(),
             [('he-lo',)])
 
-    def testDescribeNonExistentQuery(self):
+    def test_describe_non_existent_query(self):
         self.assertRaises(
             pg.OperationalError, self.c.describe_prepared, 'does-not-exist')
 
-    def testDescribeUnnamedQuery(self):
+    def test_describe_unnamed_query(self):
         self.c.prepare('', "select 1::int, 'a'::char")
         r = self.c.describe_prepared('')
         self.assertEqual(r.listfields(), ('int4', 'bpchar'))
 
-    def testDescribeNamedQuery(self):
+    def test_describe_named_query(self):
         self.c.prepare('myquery', "select 1 as first, 2 as second")
         r = self.c.describe_prepared('myquery')
         self.assertEqual(r.listfields(), ('first', 'second'))
 
-    def testDescribeMultipleNamedQueries(self):
+    def test_describe_multiple_named_queries(self):
         self.c.prepare('query1', "select 1::int")
         self.c.prepare('query2', "select 1::int, 2::int")
         r = self.c.describe_prepared('query1')
@@ -1267,36 +1267,36 @@ class TestQueryResultTypes(unittest.TestCase):
             self.assertEqual(len(r), 1)
             self.assertIsInstance(r[0], pytype)
 
-    def testInt(self):
+    def test_int(self):
         self.assert_proper_cast(0, 'int', int)
         self.assert_proper_cast(0, 'smallint', int)
         self.assert_proper_cast(0, 'oid', int)
         self.assert_proper_cast(0, 'cid', int)
         self.assert_proper_cast(0, 'xid', int)
 
-    def testLong(self):
+    def test_long(self):
         self.assert_proper_cast(0, 'bigint', int)
 
-    def testFloat(self):
+    def test_float(self):
         self.assert_proper_cast(0, 'float', float)
         self.assert_proper_cast(0, 'real', float)
         self.assert_proper_cast(0, 'double precision', float)
         self.assert_proper_cast('infinity', 'float', float)
 
-    def testNumeric(self):
+    def test_numeric(self):
         decimal = pg.get_decimal()
         self.assert_proper_cast(decimal(0), 'numeric', decimal)
         self.assert_proper_cast(decimal(0), 'decimal', decimal)
 
-    def testMoney(self):
+    def test_money(self):
         decimal = pg.get_decimal()
         self.assert_proper_cast(decimal('0'), 'money', decimal)
 
-    def testBool(self):
+    def test_bool(self):
         bool_type = bool if pg.get_bool() else str
         self.assert_proper_cast('f', 'bool', bool_type)
 
-    def testDate(self):
+    def test_date(self):
         self.assert_proper_cast('1956-01-31', 'date', str)
         self.assert_proper_cast('10:20:30', 'interval', str)
         self.assert_proper_cast('08:42:15', 'time', str)
@@ -1304,16 +1304,16 @@ class TestQueryResultTypes(unittest.TestCase):
         self.assert_proper_cast('1956-01-31 08:42:15', 'timestamp', str)
         self.assert_proper_cast('1956-01-31 08:42:15+00', 'timestamptz', str)
 
-    def testText(self):
+    def test_text(self):
         self.assert_proper_cast('', 'text', str)
         self.assert_proper_cast('', 'char', str)
         self.assert_proper_cast('', 'bpchar', str)
         self.assert_proper_cast('', 'varchar', str)
 
-    def testBytea(self):
+    def test_bytea(self):
         self.assert_proper_cast('', 'bytea', bytes)
 
-    def testJson(self):
+    def test_json(self):
         self.assert_proper_cast('{}', 'json', dict)
 
 
@@ -1326,27 +1326,27 @@ class TestQueryIterator(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
-    def testLen(self):
+    def test_len(self):
         r = self.c.query("select generate_series(3,7)")
         self.assertEqual(len(r), 5)
 
-    def testGetItem(self):
+    def test_get_item(self):
         r = self.c.query("select generate_series(7,9)")
         self.assertEqual(r[0], (7,))
         self.assertEqual(r[1], (8,))
         self.assertEqual(r[2], (9,))
 
-    def testGetItemWithNegativeIndex(self):
+    def test_get_item_with_negative_index(self):
         r = self.c.query("select generate_series(7,9)")
         self.assertEqual(r[-1], (9,))
         self.assertEqual(r[-2], (8,))
         self.assertEqual(r[-3], (7,))
 
-    def testGetItemOutOfRange(self):
+    def test_get_item_out_of_range(self):
         r = self.c.query("select generate_series(7,9)")
         self.assertRaises(IndexError, r.__getitem__, 3)
 
-    def testIterate(self):
+    def test_iterate(self):
         r = self.c.query("select generate_series(3,5)")
         self.assertNotIsInstance(r, (list, tuple))
         self.assertIsInstance(r, Iterable)
@@ -1354,29 +1354,29 @@ class TestQueryIterator(unittest.TestCase):
         # noinspection PyUnresolvedReferences
         self.assertIsInstance(r[1], tuple)
 
-    def testIterateTwice(self):
+    def test_iterate_twice(self):
         r = self.c.query("select generate_series(3,5)")
         for i in range(2):
             self.assertEqual(list(r), [(3,), (4,), (5,)])
 
-    def testIterateTwoColumns(self):
+    def test_iterate_two_columns(self):
         r = self.c.query("select 1,2 union select 3,4")
         self.assertIsInstance(r, Iterable)
         self.assertEqual(list(r), [(1, 2), (3, 4)])
 
-    def testNext(self):
+    def test_next(self):
         r = self.c.query("select generate_series(7,9)")
         self.assertEqual(next(r), (7,))
         self.assertEqual(next(r), (8,))
         self.assertEqual(next(r), (9,))
         self.assertRaises(StopIteration, next, r)
 
-    def testContains(self):
+    def test_contains(self):
         r = self.c.query("select generate_series(7,9)")
         self.assertIn((8,), r)
         self.assertNotIn((5,), r)
 
-    def testDictIterate(self):
+    def test_dict_iterate(self):
         r = self.c.query("select generate_series(3,5) as n").dictiter()
         self.assertNotIsInstance(r, (list, tuple))
         self.assertIsInstance(r, Iterable)
@@ -1384,7 +1384,7 @@ class TestQueryIterator(unittest.TestCase):
         self.assertEqual(r, [dict(n=3), dict(n=4), dict(n=5)])
         self.assertIsInstance(r[1], dict)
 
-    def testDictIterateTwoColumns(self):
+    def test_dict_iterate_two_columns(self):
         r = self.c.query(
             "select 1 as one, 2 as two"
             " union select 3 as one, 4 as two").dictiter()
@@ -1392,19 +1392,19 @@ class TestQueryIterator(unittest.TestCase):
         r = list(r)
         self.assertEqual(r, [dict(one=1, two=2), dict(one=3, two=4)])
 
-    def testDictNext(self):
+    def test_dict_next(self):
         r = self.c.query("select generate_series(7,9) as n").dictiter()
         self.assertEqual(next(r), dict(n=7))
         self.assertEqual(next(r), dict(n=8))
         self.assertEqual(next(r), dict(n=9))
         self.assertRaises(StopIteration, next, r)
 
-    def testDictContains(self):
+    def test_dict_contains(self):
         r = self.c.query("select generate_series(7,9) as n").dictiter()
         self.assertIn(dict(n=8), r)
         self.assertNotIn(dict(n=5), r)
 
-    def testNamedIterate(self):
+    def test_named_iterate(self):
         r = self.c.query("select generate_series(3,5) as number").namediter()
         self.assertNotIsInstance(r, (list, tuple))
         self.assertIsInstance(r, Iterable)
@@ -1414,7 +1414,7 @@ class TestQueryIterator(unittest.TestCase):
         self.assertEqual(r[1]._fields, ('number',))
         self.assertEqual(r[1].number, 4)
 
-    def testNamedIterateTwoColumns(self):
+    def test_named_iterate_two_columns(self):
         r = self.c.query(
             "select 1 as one, 2 as two"
             " union select 3 as one, 4 as two").namediter()
@@ -1426,7 +1426,7 @@ class TestQueryIterator(unittest.TestCase):
         self.assertEqual(r[1]._fields, ('one', 'two'))
         self.assertEqual(r[1].two, 4)
 
-    def testNamedNext(self):
+    def test_named_next(self):
         r = self.c.query("select generate_series(7,9) as number").namediter()
         self.assertEqual(next(r), (7,))
         self.assertEqual(next(r), (8,))
@@ -1435,12 +1435,12 @@ class TestQueryIterator(unittest.TestCase):
         self.assertEqual(n.number, 9)
         self.assertRaises(StopIteration, next, r)
 
-    def testNamedContains(self):
+    def test_named_contains(self):
         r = self.c.query("select generate_series(7,9)").namediter()
         self.assertIn((8,), r)
         self.assertNotIn((5,), r)
 
-    def testScalarIterate(self):
+    def test_scalar_iterate(self):
         r = self.c.query("select generate_series(3,5)").scalariter()
         self.assertNotIsInstance(r, (list, tuple))
         self.assertIsInstance(r, Iterable)
@@ -1448,20 +1448,20 @@ class TestQueryIterator(unittest.TestCase):
         self.assertEqual(r, [3, 4, 5])
         self.assertIsInstance(r[1], int)
 
-    def testScalarIterateTwoColumns(self):
+    def test_scalar_iterate_two_columns(self):
         r = self.c.query("select 1, 2 union select 3, 4").scalariter()
         self.assertIsInstance(r, Iterable)
         r = list(r)
         self.assertEqual(r, [1, 3])
 
-    def testScalarNext(self):
+    def test_scalar_next(self):
         r = self.c.query("select generate_series(7,9)").scalariter()
         self.assertEqual(next(r), 7)
         self.assertEqual(next(r), 8)
         self.assertEqual(next(r), 9)
         self.assertRaises(StopIteration, next, r)
 
-    def testScalarContains(self):
+    def test_scalar_contains(self):
         r = self.c.query("select generate_series(7,9)").scalariter()
         self.assertIn(8, r)
         self.assertNotIn(5, r)
@@ -1476,46 +1476,46 @@ class TestQueryOneSingleScalar(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
-    def testOneWithEmptyQuery(self):
+    def test_one_with_empty_query(self):
         q = self.c.query("select 0 where false")
         self.assertIsNone(q.one())
 
-    def testOneWithSingleRow(self):
+    def test_one_with_single_row(self):
         q = self.c.query("select 1, 2")
         r = q.one()
         self.assertIsInstance(r, tuple)
         self.assertEqual(r, (1, 2))
         self.assertEqual(q.one(), None)
 
-    def testOneWithTwoRows(self):
+    def test_one_with_two_rows(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         self.assertEqual(q.one(), (1, 2))
         self.assertEqual(q.one(), (3, 4))
         self.assertEqual(q.one(), None)
 
-    def testOneDictWithEmptyQuery(self):
+    def test_one_dict_with_empty_query(self):
         q = self.c.query("select 0 where false")
         self.assertIsNone(q.onedict())
 
-    def testOneDictWithSingleRow(self):
+    def test_one_dict_with_single_row(self):
         q = self.c.query("select 1 as one, 2 as two")
         r = q.onedict()
         self.assertIsInstance(r, dict)
         self.assertEqual(r, dict(one=1, two=2))
         self.assertEqual(q.onedict(), None)
 
-    def testOneDictWithTwoRows(self):
+    def test_one_dict_with_two_rows(self):
         q = self.c.query(
             "select 1 as one, 2 as two union select 3 as one, 4 as two")
         self.assertEqual(q.onedict(), dict(one=1, two=2))
         self.assertEqual(q.onedict(), dict(one=3, two=4))
         self.assertEqual(q.onedict(), None)
 
-    def testOneNamedWithEmptyQuery(self):
+    def test_one_named_with_empty_query(self):
         q = self.c.query("select 0 where false")
         self.assertIsNone(q.onenamed())
 
-    def testOneNamedWithSingleRow(self):
+    def test_one_named_with_single_row(self):
         q = self.c.query("select 1 as one, 2 as two")
         r = q.onenamed()
         self.assertEqual(r._fields, ('one', 'two'))
@@ -1524,7 +1524,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertEqual(r, (1, 2))
         self.assertEqual(q.onenamed(), None)
 
-    def testOneNamedWithTwoRows(self):
+    def test_one_named_with_two_rows(self):
         q = self.c.query(
             "select 1 as one, 2 as two union select 3 as one, 4 as two")
         r = q.onenamed()
@@ -1539,24 +1539,24 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertEqual(r, (3, 4))
         self.assertEqual(q.onenamed(), None)
 
-    def testOneScalarWithEmptyQuery(self):
+    def test_one_scalar_with_empty_query(self):
         q = self.c.query("select 0 where false")
         self.assertIsNone(q.onescalar())
 
-    def testOneScalarWithSingleRow(self):
+    def test_one_scalar_with_single_row(self):
         q = self.c.query("select 1, 2")
         r = q.onescalar()
         self.assertIsInstance(r, int)
         self.assertEqual(r, 1)
         self.assertEqual(q.onescalar(), None)
 
-    def testOneScalarWithTwoRows(self):
+    def test_one_scalar_with_two_rows(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         self.assertEqual(q.onescalar(), 1)
         self.assertEqual(q.onescalar(), 3)
         self.assertEqual(q.onescalar(), None)
 
-    def testSingleWithEmptyQuery(self):
+    def test_single_with_empty_query(self):
         q = self.c.query("select 0 where false")
         try:
             q.single()
@@ -1567,7 +1567,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.NoResultError)
         self.assertEqual(str(r), 'No result found')
 
-    def testSingleWithSingleRow(self):
+    def test_single_with_single_row(self):
         q = self.c.query("select 1, 2")
         r = q.single()
         self.assertIsInstance(r, tuple)
@@ -1576,7 +1576,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, tuple)
         self.assertEqual(r, (1, 2))
 
-    def testSingleWithTwoRows(self):
+    def test_single_with_two_rows(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.single()
@@ -1587,7 +1587,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.MultipleResultsError)
         self.assertEqual(str(r), 'Multiple results found')
 
-    def testSingleDictWithEmptyQuery(self):
+    def test_single_dict_with_empty_query(self):
         q = self.c.query("select 0 where false")
         try:
             q.singledict()
@@ -1598,7 +1598,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.NoResultError)
         self.assertEqual(str(r), 'No result found')
 
-    def testSingleDictWithSingleRow(self):
+    def test_single_dict_with_single_row(self):
         q = self.c.query("select 1 as one, 2 as two")
         r = q.singledict()
         self.assertIsInstance(r, dict)
@@ -1607,7 +1607,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertEqual(r, dict(one=1, two=2))
 
-    def testSingleDictWithTwoRows(self):
+    def test_single_dict_with_two_rows(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.singledict()
@@ -1618,7 +1618,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.MultipleResultsError)
         self.assertEqual(str(r), 'Multiple results found')
 
-    def testSingleNamedWithEmptyQuery(self):
+    def test_single_named_with_empty_query(self):
         q = self.c.query("select 0 where false")
         try:
             q.singlenamed()
@@ -1629,7 +1629,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.NoResultError)
         self.assertEqual(str(r), 'No result found')
 
-    def testSingleNamedWithSingleRow(self):
+    def test_single_named_with_single_row(self):
         q = self.c.query("select 1 as one, 2 as two")
         r = q.singlenamed()
         self.assertEqual(r._fields, ('one', 'two'))
@@ -1642,7 +1642,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertEqual(r.two, 2)
         self.assertEqual(r, (1, 2))
 
-    def testSingleNamedWithTwoRows(self):
+    def test_single_named_with_two_rows(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.singlenamed()
@@ -1653,7 +1653,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.MultipleResultsError)
         self.assertEqual(str(r), 'Multiple results found')
 
-    def testSingleScalarWithEmptyQuery(self):
+    def test_single_scalar_with_empty_query(self):
         q = self.c.query("select 0 where false")
         try:
             q.singlescalar()
@@ -1664,7 +1664,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.NoResultError)
         self.assertEqual(str(r), 'No result found')
 
-    def testSingleScalarWithSingleRow(self):
+    def test_single_scalar_with_single_row(self):
         q = self.c.query("select 1, 2")
         r = q.singlescalar()
         self.assertIsInstance(r, int)
@@ -1673,7 +1673,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 1)
 
-    def testSingleScalarWithTwoRows(self):
+    def test_single_scalar_with_two_rows(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         try:
             q.singlescalar()
@@ -1684,13 +1684,13 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, pg.MultipleResultsError)
         self.assertEqual(str(r), 'Multiple results found')
 
-    def testScalarResult(self):
+    def test_scalar_result(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         r = q.scalarresult()
         self.assertIsInstance(r, list)
         self.assertEqual(r, [1, 3])
 
-    def testScalarIter(self):
+    def test_scalar_iter(self):
         q = self.c.query("select 1, 2 union select 3, 4")
         r = q.scalariter()
         self.assertNotIsInstance(r, (list, tuple))
@@ -1809,22 +1809,22 @@ class TestInserttable(unittest.TestCase):
             data.append(row)
         return data
 
-    def testInserttable1Row(self):
+    def test_inserttable1_row(self):
         data = self.data[2:3]
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
-    def testInserttable4Rows(self):
+    def test_inserttable4_rows(self):
         data = self.data
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableFromTupleOfLists(self):
+    def test_inserttable_from_tuple_of_lists(self):
         data = tuple(list(row) for row in self.data)
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), self.data)
 
-    def testInserttableWithDifferentRowSizes(self):
+    def test_inserttable_with_different_row_sizes(self):
         data = self.data[:-1] + [self.data[-1][:-1]]
         try:
             self.c.inserttable('test', data)
@@ -1834,34 +1834,34 @@ class TestInserttable(unittest.TestCase):
         else:
             self.assertFalse('expected an error')
 
-    def testInserttableFromSetofTuples(self):
+    def test_inserttable_from_setof_tuples(self):
         data = {row for row in self.data}
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), self.data)
 
-    def testInserttableFromDictAsInterable(self):
+    def test_inserttable_from_dict_as_interable(self):
         data = {row: None for row in self.data}
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), self.data)
 
-    def testInserttableFromDictKeys(self):
+    def test_inserttable_from_dict_keys(self):
         data = {row: None for row in self.data}
         keys = data.keys()
         self.c.inserttable('test', keys)
         self.assertEqual(self.get_back(), self.data)
 
-    def testInserttableFromDictValues(self):
+    def test_inserttable_from_dict_values(self):
         data = {i: row for i, row in enumerate(self.data)}
         values = data.values()
         self.c.inserttable('test', values)
         self.assertEqual(self.get_back(), self.data)
 
-    def testInserttableFromGeneratorOfTuples(self):
+    def test_inserttable_from_generator_of_tuples(self):
         data = (row for row in self.data)
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), self.data)
 
-    def testInserttableFromListOfSets(self):
+    def test_inserttable_from_list_of_sets(self):
         data = [set(row) for row in self.data]
         try:
             self.c.inserttable('test', data)
@@ -1871,14 +1871,14 @@ class TestInserttable(unittest.TestCase):
         else:
             self.assertFalse('expected an error')
 
-    def testInserttableMultipleRows(self):
+    def test_inserttable_multiple_rows(self):
         num_rows = 100
         data = self.data[2:3] * num_rows
         self.c.inserttable('test', data)
         r = self.c.query("select count(*) from test").getresult()[0][0]
         self.assertEqual(r, num_rows)
 
-    def testInserttableMultipleCalls(self):
+    def test_inserttable_multiple_calls(self):
         num_rows = 10
         data = self.data[2:3]
         for _i in range(num_rows):
@@ -1886,23 +1886,23 @@ class TestInserttable(unittest.TestCase):
         r = self.c.query("select count(*) from test").getresult()[0][0]
         self.assertEqual(r, num_rows)
 
-    def testInserttableNullValues(self):
+    def test_inserttable_null_values(self):
         data = [(None,) * 14] * 100
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableNoColumn(self):
+    def test_inserttable_no_column(self):
         data = [()] * 10
         self.c.inserttable('test', data, [])
         self.assertEqual(self.get_back(), [])
 
-    def testInserttableOnlyOneColumn(self):
+    def test_inserttable_only_one_column(self):
         data = [(42,)] * 50
         self.c.inserttable('test', data, ['i4'])
         data = [tuple([42 if i == 1 else None for i in range(14)])] * 50
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableOnlyTwoColumns(self):
+    def test_inserttable_only_two_columns(self):
         data = [(bool(i % 2), i * .5) for i in range(20)]
         self.c.inserttable('test', data, ('b', 'f4'))
         # noinspection PyTypeChecker
@@ -1910,12 +1910,12 @@ class TestInserttable(unittest.TestCase):
                 + (None,) * 6 for i in range(20)]
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableWithDottedTableName(self):
+    def test_inserttable_with_dotted_table_name(self):
         data = self.data
         self.c.inserttable('public.test', data)
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableWithInvalidTableName(self):
+    def test_inserttable_with_invalid_table_name(self):
         data = [(42,)]
         # check that the table name is not inserted unescaped
         # (this would pass otherwise since there is a column named i4)
@@ -1928,7 +1928,7 @@ class TestInserttable(unittest.TestCase):
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i4'])
 
-    def testInserttableWithInvalidDataType(self):
+    def test_inserttable_with_invalid_data_type(self):
         try:
             self.c.inserttable('test', 42)
         except TypeError as e:
@@ -1936,7 +1936,7 @@ class TestInserttable(unittest.TestCase):
         else:
             self.assertFalse('expected an error')
 
-    def testInserttableWithInvalidColumnName(self):
+    def test_inserttable_with_invalid_column_name(self):
         data = [(2, 4)]
         # check that the column names are not inserted unescaped
         # (this would pass otherwise since there are columns i2 and i4)
@@ -1950,7 +1950,7 @@ class TestInserttable(unittest.TestCase):
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i2', 'i4'])
 
-    def testInserttableWithInvalidColumList(self):
+    def test_inserttable_with_invalid_colum_list(self):
         data = self.data
         try:
             self.c.inserttable('test', data, 'invalid')
@@ -1960,7 +1960,7 @@ class TestInserttable(unittest.TestCase):
         else:
             self.assertFalse('expected an error')
 
-    def testInserttableWithHugeListOfColumnNames(self):
+    def test_inserttable_with_huge_list_of_column_names(self):
         data = self.data
         # try inserting data with a huge list of column names
         cols = ['very_long_column_name'] * 2000
@@ -1970,13 +1970,13 @@ class TestInserttable(unittest.TestCase):
         cols *= 2
         self.assertRaises(MemoryError, self.c.inserttable, 'test', data, cols)
 
-    def testInserttableWithOutOfRangeData(self):
+    def test_inserttable_with_out_of_range_data(self):
         # try inserting data out of range for the column type
         # Should raise a value error because of smallint out of range
         self.assertRaises(
             ValueError, self.c.inserttable, 'test', [[33000]], ['i2'])
 
-    def testInserttableMaxValues(self):
+    def test_inserttable_max_values(self):
         data = [(2 ** 15 - 1, 2 ** 31 - 1, 2 ** 31 - 1,
                  True, '2999-12-31', '11:59:59', 1e99,
                  1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
@@ -1984,7 +1984,7 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableByteValues(self):
+    def test_inserttable_byte_values(self):
         try:
             self.c.query("select '€', 'käse', 'сыр', 'pont-l''évêque'")
         except pg.DataError:
@@ -2003,7 +2003,7 @@ class TestInserttable(unittest.TestCase):
         data = [row_unicode] * 2
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableUnicodeUtf8(self):
+    def test_inserttable_unicode_utf8(self):
         try:
             self.c.query("select '€', 'käse', 'сыр', 'pont-l''évêque'")
         except pg.DataError:
@@ -2018,7 +2018,7 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
-    def testInserttableUnicodeLatin1(self):
+    def test_inserttable_unicode_latin1(self):
         try:
             self.c.query("set client_encoding=latin1")
             self.c.query("select '¥'")
@@ -2040,7 +2040,7 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back('latin1'), data)
 
-    def testInserttableUnicodeLatin9(self):
+    def test_inserttable_unicode_latin9(self):
         try:
             self.c.query("set client_encoding=latin9")
             self.c.query("select '€'")
@@ -2057,7 +2057,7 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back('latin9'), data)
 
-    def testInserttableNoEncoding(self):
+    def test_inserttable_no_encoding(self):
         self.c.query("set client_encoding=sql_ascii")
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = '€' if self.has_encoding else '$'
@@ -2069,7 +2069,7 @@ class TestInserttable(unittest.TestCase):
         # cannot encode non-ascii unicode without a specific encoding
         self.assertRaises(UnicodeEncodeError, self.c.inserttable, 'test', data)
 
-    def testInserttableFromQuery(self):
+    def test_inserttable_from_query(self):
         data = self.c.query(
             "select 2::int2 as i2, 4::int4 as i4, 8::int8 as i8, true as b,"
             "null as dt, null as ti, null as d,"
@@ -2080,7 +2080,7 @@ class TestInserttable(unittest.TestCase):
             (2, 4, 8, True, None, None, None, 4.5, 8.5,
              None, 'c', 'v4', None, 'text')])
 
-    def testInserttableSpecialChars(self):
+    def test_inserttable_special_chars(self):
         class S:
             def __repr__(self):
                 return s
@@ -2093,7 +2093,7 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(
             self.c.query('select t from test').getresult(), [(s,)] * 3)
 
-    def testInsertTableBigRowSize(self):
+    def test_insert_table_big_row_size(self):
         # inserting rows with a size of up to 64k bytes should work
         t = '*' * 50000
         data = [(t,)]
@@ -2105,7 +2105,7 @@ class TestInserttable(unittest.TestCase):
         data = [(t,)]
         self.assertRaises(MemoryError, self.c.inserttable, 'test', data, ['t'])
 
-    def testInsertTableSmallIntOverflow(self):
+    def test_insert_table_small_int_overflow(self):
         rest_row = self.data[2][1:]
         data = [(32000,) + rest_row]
         self.c.inserttable('test', data)
@@ -2148,7 +2148,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         self.c.query("truncate table test")
         self.c.close()
 
-    def testPutline(self):
+    def test_putline(self):
         putline = self.c.putline
         query = self.c.query
         data = list(enumerate("apple pear plum cherry banana".split()))
@@ -2161,7 +2161,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         r = query("select * from test").getresult()
         self.assertEqual(r, data)
 
-    def testPutlineBytesAndUnicode(self):
+    def test_putline_bytes_and_unicode(self):
         putline = self.c.putline
         query = self.c.query
         try:
@@ -2177,7 +2177,7 @@ class TestDirectSocketAccess(unittest.TestCase):
         r = query("select * from test").getresult()
         self.assertEqual(r, [(47, 'käse'), (35, 'würstel')])
 
-    def testGetline(self):
+    def test_getline(self):
         getline = self.c.getline
         query = self.c.query
         data = list(enumerate("apple banana pear plum strawberry".split()))
@@ -2198,7 +2198,7 @@ class TestDirectSocketAccess(unittest.TestCase):
             except OSError:
                 pass
 
-    def testGetlineBytesAndUnicode(self):
+    def test_getline_bytes_and_unicode(self):
         getline = self.c.getline
         query = self.c.query
         try:
@@ -2222,7 +2222,7 @@ class TestDirectSocketAccess(unittest.TestCase):
             except OSError:
                 pass
 
-    def testParameterChecks(self):
+    def test_parameter_checks(self):
         self.assertRaises(TypeError, self.c.putline)
         self.assertRaises(TypeError, self.c.getline, 'invalid')
         self.assertRaises(TypeError, self.c.endcopy, 'invalid')
@@ -2238,7 +2238,7 @@ class TestNotificatons(unittest.TestCase):
         self.doCleanups()
         self.c.close()
 
-    def testGetNotify(self):
+    def test_get_notify(self):
         getnotify = self.c.getnotify
         query = self.c.query
         self.assertIsNone(getnotify())
@@ -2268,23 +2268,23 @@ class TestNotificatons(unittest.TestCase):
         finally:
             query('unlisten test_notify')
 
-    def testGetNoticeReceiver(self):
+    def test_get_notice_receiver(self):
         self.assertIsNone(self.c.get_notice_receiver())
 
-    def testSetNoticeReceiver(self):
+    def test_set_notice_receiver(self):
         self.assertRaises(TypeError, self.c.set_notice_receiver, 42)
         self.assertRaises(TypeError, self.c.set_notice_receiver, 'invalid')
         self.assertIsNone(self.c.set_notice_receiver(lambda notice: None))
         self.assertIsNone(self.c.set_notice_receiver(None))
 
-    def testSetAndGetNoticeReceiver(self):
+    def test_set_and_get_notice_receiver(self):
         r = lambda notice: None  # noqa: E731
         self.assertIsNone(self.c.set_notice_receiver(r))
         self.assertIs(self.c.get_notice_receiver(), r)
         self.assertIsNone(self.c.set_notice_receiver(None))
         self.assertIsNone(self.c.get_notice_receiver())
 
-    def testNoticeReceiver(self):
+    def test_notice_receiver(self):
         self.addCleanup(self.c.query, 'drop function bilbo_notice();')
         self.c.query('''create function bilbo_notice() returns void AS $$
             begin
@@ -2326,7 +2326,7 @@ class TestConfigFunctions(unittest.TestCase):
     def tearDown(self):
         self.c.close()
 
-    def testGetDecimalPoint(self):
+    def test_get_decimal_point(self):
         point = pg.get_decimal_point()
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_decimal_point, point)
@@ -2359,7 +2359,7 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_decimal_point(point)
         self.assertIsNone(r)
 
-    def testSetDecimalPoint(self):
+    def test_set_decimal_point(self):
         d = pg.Decimal
         point = pg.get_decimal_point()
         self.assertRaises(TypeError, pg.set_decimal_point)
@@ -2483,7 +2483,7 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_decimal_point(point)
         self.assertEqual(r, bad_money)
 
-    def testGetDecimal(self):
+    def test_get_decimal(self):
         decimal_class = pg.get_decimal()
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_decimal, decimal_class)
@@ -2497,7 +2497,7 @@ class TestConfigFunctions(unittest.TestCase):
         r = pg.get_decimal()
         self.assertIs(r, decimal_class)
 
-    def testSetDecimal(self):
+    def test_set_decimal(self):
         decimal_class = pg.get_decimal()
         # error if no parameter is passed
         self.assertRaises(TypeError, pg.set_decimal)
@@ -2520,7 +2520,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, int)
         self.assertEqual(r, 3425)
 
-    def testGetBool(self):
+    def test_get_bool(self):
         use_bool = pg.get_bool()
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_bool, use_bool)
@@ -2555,7 +2555,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, True)
 
-    def testSetBool(self):
+    def test_set_bool(self):
         use_bool = pg.get_bool()
         # error if no parameter is passed
         self.assertRaises(TypeError, pg.set_bool)
@@ -2583,7 +2583,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, True)
 
-    def testGetByteEscaped(self):
+    def test_get_byte_escaped(self):
         bytea_escaped = pg.get_bytea_escaped()
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_bytea_escaped, bytea_escaped)
@@ -2618,7 +2618,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bool)
         self.assertIs(r, False)
 
-    def testSetByteaEscaped(self):
+    def test_set_bytea_escaped(self):
         bytea_escaped = pg.get_bytea_escaped()
         # error if no parameter is passed
         self.assertRaises(TypeError, pg.set_bytea_escaped)
@@ -2646,7 +2646,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'data')
 
-    def testSetRowFactorySize(self):
+    def test_set_row_factory_size(self):
         queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
         query = self.c.query
         for maxsize in (None, 0, 1, 2, 3, 10, 1024):
@@ -2689,7 +2689,7 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         db.close()
         cls.cls_set_up = True
 
-    def testEscapeString(self):
+    def test_escape_string(self):
         self.assertTrue(self.cls_set_up)
         f = pg.escape_string
         r = f(b'plain')
@@ -2707,7 +2707,7 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         r = f(r"It's bad to have a \ inside.")
         self.assertEqual(r, r"It''s bad to have a \\ inside.")
 
-    def testEscapeBytea(self):
+    def test_escape_bytea(self):
         self.assertTrue(self.cls_set_up)
         f = pg.escape_bytea
         r = f(b'plain')
