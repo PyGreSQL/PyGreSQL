@@ -461,6 +461,48 @@ class DatabaseAPI20Test(unittest.TestCase):
         finally:
             con.close()
 
+    def test_next(self):
+        """Extension for getting the next row"""
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            if not hasattr(cur, 'next'):
+                return
+
+            # cursor.next should raise an Error if called before
+            # executing a select-type query
+            self.assertRaises(self.driver.Error, cur.next)
+
+            # cursor.next should raise an Error if called after
+            # executing a query that cannot return rows
+            self.executeDDL1(cur)
+            self.assertRaises(self.driver.Error, cur.next)
+
+            # cursor.next should return None if a query retrieves no rows
+            cur.execute(f'select name from {self.table_prefix}booze')
+            self.assertRaises(StopIteration, cur.next)
+            self.assertIn(cur.rowcount, (-1, 0))
+
+            # cursor.next should raise an Error if called after
+            # executing a query that cannot return rows
+            cur.execute(f"{self.insert} into {self.table_prefix}booze"
+                        " values ('Victoria Bitter')")
+            self.assertRaises(self.driver.Error, cur.next)
+
+            cur.execute(f'select name from {self.table_prefix}booze')
+            r = cur.next()
+            self.assertEqual(
+                len(r), 1,
+                'cursor.fetchone should have retrieved a single row')
+            self.assertEqual(
+                r[0], 'Victoria Bitter',
+                'cursor.next retrieved incorrect data')
+            # cursor.next should raise StopIteration if no more rows available
+            self.assertRaises(StopIteration, cur.next)
+            self.assertIn(cur.rowcount, (-1, 1))
+        finally:
+            con.close()
+
     samples = [
         'Carlton Cold',
         'Carlton Draft',
