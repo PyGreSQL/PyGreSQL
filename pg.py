@@ -34,7 +34,7 @@ from math import isinf, isnan
 from operator import itemgetter
 from re import compile as regex
 from types import MappingProxyType
-from typing import ClassVar, Dict, List, Mapping, Type, Union
+from typing import Callable, ClassVar, Dict, List, Mapping, Type, Union
 from uuid import UUID
 
 try:
@@ -297,6 +297,8 @@ def _quote_if_unqualified(param, name):
 
 class _ParameterList(list):
     """Helper class for building typed parameter lists."""
+
+    adapt: Callable
 
     def add(self, value, typ=None):
         """Typecast value with known database type and build parameter list.
@@ -1148,6 +1150,18 @@ class DbType(str):
         relid: corresponding table for composite types
         attnames: attributes for composite types
     """
+
+    oid: int
+    pgtype: str
+    regtype: str
+    simple: str 
+    typlen: int
+    typtype: str
+    category: str
+    delim: str
+    relid: int
+    
+    _get_attnames: Callable
 
     @property
     def attnames(self):
