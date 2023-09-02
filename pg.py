@@ -494,7 +494,7 @@ class Adapter:
             raise TypeError(f'Record parameter {v} has wrong size')
         adapt = self.adapt
         value = []
-        for v, t in zip(v, typ):
+        for v, t in zip(v, typ):  # noqa: B020
             v = adapt(v, t)
             if v is None:
                 v = ''
@@ -1989,7 +1989,7 @@ class DB:
             self._do_debug('The pkey cache has been flushed')
         try:  # cache lookup
             pkey = pkeys[table]
-        except KeyError:  # cache miss, check the database
+        except KeyError as e:  # cache miss, check the database
             q = ("SELECT a.attname, a.attnum, i.indkey"
                  " FROM pg_catalog.pg_index i"
                  " JOIN pg_catalog.pg_attribute a"
@@ -2002,7 +2002,7 @@ class DB:
                 _quote_if_unqualified('$1', table))
             pkey = self.db.query(q, (table,)).getresult()
             if not pkey:
-                raise KeyError(f'Table {table} has no primary key')
+                raise KeyError(f'Table {table} has no primary key') from e
             # we want to use the order defined in the primary key index here,
             # not the order as defined by the columns in the table
             if len(pkey) > 1:
@@ -2173,12 +2173,13 @@ class DB:
         if not keyname:
             try:  # if keyname is not specified, try using the primary key
                 keyname = self.pkey(table, True)
-            except KeyError:  # the table has no primary key
+            except KeyError as e:  # the table has no primary key
                 # try using the oid instead
                 if qoid and isinstance(row, dict) and 'oid' in row:
                     keyname = ('oid',)
                 else:
-                    raise _prg_error(f'Table {table} has no primary key')
+                    raise _prg_error(
+                        f'Table {table} has no primary key') from e
             else:  # the table has a primary key
                 # check whether all key columns have values
                 if isinstance(row, dict) and not set(keyname).issubset(row):

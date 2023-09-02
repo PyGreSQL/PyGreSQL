@@ -215,7 +215,7 @@ class UtilityTest(unittest.TestCase):
         thread.start()
         try:
             # Wait until the thread has started.
-            for n in range(500):
+            for _n in range(500):
                 if target.listening:
                     break
                 sleep(0.01)
@@ -237,7 +237,7 @@ class UtilityTest(unittest.TestCase):
             if two_payloads:
                 db2.commit()
             # Wait until the notification has been caught.
-            for n in range(500):
+            for _n in range(500):
                 if arg_dict['called'] or self.notify_timeout:
                     break
                 sleep(0.01)
@@ -256,7 +256,7 @@ class UtilityTest(unittest.TestCase):
                 db2.query("notify stop_event_1, 'payload 2'")
             db2.close()
             # Wait until the notification has been caught.
-            for n in range(500):
+            for _n in range(500):
                 if arg_dict['called'] or self.notify_timeout:
                     break
                 sleep(0.01)

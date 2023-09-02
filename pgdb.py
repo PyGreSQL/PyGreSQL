@@ -993,7 +993,8 @@ class Cursor:
             raise  # database provides error message
         except Error as err:
             # noinspection PyTypeChecker
-            raise _db_error(f"Error in '{sql}': '{err}'", InterfaceError)
+            raise _db_error(
+                f"Error in '{sql}': '{err}'", InterfaceError) from err
         except Exception as err:
             raise _op_error(f"Internal error in '{sql}': {err}") from err
         # then initialize result raw count and description
@@ -1090,9 +1091,10 @@ class Cursor:
         binary_format = format == 'binary'
         try:
             read = stream.read
-        except AttributeError:
+        except AttributeError as e:
             if size:
-                raise ValueError("Size must only be set for file-like objects")
+                raise ValueError(
+                    "Size must only be set for file-like objects") from e
             if binary_format:
                 input_type = bytes
                 type_name = 'byte strings'
@@ -1102,7 +1104,7 @@ class Cursor:
 
             if isinstance(stream, (bytes, str)):
                 if not isinstance(stream, input_type):
-                    raise ValueError(f"The input must be {type_name}")
+                    raise ValueError(f"The input must be {type_name}") from e
                 if not binary_format:
                     if isinstance(stream, str):
                         if not stream.endswith('\n'):
@@ -1130,7 +1132,7 @@ class Cursor:
                         yield chunk
 
             else:
-                raise TypeError("Need an input stream to copy from")
+                raise TypeError("Need an input stream to copy from") from e
         else:
             if size is None:
                 size = 8192
@@ -1233,8 +1235,8 @@ class Cursor:
         if stream is not None:
             try:
                 write = stream.write
-            except AttributeError:
-                raise TypeError("Need an output stream to copy to")
+            except AttributeError as e:
+                raise TypeError("Need an output stream to copy to") from e
         if not table or not isinstance(table, str):
             raise TypeError("Need a table to copy to")
         if table.lower().startswith('select '):
@@ -1405,8 +1407,8 @@ class Connection:
         self.autocommit = False
         try:
             self._cnx.source()
-        except Exception:
-            raise _op_error("Invalid connection")
+        except Exception as e:
+            raise _op_error("Invalid connection") from e
 
     def __enter__(self):
         """Enter the runtime context for the connection object.
@@ -1420,8 +1422,8 @@ class Connection:
                 self._cnx.source().execute("BEGIN")
             except DatabaseError:
                 raise  # database provides error message
-            except Exception:
-                raise _op_error("Can't start transaction")
+            except Exception as e:
+                raise _op_error("Can't start transaction") from e
             else:
                 self._tnx = True
         return self
@@ -1466,8 +1468,8 @@ class Connection:
                     self._cnx.source().execute("COMMIT")
                 except DatabaseError:
                     raise  # database provides error message
-                except Exception:
-                    raise _op_error("Can't commit transaction")
+                except Exception as e:
+                    raise _op_error("Can't commit transaction") from e
         else:
             raise _op_error("Connection has been closed")
 
@@ -1480,8 +1482,8 @@ class Connection:
                     self._cnx.source().execute("ROLLBACK")
                 except DatabaseError:
                     raise  # database provides error message
-                except Exception:
-                    raise _op_error("Can't rollback transaction")
+                except Exception as e:
+                    raise _op_error("Can't rollback transaction") from e
         else:
             raise _op_error("Connection has been closed")
 
@@ -1490,8 +1492,8 @@ class Connection:
         if self._cnx:
             try:
                 return self.cursor_type(self)
-            except Exception:
-                raise _op_error("Invalid connection")
+            except Exception as e:
+                raise _op_error("Invalid connection") from e
         else:
             raise _op_error("Connection has been closed")
 

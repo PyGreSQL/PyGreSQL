@@ -181,7 +181,7 @@ class TestCopy(unittest.TestCase):
     def check_table(self):
         self.assertEqual(self.table_data, self.data)
 
-    def check_rowcount(self, number=len(data)):
+    def check_rowcount(self, number=len(data)):  # noqa: B008
         self.assertEqual(self.cursor.rowcount, number)
 
 
@@ -429,7 +429,7 @@ class TestCopyTo(TestCopy):
     def test_rowcount_increment(self):
         ret = self.copy_to()
         self.assertIsInstance(ret, Iterable)
-        for n, row in enumerate(ret):
+        for n, _row in enumerate(ret):
             self.check_rowcount(n + 1)
 
     def test_decode(self):

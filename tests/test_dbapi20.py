@@ -1335,7 +1335,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         cur = con.cursor()
         for maxsize in (None, 0, 1, 2, 3, 10, 1024):
             pgdb.set_row_factory_size(maxsize)
-            for i in range(3):
+            for _i in range(3):
                 for q in queries:
                     cur.execute(q)
                     r = cur.fetchone()

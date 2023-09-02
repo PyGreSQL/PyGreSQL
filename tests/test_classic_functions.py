@@ -267,7 +267,7 @@ class TestParseArray(unittest.TestCase):
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0], 'b')
         r = f('{{{{{{{abc}}}}}}}')
-        for i in range(7):
+        for _i in range(7):
             self.assertIsInstance(r, list)
             self.assertEqual(len(r), 1)
             # noinspection PyUnresolvedReferences
@@ -282,7 +282,7 @@ class TestParseArray(unittest.TestCase):
                 self.assertRaises(ValueError, f, r)
             else:
                 r = f(r)
-                for i in range(n - 1):
+                for _i in range(n - 1):
                     self.assertIsInstance(r, list)
                     self.assertEqual(len(r), 1)
                     r = r[0]

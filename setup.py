@@ -90,7 +90,8 @@ class build_pg_ext(build_ext):  # noqa: N801
         supported = pg_version >= (10, 0)
         if not supported:
             warnings.warn(
-                "PyGreSQL does not support the installed PostgreSQL version.")
+                "PyGreSQL does not support the installed PostgreSQL version.",
+                stacklevel=2)
 
     def finalize_options(self):
         """Set final values for all build_pg options."""
@@ -104,7 +105,8 @@ class build_pg_ext(build_ext):  # noqa: N801
             if not supported:
                 warnings.warn(
                     "The installed PostgreSQL version"
-                    " does not support the memory size function.")
+                    " does not support the memory size function.",
+                    stacklevel=2)
         if sys.platform == 'win32':
             libraries[0] = 'lib' + libraries[0]
             if os.path.exists(os.path.join(

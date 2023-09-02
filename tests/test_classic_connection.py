@@ -1357,7 +1357,7 @@ class TestQueryIterator(unittest.TestCase):
 
     def test_iterate_twice(self):
         r = self.c.query("select generate_series(3,5)")
-        for i in range(2):
+        for _i in range(2):
             self.assertEqual(list(r), [(3,), (4,), (5,)])
 
     def test_iterate_two_columns(self):
@@ -2652,7 +2652,7 @@ class TestConfigFunctions(unittest.TestCase):
         query = self.c.query
         for maxsize in (None, 0, 1, 2, 3, 10, 1024):
             pg.set_row_factory_size(maxsize)
-            for i in range(3):
+            for _i in range(3):
                 for q in queries:
                     r = query(q).namedresult()[0]
                     if q.endswith('abc'):

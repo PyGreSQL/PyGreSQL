@@ -208,7 +208,7 @@ class TestAsyncNotification(unittest.TestCase):
         thread.start()
         self.stopped = timeout == 0
         self.addCleanup(self.stop_handler)
-        for n in range(500):
+        for _n in range(500):
             if handler.listening:
                 break
             sleep(0.01)
@@ -255,7 +255,7 @@ class TestAsyncNotification(unittest.TestCase):
         self.sent.append(arg_dict)
 
     def wait(self):
-        for n in range(500):
+        for _n in range(500):
             if self.timeout:
                 return False
             if len(self.received) >= len(self.sent):
@@ -309,15 +309,15 @@ class TestAsyncNotification(unittest.TestCase):
     def test_notify_several_times(self):
         arg_dict = {'test': 1}
         self.start_handler(arg_dict=arg_dict)
-        for count in range(3):
+        for _n in range(3):
             self.notify_query()
         self.receive()
         arg_dict['test'] += 1
-        for count in range(2):
+        for _n in range(2):
             self.notify_handler()
         self.receive()
         arg_dict['test'] += 1
-        for count in range(3):
+        for _n in range(3):
             self.notify_query()
         self.receive(stop=True)
 
@@ -338,30 +338,30 @@ class TestAsyncNotification(unittest.TestCase):
 
     def test_notify_with_five_payloads(self):
         self.start_handler('gimme_5', {'test': 'Gimme 5'})
-        for count in range(5):
-            self.notify_query(payload=f"Round {count}")
+        for n in range(5):
+            self.notify_query(payload=f"Round {n}")
         self.assertEqual(len(self.sent), 5)
         self.receive(stop=True)
 
     def test_receive_immediately(self):
         self.start_handler('immediate', {'test': 'immediate'})
-        for count in range(3):
-            self.notify_query(payload=f"Round {count}")
+        for n in range(3):
+            self.notify_query(payload=f"Round {n}")
             self.receive()
         self.receive(stop=True)
 
     def test_notify_distinct_in_transaction(self):
         self.start_handler('test_transaction', {'transaction': True})
         self.db.begin()
-        for count in range(3):
-            self.notify_query(payload=f'Round {count}')
+        for n in range(3):
+            self.notify_query(payload=f'Round {n}')
         self.db.commit()
         self.receive(stop=True)
 
     def test_notify_same_in_transaction(self):
         self.start_handler('test_transaction', {'transaction': True})
         self.db.begin()
-        for count in range(3):
+        for _n in range(3):
             self.notify_query()
         self.db.commit()
         # these same notifications may be delivered as one,

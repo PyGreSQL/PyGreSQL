@@ -2735,7 +2735,7 @@ class TestDBClass(unittest.TestCase):
         truncate('test_table')
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 0)
-        for i in range(3):
+        for _i in range(3):
             query("insert into test_table values (1)")
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 3)
@@ -2744,7 +2744,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, 0)
         self.create_table('test_table_2', 'n smallint', temporary=True)
         for t in (list, tuple, set):
-            for i in range(3):
+            for _i in range(3):
                 query("insert into test_table values (1)")
                 query("insert into test_table_2 values (2)")
             q = ("select (select count(*) from test_table),"
@@ -2760,7 +2760,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(TypeError, truncate, 'test_table', restart='invalid')
         query = self.db.query
         self.create_table('test_table', 'n serial, t text')
-        for n in range(3):
+        for _n in range(3):
             query("insert into test_table (t) values ('test')")
         q = "select count(n), min(n), max(n) from test_table"
         r = query(q).getresult()[0]
@@ -2768,14 +2768,14 @@ class TestDBClass(unittest.TestCase):
         truncate('test_table')
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, None, None))
-        for n in range(3):
+        for _n in range(3):
             query("insert into test_table (t) values ('test')")
         r = query(q).getresult()[0]
         self.assertEqual(r, (3, 4, 6))
         truncate('test_table', restart=True)
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, None, None))
-        for n in range(3):
+        for _n in range(3):
             query("insert into test_table (t) values ('test')")
         r = query(q).getresult()[0]
         self.assertEqual(r, (3, 1, 3))
@@ -2824,7 +2824,7 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         self.create_table('test_parent', 'n smallint')
         self.create_table('test_child', 'm smallint) inherits (test_parent')
-        for n in range(3):
+        for _n in range(3):
             query("insert into test_parent (n) values (1)")
             query("insert into test_child (n, m) values (2, 3)")
         q = ("select (select count(*) from test_parent),"
@@ -2834,7 +2834,7 @@ class TestDBClass(unittest.TestCase):
         truncate('test_parent')
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, 0))
-        for n in range(3):
+        for _n in range(3):
             query("insert into test_parent (n) values (1)")
             query("insert into test_child (n, m) values (2, 3)")
         r = query(q).getresult()[0]
@@ -2842,7 +2842,7 @@ class TestDBClass(unittest.TestCase):
         truncate('test_parent*')
         r = query(q).getresult()[0]
         self.assertEqual(r, (0, 0))
-        for n in range(3):
+        for _n in range(3):
             query("insert into test_parent (n) values (1)")
             query("insert into test_child (n, m) values (2, 3)")
         r = query(q).getresult()[0]
@@ -2859,7 +2859,7 @@ class TestDBClass(unittest.TestCase):
         self.create_table('test_child_2',
                           'm smallint) inherits (test_parent_2')
         for t in '', '_2':
-            for n in range(3):
+            for _n in range(3):
                 query(f"insert into test_parent{t} (n) values (1)")
                 query(f"insert into test_child{t} (n, m) values (2, 3)")
         q = ("select (select count(*) from test_parent),"
@@ -2890,7 +2890,7 @@ class TestDBClass(unittest.TestCase):
         truncate(table)
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 0)
-        for i in range(3):
+        for _i in range(3):
             query(f'insert into "{table}" values (1)')
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 3)
@@ -4703,11 +4703,11 @@ class TestSchemas(unittest.TestCase):
                 query(f"drop schema if exists {schema} cascade")
                 try:
                     query(f"create schema {schema}")
-                except pg.ProgrammingError:
+                except pg.ProgrammingError as e:
                     raise RuntimeError(
                         "The test user cannot create schemas.\n"
                         f"Grant create on database {dbname} to the user"
-                        " for running these tests.")
+                        " for running these tests.") from e
             else:
                 schema = "public"
                 query(f"drop table if exists {schema}.t")

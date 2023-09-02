@@ -41,6 +41,7 @@ download = "https://pygresql.github.io/download/"
 "mailing list" = "https://mail.vex.net/mailman/listinfo/pygresql"
 
 [tool.ruff]
+target-version = "py37"
 line-length = 79
 select = [
   "E",   # pycodestyle
@@ -50,6 +51,7 @@ select = [
   "UP",  # pyupgrade
   "D",   # pydocstyle
   "RUF", # ruff
+  "B",   # bugbear
 ]
 exclude = [
     "__pycache__",
