@@ -23,6 +23,7 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 import select
 import weakref
 from collections import OrderedDict, namedtuple
+from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from functools import lru_cache, partial
@@ -1507,11 +1508,9 @@ class DB:
             if isinstance(db, DB):
                 db = db.db
             else:
-                try:
+                with suppress(AttributeError):
                     # noinspection PyUnresolvedReferences
                     db = db._cnx
-                except AttributeError:
-                    pass
         if not db or not hasattr(db, 'db') or not hasattr(db, 'query'):
             db = connect(*args, **kw)
             self._db_args = args, kw
@@ -1592,15 +1591,11 @@ class DB:
         except AttributeError:
             db = None
         if db:
-            try:
+            with suppress(TypeError):  # when already closed
                 db.set_cast_hook(None)
-            except TypeError:
-                pass  # probably already closed
             if self._closeable:
-                try:
+                with suppress(InternalError):  # when already closed
                     db.close()
-                except InternalError:
-                    pass  # probably already closed
 
     # Auxiliary methods
 
@@ -1661,10 +1656,8 @@ class DB:
         # Wraps shared library function so we can track state.
         db = self.db
         if db:
-            try:
+            with suppress(TypeError):  # when already closed
                 db.set_cast_hook(None)
-            except TypeError:
-                pass  # probably already closed
             if self._closeable:
                 db.close()
             self.db = None
@@ -2611,10 +2604,8 @@ class DB:
             try:
                 order = self.pkey(table, True)
             except (KeyError, ProgrammingError):
-                try:
+                with suppress(KeyError, ProgrammingError):
                     order = list(self.get_attnames(table))
-                except (KeyError, ProgrammingError):
-                    pass
         if order:
             if isinstance(order, (list, tuple)):
                 order = ', '.join(map(str, order))

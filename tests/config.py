@@ -28,7 +28,7 @@ if dbport:
 try:
     from .LOCAL_PyGreSQL import *  # noqa: F403
 except (ImportError, ValueError):
-    try:
+    try:  # noqa: SIM105
         from LOCAL_PyGreSQL import *  # noqa: F403
     except ImportError:
         pass

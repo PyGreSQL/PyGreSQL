@@ -12,6 +12,7 @@ These tests need a database to test against.
 import os
 import tempfile
 import unittest
+from contextlib import suppress
 
 import pg  # the module under test
 
@@ -107,7 +108,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
         if windows:
             # NamedTemporaryFiles don't work well here
             fname = 'temp_test_pg_largeobj_import.txt'
-            f = open(fname, 'wb')
+            f = open(fname, 'wb')  # noqa: SIM115
         else:
             f = tempfile.NamedTemporaryFile()
             fname = f.name
@@ -115,7 +116,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
         f.write(data)
         if windows:
             f.close()
-            f = open(fname, 'rb')
+            f = open(fname, 'rb')  # noqa: SIM115
         else:
             f.flush()
             f.seek(0)
@@ -149,19 +150,13 @@ class TestLargeObjects(unittest.TestCase):
 
     def tearDown(self):
         if self.obj.oid:
-            try:
+            with suppress(SystemError, OSError):
                 self.obj.close()
-            except (SystemError, OSError):
-                pass
-            try:
+            with suppress(SystemError, OSError):
                 self.obj.unlink()
-            except (SystemError, OSError):
-                pass
         del self.obj
-        try:
+        with suppress(SystemError):
             self.pgcnx.query('rollback')
-        except SystemError:
-            pass
         self.pgcnx.close()
 
     def test_class_name(self):
@@ -420,7 +415,7 @@ class TestLargeObjects(unittest.TestCase):
         if windows:
             # NamedTemporaryFiles don't work well here
             fname = 'temp_test_pg_largeobj_export.txt'
-            f = open(fname, 'wb')
+            f = open(fname, 'wb')  # noqa: SIM115
         else:
             f = tempfile.NamedTemporaryFile()
             fname = f.name
@@ -433,7 +428,7 @@ class TestLargeObjects(unittest.TestCase):
         export(fname)
         if windows:
             f.close()
-            f = open(fname, 'rb')
+            f = open(fname, 'rb')  # noqa: SIM115
         r = f.read()
         f.close()
         if windows:

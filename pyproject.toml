@@ -52,6 +52,7 @@ select = [
   "D",   # pydocstyle
   "B",   # bugbear
   "S",   # bandit
+  "SIM", # simplify
   "RUF", # ruff
 ]
 exclude = [

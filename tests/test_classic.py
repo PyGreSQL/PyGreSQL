@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import unittest
+from contextlib import suppress
 from functools import partial
 from threading import Thread
 from time import sleep
@@ -34,27 +35,19 @@ class UtilityTest(unittest.TestCase):
     def setUpClass(cls):
         """Recreate test tables and schemas."""
         db = open_db()
-        try:
+        with suppress(Exception):
             db.query("DROP VIEW _test_vschema")
-        except Exception:
-            pass
-        try:
+        with suppress(Exception):
             db.query("DROP TABLE _test_schema")
-        except Exception:
-            pass
         db.query("CREATE TABLE _test_schema"
                  " (_test int PRIMARY KEY, _i interval, dvar int DEFAULT 999)")
         db.query("CREATE VIEW _test_vschema AS"
                  " SELECT _test, 'abc'::text AS _test2 FROM _test_schema")
         for t in ('_test1', '_test2'):
-            try:
+            with suppress(Exception):
                 db.query("CREATE SCHEMA " + t)
-            except Exception:
-                pass
-            try:
+            with suppress(Exception):
                 db.query(f"DROP TABLE {t}._test_schema")
-            except Exception:
-                pass
             db.query(f"CREATE TABLE {t}._test_schema"
                      f" ({t} int PRIMARY KEY)")
         db.close()

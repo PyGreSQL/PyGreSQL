@@ -15,6 +15,7 @@ import time
 import unittest
 from collections import namedtuple
 from collections.abc import Iterable
+from contextlib import suppress
 from decimal import Decimal
 from typing import Sequence, Tuple
 
@@ -94,10 +95,8 @@ class TestConnectObject(unittest.TestCase):
         self.connection = connect()
 
     def tearDown(self):
-        try:
+        with suppress(pg.InternalError):
             self.connection.close()
-        except pg.InternalError:
-            pass
 
     def is_method(self, attribute):
         """Check if given attribute on the connection is a method."""
@@ -152,10 +151,7 @@ class TestConnectObject(unittest.TestCase):
 
     @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
     def test_attribute_host(self):
-        if dbhost and not dbhost.startswith('/'):
-            host = dbhost
-        else:
-            host = 'localhost'
+        host = dbhost if dbhost and not dbhost.startswith('/') else 'localhost'
         self.assertIsInstance(self.connection.host, str)
         self.assertEqual(self.connection.host, host)
 
@@ -282,10 +278,8 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(members, query_members)
 
     def test_method_endcopy(self):
-        try:
+        with suppress(OSError):
             self.connection.endcopy()
-        except OSError:
-            pass
 
     def test_method_close(self):
         self.connection.close()
@@ -1255,9 +1249,9 @@ class TestQueryResultTypes(unittest.TestCase):
             self.fail(str(e))
         # noinspection PyUnboundLocalVariable
         self.assertIsInstance(r, pytype)
-        if isinstance(value, str):
-            if not value or ' ' in value or '{' in value:
-                value = f'"{value}"'
+        if isinstance(value, str) and (
+                not value or ' ' in value or '{' in value):
+            value = f'"{value}"'
         value = f'{{{value}}}'
         r = self.c.query(q + '[]', (value,)).getresult()[0][0]
         if pgtype.startswith(('date', 'time', 'interval')):
@@ -2194,10 +2188,8 @@ class TestDirectSocketAccess(unittest.TestCase):
                 elif i == n:
                     self.assertIsNone(v)
         finally:
-            try:
+            with suppress(OSError):
                 self.c.endcopy()
-            except OSError:
-                pass
 
     def test_getline_bytes_and_unicode(self):
         getline = self.c.getline
@@ -2218,10 +2210,8 @@ class TestDirectSocketAccess(unittest.TestCase):
             self.assertEqual(v, '73\twürstel')
             self.assertIsNone(getline())
         finally:
-            try:
+            with suppress(OSError):
                 self.c.endcopy()
-            except OSError:
-                pass
 
     def test_parameter_checks(self):
         self.assertRaises(TypeError, self.c.putline)

@@ -66,6 +66,7 @@ Basic usage:
 
 from collections import namedtuple
 from collections.abc import Iterable
+from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal as StdDecimal
 from functools import lru_cache, partial
@@ -1442,10 +1443,8 @@ class Connection:
         """Close the connection object."""
         if self._cnx:
             if self._tnx:
-                try:
+                with suppress(DatabaseError):
                     self.rollback()
-                except DatabaseError:
-                    pass
             self._cnx.close()
             self._cnx = None
         else:

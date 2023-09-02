@@ -11,6 +11,7 @@ These tests need a database to test against.
 
 import unittest
 from collections.abc import Iterable
+from contextlib import suppress
 from typing import Sequence, Tuple
 
 import pgdb  # the module under test
@@ -142,18 +143,12 @@ class TestCopy(unittest.TestCase):
         self.cursor.execute("set client_encoding=utf8")
 
     def tearDown(self):
-        try:
+        with suppress(Exception):
             self.cursor.close()
-        except Exception:
-            pass
-        try:
+        with suppress(Exception):
             self.con.rollback()
-        except Exception:
-            pass
-        try:
+        with suppress(Exception):
             self.con.close()
-        except Exception:
-            pass
 
     data: Sequence[Tuple[int, str]] = [
         (1935, 'Luciano Pavarotti'),

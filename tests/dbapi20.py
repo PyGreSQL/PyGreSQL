@@ -11,6 +11,7 @@ __version__ = '1.15.0'
 
 import time
 import unittest
+from contextlib import suppress
 from typing import Any, Mapping, Tuple
 
 
@@ -181,11 +182,9 @@ class DatabaseAPI20Test(unittest.TestCase):
         # If rollback is defined, it should either work or throw
         # the documented exception
         if hasattr(con, 'rollback'):
-            try:
+            with suppress(self.driver.NotSupportedError):
                 # noinspection PyCallingNonCallable
                 con.rollback()
-            except self.driver.NotSupportedError:
-                pass
 
     def test_cursor(self):
         con = self._connect()

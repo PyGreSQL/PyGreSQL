@@ -16,6 +16,7 @@ import sys
 import tempfile
 import unittest
 from collections import OrderedDict
+from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from io import StringIO
@@ -167,10 +168,8 @@ class TestDBClassBasic(unittest.TestCase):
         self.db = DB()
 
     def tearDown(self):
-        try:
+        with suppress(pg.InternalError):
             self.db.close()
-        except pg.InternalError:
-            pass
 
     def test_all_db_attributes(self):
         attributes = [
@@ -223,10 +222,7 @@ class TestDBClassBasic(unittest.TestCase):
 
     @unittest.skipIf(do_not_ask_for_host, do_not_ask_for_host_reason)
     def test_attribute_host(self):
-        if dbhost and not dbhost.startswith('/'):
-            host = dbhost
-        else:
-            host = 'localhost'
+        host = dbhost if dbhost and not dbhost.startswith('/') else 'localhost'
         self.assertIsInstance(self.db.host, str)
         self.assertEqual(self.db.host, host)
         self.assertEqual(self.db.db.host, host)
@@ -334,10 +330,8 @@ class TestDBClassBasic(unittest.TestCase):
             self.assertEqual(error.sqlstate, '22012')
 
     def test_method_endcopy(self):
-        try:
+        with suppress(OSError):
             self.db.endcopy()
-        except OSError:
-            pass
 
     def test_method_close(self):
         self.db.close()
@@ -4352,10 +4346,8 @@ class TestDBClassAdapter(unittest.TestCase):
         self.adapter = self.db.adapter
 
     def tearDown(self):
-        try:
+        with suppress(pg.InternalError):
             self.db.close()
-        except pg.InternalError:
-            pass
 
     def test_guess_simple_type(self):
         f = self.adapter.guess_simple_type
@@ -4744,12 +4736,9 @@ class TestSchemas(unittest.TestCase):
     def test_get_tables(self):
         tables = self.db.get_tables()
         for num_schema in range(5):
-            if num_schema:
-                schema = "s" + str(num_schema)
-            else:
-                schema = "public"
-            for t in (schema + ".t",
-                      schema + ".t" + str(num_schema)):
+            schema = 's' + str(num_schema) if num_schema else 'public'
+            for t in (schema + '.t',
+                      schema + '.t' + str(num_schema)):
                 self.assertIn(t, tables)
 
     def test_get_attnames(self):
