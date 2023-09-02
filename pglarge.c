@@ -28,9 +28,10 @@ static PyObject *
 large_str(largeObject *self)
 {
     char str[80];
-    sprintf(str, self->lo_fd >= 0 ?
-            "Opened large object, oid %ld" :
-            "Closed large object, oid %ld", (long) self->lo_oid);
+    sprintf(str,
+            self->lo_fd >= 0 ? "Opened large object, oid %ld"
+                             : "Closed large object, oid %ld",
+            (long)self->lo_oid);
     return PyUnicode_FromString(str);
 }
 
@@ -75,7 +76,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
     if (!strcmp(name, "pgcnx")) {
         if (_check_lo_obj(self, 0)) {
             Py_INCREF(self->pgcnx);
-            return (PyObject *) (self->pgcnx);
+            return (PyObject *)(self->pgcnx);
         }
         PyErr_Clear();
         Py_INCREF(Py_None);
@@ -85,7 +86,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
     /* large object oid */
     if (!strcmp(name, "oid")) {
         if (_check_lo_obj(self, 0))
-            return PyLong_FromLong((long) self->lo_oid);
+            return PyLong_FromLong((long)self->lo_oid);
         PyErr_Clear();
         Py_INCREF(Py_None);
         return Py_None;
@@ -96,7 +97,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
         return PyUnicode_FromString(PQerrorMessage(self->pgcnx->cnx));
 
     /* seeks name in methods (fallback) */
-    return PyObject_GenericGetAttr((PyObject *) self, nameobj);
+    return PyObject_GenericGetAttr((PyObject *)self, nameobj);
 }
 
 /* Get the list of large object attributes. */
@@ -105,17 +106,16 @@ large_dir(largeObject *self, PyObject *noargs)
 {
     PyObject *attrs;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
-    PyObject_CallMethod(
-        attrs, "extend", "[sss]", "oid", "pgcnx", "error");
+    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
+    PyObject_CallMethod(attrs, "extend", "[sss]", "oid", "pgcnx", "error");
 
     return attrs;
 }
 
 /* Open large object. */
 static char large_open__doc__[] =
-"open(mode) -- open access to large object with specified mode\n\n"
-"The mode must be one of INV_READ, INV_WRITE (module level constants).\n";
+    "open(mode) -- open access to large object with specified mode\n\n"
+    "The mode must be one of INV_READ, INV_WRITE (module level constants).\n";
 
 static PyObject *
 large_open(largeObject *self, PyObject *args)
@@ -148,7 +148,7 @@ large_open(largeObject *self, PyObject *args)
 
 /* Close large object. */
 static char large_close__doc__[] =
-"close() -- close access to large object data";
+    "close() -- close access to large object data";
 
 static PyObject *
 large_close(largeObject *self, PyObject *noargs)
@@ -172,8 +172,8 @@ large_close(largeObject *self, PyObject *noargs)
 
 /* Read from large object. */
 static char large_read__doc__[] =
-"read(size) -- read from large object to sized string\n\n"
-"Object must be opened in read mode before calling this method.\n";
+    "read(size) -- read from large object to sized string\n\n"
+    "Object must be opened in read mode before calling this method.\n";
 
 static PyObject *
 large_read(largeObject *self, PyObject *args)
@@ -200,11 +200,11 @@ large_read(largeObject *self, PyObject *args)
     }
 
     /* allocate buffer and runs read */
-    buffer = PyBytes_FromStringAndSize((char *) NULL, size);
+    buffer = PyBytes_FromStringAndSize((char *)NULL, size);
 
     if ((size = lo_read(self->pgcnx->cnx, self->lo_fd,
-        PyBytes_AS_STRING((PyBytesObject *) (buffer)), (size_t) size)) == -1)
-    {
+                        PyBytes_AS_STRING((PyBytesObject *)(buffer)),
+                        (size_t)size)) == -1) {
         PyErr_SetString(PyExc_IOError, "Error while reading");
         Py_XDECREF(buffer);
         return NULL;
@@ -217,8 +217,8 @@ large_read(largeObject *self, PyObject *args)
 
 /* Write to large object. */
 static char large_write__doc__[] =
-"write(string) -- write sized string to large object\n\n"
-"Object must be opened in read mode before calling this method.\n";
+    "write(string) -- write sized string to large object\n\n"
+    "Object must be opened in read mode before calling this method.\n";
 
 static PyObject *
 large_write(largeObject *self, PyObject *args)
@@ -241,8 +241,7 @@ large_write(largeObject *self, PyObject *args)
 
     /* sends query */
     if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
-                         (size_t) bufsize)) != bufsize)
-    {
+                         (size_t)bufsize)) != bufsize) {
         PyErr_SetString(PyExc_IOError, "Buffer truncated during write");
         return NULL;
     }
@@ -254,9 +253,9 @@ large_write(largeObject *self, PyObject *args)
 
 /* Go to position in large object. */
 static char large_seek__doc__[] =
-"seek(offset, whence) -- move to specified position\n\n"
-"Object must be opened before calling this method. The whence option\n"
-"can be SEEK_SET, SEEK_CUR or SEEK_END (module level constants).\n";
+    "seek(offset, whence) -- move to specified position\n\n"
+    "Object must be opened before calling this method. The whence option\n"
+    "can be SEEK_SET, SEEK_CUR or SEEK_END (module level constants).\n";
 
 static PyObject *
 large_seek(largeObject *self, PyObject *args)
@@ -277,9 +276,8 @@ large_seek(largeObject *self, PyObject *args)
     }
 
     /* sends query */
-    if ((ret = lo_lseek(
-        self->pgcnx->cnx, self->lo_fd, offset, whence)) == -1)
-    {
+    if ((ret = lo_lseek(self->pgcnx->cnx, self->lo_fd, offset, whence)) ==
+        -1) {
         PyErr_SetString(PyExc_IOError, "Error while moving cursor");
         return NULL;
     }
@@ -290,8 +288,8 @@ large_seek(largeObject *self, PyObject *args)
 
 /* Get large object size. */
 static char large_size__doc__[] =
-"size() -- return large object size\n\n"
-"The object must be opened before calling this method.\n";
+    "size() -- return large object size\n\n"
+    "The object must be opened before calling this method.\n";
 
 static PyObject *
 large_size(largeObject *self, PyObject *noargs)
@@ -316,9 +314,8 @@ large_size(largeObject *self, PyObject *noargs)
     }
 
     /* move back to start position */
-    if ((start = lo_lseek(
-        self->pgcnx->cnx, self->lo_fd, start, SEEK_SET)) == -1)
-    {
+    if ((start = lo_lseek(self->pgcnx->cnx, self->lo_fd, start, SEEK_SET)) ==
+        -1) {
         PyErr_SetString(PyExc_IOError,
                         "Error while moving back to first position");
         return NULL;
@@ -330,8 +327,8 @@ large_size(largeObject *self, PyObject *noargs)
 
 /* Get large object cursor position. */
 static char large_tell__doc__[] =
-"tell() -- give current position in large object\n\n"
-"The object must be opened before calling this method.\n";
+    "tell() -- give current position in large object\n\n"
+    "The object must be opened before calling this method.\n";
 
 static PyObject *
 large_tell(largeObject *self, PyObject *noargs)
@@ -355,8 +352,8 @@ large_tell(largeObject *self, PyObject *noargs)
 
 /* Export large object as unix file. */
 static char large_export__doc__[] =
-"export(filename) -- export large object data to specified file\n\n"
-"The object must be closed when calling this method.\n";
+    "export(filename) -- export large object data to specified file\n\n"
+    "The object must be closed when calling this method.\n";
 
 static PyObject *
 large_export(largeObject *self, PyObject *args)
@@ -387,8 +384,8 @@ large_export(largeObject *self, PyObject *args)
 
 /* Delete a large object. */
 static char large_unlink__doc__[] =
-"unlink() -- destroy large object\n\n"
-"The object must be closed when calling this method.\n";
+    "unlink() -- destroy large object\n\n"
+    "The object must be closed when calling this method.\n";
 
 static PyObject *
 large_unlink(largeObject *self, PyObject *noargs)
@@ -411,51 +408,49 @@ large_unlink(largeObject *self, PyObject *noargs)
 
 /* Large object methods */
 static struct PyMethodDef large_methods[] = {
-    {"__dir__", (PyCFunction) large_dir,  METH_NOARGS, NULL},
-    {"open", (PyCFunction) large_open, METH_VARARGS, large_open__doc__},
-    {"close", (PyCFunction) large_close, METH_NOARGS, large_close__doc__},
-    {"read", (PyCFunction) large_read, METH_VARARGS, large_read__doc__},
-    {"write", (PyCFunction) large_write, METH_VARARGS, large_write__doc__},
-    {"seek", (PyCFunction) large_seek, METH_VARARGS, large_seek__doc__},
-    {"size", (PyCFunction) large_size, METH_NOARGS, large_size__doc__},
-    {"tell", (PyCFunction) large_tell, METH_NOARGS, large_tell__doc__},
-    {"export",(PyCFunction) large_export, METH_VARARGS, large_export__doc__},
-    {"unlink",(PyCFunction) large_unlink, METH_NOARGS, large_unlink__doc__},
-    {NULL, NULL}
-};
+    {"__dir__", (PyCFunction)large_dir, METH_NOARGS, NULL},
+    {"open", (PyCFunction)large_open, METH_VARARGS, large_open__doc__},
+    {"close", (PyCFunction)large_close, METH_NOARGS, large_close__doc__},
+    {"read", (PyCFunction)large_read, METH_VARARGS, large_read__doc__},
+    {"write", (PyCFunction)large_write, METH_VARARGS, large_write__doc__},
+    {"seek", (PyCFunction)large_seek, METH_VARARGS, large_seek__doc__},
+    {"size", (PyCFunction)large_size, METH_NOARGS, large_size__doc__},
+    {"tell", (PyCFunction)large_tell, METH_NOARGS, large_tell__doc__},
+    {"export", (PyCFunction)large_export, METH_VARARGS, large_export__doc__},
+    {"unlink", (PyCFunction)large_unlink, METH_NOARGS, large_unlink__doc__},
+    {NULL, NULL}};
 
 static char large__doc__[] = "PostgreSQL large object";
 
 /* Large object type definition */
 static PyTypeObject largeType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "pg.LargeObject",              /* tp_name */
-    sizeof(largeObject),           /* tp_basicsize */
-    0,                             /* tp_itemsize */
+    PyVarObject_HEAD_INIT(NULL, 0) "pg.LargeObject", /* tp_name */
+    sizeof(largeObject),                             /* tp_basicsize */
+    0,                                               /* tp_itemsize */
 
     /* methods */
-    (destructor) large_dealloc,    /* tp_dealloc */
-    0,                             /* tp_print */
-    0,                             /* tp_getattr */
-    0,                             /* tp_setattr */
-    0,                             /* tp_compare */
-    0,                             /* tp_repr */
-    0,                             /* tp_as_number */
-    0,                             /* tp_as_sequence */
-    0,                             /* tp_as_mapping */
-    0,                             /* tp_hash */
-    0,                             /* tp_call */
-    (reprfunc) large_str,          /* tp_str */
-    (getattrofunc) large_getattr,  /* tp_getattro */
-    0,                             /* tp_setattro */
-    0,                             /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,            /* tp_flags */
-    large__doc__,                  /* tp_doc */
-    0,                             /* tp_traverse */
-    0,                             /* tp_clear */
-    0,                             /* tp_richcompare */
-    0,                             /* tp_weaklistoffset */
-    0,                             /* tp_iter */
-    0,                             /* tp_iternext */
-    large_methods,                 /* tp_methods */
+    (destructor)large_dealloc,   /* tp_dealloc */
+    0,                           /* tp_print */
+    0,                           /* tp_getattr */
+    0,                           /* tp_setattr */
+    0,                           /* tp_compare */
+    0,                           /* tp_repr */
+    0,                           /* tp_as_number */
+    0,                           /* tp_as_sequence */
+    0,                           /* tp_as_mapping */
+    0,                           /* tp_hash */
+    0,                           /* tp_call */
+    (reprfunc)large_str,         /* tp_str */
+    (getattrofunc)large_getattr, /* tp_getattro */
+    0,                           /* tp_setattro */
+    0,                           /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,          /* tp_flags */
+    large__doc__,                /* tp_doc */
+    0,                           /* tp_traverse */
+    0,                           /* tp_clear */
+    0,                           /* tp_richcompare */
+    0,                           /* tp_weaklistoffset */
+    0,                           /* tp_iter */
+    0,                           /* tp_iternext */
+    large_methods,               /* tp_methods */
 };

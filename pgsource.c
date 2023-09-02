@@ -71,7 +71,7 @@ source_getattr(sourceObject *self, PyObject *nameobj)
     if (!strcmp(name, "pgcnx")) {
         if (_check_source_obj(self, 0)) {
             Py_INCREF(self->pgcnx);
-            return (PyObject *) (self->pgcnx);
+            return (PyObject *)(self->pgcnx);
         }
         Py_INCREF(Py_None);
         return Py_None;
@@ -94,7 +94,7 @@ source_getattr(sourceObject *self, PyObject *nameobj)
         return PyLong_FromLong(self->num_fields);
 
     /* seeks name in methods (fallback) */
-    return PyObject_GenericGetAttr((PyObject *) self, nameobj);
+    return PyObject_GenericGetAttr((PyObject *)self, nameobj);
 }
 
 /* Set source object attributes. */
@@ -119,8 +119,9 @@ source_setattr(sourceObject *self, char *name, PyObject *v)
 
 /* Close object. */
 static char source_close__doc__[] =
-"close() -- close query object without deleting it\n\n"
-"All instances of the query object can no longer be used after this call.\n";
+    "close() -- close query object without deleting it\n\n"
+    "All instances of the query object can no longer be used after this "
+    "call.\n";
 
 static PyObject *
 source_close(sourceObject *self, PyObject *noargs)
@@ -141,15 +142,15 @@ source_close(sourceObject *self, PyObject *noargs)
 
 /* Database query. */
 static char source_execute__doc__[] =
-"execute(sql) -- execute a SQL statement (string)\n\n"
-"On success, this call returns the number of affected rows, or None\n"
-"for DQL (SELECT, ...) statements.  The fetch (fetch(), fetchone()\n"
-"and fetchall()) methods can be used to get result rows.\n";
+    "execute(sql) -- execute a SQL statement (string)\n\n"
+    "On success, this call returns the number of affected rows, or None\n"
+    "for DQL (SELECT, ...) statements.  The fetch (fetch(), fetchone()\n"
+    "and fetchall()) methods can be used to get result rows.\n";
 
 static PyObject *
 source_execute(sourceObject *self, PyObject *sql)
 {
-    PyObject *tmp_obj = NULL;  /* auxiliary string object */
+    PyObject *tmp_obj = NULL; /* auxiliary string object */
     char *query;
     int encoding;
 
@@ -165,7 +166,8 @@ source_execute(sourceObject *self, PyObject *sql)
     }
     else if (PyUnicode_Check(sql)) {
         tmp_obj = get_encoded_string(sql, encoding);
-        if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
+        if (!tmp_obj)
+            return NULL; /* pass the UnicodeEncodeError */
         query = PyBytes_AsString(tmp_obj);
     }
     else {
@@ -205,30 +207,29 @@ source_execute(sourceObject *self, PyObject *sql)
     /* checks result status */
     switch (PQresultStatus(self->result)) {
         /* query succeeded */
-        case PGRES_TUPLES_OK:   /* DQL: returns None (DB-SIG compliant) */
+        case PGRES_TUPLES_OK: /* DQL: returns None (DB-SIG compliant) */
             self->result_type = RESULT_DQL;
             self->max_row = PQntuples(self->result);
             self->num_fields = PQnfields(self->result);
             Py_INCREF(Py_None);
             return Py_None;
-        case PGRES_COMMAND_OK:  /* other requests */
+        case PGRES_COMMAND_OK: /* other requests */
         case PGRES_COPY_OUT:
-        case PGRES_COPY_IN:
-            {
-                long num_rows;
-                char *tmp;
+        case PGRES_COPY_IN: {
+            long num_rows;
+            char *tmp;
 
-                tmp = PQcmdTuples(self->result);
-                if (tmp[0]) {
-                    self->result_type = RESULT_DML;
-                    num_rows = atol(tmp);
-                }
-                else {
-                    self->result_type = RESULT_DDL;
-                    num_rows = -1;
-                }
-                return PyLong_FromLong(num_rows);
+            tmp = PQcmdTuples(self->result);
+            if (tmp[0]) {
+                self->result_type = RESULT_DML;
+                num_rows = atol(tmp);
             }
+            else {
+                self->result_type = RESULT_DDL;
+                num_rows = -1;
+            }
+            return PyLong_FromLong(num_rows);
+        }
 
         /* query failed */
         case PGRES_EMPTY_QUERY:
@@ -238,7 +239,7 @@ source_execute(sourceObject *self, PyObject *sql)
         case PGRES_FATAL_ERROR:
         case PGRES_NONFATAL_ERROR:
             set_error(ProgrammingError, "Cannot execute command",
-                self->pgcnx->cnx, self->result);
+                      self->pgcnx->cnx, self->result);
             break;
         default:
             set_error_msg(InternalError,
@@ -254,7 +255,7 @@ source_execute(sourceObject *self, PyObject *sql)
 
 /* Get oid status for last query (valid for INSERTs, 0 for other). */
 static char source_oidstatus__doc__[] =
-"oidstatus() -- return oid of last inserted row (if available)";
+    "oidstatus() -- return oid of last inserted row (if available)";
 
 static PyObject *
 source_oidstatus(sourceObject *self, PyObject *noargs)
@@ -272,14 +273,14 @@ source_oidstatus(sourceObject *self, PyObject *noargs)
         return Py_None;
     }
 
-    return PyLong_FromLong((long) oid);
+    return PyLong_FromLong((long)oid);
 }
 
 /* Fetch rows from last result. */
 static char source_fetch__doc__[] =
-"fetch(num) -- return the next num rows from the last result in a list\n\n"
-"If num parameter is omitted arraysize attribute value is used.\n"
-"If size equals -1, all rows are fetched.\n";
+    "fetch(num) -- return the next num rows from the last result in a list\n\n"
+    "If num parameter is omitted arraysize attribute value is used.\n"
+    "If size equals -1, all rows are fetched.\n";
 
 static PyObject *
 source_fetch(sourceObject *self, PyObject *args)
@@ -309,7 +310,8 @@ source_fetch(sourceObject *self, PyObject *args)
     }
 
     /* allocate list for result */
-    if (!(res_list = PyList_New(0))) return NULL;
+    if (!(res_list = PyList_New(0)))
+        return NULL;
 
     encoding = self->encoding;
 
@@ -319,7 +321,8 @@ source_fetch(sourceObject *self, PyObject *args)
         int j;
 
         if (!(rowtuple = PyTuple_New(self->num_fields))) {
-            Py_DECREF(res_list); return NULL;
+            Py_DECREF(res_list);
+            return NULL;
         }
 
         for (j = 0; j < self->num_fields; ++j) {
@@ -345,7 +348,9 @@ source_fetch(sourceObject *self, PyObject *args)
         }
 
         if (PyList_Append(res_list, rowtuple)) {
-            Py_DECREF(rowtuple); Py_DECREF(res_list); return NULL;
+            Py_DECREF(rowtuple);
+            Py_DECREF(res_list);
+            return NULL;
         }
         Py_DECREF(rowtuple);
     }
@@ -387,7 +392,7 @@ _source_move(sourceObject *self, int move)
 
 /* Move to first result row. */
 static char source_movefirst__doc__[] =
-"movefirst() -- move to first result row";
+    "movefirst() -- move to first result row";
 
 static PyObject *
 source_movefirst(sourceObject *self, PyObject *noargs)
@@ -397,7 +402,7 @@ source_movefirst(sourceObject *self, PyObject *noargs)
 
 /* Move to last result row. */
 static char source_movelast__doc__[] =
-"movelast() -- move to last valid result row";
+    "movelast() -- move to last valid result row";
 
 static PyObject *
 source_movelast(sourceObject *self, PyObject *noargs)
@@ -406,8 +411,7 @@ source_movelast(sourceObject *self, PyObject *noargs)
 }
 
 /* Move to next result row. */
-static char source_movenext__doc__[] =
-"movenext() -- move to next result row";
+static char source_movenext__doc__[] = "movenext() -- move to next result row";
 
 static PyObject *
 source_movenext(sourceObject *self, PyObject *noargs)
@@ -417,7 +421,7 @@ source_movenext(sourceObject *self, PyObject *noargs)
 
 /* Move to previous result row. */
 static char source_moveprev__doc__[] =
-"moveprev() -- move to previous result row";
+    "moveprev() -- move to previous result row";
 
 static PyObject *
 source_moveprev(sourceObject *self, PyObject *noargs)
@@ -427,17 +431,17 @@ source_moveprev(sourceObject *self, PyObject *noargs)
 
 /* Put copy data. */
 static char source_putdata__doc__[] =
-"putdata(buffer) -- send data to server during copy from stdin";
+    "putdata(buffer) -- send data to server during copy from stdin";
 
 static PyObject *
 source_putdata(sourceObject *self, PyObject *buffer)
 {
-    PyObject *tmp_obj = NULL;  /* an auxiliary object */
-    char *buf;                 /* the buffer as encoded string */
-    Py_ssize_t nbytes;         /* length of string */
-    char *errormsg = NULL;     /* error message */
-    int res;                   /* direct result of the operation */
-    PyObject *ret;             /* return value */
+    PyObject *tmp_obj = NULL; /* an auxiliary object */
+    char *buf;                /* the buffer as encoded string */
+    Py_ssize_t nbytes;        /* length of string */
+    char *errormsg = NULL;    /* error message */
+    int res;                  /* direct result of the operation */
+    PyObject *ret;            /* return value */
 
     /* checks validity */
     if (!_check_source_obj(self, CHECK_CNX)) {
@@ -459,9 +463,10 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
     else if (PyUnicode_Check(buffer)) {
         /* or pass a unicode string */
-        tmp_obj = get_encoded_string(
-            buffer, PQclientEncoding(self->pgcnx->cnx));
-        if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
+        tmp_obj =
+            get_encoded_string(buffer, PQclientEncoding(self->pgcnx->cnx));
+        if (!tmp_obj)
+            return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &buf, &nbytes);
     }
     else if (PyErr_GivenExceptionMatches(buffer, PyExc_BaseException)) {
@@ -470,10 +475,11 @@ source_putdata(sourceObject *self, PyObject *buffer)
         if (PyUnicode_Check(tmp_obj)) {
             PyObject *obj = tmp_obj;
 
-            tmp_obj = get_encoded_string(
-                obj, PQclientEncoding(self->pgcnx->cnx));
+            tmp_obj =
+                get_encoded_string(obj, PQclientEncoding(self->pgcnx->cnx));
             Py_DECREF(obj);
-            if (!tmp_obj) return NULL; /* pass the UnicodeEncodeError */
+            if (!tmp_obj)
+                return NULL; /* pass the UnicodeEncodeError */
         }
         errormsg = PyBytes_AsString(tmp_obj);
         buf = NULL;
@@ -487,8 +493,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
 
     /* checks validity */
     if (!_check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-        PQresultStatus(self->result) != PGRES_COPY_IN)
-    {
+        PQresultStatus(self->result) != PGRES_COPY_IN) {
         PyErr_SetString(PyExc_IOError,
                         "Connection is invalid or not in copy_in state");
         Py_XDECREF(tmp_obj);
@@ -496,7 +501,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
 
     if (buf) {
-        res = nbytes ? PQputCopyData(self->pgcnx->cnx, buf, (int) nbytes) : 1;
+        res = nbytes ? PQputCopyData(self->pgcnx->cnx, buf, (int)nbytes) : 1;
     }
     else {
         res = PQputCopyEnd(self->pgcnx->cnx, errormsg);
@@ -513,7 +518,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
         ret = Py_None;
         Py_INCREF(ret);
     }
-    else { /* copy is done */
+    else {                /* copy is done */
         PGresult *result; /* final result of the operation */
 
         Py_BEGIN_ALLOW_THREADS;
@@ -529,7 +534,8 @@ source_putdata(sourceObject *self, PyObject *buffer)
             ret = PyLong_FromLong(num_rows);
         }
         else {
-            if (!errormsg) errormsg = PQerrorMessage(self->pgcnx->cnx);
+            if (!errormsg)
+                errormsg = PQerrorMessage(self->pgcnx->cnx);
             PyErr_SetString(PyExc_IOError, errormsg);
             ret = NULL;
         }
@@ -544,15 +550,15 @@ source_putdata(sourceObject *self, PyObject *buffer)
 
 /* Get copy data. */
 static char source_getdata__doc__[] =
-"getdata(decode) -- receive data to server during copy to stdout";
+    "getdata(decode) -- receive data to server during copy to stdout";
 
 static PyObject *
 source_getdata(sourceObject *self, PyObject *args)
 {
-    int *decode = 0;    /* decode flag */
-    char *buffer;       /* the copied buffer as encoded byte string */
-    Py_ssize_t nbytes;  /* length of the byte string */
-    PyObject *ret;      /* return value */
+    int *decode = 0;   /* decode flag */
+    char *buffer;      /* the copied buffer as encoded byte string */
+    Py_ssize_t nbytes; /* length of the byte string */
+    PyObject *ret;     /* return value */
 
     /* checks validity */
     if (!_check_source_obj(self, CHECK_CNX)) {
@@ -570,8 +576,7 @@ source_getdata(sourceObject *self, PyObject *args)
 
     /* checks validity */
     if (!_check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
-        PQresultStatus(self->result) != PGRES_COPY_OUT)
-    {
+        PQresultStatus(self->result) != PGRES_COPY_OUT) {
         PyErr_SetString(PyExc_IOError,
                         "Connection is invalid or not in copy_out state");
         return NULL;
@@ -584,7 +589,7 @@ source_getdata(sourceObject *self, PyObject *args)
         return NULL;
     }
 
-    if (nbytes == -1) { /* copy is done */
+    if (nbytes == -1) {   /* copy is done */
         PGresult *result; /* final result of the operation */
 
         Py_BEGIN_ALLOW_THREADS;
@@ -609,9 +614,9 @@ source_getdata(sourceObject *self, PyObject *args)
         self->result_type = RESULT_EMPTY;
     }
     else { /* a row has been returned */
-        ret = decode ? get_decoded_string(
-                buffer, nbytes, PQclientEncoding(self->pgcnx->cnx)) :
-            PyBytes_FromStringAndSize(buffer, nbytes);
+        ret = decode ? get_decoded_string(buffer, nbytes,
+                                          PQclientEncoding(self->pgcnx->cnx))
+                     : PyBytes_FromStringAndSize(buffer, nbytes);
         PQfreemem(buffer);
     }
 
@@ -633,7 +638,7 @@ _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
         num = PQfnumber(self->result, PyBytes_AsString(param));
     }
     else if (PyLong_Check(param)) {
-        num = (int) PyLong_AsLong(param);
+        num = (int)PyLong_AsLong(param);
     }
     else {
         PyErr_SetString(PyExc_TypeError, usage);
@@ -664,20 +669,18 @@ _source_buildinfo(sourceObject *self, int num)
     /* affects field information */
     PyTuple_SET_ITEM(result, 0, PyLong_FromLong(num));
     PyTuple_SET_ITEM(result, 1,
-        PyUnicode_FromString(PQfname(self->result, num)));
+                     PyUnicode_FromString(PQfname(self->result, num)));
     PyTuple_SET_ITEM(result, 2,
-        PyLong_FromLong((long) PQftype(self->result, num)));
-    PyTuple_SET_ITEM(result, 3,
-        PyLong_FromLong(PQfsize(self->result, num)));
-    PyTuple_SET_ITEM(result, 4,
-        PyLong_FromLong(PQfmod(self->result, num)));
+                     PyLong_FromLong((long)PQftype(self->result, num)));
+    PyTuple_SET_ITEM(result, 3, PyLong_FromLong(PQfsize(self->result, num)));
+    PyTuple_SET_ITEM(result, 4, PyLong_FromLong(PQfmod(self->result, num)));
 
     return result;
 }
 
 /* Lists fields info. */
 static char source_listinfo__doc__[] =
-"listinfo() -- get information for all fields (position, name, type oid)";
+    "listinfo() -- get information for all fields (position, name, type oid)";
 
 static PyObject *
 source_listInfo(sourceObject *self, PyObject *noargs)
@@ -710,7 +713,7 @@ source_listInfo(sourceObject *self, PyObject *noargs)
 
 /* List fields information for last result. */
 static char source_fieldinfo__doc__[] =
-"fieldinfo(desc) -- get specified field info (position, name, type oid)";
+    "fieldinfo(desc) -- get specified field info (position, name, type oid)";
 
 static PyObject *
 source_fieldinfo(sourceObject *self, PyObject *desc)
@@ -719,9 +722,9 @@ source_fieldinfo(sourceObject *self, PyObject *desc)
 
     /* checks args and validity */
     if ((num = _source_fieldindex(
-        self, desc,
-        "Method fieldinfo() needs a string or integer as argument")) == -1)
-    {
+             self, desc,
+             "Method fieldinfo() needs a string or integer as argument")) ==
+        -1) {
         return NULL;
     }
 
@@ -731,7 +734,7 @@ source_fieldinfo(sourceObject *self, PyObject *desc)
 
 /* Retrieve field value. */
 static char source_field__doc__[] =
-"field(desc) -- return specified field value";
+    "field(desc) -- return specified field value";
 
 static PyObject *
 source_field(sourceObject *self, PyObject *desc)
@@ -740,9 +743,8 @@ source_field(sourceObject *self, PyObject *desc)
 
     /* checks args and validity */
     if ((num = _source_fieldindex(
-        self, desc,
-        "Method field() needs a string or integer as argument")) == -1)
-    {
+             self, desc,
+             "Method field() needs a string or integer as argument")) == -1) {
         return NULL;
     }
 
@@ -756,78 +758,70 @@ source_dir(connObject *self, PyObject *noargs)
 {
     PyObject *attrs;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
-    PyObject_CallMethod(
-        attrs, "extend", "[sssss]",
-        "pgcnx", "arraysize", "resulttype", "ntuples", "nfields");
+    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
+    PyObject_CallMethod(attrs, "extend", "[sssss]", "pgcnx", "arraysize",
+                        "resulttype", "ntuples", "nfields");
 
     return attrs;
 }
 
 /* Source object methods */
 static PyMethodDef source_methods[] = {
-    {"__dir__", (PyCFunction) source_dir, METH_NOARGS, NULL},
+    {"__dir__", (PyCFunction)source_dir, METH_NOARGS, NULL},
 
-    {"close", (PyCFunction) source_close,
-        METH_NOARGS, source_close__doc__},
-    {"execute", (PyCFunction) source_execute,
-        METH_O, source_execute__doc__},
-    {"oidstatus", (PyCFunction) source_oidstatus,
-        METH_NOARGS, source_oidstatus__doc__},
-    {"fetch", (PyCFunction) source_fetch,
-        METH_VARARGS, source_fetch__doc__},
-    {"movefirst", (PyCFunction) source_movefirst,
-        METH_NOARGS, source_movefirst__doc__},
-    {"movelast", (PyCFunction) source_movelast,
-        METH_NOARGS, source_movelast__doc__},
-    {"movenext", (PyCFunction) source_movenext,
-        METH_NOARGS, source_movenext__doc__},
-    {"moveprev", (PyCFunction) source_moveprev,
-        METH_NOARGS, source_moveprev__doc__},
-    {"putdata", (PyCFunction) source_putdata,
-        METH_O, source_putdata__doc__},
-    {"getdata", (PyCFunction) source_getdata,
-        METH_VARARGS, source_getdata__doc__},
-    {"field", (PyCFunction) source_field,
-        METH_O, source_field__doc__},
-    {"fieldinfo", (PyCFunction) source_fieldinfo,
-        METH_O, source_fieldinfo__doc__},
-    {"listinfo", (PyCFunction) source_listInfo,
-        METH_NOARGS, source_listinfo__doc__},
-    {NULL, NULL}
-};
+    {"close", (PyCFunction)source_close, METH_NOARGS, source_close__doc__},
+    {"execute", (PyCFunction)source_execute, METH_O, source_execute__doc__},
+    {"oidstatus", (PyCFunction)source_oidstatus, METH_NOARGS,
+     source_oidstatus__doc__},
+    {"fetch", (PyCFunction)source_fetch, METH_VARARGS, source_fetch__doc__},
+    {"movefirst", (PyCFunction)source_movefirst, METH_NOARGS,
+     source_movefirst__doc__},
+    {"movelast", (PyCFunction)source_movelast, METH_NOARGS,
+     source_movelast__doc__},
+    {"movenext", (PyCFunction)source_movenext, METH_NOARGS,
+     source_movenext__doc__},
+    {"moveprev", (PyCFunction)source_moveprev, METH_NOARGS,
+     source_moveprev__doc__},
+    {"putdata", (PyCFunction)source_putdata, METH_O, source_putdata__doc__},
+    {"getdata", (PyCFunction)source_getdata, METH_VARARGS,
+     source_getdata__doc__},
+    {"field", (PyCFunction)source_field, METH_O, source_field__doc__},
+    {"fieldinfo", (PyCFunction)source_fieldinfo, METH_O,
+     source_fieldinfo__doc__},
+    {"listinfo", (PyCFunction)source_listInfo, METH_NOARGS,
+     source_listinfo__doc__},
+    {NULL, NULL}};
 
 static char source__doc__[] = "PyGreSQL source object";
 
 /* Source type definition */
 static PyTypeObject sourceType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "pgdb.Source",                  /* tp_name */
-    sizeof(sourceObject),           /* tp_basicsize */
-    0,                              /* tp_itemsize */
+    PyVarObject_HEAD_INIT(NULL, 0) "pgdb.Source", /* tp_name */
+    sizeof(sourceObject),                         /* tp_basicsize */
+    0,                                            /* tp_itemsize */
     /* methods */
-    (destructor) source_dealloc,    /* tp_dealloc */
-    0,                              /* tp_print */
-    0,                              /* tp_getattr */
-    (setattrfunc) source_setattr,   /* tp_setattr */
-    0,                              /* tp_compare */
-    0,                              /* tp_repr */
-    0,                              /* tp_as_number */
-    0,                              /* tp_as_sequence */
-    0,                              /* tp_as_mapping */
-    0,                              /* tp_hash */
-    0,                              /* tp_call */
-    (reprfunc) source_str,          /* tp_str */
-    (getattrofunc) source_getattr,  /* tp_getattro */
-    0,                              /* tp_setattro */
-    0,                              /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,             /* tp_flags */
-    source__doc__,                  /* tp_doc */
-    0,                              /* tp_traverse */
-    0,                              /* tp_clear */
-    0,                              /* tp_richcompare */
-    0,                              /* tp_weaklistoffset */
-    0,                              /* tp_iter */
-    0,                              /* tp_iternext */
-    source_methods,                 /* tp_methods */
+    (destructor)source_dealloc,   /* tp_dealloc */
+    0,                            /* tp_print */
+    0,                            /* tp_getattr */
+    (setattrfunc)source_setattr,  /* tp_setattr */
+    0,                            /* tp_compare */
+    0,                            /* tp_repr */
+    0,                            /* tp_as_number */
+    0,                            /* tp_as_sequence */
+    0,                            /* tp_as_mapping */
+    0,                            /* tp_hash */
+    0,                            /* tp_call */
+    (reprfunc)source_str,         /* tp_str */
+    (getattrofunc)source_getattr, /* tp_getattro */
+    0,                            /* tp_setattro */
+    0,                            /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,           /* tp_flags */
+    source__doc__,                /* tp_doc */
+    0,                            /* tp_traverse */
+    0,                            /* tp_clear */
+    0,                            /* tp_richcompare */
+    0,                            /* tp_weaklistoffset */
+    0,                            /* tp_iter */
+    0,                            /* tp_iternext */
+    source_methods,               /* tp_methods */
 };

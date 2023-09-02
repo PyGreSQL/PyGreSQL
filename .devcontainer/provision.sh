@@ -37,7 +37,7 @@ python3.11 -m pip install build
 
 pip install ruff
 
-sudo apt-get install -y tox
+sudo apt-get install -y tox clang-format
 
 # install PostgreSQL client tools
 

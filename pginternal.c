@@ -37,8 +37,8 @@ get_decoded_string(const char *str, Py_ssize_t size, int encoding)
     if (encoding == pg_encoding_ascii)
         return PyUnicode_DecodeASCII(str, size, "strict");
     /* encoding name should be properly translated to Python here */
-    return PyUnicode_Decode(str, size,
-        pg_encoding_to_char(encoding), "strict");
+    return PyUnicode_Decode(str, size, pg_encoding_to_char(encoding),
+                            "strict");
 }
 
 static PyObject *
@@ -52,7 +52,7 @@ get_encoded_string(PyObject *unicode_obj, int encoding)
         return PyUnicode_AsASCIIString(unicode_obj);
     /* encoding name should be properly translated to Python here */
     return PyUnicode_AsEncodedString(unicode_obj,
-        pg_encoding_to_char(encoding), "strict");
+                                     pg_encoding_to_char(encoding), "strict");
 }
 
 /* Helper functions */
@@ -64,7 +64,7 @@ get_type(Oid pgtype)
     int t;
 
     switch (pgtype) {
-        /* simple types */
+            /* simple types */
 
         case INT2OID:
         case INT4OID:
@@ -113,7 +113,7 @@ get_type(Oid pgtype)
             t = PYGRES_TEXT;
             break;
 
-        /* array types */
+            /* array types */
 
         case INT2ARRAYOID:
         case INT4ARRAYOID:
@@ -137,8 +137,9 @@ get_type(Oid pgtype)
             break;
 
         case MONEYARRAYOID:
-            t = array_as_text ? PYGRES_TEXT : ((decimal_point ?
-                PYGRES_MONEY : PYGRES_TEXT) | PYGRES_ARRAY);
+            t = array_as_text ? PYGRES_TEXT
+                              : ((decimal_point ? PYGRES_MONEY : PYGRES_TEXT) |
+                                 PYGRES_ARRAY);
             break;
 
         case BOOLARRAYOID:
@@ -146,14 +147,16 @@ get_type(Oid pgtype)
             break;
 
         case BYTEAARRAYOID:
-            t = array_as_text ? PYGRES_TEXT : ((bytea_escaped ?
-                PYGRES_TEXT : PYGRES_BYTEA) | PYGRES_ARRAY);
+            t = array_as_text ? PYGRES_TEXT
+                              : ((bytea_escaped ? PYGRES_TEXT : PYGRES_BYTEA) |
+                                 PYGRES_ARRAY);
             break;
 
         case JSONARRAYOID:
         case JSONBARRAYOID:
-            t = array_as_text ? PYGRES_TEXT : ((jsondecode ?
-                PYGRES_JSON : PYGRES_TEXT) | PYGRES_ARRAY);
+            t = array_as_text ? PYGRES_TEXT
+                              : ((jsondecode ? PYGRES_JSON : PYGRES_TEXT) |
+                                 PYGRES_ARRAY);
             break;
 
         case BPCHARARRAYOID:
@@ -178,8 +181,8 @@ get_col_types(PGresult *result, int nfields)
 {
     int *types, *t, j;
 
-    if (!(types = PyMem_Malloc(sizeof(int) * (size_t) nfields))) {
-        return (int*) PyErr_NoMemory();
+    if (!(types = PyMem_Malloc(sizeof(int) * (size_t)nfields))) {
+        return (int *)PyErr_NoMemory();
     }
 
     for (j = 0, t = types; j < nfields; ++j) {
@@ -199,8 +202,8 @@ cast_bytea_text(char *s)
     size_t str_len;
 
     /* this function should not be called when bytea_escaped is set */
-    tmp_str = (char *) PQunescapeBytea((unsigned char*) s, &str_len);
-    obj = PyBytes_FromStringAndSize(tmp_str, (Py_ssize_t) str_len);
+    tmp_str = (char *)PQunescapeBytea((unsigned char *)s, &str_len);
+    obj = PyBytes_FromStringAndSize(tmp_str, (Py_ssize_t)str_len);
     if (tmp_str) {
         PQfreemem(tmp_str);
     }
@@ -221,16 +224,18 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
         case PYGRES_BYTEA:
             /* this type should not be passed when bytea_escaped is set */
             /* we need to add a null byte */
-            tmp_str = (char *) PyMem_Malloc((size_t) size + 1);
+            tmp_str = (char *)PyMem_Malloc((size_t)size + 1);
             if (!tmp_str) {
                 return PyErr_NoMemory();
             }
-            memcpy(tmp_str, s, (size_t) size);
-            s = tmp_str; *(s + size) = '\0';
-            tmp_str = (char *) PQunescapeBytea((unsigned char*) s, &str_len);
+            memcpy(tmp_str, s, (size_t)size);
+            s = tmp_str;
+            *(s + size) = '\0';
+            tmp_str = (char *)PQunescapeBytea((unsigned char *)s, &str_len);
             PyMem_Free(s);
-            if (!tmp_str) return PyErr_NoMemory();
-            obj = PyBytes_FromStringAndSize(tmp_str, (Py_ssize_t) str_len);
+            if (!tmp_str)
+                return PyErr_NoMemory();
+            obj = PyBytes_FromStringAndSize(tmp_str, (Py_ssize_t)str_len);
             if (tmp_str) {
                 PQfreemem(tmp_str);
             }
@@ -246,7 +251,7 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
             }
             break;
 
-        default:  /* PYGRES_TEXT */
+        default: /* PYGRES_TEXT */
             obj = get_decoded_string(s, size, encoding);
             if (!obj) { /* cannot decode */
                 obj = PyBytes_FromStringAndSize(s, size);
@@ -288,8 +293,8 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 
         case PYGRES_INT:
             n = sizeof(buf) / sizeof(buf[0]) - 1;
-            if ((int) size < n) {
-                n = (int) size;
+            if ((int)size < n) {
+                n = (int)size;
             }
             for (i = 0, t = buf; i < n; ++i) {
                 *t++ = *s++;
@@ -300,8 +305,8 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 
         case PYGRES_LONG:
             n = sizeof(buf) / sizeof(buf[0]) - 1;
-            if ((int) size < n) {
-                n = (int) size;
+            if ((int)size < n) {
+                n = (int)size;
             }
             for (i = 0, t = buf; i < n; ++i) {
                 *t++ = *s++;
@@ -338,14 +343,14 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
                 tmp_obj = PyUnicode_FromString(buf);
                 obj = PyFloat_FromString(tmp_obj);
                 Py_DECREF(tmp_obj);
-
             }
             break;
 
         case PYGRES_DECIMAL:
             tmp_obj = PyUnicode_FromStringAndSize(s, size);
-            obj = decimal ? PyObject_CallFunctionObjArgs(
-                decimal, tmp_obj, NULL) : PyFloat_FromString(tmp_obj);
+            obj = decimal
+                      ? PyObject_CallFunctionObjArgs(decimal, tmp_obj, NULL)
+                      : PyFloat_FromString(tmp_obj);
             Py_DECREF(tmp_obj);
             break;
 
@@ -404,7 +409,8 @@ cast_unsized_simple(char *s, int type)
                     buf[j++] = '-';
                 }
             }
-            buf[j] = '\0'; s = buf;
+            buf[j] = '\0';
+            s = buf;
             /* FALLTHROUGH */ /* no break here */
 
         case PYGRES_DECIMAL:
@@ -438,11 +444,10 @@ cast_unsized_simple(char *s, int type)
 }
 
 /* Quick case insensitive check if given sized string is null. */
-#define STR_IS_NULL(s, n) (n == 4 && \
-    (s[0] == 'n' || s[0] == 'N') && \
-    (s[1] == 'u' || s[1] == 'U') && \
-    (s[2] == 'l' || s[2] == 'L') && \
-    (s[3] == 'l' || s[3] == 'L'))
+#define STR_IS_NULL(s, n)                                            \
+    (n == 4 && (s[0] == 'n' || s[0] == 'N') &&                       \
+     (s[1] == 'u' || s[1] == 'U') && (s[2] == 'l' || s[2] == 'L') && \
+     (s[3] == 'l' || s[3] == 'L'))
 
 /* Cast string s with size and encoding to a Python list,
    using the input and output syntax for arrays.
@@ -450,8 +455,8 @@ cast_unsized_simple(char *s, int type)
    The parameter delim specifies the delimiter for the elements,
    since some types do not use the default delimiter of a comma. */
 static PyObject *
-cast_array(char *s, Py_ssize_t size, int encoding,
-     int type, PyObject *cast, char delim)
+cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
+           char delim)
 {
     PyObject *result, *stack[MAX_ARRAY_DEPTH];
     char *end = s + size, *t;
@@ -459,12 +464,13 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 
     if (type) {
         type &= ~PYGRES_ARRAY; /* get the base type */
-        if (!type) type = PYGRES_TEXT;
+        if (!type)
+            type = PYGRES_TEXT;
     }
     if (!delim) {
         delim = ',';
     }
-    else if (delim == '{' || delim =='}' || delim=='\\') {
+    else if (delim == '{' || delim == '}' || delim == '\\') {
         PyErr_SetString(PyExc_ValueError, "Invalid array delimiter");
         return NULL;
     }
@@ -475,20 +481,28 @@ cast_array(char *s, Py_ssize_t size, int encoding,
         int valid;
 
         for (valid = 0; !valid;) {
-            if (s == end || *s++ != '[') break;
+            if (s == end || *s++ != '[')
+                break;
             while (s != end && *s == ' ') ++s;
-            if (s != end && (*s == '+' || *s == '-')) ++s;
-            if (s == end || *s < '0' || *s > '9') break;
+            if (s != end && (*s == '+' || *s == '-'))
+                ++s;
+            if (s == end || *s < '0' || *s > '9')
+                break;
             while (s != end && *s >= '0' && *s <= '9') ++s;
-            if (s == end || *s++ != ':') break;
-            if (s != end && (*s == '+' || *s == '-')) ++s;
-            if (s == end || *s < '0' || *s > '9') break;
+            if (s == end || *s++ != ':')
+                break;
+            if (s != end && (*s == '+' || *s == '-'))
+                ++s;
+            if (s == end || *s < '0' || *s > '9')
+                break;
             while (s != end && *s >= '0' && *s <= '9') ++s;
-            if (s == end || *s++ != ']') break;
+            if (s == end || *s++ != ']')
+                break;
             while (s != end && *s == ' ') ++s;
             ++ranges;
             if (s != end && *s == '=') {
-                do ++s; while (s != end && *s == ' ');
+                do ++s;
+                while (s != end && *s == ' ');
                 valid = 1;
             }
         }
@@ -498,7 +512,8 @@ cast_array(char *s, Py_ssize_t size, int encoding,
         }
     }
     for (t = s, depth = 0; t != end && (*t == '{' || *t == ' '); ++t) {
-        if (*t == '{') ++depth;
+        if (*t == '{')
+            ++depth;
     }
     if (!depth) {
         PyErr_SetString(PyExc_ValueError,
@@ -516,30 +531,40 @@ cast_array(char *s, Py_ssize_t size, int encoding,
     }
     depth--; /* next level of parsing */
     result = PyList_New(0);
-    if (!result) return NULL;
-    do ++s; while (s != end && *s == ' ');
+    if (!result)
+        return NULL;
+    do ++s;
+    while (s != end && *s == ' ');
     /* everything is set up, start parsing the array */
     while (s != end) {
         if (*s == '}') {
             PyObject *subresult;
 
-            if (!level) break; /* top level array ended */
-            do ++s; while (s != end && *s == ' ');
-            if (s == end) break; /* error */
+            if (!level)
+                break; /* top level array ended */
+            do ++s;
+            while (s != end && *s == ' ');
+            if (s == end)
+                break; /* error */
             if (*s == delim) {
-                do ++s; while (s != end && *s == ' ');
-                if (s == end) break; /* error */
+                do ++s;
+                while (s != end && *s == ' ');
+                if (s == end)
+                    break; /* error */
                 if (*s != '{') {
                     PyErr_SetString(PyExc_ValueError,
                                     "Subarray expected but not found");
-                    Py_DECREF(result); return NULL;
+                    Py_DECREF(result);
+                    return NULL;
                 }
             }
-            else if (*s != '}') break; /* error */
+            else if (*s != '}')
+                break; /* error */
             subresult = result;
             result = stack[--level];
             if (PyList_Append(result, subresult)) {
-                Py_DECREF(result); return NULL;
+                Py_DECREF(result);
+                return NULL;
             }
         }
         else if (level == depth) { /* we expect elements at this level */
@@ -551,40 +576,48 @@ cast_array(char *s, Py_ssize_t size, int encoding,
             if (*s == '{') {
                 PyErr_SetString(PyExc_ValueError,
                                 "Subarray found where not expected");
-                Py_DECREF(result); return NULL;
+                Py_DECREF(result);
+                return NULL;
             }
             if (*s == '"') { /* quoted element */
                 estr = ++s;
                 while (s != end && *s != '"') {
                     if (*s == '\\') {
-                        ++s; if (s == end) break;
+                        ++s;
+                        if (s == end)
+                            break;
                         escaped = 1;
                     }
                     ++s;
                 }
                 esize = s - estr;
-                do ++s; while (s != end && *s == ' ');
+                do ++s;
+                while (s != end && *s == ' ');
             }
             else { /* unquoted element */
                 estr = s;
                 /* can contain blanks inside */
-                while (s != end && *s != '"' &&
-                       *s != '{' && *s != '}' && *s != delim)
-                {
+                while (s != end && *s != '"' && *s != '{' && *s != '}' &&
+                       *s != delim) {
                     if (*s == '\\') {
-                        ++s; if (s == end) break;
+                        ++s;
+                        if (s == end)
+                            break;
                         escaped = 1;
                     }
                     ++s;
                 }
-                t = s; while (t > estr && *(t - 1) == ' ') --t;
+                t = s;
+                while (t > estr && *(t - 1) == ' ') --t;
                 if (!(esize = t - estr)) {
-                    s = end; break; /* error */
+                    s = end;
+                    break; /* error */
                 }
                 if (STR_IS_NULL(estr, esize)) /* NULL gives None */
                     estr = NULL;
             }
-            if (s == end) break; /* error */
+            if (s == end)
+                break; /* error */
             if (estr) {
                 if (escaped) {
                     char *r;
@@ -592,12 +625,14 @@ cast_array(char *s, Py_ssize_t size, int encoding,
 
                     /* create unescaped string */
                     t = estr;
-                    estr = (char *) PyMem_Malloc((size_t) esize);
+                    estr = (char *)PyMem_Malloc((size_t)esize);
                     if (!estr) {
-                        Py_DECREF(result); return PyErr_NoMemory();
+                        Py_DECREF(result);
+                        return PyErr_NoMemory();
                     }
                     for (i = 0, r = estr; i < esize; ++i) {
-                        if (*t == '\\') ++t, ++i;
+                        if (*t == '\\')
+                            ++t, ++i;
                         *r++ = *t++;
                     }
                     esize = r - estr;
@@ -609,58 +644,73 @@ cast_array(char *s, Py_ssize_t size, int encoding,
                         element = cast_sized_simple(estr, esize, type);
                 }
                 else { /* external casting of base type */
-                    element = encoding == pg_encoding_ascii ? NULL :
-                        get_decoded_string(estr, esize, encoding);
+                    element = encoding == pg_encoding_ascii
+                                  ? NULL
+                                  : get_decoded_string(estr, esize, encoding);
                     if (!element) { /* no decoding necessary or possible */
                         element = PyBytes_FromStringAndSize(estr, esize);
                     }
                     if (element && cast) {
                         PyObject *tmp = element;
-                        element = PyObject_CallFunctionObjArgs(
-                            cast, element, NULL);
+                        element =
+                            PyObject_CallFunctionObjArgs(cast, element, NULL);
                         Py_DECREF(tmp);
                     }
                 }
-                if (escaped) PyMem_Free(estr);
+                if (escaped)
+                    PyMem_Free(estr);
                 if (!element) {
-                    Py_DECREF(result); return NULL;
+                    Py_DECREF(result);
+                    return NULL;
                 }
             }
             else {
-                Py_INCREF(Py_None); element = Py_None;
+                Py_INCREF(Py_None);
+                element = Py_None;
             }
             if (PyList_Append(result, element)) {
-                Py_DECREF(element); Py_DECREF(result); return NULL;
+                Py_DECREF(element);
+                Py_DECREF(result);
+                return NULL;
             }
             Py_DECREF(element);
             if (*s == delim) {
-                do ++s; while (s != end && *s == ' ');
-                if (s == end) break; /* error */
+                do ++s;
+                while (s != end && *s == ' ');
+                if (s == end)
+                    break; /* error */
             }
-            else if (*s != '}') break; /* error */
+            else if (*s != '}')
+                break; /* error */
         }
         else { /* we expect arrays at this level */
             if (*s != '{') {
                 PyErr_SetString(PyExc_ValueError,
                                 "Subarray must start with a left brace");
-                Py_DECREF(result); return NULL;
+                Py_DECREF(result);
+                return NULL;
             }
-            do ++s; while (s != end && *s == ' ');
-            if (s == end) break; /* error */
+            do ++s;
+            while (s != end && *s == ' ');
+            if (s == end)
+                break; /* error */
             stack[level++] = result;
-            if (!(result = PyList_New(0))) return NULL;
+            if (!(result = PyList_New(0)))
+                return NULL;
         }
     }
     if (s == end || *s != '}') {
-        PyErr_SetString(PyExc_ValueError,
-                        "Unexpected end of array");
-        Py_DECREF(result); return NULL;
+        PyErr_SetString(PyExc_ValueError, "Unexpected end of array");
+        Py_DECREF(result);
+        return NULL;
     }
-    do ++s; while (s != end && *s == ' ');
+    do ++s;
+    while (s != end && *s == ' ');
     if (s != end) {
         PyErr_SetString(PyExc_ValueError,
                         "Unexpected characters after end of array");
-        Py_DECREF(result); return NULL;
+        Py_DECREF(result);
+        return NULL;
     }
     return result;
 }
@@ -672,8 +722,8 @@ cast_array(char *s, Py_ssize_t size, int encoding,
    The parameter delim can specify a delimiter for the elements,
    although composite types always use a comma as delimiter. */
 static PyObject *
-cast_record(char *s, Py_ssize_t size, int encoding,
-     int *type, PyObject *cast, Py_ssize_t len, char delim)
+cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
+            Py_ssize_t len, char delim)
 {
     PyObject *result, *ret;
     char *end = s + size, *t;
@@ -682,7 +732,7 @@ cast_record(char *s, Py_ssize_t size, int encoding,
     if (!delim) {
         delim = ',';
     }
-    else if (delim == '(' || delim ==')' || delim=='\\') {
+    else if (delim == '(' || delim == ')' || delim == '\\') {
         PyErr_SetString(PyExc_ValueError, "Invalid record delimiter");
         return NULL;
     }
@@ -695,14 +745,16 @@ cast_record(char *s, Py_ssize_t size, int encoding,
         return NULL;
     }
     result = PyList_New(0);
-    if (!result) return NULL;
+    if (!result)
+        return NULL;
     i = 0;
     /* everything is set up, start parsing the record */
     while (++s != end) {
         PyObject *element;
 
         if (*s == ')' || *s == delim) {
-            Py_INCREF(Py_None); element = Py_None;
+            Py_INCREF(Py_None);
+            element = Py_None;
         }
         else {
             char *estr;
@@ -711,32 +763,40 @@ cast_record(char *s, Py_ssize_t size, int encoding,
 
             estr = s;
             quoted = *s == '"';
-            if (quoted) ++s;
+            if (quoted)
+                ++s;
             esize = 0;
             while (s != end) {
                 if (!quoted && (*s == ')' || *s == delim))
                     break;
                 if (*s == '"') {
-                    ++s; if (s == end) break;
+                    ++s;
+                    if (s == end)
+                        break;
                     if (!(quoted && *s == '"')) {
-                        quoted = !quoted; continue;
+                        quoted = !quoted;
+                        continue;
                     }
                 }
                 if (*s == '\\') {
-                    ++s; if (s == end) break;
+                    ++s;
+                    if (s == end)
+                        break;
                 }
                 ++s, ++esize;
             }
-            if (s == end) break; /* error */
+            if (s == end)
+                break; /* error */
             if (estr + esize != s) {
                 char *r;
 
                 escaped = 1;
                 /* create unescaped string */
                 t = estr;
-                estr = (char *) PyMem_Malloc((size_t) esize);
+                estr = (char *)PyMem_Malloc((size_t)esize);
                 if (!estr) {
-                    Py_DECREF(result); return PyErr_NoMemory();
+                    Py_DECREF(result);
+                    return PyErr_NoMemory();
                 }
                 quoted = 0;
                 r = estr;
@@ -744,10 +804,12 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                     if (*t == '"') {
                         ++t;
                         if (!(quoted && *t == '"')) {
-                            quoted = !quoted; continue;
+                            quoted = !quoted;
+                            continue;
                         }
                     }
-                    if (*t == '\\') ++t;
+                    if (*t == '\\')
+                        ++t;
                     *r++ = *t++;
                 }
             }
@@ -755,16 +817,17 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                 int etype = type[i];
 
                 if (etype & PYGRES_ARRAY)
-                    element = cast_array(
-                        estr, esize, encoding, etype, NULL, 0);
+                    element =
+                        cast_array(estr, esize, encoding, etype, NULL, 0);
                 else if (etype & PYGRES_TEXT)
                     element = cast_sized_text(estr, esize, encoding, etype);
                 else
                     element = cast_sized_simple(estr, esize, etype);
             }
             else { /* external casting of base type */
-                element = encoding == pg_encoding_ascii ? NULL :
-                    get_decoded_string(estr, esize, encoding);
+                element = encoding == pg_encoding_ascii
+                              ? NULL
+                              : get_decoded_string(estr, esize, encoding);
                 if (!element) { /* no decoding necessary or possible */
                     element = PyBytes_FromStringAndSize(estr, esize);
                 }
@@ -781,46 +844,58 @@ cast_record(char *s, Py_ssize_t size, int encoding,
                             }
                         }
                         else {
-                            Py_DECREF(element); element = NULL;
+                            Py_DECREF(element);
+                            element = NULL;
                         }
                     }
                     else {
                         PyObject *tmp = element;
-                        element = PyObject_CallFunctionObjArgs(
-                            cast, element, NULL);
+                        element =
+                            PyObject_CallFunctionObjArgs(cast, element, NULL);
                         Py_DECREF(tmp);
                     }
                 }
             }
-            if (escaped) PyMem_Free(estr);
+            if (escaped)
+                PyMem_Free(estr);
             if (!element) {
-                Py_DECREF(result); return NULL;
+                Py_DECREF(result);
+                return NULL;
             }
         }
         if (PyList_Append(result, element)) {
-            Py_DECREF(element); Py_DECREF(result); return NULL;
+            Py_DECREF(element);
+            Py_DECREF(result);
+            return NULL;
         }
         Py_DECREF(element);
-        if (len) ++i;
-        if (*s != delim) break; /* no next record */
+        if (len)
+            ++i;
+        if (*s != delim)
+            break; /* no next record */
         if (len && i >= len) {
             PyErr_SetString(PyExc_ValueError, "Too many columns");
-            Py_DECREF(result); return NULL;
+            Py_DECREF(result);
+            return NULL;
         }
     }
     if (s == end || *s != ')') {
         PyErr_SetString(PyExc_ValueError, "Unexpected end of record");
-        Py_DECREF(result); return NULL;
+        Py_DECREF(result);
+        return NULL;
     }
-    do ++s; while (s != end && *s == ' ');
+    do ++s;
+    while (s != end && *s == ' ');
     if (s != end) {
         PyErr_SetString(PyExc_ValueError,
                         "Unexpected characters after end of record");
-        Py_DECREF(result); return NULL;
+        Py_DECREF(result);
+        return NULL;
     }
     if (len && i < len) {
         PyErr_SetString(PyExc_ValueError, "Too few columns");
-        Py_DECREF(result); return NULL;
+        Py_DECREF(result);
+        return NULL;
     }
 
     ret = PyList_AsTuple(result);
@@ -846,94 +921,116 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
         int quoted;
 
         while (s != end && *s == ' ') ++s;
-        if (s == end) break;
+        if (s == end)
+            break;
         quoted = *s == '"';
         if (quoted) {
             key = ++s;
             while (s != end) {
-                if (*s == '"') break;
+                if (*s == '"')
+                    break;
                 if (*s == '\\') {
-                    if (++s == end) break;
+                    if (++s == end)
+                        break;
                     ++key_esc;
                 }
                 ++s;
             }
             if (s == end) {
                 PyErr_SetString(PyExc_ValueError, "Unterminated quote");
-                Py_DECREF(result); return NULL;
+                Py_DECREF(result);
+                return NULL;
             }
         }
         else {
             key = s;
             while (s != end) {
-                if (*s == '=' || *s == ' ') break;
+                if (*s == '=' || *s == ' ')
+                    break;
                 if (*s == '\\') {
-                    if (++s == end) break;
+                    if (++s == end)
+                        break;
                     ++key_esc;
                 }
                 ++s;
             }
             if (s == key) {
                 PyErr_SetString(PyExc_ValueError, "Missing key");
-                Py_DECREF(result); return NULL;
+                Py_DECREF(result);
+                return NULL;
             }
         }
         size = s - key - key_esc;
         if (key_esc) {
             char *r = key, *t;
-            key = (char *) PyMem_Malloc((size_t) size);
+            key = (char *)PyMem_Malloc((size_t)size);
             if (!key) {
-                Py_DECREF(result); return PyErr_NoMemory();
+                Py_DECREF(result);
+                return PyErr_NoMemory();
             }
             t = key;
             while (r != s) {
                 if (*r == '\\') {
-                    ++r; if (r == s) break;
+                    ++r;
+                    if (r == s)
+                        break;
                 }
                 *t++ = *r++;
             }
         }
         key_obj = cast_sized_text(key, size, encoding, PYGRES_TEXT);
-        if (key_esc) PyMem_Free(key);
+        if (key_esc)
+            PyMem_Free(key);
         if (!key_obj) {
-            Py_DECREF(result); return NULL;
+            Py_DECREF(result);
+            return NULL;
         }
-        if (quoted) ++s;
+        if (quoted)
+            ++s;
         while (s != end && *s == ' ') ++s;
         if (s == end || *s++ != '=' || s == end || *s++ != '>') {
             PyErr_SetString(PyExc_ValueError, "Invalid characters after key");
-            Py_DECREF(key_obj); Py_DECREF(result); return NULL;
+            Py_DECREF(key_obj);
+            Py_DECREF(result);
+            return NULL;
         }
         while (s != end && *s == ' ') ++s;
         quoted = *s == '"';
         if (quoted) {
             val = ++s;
             while (s != end) {
-                if (*s == '"') break;
+                if (*s == '"')
+                    break;
                 if (*s == '\\') {
-                    if (++s == end) break;
+                    if (++s == end)
+                        break;
                     ++val_esc;
                 }
                 ++s;
             }
             if (s == end) {
                 PyErr_SetString(PyExc_ValueError, "Unterminated quote");
-                Py_DECREF(result); return NULL;
+                Py_DECREF(result);
+                return NULL;
             }
         }
         else {
             val = s;
             while (s != end) {
-                if (*s == ',' || *s == ' ') break;
+                if (*s == ',' || *s == ' ')
+                    break;
                 if (*s == '\\') {
-                    if (++s == end) break;
+                    if (++s == end)
+                        break;
                     ++val_esc;
                 }
                 ++s;
             }
             if (s == val) {
                 PyErr_SetString(PyExc_ValueError, "Missing value");
-                Py_DECREF(key_obj); Py_DECREF(result); return NULL;
+                Py_DECREF(key_obj);
+                Py_DECREF(result);
+                return NULL;
             }
             if (STR_IS_NULL(val, s - val))
                 val = NULL;
@@ -942,46 +1039,59 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             size = s - val - val_esc;
             if (val_esc) {
                 char *r = val, *t;
-                val = (char *) PyMem_Malloc((size_t) size);
+                val = (char *)PyMem_Malloc((size_t)size);
                 if (!val) {
-                    Py_DECREF(key_obj); Py_DECREF(result);
+                    Py_DECREF(key_obj);
+                    Py_DECREF(result);
                     return PyErr_NoMemory();
                 }
                 t = val;
                 while (r != s) {
                     if (*r == '\\') {
-                        ++r; if (r == s) break;
+                        ++r;
+                        if (r == s)
+                            break;
                     }
                     *t++ = *r++;
                 }
             }
             val_obj = cast_sized_text(val, size, encoding, PYGRES_TEXT);
-            if (val_esc) PyMem_Free(val);
+            if (val_esc)
+                PyMem_Free(val);
             if (!val_obj) {
-                Py_DECREF(key_obj); Py_DECREF(result); return NULL;
+                Py_DECREF(key_obj);
+                Py_DECREF(result);
+                return NULL;
             }
         }
         else {
-            Py_INCREF(Py_None); val_obj = Py_None;
+            Py_INCREF(Py_None);
+            val_obj = Py_None;
         }
-        if (quoted) ++s;
+        if (quoted)
+            ++s;
         while (s != end && *s == ' ') ++s;
         if (s != end) {
             if (*s++ != ',') {
                 PyErr_SetString(PyExc_ValueError,
                                 "Invalid characters after val");
-                Py_DECREF(key_obj); Py_DECREF(val_obj);
-                Py_DECREF(result); return NULL;
+                Py_DECREF(key_obj);
+                Py_DECREF(val_obj);
+                Py_DECREF(result);
+                return NULL;
             }
             while (s != end && *s == ' ') ++s;
             if (s == end) {
                 PyErr_SetString(PyExc_ValueError, "Missing entry");
-                Py_DECREF(key_obj); Py_DECREF(val_obj);
-                Py_DECREF(result); return NULL;
+                Py_DECREF(key_obj);
+                Py_DECREF(val_obj);
+                Py_DECREF(result);
+                return NULL;
             }
         }
         PyDict_SetItem(result, key_obj, val_obj);
-        Py_DECREF(key_obj); Py_DECREF(val_obj);
+        Py_DECREF(key_obj);
+        Py_DECREF(val_obj);
     }
     return result;
 }
@@ -1054,15 +1164,15 @@ get_error_type(const char *sqlstate)
 
 /* Set database error message and sqlstate attribute. */
 static void
-set_error_msg_and_state(PyObject *type,
-    const char *msg, int encoding, const char *sqlstate)
+set_error_msg_and_state(PyObject *type, const char *msg, int encoding,
+                        const char *sqlstate)
 {
     PyObject *err_obj, *msg_obj, *sql_obj = NULL;
 
     if (encoding == -1) /* unknown */
         msg_obj = PyUnicode_DecodeLocale(msg, NULL);
     else
-        msg_obj = get_decoded_string(msg, (Py_ssize_t) strlen(msg), encoding);
+        msg_obj = get_decoded_string(msg, (Py_ssize_t)strlen(msg), encoding);
     if (!msg_obj) /* cannot decode */
         msg_obj = PyBytes_FromString(msg);
 
@@ -1070,7 +1180,8 @@ set_error_msg_and_state(PyObject *type,
         sql_obj = PyUnicode_FromStringAndSize(sqlstate, 5);
     }
     else {
-        Py_INCREF(Py_None); sql_obj = Py_None;
+        Py_INCREF(Py_None);
+        sql_obj = Py_None;
     }
 
     err_obj = PyObject_CallFunctionObjArgs(type, msg_obj, NULL);
@@ -1095,7 +1206,7 @@ set_error_msg(PyObject *type, const char *msg)
 
 /* Set database error from connection and/or result. */
 static void
-set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
+set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result)
 {
     char *sqlstate = NULL;
     int encoding = pg_encoding_ascii;
@@ -1109,7 +1220,8 @@ set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
     }
     if (result) {
         sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
-        if (sqlstate) type = get_error_type(sqlstate);
+        if (sqlstate)
+            type = get_error_type(sqlstate);
     }
 
     set_error_msg_and_state(type, msg, encoding, sqlstate);
@@ -1117,9 +1229,10 @@ set_error(PyObject *type, const char * msg, PGconn *cnx, PGresult *result)
 
 /* Get SSL attributes and values as a dictionary. */
 static PyObject *
-get_ssl_attributes(PGconn *cnx) {
+get_ssl_attributes(PGconn *cnx)
+{
     PyObject *attr_dict = NULL;
-    const char * const *s;
+    const char *const *s;
 
     if (!(attr_dict = PyDict_New())) {
         return NULL;
@@ -1129,7 +1242,7 @@ get_ssl_attributes(PGconn *cnx) {
         const char *val = PQsslAttribute(cnx, *s);
 
         if (val) {
-            PyObject * val_obj = PyUnicode_FromString(val);
+            PyObject *val_obj = PyUnicode_FromString(val);
 
             PyDict_SetItemString(attr_dict, *s, val_obj);
             Py_DECREF(val_obj);
@@ -1153,10 +1266,10 @@ format_result(const PGresult *res)
     const int n = PQnfields(res);
 
     if (n > 0) {
-        char * const aligns = (char *) PyMem_Malloc(
-            (unsigned int) n * sizeof(char));
-        size_t * const sizes = (size_t *) PyMem_Malloc(
-            (unsigned int) n * sizeof(size_t));
+        char *const aligns =
+            (char *)PyMem_Malloc((unsigned int)n * sizeof(char));
+        size_t *const sizes =
+            (size_t *)PyMem_Malloc((unsigned int)n * sizeof(size_t));
 
         if (aligns && sizes) {
             const int m = PQntuples(res);
@@ -1166,7 +1279,7 @@ format_result(const PGresult *res)
 
             /* calculate sizes and alignments */
             for (j = 0; j < n; ++j) {
-                const char * const s = PQfname(res, j);
+                const char *const s = PQfname(res, j);
                 const int format = PQfformat(res, j);
 
                 sizes[j] = s ? strlen(s) : 0;
@@ -1202,9 +1315,9 @@ format_result(const PGresult *res)
                     if (aligns[j]) {
                         const int k = PQgetlength(res, i, j);
 
-                        if (sizes[j] < (size_t) k)
+                        if (sizes[j] < (size_t)k)
                             /* value must fit */
-                            sizes[j] = (size_t) k;
+                            sizes[j] = (size_t)k;
                     }
                 }
             }
@@ -1212,23 +1325,23 @@ format_result(const PGresult *res)
             /* size of one row */
             for (j = 0; j < n; ++j) size += sizes[j] + 1;
             /* times number of rows incl. heading */
-            size *= (size_t) m + 2;
+            size *= (size_t)m + 2;
             /* plus size of footer */
             size += 40;
             /* is the buffer size that needs to be allocated */
-            buffer = (char *) PyMem_Malloc(size);
+            buffer = (char *)PyMem_Malloc(size);
             if (buffer) {
                 char *p = buffer;
                 PyObject *result;
 
                 /* create the header */
                 for (j = 0; j < n; ++j) {
-                    const char * const s = PQfname(res, j);
+                    const char *const s = PQfname(res, j);
                     const size_t k = sizes[j];
-                    const size_t h = (k - (size_t) strlen(s)) / 2;
+                    const size_t h = (k - (size_t)strlen(s)) / 2;
 
-                    sprintf(p, "%*s", (int) h, "");
-                    sprintf(p + h, "%-*s", (int) (k - h), s);
+                    sprintf(p, "%*s", (int)h, "");
+                    sprintf(p + h, "%-*s", (int)(k - h), s);
                     p += k;
                     if (j + 1 < n)
                         *p++ = '|';
@@ -1237,8 +1350,7 @@ format_result(const PGresult *res)
                 for (j = 0; j < n; ++j) {
                     size_t k = sizes[j];
 
-                    while (k--)
-                        *p++ = '-';
+                    while (k--) *p++ = '-';
                     if (j + 1 < n)
                         *p++ = '+';
                 }
@@ -1250,11 +1362,11 @@ format_result(const PGresult *res)
                         const size_t k = sizes[j];
 
                         if (align) {
-                            sprintf(p, align == 'r' ? "%*s" : "%-*s", (int) k,
+                            sprintf(p, align == 'r' ? "%*s" : "%-*s", (int)k,
                                     PQgetvalue(res, i, j));
                         }
                         else {
-                            sprintf(p, "%-*s", (int) k,
+                            sprintf(p, "%-*s", (int)k,
                                     PQgetisnull(res, i, j) ? "" : "<binary>");
                         }
                         p += k;
@@ -1264,7 +1376,8 @@ format_result(const PGresult *res)
                     *p++ = '\n';
                 }
                 /* free memory */
-                PyMem_Free(aligns); PyMem_Free(sizes);
+                PyMem_Free(aligns);
+                PyMem_Free(sizes);
                 /* create the footer */
                 sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
                 /* return the result */
@@ -1273,11 +1386,15 @@ format_result(const PGresult *res)
                 return result;
             }
             else {
-                PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
+                PyMem_Free(aligns);
+                PyMem_Free(sizes);
+                return PyErr_NoMemory();
             }
         }
         else {
-            PyMem_Free(aligns); PyMem_Free(sizes); return PyErr_NoMemory();
+            PyMem_Free(aligns);
+            PyMem_Free(sizes);
+            return PyErr_NoMemory();
         }
     }
     else
@@ -1288,28 +1405,31 @@ format_result(const PGresult *res)
 static const char *
 date_style_to_format(const char *s)
 {
-    static const char *formats[] =
-    {
-        "%Y-%m-%d",  /* 0 = ISO */
-        "%m-%d-%Y",  /* 1 = Postgres, MDY */
-        "%d-%m-%Y",  /* 2 = Postgres, DMY */
-        "%m/%d/%Y",  /* 3 = SQL, MDY */
-        "%d/%m/%Y",  /* 4 = SQL, DMY */
-        "%d.%m.%Y"   /* 5 = German */
+    static const char *formats[] = {
+        "%Y-%m-%d", /* 0 = ISO */
+        "%m-%d-%Y", /* 1 = Postgres, MDY */
+        "%d-%m-%Y", /* 2 = Postgres, DMY */
+        "%m/%d/%Y", /* 3 = SQL, MDY */
+        "%d/%m/%Y", /* 4 = SQL, DMY */
+        "%d.%m.%Y"  /* 5 = German */
     };
 
     switch (s ? *s : 'I') {
         case 'P': /* Postgres */
             s = strchr(s + 1, ',');
-            if (s) do ++s; while (*s && *s == ' ');
+            if (s)
+                do ++s;
+                while (*s && *s == ' ');
             return formats[s && *s == 'D' ? 2 : 1];
         case 'S': /* SQL */
             s = strchr(s + 1, ',');
-            if (s) do ++s; while (*s && *s == ' ');
+            if (s)
+                do ++s;
+                while (*s && *s == ' ');
             return formats[s && *s == 'D' ? 4 : 3];
         case 'G': /* German */
             return formats[5];
-        default: /* ISO */
+        default:               /* ISO */
             return formats[0]; /* ISO is the default */
     }
 }
@@ -1318,14 +1438,13 @@ date_style_to_format(const char *s)
 static const char *
 date_format_to_style(const char *s)
 {
-    static const char *datestyle[] =
-    {
-        "ISO, YMD",         /* 0 = %Y-%m-%d */
-        "Postgres, MDY",    /* 1 = %m-%d-%Y */
-        "Postgres, DMY",    /* 2 = %d-%m-%Y */
-        "SQL, MDY",         /* 3 = %m/%d/%Y */
-        "SQL, DMY",         /* 4 = %d/%m/%Y */
-        "German, DMY"       /* 5 = %d.%m.%Y */
+    static const char *datestyle[] = {
+        "ISO, YMD",      /* 0 = %Y-%m-%d */
+        "Postgres, MDY", /* 1 = %m-%d-%Y */
+        "Postgres, DMY", /* 2 = %d-%m-%Y */
+        "SQL, MDY",      /* 3 = %m/%d/%Y */
+        "SQL, DMY",      /* 4 = %d/%m/%Y */
+        "German, DMY"    /* 5 = %d.%m.%Y */
     };
 
     switch (s ? s[1] : 'Y') {
@@ -1355,7 +1474,7 @@ static void
 notice_receiver(void *arg, const PGresult *res)
 {
     PyGILState_STATE gstate = PyGILState_Ensure();
-    connObject *self = (connObject*) arg;
+    connObject *self = (connObject *)arg;
     PyObject *func = self->notice_receiver;
 
     if (func) {
@@ -1367,7 +1486,7 @@ notice_receiver(void *arg, const PGresult *res)
         }
         else {
             Py_INCREF(Py_None);
-            notice = (noticeObject *)(void *) Py_None;
+            notice = (noticeObject *)(void *)Py_None;
         }
         ret = PyObject_CallFunction(func, "(O)", notice);
         Py_XDECREF(ret);

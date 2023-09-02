@@ -25,7 +25,7 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
     if (!strcmp(name, "pgcnx")) {
         if (self->pgcnx && _check_cnx_obj(self->pgcnx)) {
             Py_INCREF(self->pgcnx);
-            return (PyObject *) self->pgcnx;
+            return (PyObject *)self->pgcnx;
         }
         else {
             Py_INCREF(Py_None);
@@ -54,11 +54,12 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
             return PyUnicode_FromString(s);
         }
         else {
-            Py_INCREF(Py_None); return Py_None;
+            Py_INCREF(Py_None);
+            return Py_None;
         }
     }
 
-    return PyObject_GenericGetAttr((PyObject *) self, nameobj);
+    return PyObject_GenericGetAttr((PyObject *)self, nameobj);
 }
 
 /* Get the list of notice attributes. */
@@ -67,10 +68,9 @@ notice_dir(noticeObject *self, PyObject *noargs)
 {
     PyObject *attrs;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *) self));
-    PyObject_CallMethod(
-        attrs, "extend", "[ssssss]",
-        "pgcnx", "severity", "message", "primary", "detail", "hint");
+    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
+    PyObject_CallMethod(attrs, "extend", "[ssssss]", "pgcnx", "severity",
+                        "message", "primary", "detail", "hint");
 
     return attrs;
 }
@@ -84,41 +84,38 @@ notice_str(noticeObject *self)
 
 /* Notice object methods */
 static struct PyMethodDef notice_methods[] = {
-    {"__dir__", (PyCFunction) notice_dir,  METH_NOARGS, NULL},
-    {NULL, NULL}
-};
+    {"__dir__", (PyCFunction)notice_dir, METH_NOARGS, NULL}, {NULL, NULL}};
 
 static char notice__doc__[] = "PostgreSQL notice object";
 
 /* Notice type definition */
 static PyTypeObject noticeType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "pg.Notice",                    /* tp_name */
-    sizeof(noticeObject),           /* tp_basicsize */
-    0,                              /* tp_itemsize */
+    PyVarObject_HEAD_INIT(NULL, 0) "pg.Notice", /* tp_name */
+    sizeof(noticeObject),                       /* tp_basicsize */
+    0,                                          /* tp_itemsize */
     /* methods */
-    0,                              /* tp_dealloc */
-    0,                              /* tp_print */
-    0,                              /* tp_getattr */
-    0,                              /* tp_setattr */
-    0,                              /* tp_compare */
-    0,                              /* tp_repr */
-    0,                              /* tp_as_number */
-    0,                              /* tp_as_sequence */
-    0,                              /* tp_as_mapping */
-    0,                              /* tp_hash */
-    0,                              /* tp_call */
-    (reprfunc) notice_str,          /* tp_str */
-    (getattrofunc) notice_getattr,  /* tp_getattro */
-    PyObject_GenericSetAttr,        /* tp_setattro */
-    0,                              /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,             /* tp_flags */
-    notice__doc__,                  /* tp_doc */
-    0,                              /* tp_traverse */
-    0,                              /* tp_clear */
-    0,                              /* tp_richcompare */
-    0,                              /* tp_weaklistoffset */
-    0,                              /* tp_iter */
-    0,                              /* tp_iternext */
-    notice_methods,                 /* tp_methods */
+    0,                            /* tp_dealloc */
+    0,                            /* tp_print */
+    0,                            /* tp_getattr */
+    0,                            /* tp_setattr */
+    0,                            /* tp_compare */
+    0,                            /* tp_repr */
+    0,                            /* tp_as_number */
+    0,                            /* tp_as_sequence */
+    0,                            /* tp_as_mapping */
+    0,                            /* tp_hash */
+    0,                            /* tp_call */
+    (reprfunc)notice_str,         /* tp_str */
+    (getattrofunc)notice_getattr, /* tp_getattro */
+    PyObject_GenericSetAttr,      /* tp_setattro */
+    0,                            /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,           /* tp_flags */
+    notice__doc__,                /* tp_doc */
+    0,                            /* tp_traverse */
+    0,                            /* tp_clear */
+    0,                            /* tp_richcompare */
+    0,                            /* tp_weaklistoffset */
+    0,                            /* tp_iter */
+    0,                            /* tp_iternext */
+    notice_methods,               /* tp_methods */
 };

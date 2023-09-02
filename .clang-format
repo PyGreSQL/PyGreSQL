@@ -1,0 +1,25 @@
+# A clang-format style that approximates Python's PEP 7
+# Useful for IDE integration
+#
+# Based on Paul Ganssle's version at
+# https://gist.github.com/pganssle/0e3a5f828b4d07d79447f6ced8e7e4db
+BasedOnStyle: Google
+AlwaysBreakAfterReturnType: All
+AllowShortIfStatementsOnASingleLine: false
+AlignAfterOpenBracket: Align
+AlignTrailingComments: true
+BreakBeforeBraces: Stroustrup
+ColumnLimit: 79
+DerivePointerAlignment: false
+IndentWidth: 4
+Language: Cpp
+PointerAlignment: Right
+ReflowComments: true
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+TabWidth: 4
+UseCRLF: false
+UseTab: Never
+StatementMacros:
+  - Py_BEGIN_ALLOW_THREADS
+  - Py_END_ALLOW_THREADS
