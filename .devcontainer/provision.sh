@@ -35,7 +35,9 @@ python3.9 -m pip install build
 python3.10 -m pip install build
 python3.11 -m pip install build
 
-sudo apt-get install -y tox python3-poetry
+pip install ruff
+
+sudo apt-get install -y tox
 
 # install PostgreSQL client tools
 
