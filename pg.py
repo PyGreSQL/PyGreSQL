@@ -1990,7 +1990,8 @@ class DB:
         try:  # cache lookup
             pkey = pkeys[table]
         except KeyError as e:  # cache miss, check the database
-            q = ("SELECT a.attname, a.attnum, i.indkey"
+            q = ("SELECT"  # noqa: S608
+                 " a.attname, a.attnum, i.indkey"
                  " FROM pg_catalog.pg_index i"
                  " JOIN pg_catalog.pg_attribute a"
                  " ON a.attrelid OPERATOR(pg_catalog.=) i.indrelid"
@@ -2038,7 +2039,8 @@ class DB:
             where.append("s.nspname NOT SIMILAR"
                          " TO 'pg/_%|information/_schema' ESCAPE '/'")
         where = " WHERE " + ' AND '.join(where) if where else ''
-        q = ("SELECT pg_catalog.quote_ident(s.nspname) OPERATOR(pg_catalog.||)"
+        q = ("SELECT"  # noqa: S608
+             " pg_catalog.quote_ident(s.nspname) OPERATOR(pg_catalog.||)"
              " '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.relname)"
              " FROM pg_catalog.pg_class r"
              " JOIN pg_catalog.pg_namespace s"
@@ -2207,7 +2209,7 @@ class DB:
                 row[qoid] = row['oid']
             del row['oid']
         t = self._escape_qualified_name(table)
-        q = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'
+        q = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'  # noqa: S608s
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -2259,7 +2261,8 @@ class DB:
         names, values = ', '.join(names), ', '.join(values)
         ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
-        q = f'INSERT INTO {t} ({names}) VALUES ({values}) RETURNING {ret}'
+        q = (f'INSERT INTO {t} ({names})'  # noqa: S608
+             f' VALUES ({values}) RETURNING {ret}')
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -2322,7 +2325,8 @@ class DB:
         values = ', '.join(values)
         ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
-        q = f'UPDATE {t} SET {values} WHERE {where} RETURNING {ret}'
+        q = (f'UPDATE {t} SET {values}'  # noqa: S608
+             f' WHERE {where} RETURNING {ret}')
         self._do_debug(q, params)
         q = self.db.query(q, params)
         res = q.dictresult()
@@ -2417,7 +2421,8 @@ class DB:
         do = 'update set ' + ', '.join(update) if update else 'nothing'
         ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
-        q = (f'INSERT INTO {t} AS included ({names}) VALUES ({values})'
+        q = (f'INSERT INTO {t} AS included ({names})'  # noqa: S608
+             f' VALUES ({values})'
              f' ON CONFLICT ({target}) DO {do} RETURNING {ret}')
         self._do_debug(q, params)
         q = self.db.query(q, params)
@@ -2499,7 +2504,7 @@ class DB:
                 row[qoid] = row['oid']
             del row['oid']
         t = self._escape_qualified_name(table)
-        q = f'DELETE FROM {t} WHERE {where}'
+        q = f'DELETE FROM {t} WHERE {where}'  # noqa: S608
         self._do_debug(q, params)
         res = self.db.query(q, params)
         return int(res)

@@ -34,7 +34,7 @@ c_sources = ['pgmodule.c']
 
 def pg_config(s):
     """Retrieve information about installed version of PostgreSQL."""
-    f = os.popen(f'pg_config --{s}')
+    f = os.popen(f'pg_config --{s}')  # noqa: S605
     d = f.readline().strip()
     if f.close() is not None:
         raise Exception("pg_config tool is not available.")

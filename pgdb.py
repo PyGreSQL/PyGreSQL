@@ -686,7 +686,7 @@ class TypeCache(dict):
         if not typ.relid:
             return None  # this type is not composite
         self._src.execute(
-            "SELECT attname, atttypid"
+            "SELECT attname, atttypid"  # noqa: S608
             " FROM pg_catalog.pg_attribute"
             f" WHERE attrelid OPERATOR(pg_catalog.=) {typ.relid}"
             " AND attnum OPERATOR(pg_catalog.>) 0"
@@ -1065,7 +1065,7 @@ class Cursor:
         """
         n = len(parameters) if parameters else 0
         s = ','.join(n * ['%s'])
-        query = f'select * from "{procname}"({s})'
+        query = f'select * from "{procname}"({s})'  # noqa: S608
         self.execute(query, parameters)
         return parameters
 
