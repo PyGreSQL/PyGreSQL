@@ -2691,16 +2691,18 @@ class DB:
 
         The parameter 'what' can restrict the query to only return a
         subset of the table columns.  It can be a string, list or a tuple.
+
         The parameter 'where' can restrict the query to only return a
         subset of the table rows.  It can be a string, list or a tuple
-        of SQL expressions that all need to be fulfilled.  The parameter
-        'order' specifies the ordering of the rows.  It can also be a
-        other string, list or a tuple.  If no ordering is specified,
-        the result will be ordered by the primary key(s) or all columns
-        if no primary key exists.  You can set 'order' to False if you
-        don't care about the ordering.  The parameters 'limit' and 'offset'
-        can be integers specifying the maximum number of rows returned
-        and a number of rows skipped over.
+        of SQL expressions that all need to be fulfilled.
+
+        The parameter 'order' specifies the ordering of the rows.  It can
+        also be a string, list or a tuple.  If no ordering is specified,
+        the result will be ordered by the primary key(s) or all columns if
+        no primary key exists.  You can set 'order' to False if you don't
+        care about the ordering.  The parameters 'limit' and 'offset' can be
+        integers specifying the maximum number of rows returned and a number
+        of rows skipped over.
 
         If you set the 'scalar' option to True, then instead of the
         named tuples you will get the first items of these tuples.
