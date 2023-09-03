@@ -13,6 +13,7 @@ import os
 import tempfile
 import unittest
 from contextlib import suppress
+from typing import Any
 
 import pg  # the module under test
 
@@ -105,6 +106,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.assertEqual(r, data)
 
     def test_lo_import(self):
+        f : Any
         if windows:
             # NamedTemporaryFiles don't work well here
             fname = 'temp_test_pg_largeobj_import.txt'
@@ -412,6 +414,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertRaises(TypeError, export)
         self.assertRaises(TypeError, export, 0)
         self.assertRaises(TypeError, export, 'invalid', 0)
+        f: Any
         if windows:
             # NamedTemporaryFiles don't work well here
             fname = 'temp_test_pg_largeobj_export.txt'

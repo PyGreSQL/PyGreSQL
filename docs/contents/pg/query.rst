@@ -336,10 +336,10 @@ listfields -- list field names of query result
     List field names of query result
 
     :returns: field names
-    :rtype: list
+    :rtype: tuple
     :raises TypeError: too many parameters
 
-This method returns the list of field names defined for the query result.
+This method returns the tuple of field names defined for the query result.
 The fields are in the same order as the result values.
 
 fieldname, fieldnum -- field name/number conversion

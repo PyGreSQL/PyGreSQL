@@ -9,10 +9,12 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
+from __future__ import annotations  #
+
 import unittest
 from collections.abc import Iterable
 from contextlib import suppress
-from typing import Sequence, Tuple
+from typing import Sequence
 
 import pgdb  # the module under test
 
@@ -150,7 +152,7 @@ class TestCopy(unittest.TestCase):
         with suppress(Exception):
             self.con.close()
 
-    data: Sequence[Tuple[int, str]] = [
+    data: Sequence[tuple[int, str]] = [
         (1935, 'Luciano Pavarotti'),
         (1941, 'Plácido Domingo'),
         (1946, 'José Carreras')]

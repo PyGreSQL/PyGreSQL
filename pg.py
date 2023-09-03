@@ -20,9 +20,11 @@ This is known as the "classic" ("old style") PyGreSQL interface.
 For a DB-API 2 compliant interface use the newer pgdb module.
 """
 
+from __future__ import annotations
+
 import select
 import weakref
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -34,7 +36,18 @@ from math import isinf, isnan
 from operator import itemgetter
 from re import compile as regex
 from types import MappingProxyType
-from typing import Callable, ClassVar, Dict, List, Mapping, Type, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Generator,
+    Iterator,
+    List,
+    Mapping,
+    NamedTuple,
+    Sequence,
+    TypeVar,
+)
 from uuid import UUID
 
 try:
@@ -49,15 +62,16 @@ except ImportError as e:  # noqa: F841
                  if os.path.exists(os.path.join(path, libpq))]
         if sys.version_info >= (3, 8):
             # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
+            add_dll_dir = os.add_dll_directory  # type: ignore
             for path in paths:
-                with os.add_dll_directory(os.path.abspath(path)):
+                with add_dll_dir(os.path.abspath(path)):
                     try:
-                        from _pg import version
+                        from _pg import version  # type: ignore
                     except ImportError:
                         pass
                     else:
                         del version
-                        e = None
+                        e = None  # type: ignore
                         break
         if paths:
             libpq = 'compatible ' + libpq
@@ -86,6 +100,7 @@ from _pg import (
     TRANS_INERROR,
     TRANS_INTRANS,
     TRANS_UNKNOWN,
+    Connection,
     DatabaseError,
     DataError,
     Error,
@@ -98,6 +113,7 @@ from _pg import (
     NotSupportedError,
     OperationalError,
     ProgrammingError,
+    Query,
     Warning,
     cast_array,
     cast_hstore,
@@ -148,6 +164,7 @@ __all__ = [
     'InvalidResultError', 'MultipleResultsError',
     'NoResultError', 'NotSupportedError',
     'OperationalError', 'ProgrammingError',
+    'Query',
     'INV_READ', 'INV_WRITE',
     'POLLING_OK', 'POLLING_FAILED', 'POLLING_READING', 'POLLING_WRITING',
     'SEEK_CUR', 'SEEK_END', 'SEEK_SET',
@@ -164,21 +181,24 @@ __all__ = [
     'set_defbase', 'set_defhost', 'set_defopt',
     'set_defpasswd', 'set_defport', 'set_defuser',
     'set_jsondecode', 'set_query_helpers', 'set_typecast',
-    'version', '__version__']
+    'version', '__version__',
+]
 
 # Auxiliary classes and functions that are independent of a DB connection:
 
-def get_args(func):
+def get_args(func: Callable) -> list:
     return list(signature(func).parameters)
 
 
 # time zones used in Postgres timestamptz output
-_timezones = dict(CET='+0100', EET='+0200', EST='-0500',
-                  GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
-                  UCT='+0000', UTC='+0000', WET='+0000')
+_timezones: dict[str, str] = {
+    'CET': '+0100', 'EET': '+0200', 'EST': '-0500',
+    'GMT': '+0000', 'HST': '-1000', 'MET': '+0100', 'MST': '-0700',
+    'UCT': '+0000', 'UTC': '+0000', 'WET': '+0000'
+}
 
 
-def _timezone_as_offset(tz):
+def _timezone_as_offset(tz: str) -> str:
     if tz.startswith(('+', '-')):
         if len(tz) < 5:
             return tz + '00'
@@ -186,7 +206,7 @@ def _timezone_as_offset(tz):
     return _timezones.get(tz, '+0000')
 
 
-def _oid_key(table):
+def _oid_key(table: str) -> str:
     """Build oid key from a table name."""
     return f'oid({table})'
 
@@ -201,7 +221,7 @@ class Hstore(dict):
     _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
 
     @classmethod
-    def _quote(cls, s):
+    def _quote(cls, s: Any) -> str:
         if s is None:
             return 'NULL'
         if not isinstance(s, str):
@@ -213,7 +233,7 @@ class Hstore(dict):
             s = f'"{s}"'
         return s
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Create a printable representation of the hstore value."""
         q = self._quote
         return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
@@ -222,12 +242,12 @@ class Hstore(dict):
 class Json:
     """Wrapper class for marking Json values."""
 
-    def __init__(self, obj, encode=None):
+    def __init__(self, obj: Any, encode: Callable | None = None) -> None:
         """Initialize the JSON object."""
         self.obj = obj
         self.encode = encode or jsonencode
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Create a printable representation of the JSON object."""
         obj = self.obj
         if isinstance(obj, str):
@@ -241,7 +261,7 @@ class _SimpleTypes(dict):
     The corresponding Python types and simple names are also mapped.
     """
 
-    _type_aliases: Mapping[str, List[Union[str, type]]] = MappingProxyType({
+    _type_aliases: Mapping[str, list[str | type]] = MappingProxyType({
         'bool': [bool],
         'bytea': [Bytea],
         'date': ['interval', 'time', 'timetz', 'timestamp', 'timestamptz',
@@ -256,7 +276,7 @@ class _SimpleTypes(dict):
     })
 
     # noinspection PyMissingConstructor
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize type mapping."""
         for typ, keys in self._type_aliases.items():
             keys = [typ, *keys]
@@ -265,24 +285,24 @@ class _SimpleTypes(dict):
                 if isinstance(key, str):
                     self[f'_{key}'] = f'{typ}[]'
                 elif not isinstance(key, tuple):
-                    self[List[key]] = f'{typ}[]'
+                    self[List[key]] = f'{typ}[]'  # type: ignore
 
     @staticmethod
-    def __missing__(key):
+    def __missing__(key: str) -> str:
         """Unmapped types are interpreted as text."""
         return 'text'
 
-    def get_type_dict(self):
+    def get_type_dict(self) -> dict[type, str]:
         """Get a plain dictionary of only the types."""
-        return dict((key, typ) for key, typ in self.items()
-                    if not isinstance(key, (str, tuple)))
+        return {key: typ for key, typ in self.items()
+                if not isinstance(key, (str, tuple))}
 
 
 _simpletypes = _SimpleTypes()
 _simple_type_dict = _simpletypes.get_type_dict()
 
 
-def _quote_if_unqualified(param, name):
+def _quote_if_unqualified(param: str, name: int | str) -> str:
     """Quote parameter representing a qualified name.
 
     Puts a quote_ident() call around the given parameter unless
@@ -300,7 +320,7 @@ class _ParameterList(list):
 
     adapt: Callable
 
-    def add(self, value, typ=None):
+    def add(self, value: Any, typ:Any = None) -> str:
         """Typecast value with known database type and build parameter list.
 
         If this is a literal value, it will be returned as is.  Otherwise, a
@@ -318,29 +338,29 @@ class Literal(str):
     """Wrapper class for marking literal SQL values."""
 
 
-class AttrDict(OrderedDict):
+class AttrDict(dict):
     """Simple read-only ordered dictionary for storing attribute names."""
 
-    def __init__(self, *args, **kw):
+    def __init__(self, *args: Any, **kw: Any) -> None:
         self._read_only = False
-        OrderedDict.__init__(self, *args, **kw)
+        super().__init__(*args, **kw)
         self._read_only = True
         error = self._read_only_error
-        self.clear = self.update = error
-        self.pop = self.setdefault = self.popitem = error
+        self.clear = self.update = error  # type: ignore
+        self.pop = self.setdefault = self.popitem = error  # type: ignore
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         if self._read_only:
             self._read_only_error()
-        OrderedDict.__setitem__(self, key, value)
+        super().__setitem__(key, value)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         if self._read_only:
             self._read_only_error()
-        OrderedDict.__delitem__(self, key)
+        super().__delitem__(key)
 
     @staticmethod
-    def _read_only_error(*args, **kw):
+    def _read_only_error(*_args: Any, **_kw: Any) -> Any:
         raise TypeError('This object is read-only')
 
 
@@ -357,12 +377,12 @@ class Adapter:
     _re_record_quote = regex(r'[(,"\\]')
     _re_array_escape = _re_record_escape = regex(r'(["\\])')
 
-    def __init__(self, db):
+    def __init__(self, db: DB):
         """Initialize the adapter object with the given connection."""
         self.db = weakref.proxy(db)
 
     @classmethod
-    def _adapt_bool(cls, v):
+    def _adapt_bool(cls, v: Any) -> str | None:
         """Adapt a boolean parameter."""
         if isinstance(v, str):
             if not v:
@@ -371,7 +391,7 @@ class Adapter:
         return 't' if v else 'f'
 
     @classmethod
-    def _adapt_date(cls, v):
+    def _adapt_date(cls, v: Any) -> Any:
         """Adapt a date parameter."""
         if not v:
             return None
@@ -380,7 +400,7 @@ class Adapter:
         return v
 
     @staticmethod
-    def _adapt_num(v):
+    def _adapt_num(v: Any) -> Any:
         """Adapt a numeric parameter."""
         if not v and v != 0:
             return None
@@ -388,11 +408,11 @@ class Adapter:
 
     _adapt_int = _adapt_float = _adapt_money = _adapt_num
 
-    def _adapt_bytea(self, v):
+    def _adapt_bytea(self, v: Any) -> str:
         """Adapt a bytea parameter."""
         return self.db.escape_bytea(v)
 
-    def _adapt_json(self, v):
+    def _adapt_json(self, v: Any) -> str | None:
         """Adapt a json parameter."""
         if not v:
             return None
@@ -402,7 +422,7 @@ class Adapter:
             return str(v)
         return self.db.encode_json(v)
 
-    def _adapt_hstore(self, v):
+    def _adapt_hstore(self, v: Any) -> str | None:
         """Adapt a hstore parameter."""
         if not v:
             return None
@@ -414,7 +434,7 @@ class Adapter:
             return str(Hstore(v))
         raise TypeError(f'Hstore parameter {v} has wrong type')
 
-    def _adapt_uuid(self, v):
+    def _adapt_uuid(self, v: Any) -> str | None:
         """Adapt a UUID parameter."""
         if not v:
             return None
@@ -423,7 +443,7 @@ class Adapter:
         return str(v)
 
     @classmethod
-    def _adapt_text_array(cls, v):
+    def _adapt_text_array(cls, v: Any) -> str:
         """Adapt a text type array parameter."""
         if isinstance(v, list):
             adapt = cls._adapt_text_array
@@ -441,7 +461,7 @@ class Adapter:
     _adapt_date_array = _adapt_text_array
 
     @classmethod
-    def _adapt_bool_array(cls, v):
+    def _adapt_bool_array(cls, v: Any) -> str:
         """Adapt a boolean array parameter."""
         if isinstance(v, list):
             adapt = cls._adapt_bool_array
@@ -455,7 +475,7 @@ class Adapter:
         return 't' if v else 'f'
 
     @classmethod
-    def _adapt_num_array(cls, v):
+    def _adapt_num_array(cls, v: Any) -> str:
         """Adapt a numeric array parameter."""
         if isinstance(v, list):
             adapt = cls._adapt_num_array
@@ -467,7 +487,7 @@ class Adapter:
     _adapt_int_array = _adapt_float_array = _adapt_money_array = \
         _adapt_num_array
 
-    def _adapt_bytea_array(self, v):
+    def _adapt_bytea_array(self, v: Any) -> bytes:
         """Adapt a bytea array parameter."""
         if isinstance(v, list):
             return b'{' + b','.join(
@@ -476,7 +496,7 @@ class Adapter:
             return b'null'
         return self.db.escape_bytea(v).replace(b'\\', b'\\\\')
 
-    def _adapt_json_array(self, v):
+    def _adapt_json_array(self, v: Any) -> str:
         """Adapt a json array parameter."""
         if isinstance(v, list):
             adapt = self._adapt_json_array
@@ -490,7 +510,7 @@ class Adapter:
             v = f'"{v}"'
         return v
 
-    def _adapt_record(self, v, typ):
+    def _adapt_record(self, v: Any, typ: Any) -> str:
         """Adapt a record parameter with given type."""
         typ = self.get_attnames(typ).values()
         if len(typ) != len(v):
@@ -516,7 +536,7 @@ class Adapter:
         v = ','.join(value)
         return f'({v})'
 
-    def adapt(self, value, typ=None):
+    def adapt(self, value: Any, typ: Any =  None) -> str:
         """Adapt a value with known database type."""
         if value is not None and not isinstance(value, Literal):
             if typ:
@@ -541,14 +561,14 @@ class Adapter:
         return value
 
     @staticmethod
-    def simple_type(name):
+    def simple_type(name: str) -> DbType:
         """Create a simple database type with given attribute names."""
         typ = DbType(name)
         typ.simple = name
         return typ
 
     @staticmethod
-    def get_simple_name(typ):
+    def get_simple_name(typ: Any) -> str:
         """Get the simple name of a database type."""
         if isinstance(typ, DbType):
             # noinspection PyUnresolvedReferences
@@ -556,14 +576,14 @@ class Adapter:
         return _simpletypes[typ]
 
     @staticmethod
-    def get_attnames(typ):
+    def get_attnames(typ: Any) -> dict[str, dict[str, str]]:
         """Get the attribute names of a composite database type."""
         if isinstance(typ, DbType):
             return typ.attnames
         return {}
 
     @classmethod
-    def guess_simple_type(cls, value):
+    def guess_simple_type(cls, value: Any) -> str | None:
         """Try to guess which database type the given value has."""
         # optimize for most frequent types
         try:
@@ -597,16 +617,17 @@ class Adapter:
             guess = cls.guess_simple_type
 
             # noinspection PyUnusedLocal
-            def get_attnames(self):
-                return AttrDict((str(n + 1), simple_type(guess(v)))
+            def get_attnames(self: DbType) -> AttrDict:
+                return AttrDict((str(n + 1), simple_type(guess(v) or 'text'))
                                 for n, v in enumerate(value))
 
             typ = simple_type('record')
             typ._get_attnames = get_attnames
             return typ
+        return None
 
     @classmethod
-    def guess_simple_base_type(cls, value):
+    def guess_simple_base_type(cls, value: Any) -> str | None:
         """Try to guess the base type of a given array."""
         for v in value:
             if isinstance(v, list):
@@ -615,8 +636,9 @@ class Adapter:
                 typ = cls.guess_simple_type(v)
             if typ:
                 return typ
+        return None
 
-    def adapt_inline(self, value, nested=False):
+    def adapt_inline(self, value: Any, nested: bool=False) -> Any:
         """Adapt a value that is put into the SQL and needs to be quoted."""
         if value is None:
             return 'NULL'
@@ -661,7 +683,7 @@ class Adapter:
             value = self.adapt_inline(value)
         return value
 
-    def parameter_list(self):
+    def parameter_list(self) -> _ParameterList:
         """Return a parameter list for parameters with known database types.
 
         The list has an add(value, typ) method that will build up the
@@ -671,7 +693,11 @@ class Adapter:
         params.adapt = self.adapt
         return params
 
-    def format_query(self, command, values=None, types=None, inline=False):
+    def format_query(self, command: str,
+                     values: list | tuple | dict | None = None,
+                     types: list | tuple | dict | None = None,
+                     inline: bool=False
+                     ) -> tuple[str, _ParameterList]:
         """Format a database query using the given values and types.
 
         The optional types describe the values and must be passed as a list,
@@ -681,15 +707,15 @@ class Adapter:
         If inline is set to True, then parameters will be passed inline
         together with the query string.
         """
+        params = self.parameter_list()
         if not values:
-            return command, []
+            return command, params
         if inline and types:
             raise ValueError('Typed parameters must be sent separately')
-        params = self.parameter_list()
         if isinstance(values, (list, tuple)):
             if inline:
                 adapt = self.adapt_inline
-                literals = [adapt(value) for value in values]
+                seq_literals = [adapt(value) for value in values]
             else:
                 add = params.add
                 if types:
@@ -698,52 +724,51 @@ class Adapter:
                     if (not isinstance(types, (list, tuple))
                             or len(types) != len(values)):
                         raise TypeError('The values and types do not match')
-                    literals = [add(value, typ)
-                                for value, typ in zip(values, types)]
+                    seq_literals = [add(value, typ)
+                                    for value, typ in zip(values, types)]
                 else:
-                    literals = [add(value) for value in values]
-            command %= tuple(literals)
+                    seq_literals = [add(value) for value in values]
+            command %= tuple(seq_literals)
         elif isinstance(values, dict):
             # we want to allow extra keys in the dictionary,
             # so we first must find the values actually used in the command
             used_values = {}
-            literals = dict.fromkeys(values, '')
+            map_literals = dict.fromkeys(values, '')
             for key in values:
-                del literals[key]
+                del map_literals[key]
                 try:
-                    command % literals
+                    command % map_literals
                 except KeyError:
-                    used_values[key] = values[key]
-                literals[key] = ''
-            values = used_values
+                    used_values[key] = values[key]  # pyright: ignore
+                map_literals[key] = ''
             if inline:
                 adapt = self.adapt_inline
-                literals = {key: adapt(value)
-                            for key, value in values.items()}
+                map_literals = {key: adapt(value)
+                            for key, value in used_values.items()}
             else:
                 add = params.add
                 if types:
                     if not isinstance(types, dict):
                         raise TypeError('The values and types do not match')
-                    literals = {key: add(values[key], types.get(key))
-                                for key in sorted(values)}
+                    map_literals = {key: add(used_values[key], types.get(key))
+                                for key in sorted(used_values)}
                 else:
-                    literals = {key: add(values[key])
-                                for key in sorted(values)}
-            command %= literals
+                    map_literals = {key: add(used_values[key])
+                                for key in sorted(used_values)}
+            command %= map_literals
         else:
             raise TypeError('The values must be passed as tuple, list or dict')
         return command, params
 
 
-def cast_bool(value):
+def cast_bool(value: str) -> Any:
     """Cast a boolean value."""
     if not get_bool():
         return value
     return value[0] == 't'
 
 
-def cast_json(value):
+def cast_json(value: str) -> Any:
     """Cast a JSON value."""
     cast = get_jsondecode()
     if not cast:
@@ -751,12 +776,12 @@ def cast_json(value):
     return cast(value)
 
 
-def cast_num(value):
+def cast_num(value: str) -> Any:
     """Cast a numeric value."""
     return (get_decimal() or float)(value)
 
 
-def cast_money(value):
+def cast_money(value: str) -> Any:
     """Cast a money value."""
     point = get_decimal_point()
     if not point:
@@ -768,12 +793,12 @@ def cast_money(value):
     return (get_decimal() or float)(value)
 
 
-def cast_int2vector(value):
+def cast_int2vector(value: str) -> list[int]:
     """Cast an int2vector value."""
     return [int(v) for v in value.split()]
 
 
-def cast_date(value, connection):
+def cast_date(value: str, connection: DB) -> Any:
     """Cast a date value."""
     # The output format depends on the server setting DateStyle.  The default
     # setting ISO and the setting for German are actually unambiguous.  The
@@ -783,93 +808,93 @@ def cast_date(value, connection):
         return date.min
     if value == 'infinity':
         return date.max
-    value = value.split()
-    if value[-1] == 'BC':
+    values = value.split()
+    if values[-1] == 'BC':
         return date.min
-    value = value[0]
+    value = values[0]
     if len(value) > 10:
         return date.max
-    fmt = connection.date_format()
-    return datetime.strptime(value, fmt).date()
+    format = connection.date_format()
+    return datetime.strptime(value, format).date()
 
 
-def cast_time(value):
+def cast_time(value: str) -> Any:
     """Cast a time value."""
-    fmt = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
-    return datetime.strptime(value, fmt).time()
+    format = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
+    return datetime.strptime(value, format).time()
 
 
 _re_timezone = regex('(.*)([+-].*)')
 
 
-def cast_timetz(value):
+def cast_timetz(value: str) -> Any:
     """Cast a timetz value."""
-    tz = _re_timezone.match(value)
-    if tz:
-        value, tz = tz.groups()
+    m = _re_timezone.match(value)
+    if m:
+        value, tz = m.groups()
     else:
         tz = '+0000'
-    fmt = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
+    format = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
     value += _timezone_as_offset(tz)
-    fmt += '%z'
-    return datetime.strptime(value, fmt).timetz()
+    format += '%z'
+    return datetime.strptime(value, format).timetz()
 
 
-def cast_timestamp(value, connection):
+def cast_timestamp(value: str, connection: DB) -> Any:
     """Cast a timestamp value."""
     if value == '-infinity':
         return datetime.min
     if value == 'infinity':
         return datetime.max
-    value = value.split()
-    if value[-1] == 'BC':
+    values = value.split()
+    if values[-1] == 'BC':
         return datetime.min
-    fmt = connection.date_format()
-    if fmt.endswith('-%Y') and len(value) > 2:
-        value = value[1:5]
-        if len(value[3]) > 4:
+    format = connection.date_format()
+    if format.endswith('-%Y') and len(values) > 2:
+        values = values[1:5]
+        if len(values[3]) > 4:
             return datetime.max
-        fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
+        formats = ['%d %b' if format.startswith('%d') else '%b %d',
+                   '%H:%M:%S.%f' if len(values[2]) > 8 else '%H:%M:%S', '%Y']
     else:
-        if len(value[0]) > 10:
+        if len(values[0]) > 10:
             return datetime.max
-        fmt = [fmt, '%H:%M:%S.%f' if len(value[1]) > 8 else '%H:%M:%S']
-    return datetime.strptime(' '.join(value), ' '.join(fmt))
+        formats = [format, '%H:%M:%S.%f' if len(values[1]) > 8 else '%H:%M:%S']
+    return datetime.strptime(' '.join(values), ' '.join(formats))
 
 
-def cast_timestamptz(value, connection):
+def cast_timestamptz(value: str, connection: DB) -> Any:
     """Cast a timestamptz value."""
     if value == '-infinity':
         return datetime.min
     if value == 'infinity':
         return datetime.max
-    value = value.split()
-    if value[-1] == 'BC':
+    values = value.split()
+    if values[-1] == 'BC':
         return datetime.min
-    fmt = connection.date_format()
-    if fmt.endswith('-%Y') and len(value) > 2:
-        value = value[1:]
-        if len(value[3]) > 4:
+    format = connection.date_format()
+    if format.endswith('-%Y') and len(values) > 2:
+        values = values[1:]
+        if len(values[3]) > 4:
             return datetime.max
-        fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
-        value, tz = value[:-1], value[-1]
+        formats = ['%d %b' if format.startswith('%d') else '%b %d',
+                   '%H:%M:%S.%f' if len(values[2]) > 8 else '%H:%M:%S', '%Y']
+        values, tz = values[:-1], values[-1]
     else:
-        if fmt.startswith('%Y-'):
-            tz = _re_timezone.match(value[1])
-            if tz:
-                value[1], tz = tz.groups()
+        if format.startswith('%Y-'):
+            m = _re_timezone.match(values[1])
+            if m:
+                values[1], tz = m.groups()
             else:
                 tz = '+0000'
         else:
-            value, tz = value[:-1], value[-1]
-        if len(value[0]) > 10:
+            values, tz = values[:-1], values[-1]
+        if len(values[0]) > 10:
             return datetime.max
-        fmt = [fmt, '%H:%M:%S.%f' if len(value[1]) > 8 else '%H:%M:%S']
-    value.append(_timezone_as_offset(tz))
-    fmt.append('%z')
-    return datetime.strptime(' '.join(value), ' '.join(fmt))
+        formats = [format, '%H:%M:%S.%f' if len(values[1]) > 8 else '%H:%M:%S']
+    values.append(_timezone_as_offset(tz))
+    formats.append('%z')
+    return datetime.strptime(' '.join(values), ' '.join(formats))
 
 
 _re_interval_sql_standard = regex(
@@ -900,37 +925,37 @@ _re_interval_iso_8601 = regex(
     '(?:([+-])?([0-9]+)(?:\\.([0-9]+))?S)?)?')
 
 
-def cast_interval(value):
+def cast_interval(value: str) -> timedelta:
     """Cast an interval value."""
     # The output format depends on the server setting IntervalStyle, but it's
     # not necessary to consult this setting to parse it.  It's faster to just
     # check all possible formats, and there is no ambiguity here.
     m = _re_interval_iso_8601.match(value)
     if m:
-        m = [d or '0' for d in m.groups()]
-        secs_ago = m.pop(5) == '-'
-        m = [int(d) for d in m]
-        years, mons, days, hours, mins, secs, usecs = m
+        s = [v or '0' for v in m.groups()]
+        secs_ago = s.pop(5) == '-'
+        d = [int(v) for v in s]
+        years, mons, days, hours, mins, secs, usecs = d
         if secs_ago:
             secs = -secs
             usecs = -usecs
     else:
         m = _re_interval_postgres_verbose.match(value)
         if m:
-            m, ago = [d or '0' for d in m.groups()[:8]], m.group(9)
-            secs_ago = m.pop(5) == '-'
-            m = [-int(d) for d in m] if ago else [int(d) for d in m]
-            years, mons, days, hours, mins, secs, usecs = m
+            s, ago = [v or '0' for v in m.groups()[:8]], m.group(9)
+            secs_ago = s.pop(5) == '-'
+            d = [-int(v) for v in s] if ago else [int(v) for v in s]
+            years, mons, days, hours, mins, secs, usecs = d
             if secs_ago:
                 secs = - secs
                 usecs = -usecs
         else:
             m = _re_interval_postgres.match(value)
             if m and any(m.groups()):
-                m = [d or '0' for d in m.groups()]
-                hours_ago = m.pop(3) == '-'
-                m = [int(d) for d in m]
-                years, mons, days, hours, mins, secs, usecs = m
+                s = [v or '0' for v in m.groups()]
+                hours_ago = s.pop(3) == '-'
+                d = [int(v) for v in s]
+                years, mons, days, hours, mins, secs, usecs = d
                 if hours_ago:
                     hours = -hours
                     mins = -mins
@@ -939,11 +964,11 @@ def cast_interval(value):
             else:
                 m = _re_interval_sql_standard.match(value)
                 if m and any(m.groups()):
-                    m = [d or '0' for d in m.groups()]
-                    years_ago = m.pop(0) == '-'
-                    hours_ago = m.pop(3) == '-'
-                    m = [int(d) for d in m]
-                    years, mons, days, hours, mins, secs, usecs = m
+                    s = [v or '0' for v in m.groups()]
+                    years_ago = s.pop(0) == '-'
+                    hours_ago = s.pop(3) == '-'
+                    d = [int(v) for v in s]
+                    years, mons, days, hours, mins, secs, usecs = d
                     if years_ago:
                         years = -years
                         mons = -mons
@@ -973,7 +998,7 @@ class Typecasts(dict):
 
     # the default cast functions
     # (str functions are ignored but have been added for faster access)
-    defaults: ClassVar[Dict[str, Type]] = {
+    defaults: ClassVar[dict[str, Callable]] = {
         'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
@@ -985,11 +1010,11 @@ class Typecasts(dict):
         'time': cast_time, 'timetz': cast_timetz,
         'timestamp': cast_timestamp, 'timestamptz': cast_timestamptz,
         'int2vector': cast_int2vector, 'uuid': UUID,
-        'anyarray': cast_array, 'record': cast_record}
+        'anyarray': cast_array, 'record': cast_record}  # pyright: ignore
 
-    connection = None  # will be set in a connection specific instance
+    connection: DB | None = None  # set in a connection specific instance
 
-    def __missing__(self, typ):
+    def __missing__(self, typ: Any) -> Callable | None:
         """Create a cast function if it is not cached.
 
         Note that this class never raises a KeyError,
@@ -997,7 +1022,7 @@ class Typecasts(dict):
         """
         if not isinstance(typ, str):
             raise TypeError(f'Invalid type: {typ}')
-        cast = self.defaults.get(typ)
+        cast: Callable | None = self.defaults.get(typ)
         if cast:
             # store default for faster access
             cast = self._add_connection(cast)
@@ -1016,7 +1041,7 @@ class Typecasts(dict):
         return cast
 
     @staticmethod
-    def _needs_connection(func):
+    def _needs_connection(func: Callable) -> bool:
         """Check if a typecast function needs a connection argument."""
         try:
             args = get_args(func)
@@ -1025,17 +1050,17 @@ class Typecasts(dict):
         else:
             return 'connection' in args[1:]
 
-    def _add_connection(self, cast):
+    def _add_connection(self, cast: Callable) -> Callable:
         """Add a connection argument to the typecast function if necessary."""
         if not self.connection or not self._needs_connection(cast):
             return cast
         return partial(cast, connection=self.connection)
 
-    def get(self, typ, default=None):
+    def get(self, typ: Any, default: Any = None) -> Any:
         """Get the typecast function for the given database type."""
         return self[typ] or default
 
-    def set(self, typ, cast):
+    def set(self, typ: Any, cast: Callable) -> None:
         """Set a typecast function for the specified database type(s)."""
         if isinstance(typ, str):
             typ = [typ]
@@ -1050,7 +1075,7 @@ class Typecasts(dict):
                 self[t] = self._add_connection(cast)
                 self.pop(f'_{t}', None)
 
-    def reset(self, typ=None):
+    def reset(self, typ: Any = None) -> None:
         """Reset the typecasts for the specified type(s) to their defaults.
 
         When no type is specified, all typecasts will be reset.
@@ -1064,12 +1089,12 @@ class Typecasts(dict):
                 self.pop(t, None)
 
     @classmethod
-    def get_default(cls, typ):
+    def get_default(cls, typ: Any) -> Any:
         """Get the default typecast function for the given database type."""
         return cls.defaults.get(typ)
 
     @classmethod
-    def set_default(cls, typ, cast):
+    def set_default(cls, typ: Any, cast: Callable | None) -> None:
         """Set a default typecast function for the given database type(s)."""
         if isinstance(typ, str):
             typ = [typ]
@@ -1086,46 +1111,47 @@ class Typecasts(dict):
                 defaults.pop(f'_{t}', None)
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_attnames(self, typ):
+    def get_attnames(self, typ: Any) -> AttrDict:
         """Return the fields for the given record type.
 
         This method will be replaced with the get_attnames() method of DbTypes.
         """
-        return {}
+        return AttrDict()
 
     # noinspection PyMethodMayBeStatic
-    def dateformat(self):
+    def dateformat(self) -> str:
         """Return the current date format.
 
         This method will be replaced with the dateformat() method of DbTypes.
         """
         return '%Y-%m-%d'
 
-    def create_array_cast(self, basecast):
+    def create_array_cast(self, basecast: Callable) -> Callable:
         """Create an array typecast for the given base cast."""
         cast_array = self['anyarray']
 
-        def cast(v):
+        def cast(v: Any) -> Callable:
             return cast_array(v, basecast)
         return cast
 
-    def create_record_cast(self, name, fields, casts):
+    def create_record_cast(self, name: str, fields: AttrDict,
+                           casts: list[Callable]) -> Callable:
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
-        record = namedtuple(name, fields)
+        record = namedtuple(name, fields)  # type: ignore
 
-        def cast(v):
+        def cast(v: Any) -> record:
             # noinspection PyArgumentList
             return record(*cast_record(v, casts))
         return cast
 
 
-def get_typecast(typ):
+def get_typecast(typ: Any) -> Callable | None:
     """Get the global typecast function for the given database type(s)."""
     return Typecasts.get_default(typ)
 
 
-def set_typecast(typ, cast):
+def set_typecast(typ: Any, cast: Callable | None) -> None:
     """Set a global typecast function for the given database type(s).
 
     Note that connections cache cast functions. To be sure a global change
@@ -1161,10 +1187,10 @@ class DbType(str):
     delim: str
     relid: int
     
-    _get_attnames: Callable
+    _get_attnames: Callable[[DbType], AttrDict]
 
     @property
-    def attnames(self):
+    def attnames(self) -> AttrDict:
         """Get names and types of the fields of a composite type."""
         # noinspection PyUnresolvedReferences
         return self._get_attnames(self)
@@ -1180,13 +1206,13 @@ class DbTypes(dict):
     _num_types = frozenset('int float num money int2 int4 int8'
                            ' float4 float8 numeric money'.split())
 
-    def __init__(self, db):
+    def __init__(self, db: DB) -> None:
         """Initialize type cache for connection."""
         super().__init__()
         self._db = weakref.proxy(db)
         self._regtypes = False
         self._typecasts = Typecasts()
-        self._typecasts.get_attnames = self.get_attnames
+        self._typecasts.get_attnames = self.get_attnames  # type: ignore
         self._typecasts.connection = self._db
         self._query_pg_type = (
             "SELECT oid, typname, oid::pg_catalog.regtype,"
@@ -1194,8 +1220,9 @@ class DbTypes(dict):
             " FROM pg_catalog.pg_type"
             " WHERE oid OPERATOR(pg_catalog.=) {}::pg_catalog.regtype")
 
-    def add(self, oid, pgtype, regtype,
-            typlen, typtype, category, delim, relid):
+    def add(self, oid: int, pgtype: str, regtype: str,
+            typlen: int, typtype: str, category: str, delim: str, relid: int
+            ) -> DbType:
         """Create a PostgreSQL type name with additional info."""
         if oid in self:
             return self[oid]
@@ -1210,14 +1237,14 @@ class DbTypes(dict):
         typ.category = category
         typ.delim = delim
         typ.relid = relid
-        typ._get_attnames = self.get_attnames
+        typ._get_attnames = self.get_attnames  # type: ignore
         return typ
 
-    def __missing__(self, key):
+    def __missing__(self, key: int | str) -> DbType:
         """Get the type info from the database if it is not cached."""
         try:
-            q = self._query_pg_type.format(_quote_if_unqualified('$1', key))
-            res = self._db.query(q, (key,)).getresult()
+            cmd = self._query_pg_type.format(_quote_if_unqualified('$1', key))
+            res = self._db.query(cmd, (key,)).getresult()
         except ProgrammingError:
             res = None
         if not res:
@@ -1227,14 +1254,14 @@ class DbTypes(dict):
         self[typ.oid] = self[typ.pgtype] = typ
         return typ
 
-    def get(self, key, default=None):
+    def get(self, key: int | str, default: Any = None) -> Any:
         """Get the type even if it is not cached."""
         try:
             return self[key]
         except KeyError:
             return default
 
-    def get_attnames(self, typ):
+    def get_attnames(self, typ: Any) -> AttrDict | None:
         """Get names and types of the fields of a composite type."""
         if not isinstance(typ, DbType):
             typ = self.get(typ)
@@ -1244,19 +1271,19 @@ class DbTypes(dict):
             return None
         return self._db.get_attnames(typ.relid, with_oid=False)
 
-    def get_typecast(self, typ):
+    def get_typecast(self, typ: Any) -> Callable:
         """Get the typecast function for the given database type."""
         return self._typecasts.get(typ)
 
-    def set_typecast(self, typ, cast):
+    def set_typecast(self, typ: Any, cast: Callable) -> None:
         """Set a typecast function for the specified database type(s)."""
         self._typecasts.set(typ, cast)
 
-    def reset_typecast(self, typ=None):
+    def reset_typecast(self, typ: Any = None) -> None:
         """Reset the typecast function for the specified database type(s)."""
         self._typecasts.reset(typ)
 
-    def typecast(self, value, typ):
+    def typecast(self, value: Any, typ: Any) -> Callable | None:
         """Cast the given value according to the given database type."""
         if value is None:
             # for NULL values, no typecast is necessary
@@ -1272,25 +1299,22 @@ class DbTypes(dict):
         return cast(value)
 
 
-_re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
-
-
 # The result rows for database operations are returned as named tuples
 # by default. Since creating namedtuple classes is a somewhat expensive
 # operation, we cache up to 1024 of these classes by default.
 
 # noinspection PyUnresolvedReferences
 @lru_cache(maxsize=1024)
-def _row_factory(names):
+def _row_factory(names: Sequence[str]) -> Callable[[Sequence], NamedTuple]:
     """Get a namedtuple factory for row results with the given names."""
     try:
-        return namedtuple('Row', names, rename=True)._make
+        return namedtuple('Row', names, rename=True)._make  # type: ignore
     except ValueError:  # there is still a problem with the field names
         names = [f'column_{n}' for n in range(len(names))]
-        return namedtuple('Row', names)._make
+        return namedtuple('Row', names)._make  # type: ignore
 
 
-def set_row_factory_size(maxsize):
+def set_row_factory_size(maxsize: int | None) -> None:
     """Change the size of the namedtuple factory cache.
 
     If maxsize is set to None, the cache can grow without bound.
@@ -1302,26 +1326,26 @@ def set_row_factory_size(maxsize):
 
 # Helper functions used by the query object
 
-def _dictiter(q):
+def _dictiter(q: Query) -> Generator[dict[str, Any], None, None]:
     """Get query result as an iterator of dictionaries."""
-    fields = q.listfields()
+    fields: tuple[str, ...] = q.listfields()
     for r in q:
         yield dict(zip(fields, r))
 
 
-def _namediter(q):
+def _namediter(q: Query) -> Generator[NamedTuple, None, None]:
     """Get query result as an iterator of named tuples."""
     row = _row_factory(q.listfields())
     for r in q:
         yield row(r)
 
 
-def _namednext(q):
+def _namednext(q: Query) -> NamedTuple:
     """Get next row from query result as a named tuple."""
     return _row_factory(q.listfields())(next(q))
 
 
-def _scalariter(q):
+def _scalariter(q: Query) -> Generator[Any, None, None]:
     """Get query result as an iterator of scalar values."""
     for r in q:
         yield r[0]
@@ -1330,36 +1354,41 @@ def _scalariter(q):
 class _MemoryQuery:
     """Class that embodies a given query result."""
 
-    def __init__(self, result, fields):
+    result: Any
+    fields: tuple[str, ...]
+
+    def __init__(self, result: Any, fields: Sequence[str]) -> None:
         """Create query from given result rows and field names."""
         self.result = result
         self.fields = tuple(fields)
 
-    def listfields(self):
+    def listfields(self) -> tuple[str, ...]:
         """Return the stored field names of this query."""
         return self.fields
 
-    def getresult(self):
+    def getresult(self) -> Any:
         """Return the stored result of this query."""
         return self.result
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(self.result)
 
 
-def _db_error(msg, cls=DatabaseError):
+E = TypeVar('E', bound=DatabaseError)
+
+def _db_error(msg: str, cls:type[E] = DatabaseError) -> type[E]:
     """Return DatabaseError with empty sqlstate attribute."""
     error = cls(msg)
     error.sqlstate = None
     return error
 
 
-def _int_error(msg):
+def _int_error(msg: str) -> InternalError:
     """Return InternalError."""
     return _db_error(msg, InternalError)
 
 
-def _prg_error(msg):
+def _prg_error(msg: str) -> ProgrammingError:
     """Return ProgrammingError."""
     return _db_error(msg, ProgrammingError)
 
@@ -1376,8 +1405,10 @@ set_query_helpers(_dictiter, _namediter, _namednext, _scalariter)
 class NotificationHandler:
     """A PostgreSQL client-side asynchronous notification handler."""
 
-    def __init__(self, db, event, callback=None,
-                 arg_dict=None, timeout=None, stop_event=None):
+    def __init__(self, db: DB, event: str, callback: Callable,
+                 arg_dict: dict | None = None,
+                 timeout: int | float | None = None,
+                 stop_event: str | None = None):
         """Initialize the notification handler.
 
         You must pass a PyGreSQL database connection, the name of an
@@ -1395,7 +1426,7 @@ class NotificationHandler:
         the handler to stop listening as stop_event. By default, it will
         be the event name prefixed with 'stop_'.
         """
-        self.db = db
+        self.db: DB | None = db
         self.event = event
         self.stop_event = stop_event or f'stop_{event}'
         self.listening = False
@@ -1405,32 +1436,35 @@ class NotificationHandler:
         self.arg_dict = arg_dict
         self.timeout = timeout
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Delete the notification handler."""
         self.unlisten()
 
-    def close(self):
+    def close(self) -> None:
         """Stop listening and close the connection."""
         if self.db:
             self.unlisten()
             self.db.close()
             self.db = None
 
-    def listen(self):
+    def listen(self) -> None:
         """Start listening for the event and the stop event."""
-        if not self.listening:
-            self.db.query(f'listen "{self.event}"')
-            self.db.query(f'listen "{self.stop_event}"')
+        db = self.db
+        if db and not self.listening:
+            db.query(f'listen "{self.event}"')
+            db.query(f'listen "{self.stop_event}"')
             self.listening = True
 
-    def unlisten(self):
+    def unlisten(self) -> None:
         """Stop listening for the event and the stop event."""
-        if self.listening:
-            self.db.query(f'unlisten "{self.event}"')
-            self.db.query(f'unlisten "{self.stop_event}"')
+        db = self.db
+        if db and self.listening:
+            db.query(f'unlisten "{self.event}"')
+            db.query(f'unlisten "{self.stop_event}"')
             self.listening = False
 
-    def notify(self, db=None, stop=False, payload=None):
+    def notify(self, db: DB | None = None, stop: bool = False,
+               payload: str | None = None) -> None:
         """Generate a notification.
 
         Optionally, you can pass a payload with the notification.
@@ -1445,13 +1479,15 @@ class NotificationHandler:
         if self.listening:
             if not db:
                 db = self.db
+                if not db:
+                    return
             event = self.stop_event if stop else self.event
-            q = f'notify "{event}"'
+            cmd = f'notify "{event}"'
             if payload:
-                q += f", '{payload}'"
-            return db.query(q)
+                cmd += f", '{payload}'"
+            return db.query(cmd)
 
-    def __call__(self):
+    def __call__(self) -> None:
         """Invoke the notification handler.
 
         The handler is a loop that listens for notifications on the event
@@ -1469,14 +1505,15 @@ class NotificationHandler:
         Note: If you run this loop in another thread, don't use the same
         database connection for database operations in the main thread.
         """
+        if not self.db:
+            return
         self.listen()
         poll = self.timeout == 0
-        if not poll:
-            rlist = [self.db.fileno()]
-        while self.listening:
+        rlist = [] if poll else [self.db.fileno()]
+        while self.db and self.listening:
             # noinspection PyUnboundLocalVariable
             if poll or select.select(rlist, [], [], self.timeout)[0]:
-                while self.listening:
+                while self.db and self.listening:
                     notice = self.db.getnotify()
                     if not notice:  # no more messages
                         break
@@ -1503,9 +1540,9 @@ class NotificationHandler:
 class DB:
     """Wrapper class for the _pg connection type."""
 
-    db = None  # invalid fallback for underlying connection
+    db: Connection | None = None  # invalid fallback for underlying connection
 
-    def __init__(self, *args, **kw):
+    def __init__(self, *args: Any, **kw: Any) -> None:
         """Create a new connection.
 
         You can pass either the connection parameters or an existing
@@ -1535,10 +1572,10 @@ class DB:
         self.db = db
         self.dbname = db.db
         self._regtypes = False
-        self._attnames = {}
-        self._generated = {}
-        self._pkeys = {}
-        self._privileges = {}
+        self._attnames: dict[str, AttrDict] = {}
+        self._generated: dict[str, frozenset[str]] = {}
+        self._pkeys: dict[str, str | tuple[str, ...]] = {}
+        self._privileges: dict[tuple[str, str], bool] = {}
         self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
         self._query_attnames = (
@@ -1566,9 +1603,9 @@ class DB:
         # * to a file object to write debug statements or
         # * to a callable object which takes a string argument
         # * to any other true value to just print debug statements
-        self.debug = None
+        self.debug: Any = None
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         """Get the specified attritbute of the connection."""
         # All undefined members are same as in underlying connection:
         if self.db:
@@ -1576,7 +1613,7 @@ class DB:
         else:
             raise _int_error('Connection is not valid')
 
-    def __dir__(self):
+    def __dir__(self) -> list[str]:
         """List all attributes of the connection."""
         # Custom dir function including the attributes of the connection:
         attrs = set(self.__class__.__dict__)
@@ -1586,19 +1623,20 @@ class DB:
 
     # Context manager methods
 
-    def __enter__(self):
+    def __enter__(self) -> DB:
         """Enter the runtime context. This will start a transaction."""
         self.begin()
         return self
 
-    def __exit__(self, et, ev, tb):
+    def __exit__(self, et: type[BaseException] | None,
+                 ev: BaseException | None, tb: Any) -> None:
         """Exit the runtime context. This will end the transaction."""
         if et is None and ev is None and tb is None:
             self.commit()
         else:
             self.rollback()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Delete the connection."""
         try:
             db = self.db
@@ -1613,7 +1651,7 @@ class DB:
 
     # Auxiliary methods
 
-    def _do_debug(self, *args):
+    def _do_debug(self, *args: Any) -> None:
         """Print a debug message."""
         if self.debug:
             s = '\n'.join(str(arg) for arg in args)
@@ -1627,7 +1665,7 @@ class DB:
             else:
                 print(s)
 
-    def _escape_qualified_name(self, s):
+    def _escape_qualified_name(self, s: str) -> str:
         """Escape a qualified name.
 
         Escapes the name for use as an SQL identifier, unless the
@@ -1640,14 +1678,22 @@ class DB:
         return s
 
     @staticmethod
-    def _make_bool(d):
+    def _make_bool(d: Any) -> bool | str:
         """Get boolean value corresponding to d."""
         return bool(d) if get_bool() else ('t' if d else 'f')
 
     @staticmethod
-    def _list_params(params):
+    def _list_params(params: Sequence) -> str:
         """Create a human readable parameter list."""
         return ', '.join(f'${n}={v!r}' for n, v in enumerate(params, 1))
+
+    @property
+    def _valid_db(self) -> Connection:
+        """Get underlying connection and make sure it is not closed."""
+        db = self.db
+        if not db:
+            raise _int_error('Connection already closed')
+        return db
 
     # Public methods
 
@@ -1656,46 +1702,38 @@ class DB:
     unescape_bytea = staticmethod(unescape_bytea)
 
     @staticmethod
-    def decode_json(s):
+    def decode_json(s: str) -> Any:
         """Decode a JSON string coming from the database."""
         return (get_jsondecode() or jsondecode)(s)
 
     @staticmethod
-    def encode_json(d):
+    def encode_json(d: Any) -> str:
         """Encode a JSON string for use within SQL."""
         return jsonencode(d)
 
-    def close(self):
+    def close(self) -> None:
         """Close the database connection."""
         # Wraps shared library function so we can track state.
-        db = self.db
-        if db:
-            with suppress(TypeError):  # when already closed
-                db.set_cast_hook(None)
-            if self._closeable:
-                db.close()
-            self.db = None
-        else:
-            raise _int_error('Connection already closed')
+        db = self._valid_db
+        with suppress(TypeError):  # when already closed
+            db.set_cast_hook(None)
+        if self._closeable:
+            db.close()
+        self.db = None
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset connection with current parameters.
 
         All derived queries and large objects derived from this connection
         will not be usable after this call.
+        """            
+        self._valid_db.reset()
 
-        """
-        if self.db:
-            self.db.reset()
-        else:
-            raise _int_error('Connection already closed')
-
-    def reopen(self):
+    def reopen(self) -> None:
         """Reopen connection to the database.
 
         Used in case we need another connection to the same database.
         Note that we can still reopen a database that we have closed.
-
         """
         # There is no such shared library function.
         if self._closeable:
@@ -1708,7 +1746,7 @@ class DB:
         else:
             self.db = self._db_args
 
-    def begin(self, mode=None):
+    def begin(self, mode: str | None = None) -> None:
         """Begin a transaction."""
         qstr = 'BEGIN'
         if mode:
@@ -1717,13 +1755,13 @@ class DB:
 
     start = begin
 
-    def commit(self):
+    def commit(self) -> None:
         """Commit the current transaction."""
         return self.query('COMMIT')
 
     end = commit
 
-    def rollback(self, name=None):
+    def rollback(self, name: str | None = None) -> None:
         """Roll back the current transaction."""
         qstr = 'ROLLBACK'
         if name:
@@ -1732,15 +1770,18 @@ class DB:
 
     abort = rollback
 
-    def savepoint(self, name):
+    def savepoint(self, name: str) -> None:
         """Define a new savepoint within the current transaction."""
         return self.query('SAVEPOINT ' + name)
 
-    def release(self, name):
+    def release(self, name: str) -> None:
         """Destroy a previously defined savepoint."""
         return self.query('RELEASE ' + name)
 
-    def get_parameter(self, parameter):
+    def get_parameter(self,
+                      parameter: str | list[str] | tuple[str, ...] |
+                      set[str] | frozenset[str] | dict[str, Any]
+                      ) -> str | list[str] | dict[str, str]:
         """Get the value of a run-time parameter.
 
         If the parameter is a string, the return value will also be a string
@@ -1757,6 +1798,7 @@ class DB:
         By passing the special name 'all' as the parameter, you can get a dict
         of all existing configuration parameters.
         """
+        values: Any
         if isinstance(parameter, str):
             parameter = [parameter]
             values = None
@@ -1771,25 +1813,26 @@ class DB:
                 'The parameter must be a string, list, set or dict')
         if not parameter:
             raise TypeError('No parameter has been specified')
-        params = {} if isinstance(values, dict) else []
-        for key in parameter:
-            param = key.strip().lower() if isinstance(
-                key, (bytes, str)) else None
+        query = self._valid_db.query
+        params: Any = {} if isinstance(values, dict) else []
+        for param_key in parameter:
+            param = param_key.strip().lower() if isinstance(
+                param_key, (bytes, str)) else None
             if not param:
                 raise TypeError('Invalid parameter')
             if param == 'all':
-                q = 'SHOW ALL'
-                values = self.db.query(q).getresult()
+                cmd = 'SHOW ALL'
+                values = query(cmd).getresult()
                 values = {value[0]: value[1] for value in values}
                 break
-            if isinstance(values, dict):
-                params[param] = key
+            if isinstance(params, dict):
+                params[param] = param_key
             else:
                 params.append(param)
         else:
             for param in params:
-                q = f'SHOW {param}'
-                value = self.db.query(q).singlescalar()
+                cmd = f'SHOW {param}'
+                value = query(cmd).singlescalar()
                 if values is None:
                     values = value
                 elif isinstance(values, list):
@@ -1798,7 +1841,12 @@ class DB:
                     values[params[param]] = value
         return values
 
-    def set_parameter(self, parameter, value=None, local=False):
+    def set_parameter(self,
+                      parameter: str | list[str] | tuple[str, ...] |
+                      set[str] | frozenset[str] | dict[str, Any],
+                      value: str | list[str] | tuple[str, ...] |
+                      set[str] | frozenset[str]| None = None,
+                      local: bool = False) -> None:
         """Set the value of a run-time parameter.
 
         If the parameter and the value are strings, the run-time parameter
@@ -1833,7 +1881,7 @@ class DB:
             if isinstance(value, (list, tuple, set, frozenset)):
                 value = set(value)
                 if len(value) == 1:
-                    value = value.pop()
+                    value = next(iter(value))
             if not (value is None or isinstance(value, str)):
                 raise ValueError(
                     'A single value must be specified'
@@ -1849,30 +1897,28 @@ class DB:
                 'The parameter must be a string, list, set or dict')
         if not parameter:
             raise TypeError('No parameter has been specified')
-        params = {}
-        for key, value in parameter.items():
-            param = key.strip().lower() if isinstance(
-                key, str) else None
+        params: dict[str, str | None] = {}
+        for param, param_value in parameter.items():
+            param = param.strip().lower() if isinstance(param, str) else None
             if not param:
                 raise TypeError('Invalid parameter')
             if param == 'all':
-                if value is not None:
+                if param_value is not None:
                     raise ValueError(
-                        'A value must ot be specified'
+                        'A value must not be specified'
                         " when parameter is 'all'")
                 params = {'all': None}
                 break
-            params[param] = value
-        local = ' LOCAL' if local else ''
-        for param, value in params.items():
-            if value is None:
-                q = f'RESET{local} {param}'
-            else:
-                q = f'SET{local} {param} TO {value}'
-            self._do_debug(q)
-            self.db.query(q)
+            params[param] = param_value
+        local_clause = ' LOCAL' if local else ''
+        for param, param_value in params.items():
+            cmd = (f'RESET{local_clause} {param}'
+                   if param_value is None else
+                   f'SET{local_clause} {param} TO {param_value}')
+            self._do_debug(cmd)
+            self._valid_db.query(cmd)
 
-    def query(self, command, *args):
+    def query(self, command: str, *args: Any) -> Query:
         """Execute a SQL command string.
 
         This method simply sends a SQL query to the database.  If the query is
@@ -1892,16 +1938,17 @@ class DB:
         values can also be given as a single list or tuple argument.
         """
         # Wraps shared library function for debugging.
-        if not self.db:
-            raise _int_error('Connection is not valid')
+        db = self._valid_db
         if args:
             self._do_debug(command, args)
-            return self.db.query(command, args)
+            return db.query(command, args)
         self._do_debug(command)
-        return self.db.query(command)
+        return db.query(command)
 
-    def query_formatted(self, command,
-                        parameters=None, types=None, inline=False):
+    def query_formatted(self, command: str,
+                        parameters: tuple | list | dict | None = None,
+                        types: tuple | list | dict | None = None,
+                        inline: bool =False) -> Query:
         """Execute a formatted SQL command string.
 
         Similar to query, but using Python format placeholders of the form
@@ -1916,24 +1963,23 @@ class DB:
         return self.query(*self.adapter.format_query(
             command, parameters, types, inline))
 
-    def query_prepared(self, name, *args):
+    def query_prepared(self, name: str, *args: Any) -> Query:
         """Execute a prepared SQL statement.
 
         This works like the query() method, except that instead of passing
         the SQL command, you pass the name of a prepared statement.  If you
         pass an empty name, the unnamed statement will be executed.
         """
-        if not self.db:
-            raise _int_error('Connection is not valid')
         if name is None:
             name = ''
+        db = self._valid_db
         if args:
             self._do_debug('EXECUTE', name, args)
-            return self.db.query_prepared(name, args)
+            return db.query_prepared(name, args)
         self._do_debug('EXECUTE', name)
-        return self.db.query_prepared(name)
+        return db.query_prepared(name)
 
-    def prepare(self, name, command):
+    def prepare(self, name: str, command: str) -> Query:
         """Create a prepared SQL statement.
 
         This creates a prepared statement for the given command with the
@@ -1946,14 +1992,12 @@ class DB:
         named queries, since unnamed queries have a limited lifetime and
         can be automatically replaced or destroyed by various operations.
         """
-        if not self.db:
-            raise _int_error('Connection is not valid')
         if name is None:
             name = ''
         self._do_debug('prepare', name, command)
-        return self.db.prepare(name, command)
+        return self._valid_db.prepare(name, command)
 
-    def describe_prepared(self, name=None):
+    def describe_prepared(self, name: str | None = None) -> Query:
         """Describe a prepared SQL statement.
 
         This method returns a Query object describing the result columns of
@@ -1962,9 +2006,9 @@ class DB:
         """
         if name is None:
             name = ''
-        return self.db.describe_prepared(name)
+        return self._valid_db.describe_prepared(name)
 
-    def delete_prepared(self, name=None):
+    def delete_prepared(self, name: str | None = None) -> Query:
         """Delete a prepared SQL statement.
 
         This deallocates a previously prepared SQL statement with the given
@@ -1974,12 +2018,13 @@ class DB:
         """
         if not name:
             name = 'ALL'
-        q = f"DEALLOCATE {name}"
-        self._do_debug(q)
-        return self.db.query(q)
+        cmd = f"DEALLOCATE {name}"
+        self._do_debug(cmd)
+        return self._valid_db.query(cmd)
 
-    def pkey(self, table, composite=False, flush=False):
-        """Get or set the primary key of a table.
+    def pkey(self, table: str, composite: bool = False, flush: bool = False
+             ) -> str | tuple[str, ...]:
+        """Get the primary key of a table.
 
         Single primary keys are returned as strings unless you
         set the composite flag.  Composite primary keys are always
@@ -1997,26 +2042,26 @@ class DB:
         try:  # cache lookup
             pkey = pkeys[table]
         except KeyError as e:  # cache miss, check the database
-            q = ("SELECT"  # noqa: S608
-                 " a.attname, a.attnum, i.indkey"
-                 " FROM pg_catalog.pg_index i"
-                 " JOIN pg_catalog.pg_attribute a"
-                 " ON a.attrelid OPERATOR(pg_catalog.=) i.indrelid"
-                 " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
-                 " AND NOT a.attisdropped"
-                 " WHERE i.indrelid OPERATOR(pg_catalog.=)"
-                 " {}::pg_catalog.regclass"
-                 " AND i.indisprimary ORDER BY a.attnum").format(
-                _quote_if_unqualified('$1', table))
-            pkey = self.db.query(q, (table,)).getresult()
+            cmd = ("SELECT"  # noqa: S608
+                   " a.attname, a.attnum, i.indkey"
+                   " FROM pg_catalog.pg_index i"
+                   " JOIN pg_catalog.pg_attribute a"
+                   " ON a.attrelid OPERATOR(pg_catalog.=) i.indrelid"
+                   " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
+                   " AND NOT a.attisdropped"
+                   " WHERE i.indrelid OPERATOR(pg_catalog.=)"
+                   " {}::pg_catalog.regclass"
+                   " AND i.indisprimary ORDER BY a.attnum").format(
+                  _quote_if_unqualified('$1', table))
+            pkey = self._valid_db.query(cmd, (table,)).getresult()
             if not pkey:
                 raise KeyError(f'Table {table} has no primary key') from e
             # we want to use the order defined in the primary key index here,
             # not the order as defined by the columns in the table
             if len(pkey) > 1:
                 indkey = pkey[0][2]
-                pkey = sorted(pkey, key=lambda row: indkey.index(row[1]))
-                pkey = tuple(row[0] for row in pkey)
+                pkey = tuple(row[0] for row in sorted(
+                    pkey, key=lambda row: indkey.index(row[1])))
             else:
                 pkey = pkey[0][0]
             pkeys[table] = pkey  # cache it
@@ -2024,12 +2069,20 @@ class DB:
             pkey = (pkey,)
         return pkey
 
-    def get_databases(self):
+    def pkeys(self, table: str) -> tuple[str, ...]:
+        """Get the primary key of a table as a tuple.
+        
+        Same as pkey() with 'composite' set to True.
+        """
+        return self.pkey(table, True)  # type: ignore
+
+    def get_databases(self) -> list[str]:
         """Get list of databases in the system."""
-        return [s[0] for s in self.db.query(
+        return [r[0] for r in self._valid_db.query(
             'SELECT datname FROM pg_catalog.pg_database').getresult()]
 
-    def get_relations(self, kinds=None, system=False):
+    def get_relations(self, kinds: str | Sequence[str] | None = None,
+                      system: bool = False) -> list[str]:
         """Get list of relations in connected database of specified kinds.
 
         If kinds is None or empty, all kinds of relations are returned.
@@ -2038,31 +2091,32 @@ class DB:
 
         Set the system flag if you want to get the system relations as well.
         """
-        where = []
+        where_parts = []
         if kinds:
-            where.append(
+            where_parts.append(
                 "r.relkind IN ({})".format(','.join(f"'{k}'" for k in kinds)))
         if not system:
-            where.append("s.nspname NOT SIMILAR"
-                         " TO 'pg/_%|information/_schema' ESCAPE '/'")
-        where = " WHERE " + ' AND '.join(where) if where else ''
-        q = ("SELECT"  # noqa: S608
-             " pg_catalog.quote_ident(s.nspname) OPERATOR(pg_catalog.||)"
-             " '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.relname)"
-             " FROM pg_catalog.pg_class r"
-             " JOIN pg_catalog.pg_namespace s"
-             f" ON s.oid OPERATOR(pg_catalog.=) r.relnamespace{where}"
-             " ORDER BY s.nspname, r.relname")
-        return [r[0] for r in self.db.query(q).getresult()]
+            where_parts.append("s.nspname NOT SIMILAR"
+                               " TO 'pg/_%|information/_schema' ESCAPE '/'")
+        where = " WHERE " + ' AND '.join(where_parts) if where_parts else ''
+        cmd = ("SELECT"  # noqa: S608
+               " pg_catalog.quote_ident(s.nspname) OPERATOR(pg_catalog.||)"
+               " '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.relname)"
+               " FROM pg_catalog.pg_class r"
+               " JOIN pg_catalog.pg_namespace s"
+               f" ON s.oid OPERATOR(pg_catalog.=) r.relnamespace{where}"
+               " ORDER BY s.nspname, r.relname")
+        return [r[0] for r in self._valid_db.query(cmd).getresult()]
 
-    def get_tables(self, system=False):
+    def get_tables(self, system: bool = False) -> list[str]:
         """Return list of tables in connected database.
 
         Set the system flag if you want to get the system tables as well.
         """
         return self.get_relations('r', system)
 
-    def get_attnames(self, table, with_oid=True, flush=False):
+    def get_attnames(self, table: str, with_oid: bool=True, flush: bool=False
+                     ) -> AttrDict:
         """Given the name of a table, dig out the set of attribute names.
 
         Returns a read-only dictionary of attribute names (the names are
@@ -2083,19 +2137,18 @@ class DB:
         try:  # cache lookup
             names = attnames[table]
         except KeyError:  # cache miss, check the database
-            q = "a.attnum OPERATOR(pg_catalog.>) 0"
+            cmd = "a.attnum OPERATOR(pg_catalog.>) 0"
             if with_oid:
-                q = f"({q} OR a.attname OPERATOR(pg_catalog.=) 'oid')"
-            q = self._query_attnames.format(
-                _quote_if_unqualified('$1', table), q)
-            names = self.db.query(q, (table,)).getresult()
+                cmd = f"({cmd} OR a.attname OPERATOR(pg_catalog.=) 'oid')"
+            cmd = self._query_attnames.format(
+                _quote_if_unqualified('$1', table), cmd)
+            names = self._valid_db.query(cmd, (table,)).getresult()
             types = self.dbtypes
-            names = ((name[0], types.add(*name[1:])) for name in names)
-            names = AttrDict(names)
+            names = AttrDict((name[0], types.add(*name[1:])) for name in names)
             attnames[table] = names  # cache it
         return names
 
-    def get_generated(self, table, flush=False):
+    def get_generated(self, table: str, flush: bool = False) -> frozenset[str]:
         """Given the name of a table, dig out the set of generated columns.
 
         Returns a set of column names that are generated and unalterable.
@@ -2111,28 +2164,28 @@ class DB:
         try:  # cache lookup
             names = generated[table]
         except KeyError:  # cache miss, check the database
-            q = "a.attnum OPERATOR(pg_catalog.>) 0"
-            q = f"{q} AND {self._query_generated}"
-            q = self._query_attnames.format(
-                _quote_if_unqualified('$1', table), q)
-            names = self.db.query(q, (table,)).getresult()
+            cmd = "a.attnum OPERATOR(pg_catalog.>) 0"
+            cmd = f"{cmd} AND {self._query_generated}"
+            cmd = self._query_attnames.format(
+                _quote_if_unqualified('$1', table), cmd)
+            names = self._valid_db.query(cmd, (table,)).getresult()
             names = frozenset(name[0] for name in names)
             generated[table] = names  # cache it
         return names
 
-    def use_regtypes(self, regtypes=None):
+    def use_regtypes(self, regtypes: bool | None = None) -> bool:
         """Use registered type names instead of simplified type names."""
         if regtypes is None:
             return self.dbtypes._regtypes
-        else:
-            regtypes = bool(regtypes)
-            if regtypes != self.dbtypes._regtypes:
-                self.dbtypes._regtypes = regtypes
-                self._attnames.clear()
-                self.dbtypes.clear()
-            return regtypes
+        regtypes = bool(regtypes)
+        if regtypes != self.dbtypes._regtypes:
+            self.dbtypes._regtypes = regtypes
+            self._attnames.clear()
+            self.dbtypes.clear()
+        return regtypes
 
-    def has_table_privilege(self, table, privilege='select', flush=False):
+    def has_table_privilege(self, table: str, privilege: str = 'select',
+                            flush: bool = False) -> bool:
         """Check whether current user has specified table privilege.
 
         If flush is set, then the internal cache for table privileges will
@@ -2146,14 +2199,15 @@ class DB:
         try:  # ask cache
             ret = privileges[table, privilege]
         except KeyError:  # cache miss, ask the database
-            q = "SELECT pg_catalog.has_table_privilege({}, $2)".format(
+            cmd = "SELECT pg_catalog.has_table_privilege({}, $2)".format(
                 _quote_if_unqualified('$1', table))
-            q = self.db.query(q, (table, privilege))
-            ret = q.singlescalar() == self._make_bool(True)
+            query = self._valid_db.query(cmd, (table, privilege))
+            ret = query.singlescalar() == self._make_bool(True)
             privileges[table, privilege] = ret  # cache it
         return ret
 
-    def get(self, table, row, keyname=None):
+    def get(self, table: str, row: Any,
+            keyname: str | tuple[str, ...] | None = None) -> dict[str, Any]:
         """Get a row from a database table or view.
 
         This method is the basic mechanism to get a single row.  It assumes
@@ -2181,7 +2235,7 @@ class DB:
             row['oid'] = row[qoid]
         if not keyname:
             try:  # if keyname is not specified, try using the primary key
-                keyname = self.pkey(table, True)
+                keyname = self.pkeys(table)
             except KeyError as e:  # the table has no primary key
                 # try using the oid instead
                 if qoid and isinstance(row, dict) and 'oid' in row:
@@ -2216,10 +2270,10 @@ class DB:
                 row[qoid] = row['oid']
             del row['oid']
         t = self._escape_qualified_name(table)
-        q = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'  # noqa: S608s
-        self._do_debug(q, params)
-        q = self.db.query(q, params)
-        res = q.dictresult()
+        cmd = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'  # noqa: S608s
+        self._do_debug(cmd, params)
+        query = self._valid_db.query(cmd, params)
+        res = query.dictresult()
         if not res:
             # make where clause in error message better readable
             where = where.replace('OPERATOR(pg_catalog.=)', '=')
@@ -2232,7 +2286,8 @@ class DB:
             row[n] = value
         return row
 
-    def insert(self, table, row=None, **kw):
+    def insert(self, table: str, row: dict[str, Any] | None = None, **kw: Any
+               ) -> dict[str, Any]:
         """Insert a row into a database table.
 
         This method inserts a row into a table.  The name of the table must
@@ -2258,21 +2313,21 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        names, values = [], []
+        name_list, value_list = [], []
         for n in attnames:
             if n in row and n not in generated:
-                names.append(col(n))
-                values.append(adapt(row[n], attnames[n]))
-        if not names:
+                name_list.append(col(n))
+                value_list.append(adapt(row[n], attnames[n]))
+        if not name_list:
             raise _prg_error('No column found that can be inserted')
-        names, values = ', '.join(names), ', '.join(values)
+        names, values = ', '.join(name_list), ', '.join(value_list)
         ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
-        q = (f'INSERT INTO {t} ({names})'  # noqa: S608
-             f' VALUES ({values}) RETURNING {ret}')
-        self._do_debug(q, params)
-        q = self.db.query(q, params)
-        res = q.dictresult()
+        cmd = (f'INSERT INTO {t} ({names})'  # noqa: S608
+               f' VALUES ({values}) RETURNING {ret}')
+        self._do_debug(cmd, params)
+        query = self._valid_db.query(cmd, params)
+        res = query.dictresult()
         if res:  # this should always be true
             for n, value in res[0].items():
                 if qoid and n == 'oid':
@@ -2280,7 +2335,8 @@ class DB:
                 row[n] = value
         return row
 
-    def update(self, table, row=None, **kw):
+    def update(self, table: str, row: dict[str, Any] | None = None, **kw : Any
+               ) -> dict[str, Any]:
         """Update an existing row in a database table.
 
         Similar to insert, but updates an existing row.  The update is based
@@ -2304,39 +2360,40 @@ class DB:
         if qoid and qoid in row and 'oid' not in row:
             row['oid'] = row[qoid]
         if qoid and 'oid' in row:  # try using the oid
-            keyname = ('oid',)
+            keynames: tuple[str, ...] = ('oid',)
+            keyset = set(keynames)
         else:  # try using the primary key
             try:
-                keyname = self.pkey(table, True)
+                keynames = self.pkeys(table)
             except KeyError as e:  # the table has no primary key
                 raise _prg_error(f'Table {table} has no primary key') from e
+            keyset = set(keynames)
             # check whether all key columns have values
-            if not set(keyname).issubset(row):
+            if not keyset.issubset(row):
                 raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
         where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
-            col(k), adapt(row[k], attnames[k])) for k in keyname)
+            col(k), adapt(row[k], attnames[k])) for k in keynames)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
             del row['oid']
-        values = []
-        keyname = set(keyname)
+        values_list = []
         for n in attnames:
-            if n in row and n not in keyname and n not in generated:
-                values.append(f'{col(n)} = {adapt(row[n], attnames[n])}')
-        if not values:
+            if n in row and n not in keyset and n not in generated:
+                values_list.append(f'{col(n)} = {adapt(row[n], attnames[n])}')
+        if not values_list:
             return row
-        values = ', '.join(values)
+        values = ', '.join(values_list)
         ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
-        q = (f'UPDATE {t} SET {values}'  # noqa: S608
-             f' WHERE {where} RETURNING {ret}')
-        self._do_debug(q, params)
-        q = self.db.query(q, params)
-        res = q.dictresult()
+        cmd = (f'UPDATE {t} SET {values}'  # noqa: S608
+               f' WHERE {where} RETURNING {ret}')
+        self._do_debug(cmd, params)
+        query = self._valid_db.query(cmd, params)
+        res = query.dictresult()
         if res:  # may be empty when row does not exist
             for n, value in res[0].items():
                 if qoid and n == 'oid':
@@ -2344,7 +2401,8 @@ class DB:
                 row[n] = value
         return row
 
-    def upsert(self, table, row=None, **kw):
+    def upsert(self, table: str, row: dict[str, Any] | None = None, **kw: Any
+               ) -> dict[str, Any]:
         """Insert a row into a database table with conflict resolution.
 
         This method inserts a row into a table, but instead of raising a
@@ -2402,22 +2460,22 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        names, values = [], []
+        name_list, value_list = [], []
         for n in attnames:
             if n in row and n not in generated:
-                names.append(col(n))
-                values.append(adapt(row[n], attnames[n]))
-        names, values = ', '.join(names), ', '.join(values)
+                name_list.append(col(n))
+                value_list.append(adapt(row[n], attnames[n]))
+        names, values = ', '.join(name_list), ', '.join(value_list)
         try:
-            keyname = self.pkey(table, True)
+            keynames = self.pkeys(table)
         except KeyError as e:
             raise _prg_error(f'Table {table} has no primary key') from e
-        target = ', '.join(col(k) for k in keyname)
+        target = ', '.join(col(k) for k in keynames)
         update = []
-        keyname = set(keyname)
-        keyname.add('oid')
+        keyset = set(keynames)
+        keyset.add('oid')
         for n in attnames:
-            if n not in keyname and n not in generated:
+            if n not in keyset and n not in generated:
                 value = kw.get(n, n in row)
                 if value:
                     if not isinstance(value, str):
@@ -2428,12 +2486,12 @@ class DB:
         do = 'update set ' + ', '.join(update) if update else 'nothing'
         ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
-        q = (f'INSERT INTO {t} AS included ({names})'  # noqa: S608
-             f' VALUES ({values})'
-             f' ON CONFLICT ({target}) DO {do} RETURNING {ret}')
-        self._do_debug(q, params)
-        q = self.db.query(q, params)
-        res = q.dictresult()
+        cmd = (f'INSERT INTO {t} AS included ({names})'  # noqa: S608
+               f' VALUES ({values})'
+               f' ON CONFLICT ({target}) DO {do} RETURNING {ret}')
+        self._do_debug(cmd, params)
+        query = self._valid_db.query(cmd, params)
+        res = query.dictresult()
         if res:  # may be empty with "do nothing"
             for n, value in res[0].items():
                 if qoid and n == 'oid':
@@ -2443,7 +2501,8 @@ class DB:
             self.get(table, row)
         return row
 
-    def clear(self, table, row=None):
+    def clear(self, table: str, row: dict[str, Any] | None = None
+              ) -> dict[str, Any]:
         """Clear all the attributes to values determined by the types.
 
         Numeric types are set to 0, Booleans are set to false, and everything
@@ -2467,7 +2526,8 @@ class DB:
                 row[n] = ''
         return row
 
-    def delete(self, table, row=None, **kw):
+    def delete(self, table: str, row: dict[str, Any] | None = None, **kw: Any
+               ) -> int:
         """Delete an existing row in a database table.
 
         This method deletes the row from a table.  It deletes based on the
@@ -2492,31 +2552,33 @@ class DB:
         if qoid and qoid in row and 'oid' not in row:
             row['oid'] = row[qoid]
         if qoid and 'oid' in row:  # try using the oid
-            keyname = ('oid',)
+            keynames: tuple[str, ...] = ('oid',)
         else:  # try using the primary key
             try:
-                keyname = self.pkey(table, True)
+                keynames = self.pkeys(table)
             except KeyError as e:  # the table has no primary key
                 raise _prg_error(f'Table {table} has no primary key') from e
             # check whether all key columns have values
-            if not set(keyname).issubset(row):
+            if not set(keynames).issubset(row):
                 raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
         where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
-            col(k), adapt(row[k], attnames[k])) for k in keyname)
+            col(k), adapt(row[k], attnames[k])) for k in keynames)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
             del row['oid']
         t = self._escape_qualified_name(table)
-        q = f'DELETE FROM {t} WHERE {where}'  # noqa: S608
-        self._do_debug(q, params)
-        res = self.db.query(q, params)
+        cmd = f'DELETE FROM {t} WHERE {where}'  # noqa: S608
+        self._do_debug(cmd, params)
+        res = self._valid_db.query(cmd, params)
         return int(res)
 
-    def truncate(self, table, restart=False, cascade=False, only=False):
+    def truncate(self, table: str | list[str] | tuple[str, ...] |
+                 set[str] | frozenset[str], restart: bool = False,
+                 cascade: bool = False, only: bool = False) -> Query:
         """Empty a table or set of tables.
 
         This method quickly removes all rows from the given table or set
@@ -2528,21 +2590,21 @@ class DB:
         If restart is set to True, sequences owned by columns of the truncated
         table(s) are automatically restarted.  If cascade is set to True, it
         also truncates all tables that have foreign-key references to any of
-        the named tables.  If the parameter only is not set to True, all the
+        the named tables.  If the parameter 'only' is not set to True, all the
         descendant tables (if any) will also be truncated. Optionally, a '*'
         can be specified after the table name to explicitly indicate that
         descendant tables are included.
         """
         if isinstance(table, str):
-            only = {table: only}
+            table_only = {table: only}
             table = [table]
         elif isinstance(table, (list, tuple)):
             if isinstance(only, (list, tuple)):
-                only = dict(zip(table, only))
+                table_only = dict(zip(table, only))
             else:
-                only = dict.fromkeys(table, only)
+                table_only = dict.fromkeys(table, only)
         elif isinstance(table, (set, frozenset)):
-            only = dict.fromkeys(table, only)
+            table_only = dict.fromkeys(table, only)
         else:
             raise TypeError('The table must be a string, list or set')
         if not (restart is None or isinstance(restart, (bool, int))):
@@ -2551,7 +2613,7 @@ class DB:
             raise TypeError('Invalid type for the cascade option')
         tables = []
         for t in table:
-            u = only.get(t)
+            u = table_only.get(t)
             if not (u is None or isinstance(u, (bool, int))):
                 raise TypeError('Invalid type for the only option')
             if t.endswith('*'):
@@ -2563,17 +2625,21 @@ class DB:
             if u:
                 t = f'ONLY {t}'
             tables.append(t)
-        q = ['TRUNCATE', ', '.join(tables)]
+        cmd_parts = ['TRUNCATE', ', '.join(tables)]
         if restart:
-            q.append('RESTART IDENTITY')
+            cmd_parts.append('RESTART IDENTITY')
         if cascade:
-            q.append('CASCADE')
-        q = ' '.join(q)
-        self._do_debug(q)
-        return self.db.query(q)
+            cmd_parts.append('CASCADE')
+        cmd = ' '.join(cmd_parts)
+        self._do_debug(cmd)
+        return self._valid_db.query(cmd)
 
-    def get_as_list(self, table, what=None, where=None,
-                    order=None, limit=None, offset=None, scalar=False):
+    def get_as_list(self, table: str,
+                    what: str | list[str] | tuple[str, ...] | None = None,
+                    where: str | list[str] | tuple[str, ...] | None = None,
+                    order: str | list[str] | tuple[str, ...] | None = None,
+                    limit: int | None = None, offset: int | None = None,
+                    scalar: bool = False) -> list:
         """Get a table as a list.
 
         This gets a convenient representation of the table as a list
@@ -2585,16 +2651,18 @@ class DB:
 
         The parameter 'what' can restrict the query to only return a
         subset of the table columns.  It can be a string, list or a tuple.
+
         The parameter 'where' can restrict the query to only return a
         subset of the table rows.  It can be a string, list or a tuple
-        of SQL expressions that all need to be fulfilled.  The parameter
-        'order' specifies the ordering of the rows.  It can also be a
-        other string, list or a tuple.  If no ordering is specified,
-        the result will be ordered by the primary key(s) or all columns
-        if no primary key exists.  You can set 'order' to False if you
-        don't care about the ordering.  The parameters 'limit' and 'offset'
-        can be integers specifying the maximum number of rows returned
-        and a number of rows skipped over.
+        of SQL expressions that all need to be fulfilled.
+        
+        The parameter 'order' specifies the ordering of the rows.  It can
+        also be a string, list or a tuple.  If no ordering is specified,
+        the result will be ordered by the primary key(s) or all columns if
+        no primary key exists.  You can set 'order' to False if you don't
+        care about the ordering.  The parameters 'limit' and 'offset' can be
+        integers specifying the maximum number of rows returned and a number
+        of rows skipped over.
 
         If you set the 'scalar' option to True, then instead of the
         named tuples you will get the first items of these tuples.
@@ -2609,35 +2677,40 @@ class DB:
                 order = what
         else:
             what = '*'
-        q = ['SELECT', what, 'FROM', table]
+        cmd_parts = ['SELECT', what, 'FROM', table]
         if where:
             if isinstance(where, (list, tuple)):
                 where = ' AND '.join(map(str, where))
-            q.extend(['WHERE', where])
+            cmd_parts.extend(['WHERE', where])
         if order is None:
             try:
-                order = self.pkey(table, True)
+                order = self.pkeys(table)
             except (KeyError, ProgrammingError):
                 with suppress(KeyError, ProgrammingError):
                     order = list(self.get_attnames(table))
         if order:
             if isinstance(order, (list, tuple)):
                 order = ', '.join(map(str, order))
-            q.extend(['ORDER BY', order])
+            cmd_parts.extend(['ORDER BY', order])
         if limit:
-            q.append(f'LIMIT {limit}')
+            cmd_parts.append(f'LIMIT {limit}')
         if offset:
-            q.append(f'OFFSET {offset}')
-        q = ' '.join(q)
-        self._do_debug(q)
-        q = self.db.query(q)
-        res = q.namedresult()
+            cmd_parts.append(f'OFFSET {offset}')
+        cmd = ' '.join(cmd_parts)
+        self._do_debug(cmd)
+        query = self._valid_db.query(cmd)
+        res = query.namedresult()
         if res and scalar:
             res = [row[0] for row in res]
         return res
 
-    def get_as_dict(self, table, keyname=None, what=None, where=None,
-                    order=None, limit=None, offset=None, scalar=False):
+    def get_as_dict(self, table: str,
+                    keyname: str | list[str] | tuple[str, ...] | None = None, 
+                    what: str | list[str] | tuple[str, ...] | None = None,
+                    where: str | list[str] | tuple[str, ...] | None = None,
+                    order: str | list[str] | tuple[str, ...] | None = None,
+                    limit: int | None = None, offset: int | None = None,
+                    scalar: bool = False) -> dict:
         """Get a table as a dictionary.
 
         This method is similar to get_as_list(), but returns the table
@@ -2652,7 +2725,7 @@ class DB:
         be set as a string, list or a tuple.
 
         If the Python version supports it, the dictionary will be an
-        OrderedDict using the order specified with the 'order' parameter
+        dict using the order specified with the 'order' parameter
         or the key column(s) if not specified.  You can set 'order' to False
         if you don't care about the ordering.  In this case the returned
         dictionary will be an ordinary one.
@@ -2661,12 +2734,14 @@ class DB:
             raise TypeError('The table name is missing')
         if not keyname:
             try:
-                keyname = self.pkey(table, True)
+                keyname = self.pkeys(table)
             except (KeyError, ProgrammingError) as e:
                 raise _prg_error(f'Table {table} has no primary key') from e
         if isinstance(keyname, str):
-            keyname = [keyname]
-        elif not isinstance(keyname, (list, tuple)):
+            keynames: list[str] | tuple[str, ...] = (keyname,)
+        elif isinstance(keyname, (list, tuple)):
+            keynames = keyname
+        else:
             raise KeyError('The keyname must be a string, list or tuple')
         if what:
             if isinstance(what, (list, tuple)):
@@ -2675,64 +2750,68 @@ class DB:
                 order = what
         else:
             what = '*'
-        q = ['SELECT', what, 'FROM', table]
+        cmd_parts = ['SELECT', what, 'FROM', table]
         if where:
             if isinstance(where, (list, tuple)):
                 where = ' AND '.join(map(str, where))
-            q.extend(['WHERE', where])
+            cmd_parts.extend(['WHERE', where])
         if order is None:
             order = keyname
         if order:
             if isinstance(order, (list, tuple)):
                 order = ', '.join(map(str, order))
-            q.extend(['ORDER BY', order])
+            cmd_parts.extend(['ORDER BY', order])
         if limit:
-            q.append(f'LIMIT {limit}')
+            cmd_parts.append(f'LIMIT {limit}')
         if offset:
-            q.append(f'OFFSET {offset}')
-        q = ' '.join(q)
-        self._do_debug(q)
-        q = self.db.query(q)
-        res = q.getresult()
-        cls = OrderedDict if order else dict
+            cmd_parts.append(f'OFFSET {offset}')
+        cmd = ' '.join(cmd_parts)
+        self._do_debug(cmd)
+        query = self._valid_db.query(cmd)
+        res = query.getresult()
         if not res:
-            return cls()
-        keyset = set(keyname)
-        fields = q.listfields()
+            return {}
+        keyset = set(keynames)
+        fields = query.listfields()
         if not keyset.issubset(fields):
             raise KeyError('Missing keyname in row')
-        keyind, rowind = [], []
+        key_index: list[int] = []
+        row_index: list[int] = []
         for i, f in enumerate(fields):
-            (keyind if f in keyset else rowind).append(i)
-        keytuple = len(keyind) > 1
-        getkey = itemgetter(*keyind)
-        keys = map(getkey, res)
+            (key_index if f in keyset else row_index).append(i)
+        key_tuple = len(key_index) > 1
+        get_key = itemgetter(*key_index)
+        keys = map(get_key, res)
         if scalar:
-            rowind = rowind[:1]
-            rowtuple = False
+            row_index = row_index[:1]
+            row_is_tuple = False
         else:
-            rowtuple = len(rowind) > 1
-        if scalar or rowtuple:
-            getrow = itemgetter(*rowind)
+            row_is_tuple = len(row_index) > 1
+        if scalar or row_is_tuple:
+            get_row: Callable[[tuple], tuple] = itemgetter(  # pyright: ignore
+                *row_index)
         else:
-            rowind = rowind[0]
+            frst_index = row_index[0]
 
-            def getrow(row):
-                return row[rowind],  # tuple with one item
+            def get_row(row : tuple) -> tuple:
+                return row[frst_index],  # tuple with one item
 
-            rowtuple = True
-        rows = map(getrow, res)
-        if keytuple or rowtuple:
-            if keytuple:
-                keys = _namediter(_MemoryQuery(keys, keyname))
-            if rowtuple:
+            row_is_tuple = True
+        rows = map(get_row, res)
+        if key_tuple or row_is_tuple:
+            if key_tuple:
+                keys = _namediter(_MemoryQuery(keys, keynames))  # type: ignore
+            if row_is_tuple:
                 fields = [f for f in fields if f not in keyset]
-                rows = _namediter(_MemoryQuery(rows, fields))
+                rows = _namediter(_MemoryQuery(rows, fields))  # type: ignore
         # noinspection PyArgumentList
-        return cls(zip(keys, rows))
+        return dict(zip(keys, rows))
 
-    def notification_handler(self, event, callback,
-                             arg_dict=None, timeout=None, stop_event=None):
+    def notification_handler(self, event: str, callback: Callable,
+                             arg_dict: dict | None = None,
+                             timeout: int | float | None = None,
+                             stop_event: str | None = None
+                             ) -> NotificationHandler:
         """Get notification handler that will run the given callback."""
         return NotificationHandler(self, event, callback,
                                    arg_dict, timeout, stop_event)

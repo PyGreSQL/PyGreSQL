@@ -9,11 +9,13 @@ Contributed by Christoph Zwerschke.
 These tests do not need a database to test against.
 """
 
+from __future__ import annotations
+
 import json
 import re
 import unittest
 from datetime import timedelta
-from typing import Any, Sequence, Tuple, Type
+from typing import Any, Sequence
 
 import pg  # the module under test
 
@@ -21,56 +23,64 @@ import pg  # the module under test
 class TestHasConnect(unittest.TestCase):
     """Test existence of basic pg module functions."""
 
-    def testhas_pg_error(self):
+    def test_has_pg_error(self):
         self.assertTrue(issubclass(pg.Error, Exception))
 
-    def testhas_pg_warning(self):
+    def test_has_pg_warning(self):
         self.assertTrue(issubclass(pg.Warning, Exception))
 
-    def testhas_pg_interface_error(self):
+    def test_has_pg_interface_error(self):
         self.assertTrue(issubclass(pg.InterfaceError, pg.Error))
 
-    def testhas_pg_database_error(self):
+    def test_has_pg_database_error(self):
         self.assertTrue(issubclass(pg.DatabaseError, pg.Error))
 
-    def testhas_pg_internal_error(self):
+    def test_has_pg_internal_error(self):
         self.assertTrue(issubclass(pg.InternalError, pg.DatabaseError))
 
-    def testhas_pg_operational_error(self):
+    def test_has_pg_operational_error(self):
         self.assertTrue(issubclass(pg.OperationalError, pg.DatabaseError))
 
-    def testhas_pg_programming_error(self):
+    def test_has_pg_programming_error(self):
         self.assertTrue(issubclass(pg.ProgrammingError, pg.DatabaseError))
 
-    def testhas_pg_integrity_error(self):
+    def test_has_pg_integrity_error(self):
         self.assertTrue(issubclass(pg.IntegrityError, pg.DatabaseError))
 
-    def testhas_pg_data_error(self):
+    def test_has_pg_data_error(self):
         self.assertTrue(issubclass(pg.DataError, pg.DatabaseError))
 
-    def testhas_pg_not_supported_error(self):
+    def test_has_pg_not_supported_error(self):
         self.assertTrue(issubclass(pg.NotSupportedError, pg.DatabaseError))
 
-    def testhas_pg_invalid_result_error(self):
+    def test_has_pg_invalid_result_error(self):
         self.assertTrue(issubclass(pg.InvalidResultError, pg.DataError))
 
-    def testhas_pg_no_result_error(self):
+    def test_has_pg_no_result_error(self):
         self.assertTrue(issubclass(pg.NoResultError, pg.InvalidResultError))
 
-    def testhas_pg_multiple_results_error(self):
+    def test_has_pg_multiple_results_error(self):
         self.assertTrue(
             issubclass(pg.MultipleResultsError, pg.InvalidResultError))
 
-    def testhas_connect(self):
+    def test_has_connection_type(self):
+        self.assertIsInstance(pg.Connection, type)
+        self.assertEqual(pg.Connection.__name__, 'Connection')
+
+    def test_has_query_type(self):
+        self.assertIsInstance(pg.Query, type)
+        self.assertEqual(pg.Query.__name__, 'Query')
+
+    def test_has_connect(self):
         self.assertTrue(callable(pg.connect))
 
-    def testhas_escape_string(self):
+    def test_has_escape_string(self):
         self.assertTrue(callable(pg.escape_string))
 
-    def testhas_escape_bytea(self):
+    def test_has_escape_bytea(self):
         self.assertTrue(callable(pg.escape_bytea))
 
-    def testhas_unescape_bytea(self):
+    def test_has_unescape_bytea(self):
         self.assertTrue(callable(pg.unescape_bytea))
 
     def test_def_host(self):
@@ -120,7 +130,7 @@ class TestHasConnect(unittest.TestCase):
 class TestParseArray(unittest.TestCase):
     """Test the array parser."""
 
-    test_strings: Sequence[Tuple[str, Type, Any]] = [
+    test_strings: Sequence[tuple[str, type | None, Any]] = [
         ('', str, ValueError),
         ('{}', None, []),
         ('{}', str, []),
@@ -354,7 +364,7 @@ class TestParseArray(unittest.TestCase):
 class TestParseRecord(unittest.TestCase):
     """Test the record parser."""
 
-    test_strings: Sequence[Tuple[str, Type, Any]] = [
+    test_strings: Sequence[tuple[str, type | tuple[type, ...] | None, Any]] = [
         ('', None, ValueError),
         ('', str, ValueError),
         ('(', None, ValueError),
@@ -635,7 +645,7 @@ class TestParseRecord(unittest.TestCase):
 class TestParseHStore(unittest.TestCase):
     """Test the hstore parser."""
 
-    test_strings: Sequence[Tuple[str, Any]] = [
+    test_strings: Sequence[tuple[str, Any]] = [
         ('', {}),
         ('=>', ValueError),
         ('""=>', ValueError),
@@ -684,7 +694,7 @@ class TestParseHStore(unittest.TestCase):
 class TestCastInterval(unittest.TestCase):
     """Test the interval typecast function."""
 
-    intervals: Sequence[Tuple[Tuple[int, ...], Tuple[str, ...]]] = [
+    intervals: Sequence[tuple[tuple[int, ...], tuple[str, ...]]] = [
         ((0, 0, 0, 1, 0, 0, 0),
             ('1:00:00', '01:00:00', '@ 1 hour', 'PT1H')),
         ((0, 0, 0, -1, 0, 0, 0),

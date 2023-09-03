@@ -7,13 +7,14 @@ This software is Public Domain and may be used without restrictions.
 Some modernization of the code has been done by the PyGreSQL team.
 """
 
-__version__ = '1.15.0'
+from __future__ import annotations
 
 import time
 import unittest
 from contextlib import suppress
-from typing import Any, Mapping, Tuple
+from typing import Any, Mapping
 
+__version__ = '1.15.0'
 
 class DatabaseAPI20Test(unittest.TestCase):
     """Test a database self.driver for DB API 2.0 compatibility.
@@ -41,7 +42,7 @@ class DatabaseAPI20Test(unittest.TestCase):
     # The self.driver module. This should be the module where the 'connect'
     # method is to be found
     driver: Any = None
-    connect_args: Tuple = ()  # List of arguments to pass to connect
+    connect_args: tuple = ()  # List of arguments to pass to connect
     connect_kw_args: Mapping[str, Any] = {}  # Keyword arguments for connect
     table_prefix = 'dbapi20test_'  # If you need to specify a prefix for tables
 

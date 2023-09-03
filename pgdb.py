@@ -64,6 +64,8 @@ Basic usage:
     connection.close() # close the connection
 """
 
+from __future__ import annotations
+
 from collections import namedtuple
 from collections.abc import Iterable
 from contextlib import suppress
@@ -76,7 +78,7 @@ from json import loads as jsondecode
 from math import isinf, isnan
 from re import compile as regex
 from time import localtime
-from typing import ClassVar, Dict, Type
+from typing import Callable, ClassVar
 from uuid import UUID as Uuid  # noqa: N811
 
 try:
@@ -91,15 +93,16 @@ except ImportError as e:  # noqa: F841
                  if os.path.exists(os.path.join(path, libpq))]
         if sys.version_info >= (3, 8):
             # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
+            add_dll_dir = os.add_dll_directory  # type: ignore
             for path in paths:
-                with os.add_dll_directory(os.path.abspath(path)):
+                with add_dll_dir(os.path.abspath(path)):
                     try:
-                        from _pg import version
+                        from _pg import version  # type: ignore
                     except ImportError:
                         pass
                     else:
                         del version
-                        e = None
+                        e = None  # type: ignore
                         break
         if paths:
             libpq = 'compatible ' + libpq
@@ -140,7 +143,7 @@ __all__ = [
     'Date', 'Time', 'Timestamp',
     'DateFromTicks', 'TimeFromTicks', 'TimestampFromTicks',
     'Binary', 'Interval', 'Uuid',
-    'Hstore', 'Json', 'Literal', 'Type',
+    'Hstore', 'Json', 'Literal', 'DbType',
     'STRING', 'BINARY', 'NUMBER', 'DATETIME', 'ROWID', 'BOOL',
     'SMALLINT', 'INTEGER', 'LONG', 'FLOAT', 'NUMERIC', 'MONEY',
     'DATE', 'TIME', 'TIMESTAMP', 'INTERVAL',
@@ -150,9 +153,10 @@ __all__ = [
     'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError',
     'apilevel', 'connect', 'paramstyle', 'threadsafety',
     'get_typecast', 'set_typecast', 'reset_typecast',
-    'version', '__version__']
+    'version', '__version__',
+]
 
-Decimal = StdDecimal
+Decimal: type = StdDecimal
 
 
 # *** Module Constants ***
@@ -173,17 +177,19 @@ shortcutmethods = 1
 
 # *** Internal Type Handling ***
 
-def get_args(func):
+def get_args(func: Callable) -> list:
     return list(signature(func).parameters)
 
 
 # time zones used in Postgres timestamptz output
-_timezones = dict(CET='+0100', EET='+0200', EST='-0500',
-                  GMT='+0000', HST='-1000', MET='+0100', MST='-0700',
-                  UCT='+0000', UTC='+0000', WET='+0000')
+_timezones: dict[str, str] = {
+    'CET': '+0100', 'EET': '+0200', 'EST': '-0500',
+    'GMT': '+0000', 'HST': '-1000', 'MET': '+0100', 'MST': '-0700',
+    'UCT': '+0000', 'UTC': '+0000', 'WET': '+0000'
+}
 
 
-def _timezone_as_offset(tz):
+def _timezone_as_offset(tz: str) -> str:
     if tz.startswith(('+', '-')):
         if len(tz) < 5:
             return tz + '00'
@@ -191,7 +197,7 @@ def _timezone_as_offset(tz):
     return _timezones.get(tz, '+0000')
 
 
-def decimal_type(decimal_type=None):
+def decimal_type(decimal_type: type | None = None):
     """Get or set global type to be used for decimal values.
 
     Note that connections cache cast functions. To be sure a global change
@@ -204,25 +210,25 @@ def decimal_type(decimal_type=None):
     return Decimal
 
 
-def cast_bool(value):
+def cast_bool(value: str) -> bool | None:
     """Cast boolean value in database format to bool."""
     if value:
         return value[0] in ('t', 'T')
 
 
-def cast_money(value):
+def cast_money(value: str) -> Decimal | None:  # pyright: ignore
     """Cast money value in database format to Decimal."""
     if value:
         value = value.replace('(', '-')
         return Decimal(''.join(c for c in value if c.isdigit() or c in '.-'))
 
 
-def cast_int2vector(value):
+def cast_int2vector(value: str) -> list[int]:
     """Cast an int2vector value."""
     return [int(v) for v in value.split()]
 
 
-def cast_date(value, connection):
+def cast_date(value: str, connection) -> date:
     """Cast a date value."""
     # The output format depends on the server setting DateStyle.  The default
     # setting ISO and the setting for German are actually unambiguous.  The
@@ -232,17 +238,17 @@ def cast_date(value, connection):
         return date.min
     if value == 'infinity':
         return date.max
-    value = value.split()
-    if value[-1] == 'BC':
+    values = value.split()
+    if values[-1] == 'BC':
         return date.min
-    value = value[0]
+    value = values[0]
     if len(value) > 10:
         return date.max
-    fmt = connection.date_format()
-    return datetime.strptime(value, fmt).date()
+    format = connection.date_format()
+    return datetime.strptime(value, format).date()
 
 
-def cast_time(value):
+def cast_time(value: str) -> time:
     """Cast a time value."""
     fmt = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
     return datetime.strptime(value, fmt).time()
@@ -251,74 +257,74 @@ def cast_time(value):
 _re_timezone = regex('(.*)([+-].*)')
 
 
-def cast_timetz(value):
+def cast_timetz(value: str) -> time:
     """Cast a timetz value."""
-    tz = _re_timezone.match(value)
-    if tz:
-        value, tz = tz.groups()
+    m = _re_timezone.match(value)
+    if m:
+        value, tz = m.groups()
     else:
         tz = '+0000'
-    fmt = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
+    format = '%H:%M:%S.%f' if len(value) > 8 else '%H:%M:%S'
     value += _timezone_as_offset(tz)
-    fmt += '%z'
-    return datetime.strptime(value, fmt).timetz()
+    format += '%z'
+    return datetime.strptime(value, format).timetz()
 
 
-def cast_timestamp(value, connection):
+def cast_timestamp(value: str, connection) -> datetime:
     """Cast a timestamp value."""
     if value == '-infinity':
         return datetime.min
     if value == 'infinity':
         return datetime.max
-    value = value.split()
-    if value[-1] == 'BC':
+    values = value.split()
+    if values[-1] == 'BC':
         return datetime.min
-    fmt = connection.date_format()
-    if fmt.endswith('-%Y') and len(value) > 2:
-        value = value[1:5]
-        if len(value[3]) > 4:
+    format = connection.date_format()
+    if format.endswith('-%Y') and len(values) > 2:
+        values = values[1:5]
+        if len(values[3]) > 4:
             return datetime.max
-        fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
+        formats = ['%d %b' if format.startswith('%d') else '%b %d',
+                   '%H:%M:%S.%f' if len(values[2]) > 8 else '%H:%M:%S', '%Y']
     else:
-        if len(value[0]) > 10:
+        if len(values[0]) > 10:
             return datetime.max
-        fmt = [fmt, '%H:%M:%S.%f' if len(value[1]) > 8 else '%H:%M:%S']
-    return datetime.strptime(' '.join(value), ' '.join(fmt))
+        formats = [format, '%H:%M:%S.%f' if len(values[1]) > 8 else '%H:%M:%S']
+    return datetime.strptime(' '.join(values), ' '.join(formats))
 
 
-def cast_timestamptz(value, connection):
+def cast_timestamptz(value: str, connection) -> datetime:
     """Cast a timestamptz value."""
     if value == '-infinity':
         return datetime.min
     if value == 'infinity':
         return datetime.max
-    value = value.split()
-    if value[-1] == 'BC':
+    values = value.split()
+    if values[-1] == 'BC':
         return datetime.min
-    fmt = connection.date_format()
-    if fmt.endswith('-%Y') and len(value) > 2:
-        value = value[1:]
-        if len(value[3]) > 4:
+    format = connection.date_format()
+    if format.endswith('-%Y') and len(values) > 2:
+        values = values[1:]
+        if len(values[3]) > 4:
             return datetime.max
-        fmt = ['%d %b' if fmt.startswith('%d') else '%b %d',
-               '%H:%M:%S.%f' if len(value[2]) > 8 else '%H:%M:%S', '%Y']
-        value, tz = value[:-1], value[-1]
+        formats = ['%d %b' if format.startswith('%d') else '%b %d',
+                   '%H:%M:%S.%f' if len(values[2]) > 8 else '%H:%M:%S', '%Y']
+        values, tz = values[:-1], values[-1]
     else:
-        if fmt.startswith('%Y-'):
-            tz = _re_timezone.match(value[1])
-            if tz:
-                value[1], tz = tz.groups()
+        if format.startswith('%Y-'):
+            m = _re_timezone.match(values[1])
+            if m:
+                values[1], tz = m.groups()
             else:
                 tz = '+0000'
         else:
-            value, tz = value[:-1], value[-1]
-        if len(value[0]) > 10:
+            values, tz = values[:-1], values[-1]
+        if len(values[0]) > 10:
             return datetime.max
-        fmt = [fmt, '%H:%M:%S.%f' if len(value[1]) > 8 else '%H:%M:%S']
-    value.append(_timezone_as_offset(tz))
-    fmt.append('%z')
-    return datetime.strptime(' '.join(value), ' '.join(fmt))
+        formats = [format, '%H:%M:%S.%f' if len(values[1]) > 8 else '%H:%M:%S']
+    values.append(_timezone_as_offset(tz))
+    formats.append('%z')
+    return datetime.strptime(' '.join(values), ' '.join(formats))
 
 
 _re_interval_sql_standard = regex(
@@ -349,37 +355,37 @@ _re_interval_iso_8601 = regex(
     '(?:([+-])?([0-9]+)(?:\\.([0-9]+))?S)?)?')
 
 
-def cast_interval(value):
+def cast_interval(value: str) -> timedelta:
     """Cast an interval value."""
     # The output format depends on the server setting IntervalStyle, but it's
     # not necessary to consult this setting to parse it.  It's faster to just
     # check all possible formats, and there is no ambiguity here.
     m = _re_interval_iso_8601.match(value)
     if m:
-        m = [d or '0' for d in m.groups()]
-        secs_ago = m.pop(5) == '-'
-        m = [int(d) for d in m]
-        years, mons, days, hours, mins, secs, usecs = m
+        s = [v or '0' for v in m.groups()]
+        secs_ago = s.pop(5) == '-'
+        d = [int(v) for v in s]
+        years, mons, days, hours, mins, secs, usecs = d
         if secs_ago:
             secs = -secs
             usecs = -usecs
     else:
         m = _re_interval_postgres_verbose.match(value)
         if m:
-            m, ago = [d or '0' for d in m.groups()[:8]], m.group(9)
-            secs_ago = m.pop(5) == '-'
-            m = [-int(d) for d in m] if ago else [int(d) for d in m]
-            years, mons, days, hours, mins, secs, usecs = m
+            s, ago = [v or '0' for v in m.groups()[:8]], m.group(9)
+            secs_ago = s.pop(5) == '-'
+            d = [-int(v) for v in s] if ago else [int(v) for v in s]
+            years, mons, days, hours, mins, secs, usecs = d
             if secs_ago:
                 secs = - secs
                 usecs = -usecs
         else:
             m = _re_interval_postgres.match(value)
             if m and any(m.groups()):
-                m = [d or '0' for d in m.groups()]
-                hours_ago = m.pop(3) == '-'
-                m = [int(d) for d in m]
-                years, mons, days, hours, mins, secs, usecs = m
+                s = [v or '0' for v in m.groups()]
+                hours_ago = s.pop(3) == '-'
+                d = [int(v) for v in s]
+                years, mons, days, hours, mins, secs, usecs = d
                 if hours_ago:
                     hours = -hours
                     mins = -mins
@@ -388,11 +394,11 @@ def cast_interval(value):
             else:
                 m = _re_interval_sql_standard.match(value)
                 if m and any(m.groups()):
-                    m = [d or '0' for d in m.groups()]
-                    years_ago = m.pop(0) == '-'
-                    hours_ago = m.pop(3) == '-'
-                    m = [int(d) for d in m]
-                    years, mons, days, hours, mins, secs, usecs = m
+                    s = [v or '0' for v in m.groups()]
+                    years_ago = s.pop(0) == '-'
+                    hours_ago = s.pop(3) == '-'
+                    d = [int(v) for v in s]
+                    years, mons, days, hours, mins, secs, usecs = d
                     if years_ago:
                         years = -years
                         mons = -mons
@@ -419,7 +425,7 @@ class Typecasts(dict):
 
     # the default cast functions
     # (str functions are ignored but have been added for faster access)
-    defaults: ClassVar[Dict[str, Type]] = {
+    defaults: ClassVar[dict[str, Callable]] = {
         'char': str, 'bpchar': str, 'name': str,
         'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
@@ -758,10 +764,6 @@ def _op_error(msg):
 
 
 # *** Row Tuples ***
-
-
-_re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
-
 
 # The result rows for database operations are returned as named tuples
 # by default. Since creating namedtuple classes is a somewhat expensive

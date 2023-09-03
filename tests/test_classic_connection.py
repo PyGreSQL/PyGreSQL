@@ -9,6 +9,8 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
+from __future__ import annotations
+
 import os
 import threading
 import time
@@ -17,7 +19,7 @@ from collections import namedtuple
 from collections.abc import Iterable
 from contextlib import suppress
 from decimal import Decimal
-from typing import Sequence, Tuple
+from typing import Sequence
 
 import pg  # the module under test
 
@@ -532,9 +534,9 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields, ('snake_case_alias', 'CamelCaseAlias'))
 
     def test_namedresult_with_bad_fieldnames(self):
-        r = namedtuple('Bad', ['?'] * 6, rename=True)
+        t = namedtuple('Bad', ['?'] * 6, rename=True)  # type: ignore
         # noinspection PyUnresolvedReferences
-        fields = r._fields
+        fields = t._fields
         q = ('select 3 as "0alias", 4 as _alias, 5 as "alias$", 6 as "alias?",'
              ' 7 as "kebap-case-alias", 8 as break, 9 as and_a_good_one')
         result = [tuple(range(3, 10))]
@@ -820,45 +822,44 @@ class TestUnicodeQueries(unittest.TestCase):
 
     def test_getresul_ascii(self):
         result = 'Hello, world!'
-        q = f"select '{result}'"
-        v = self.c.query(q).getresult()[0][0]
+        cmd = f"select '{result}'"
+        v = self.c.query(cmd).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
     def test_dictresul_ascii(self):
         result = 'Hello, world!'
-        q = f"select '{result}' as greeting"
-        v = self.c.query(q).dictresult()[0]['greeting']
+        cmd = f"select '{result}' as greeting"
+        v = self.c.query(cmd).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
     def test_getresult_utf8(self):
         result = 'Hello, wörld & мир!'
-        q = f"select '{result}'"
+        cmd = f"select '{result}'"
         # pass the query as unicode
         try:
-            v = self.c.query(q).getresult()[0][0]
+            v = self.c.query(cmd).getresult()[0][0]
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support utf8")
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode()
-        # pass the query as bytes
-        v = self.c.query(q).getresult()[0][0]
+        cmd_bytes = cmd.encode()
+        v = self.c.query(cmd_bytes).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
     def test_dictresult_utf8(self):
         result = 'Hello, wörld & мир!'
-        q = f"select '{result}' as greeting"
+        cmd = f"select '{result}' as greeting"
         try:
-            v = self.c.query(q).dictresult()[0]['greeting']
+            v = self.c.query(cmd).dictresult()[0]['greeting']
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support utf8")
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode()
-        v = self.c.query(q).dictresult()[0]['greeting']
+        cmd_bytes = cmd.encode()
+        v = self.c.query(cmd_bytes).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
@@ -868,12 +869,12 @@ class TestUnicodeQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support latin1")
         result = 'Hello, wörld!'
-        q = f"select '{result}'"
-        v = self.c.query(q).getresult()[0][0]
+        cmd = f"select '{result}'"
+        v = self.c.query(cmd).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('latin1')
-        v = self.c.query(q).getresult()[0][0]
+        cmd_bytes = cmd.encode('latin1')
+        v = self.c.query(cmd_bytes).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
@@ -883,12 +884,12 @@ class TestUnicodeQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support latin1")
         result = 'Hello, wörld!'
-        q = f"select '{result}' as greeting"
-        v = self.c.query(q).dictresult()[0]['greeting']
+        cmd = f"select '{result}' as greeting"
+        v = self.c.query(cmd).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('latin1')
-        v = self.c.query(q).dictresult()[0]['greeting']
+        cmd_bytes = cmd.encode('latin1')
+        v = self.c.query(cmd_bytes).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
@@ -898,12 +899,12 @@ class TestUnicodeQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support cyrillic")
         result = 'Hello, мир!'
-        q = f"select '{result}'"
-        v = self.c.query(q).getresult()[0][0]
+        cmd = f"select '{result}'"
+        v = self.c.query(cmd).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('cyrillic')
-        v = self.c.query(q).getresult()[0][0]
+        cmd_bytes = cmd.encode('cyrillic')
+        v = self.c.query(cmd_bytes).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
@@ -913,12 +914,12 @@ class TestUnicodeQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support cyrillic")
         result = 'Hello, мир!'
-        q = f"select '{result}' as greeting"
-        v = self.c.query(q).dictresult()[0]['greeting']
+        cmd = f"select '{result}' as greeting"
+        v = self.c.query(cmd).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('cyrillic')
-        v = self.c.query(q).dictresult()[0]['greeting']
+        cmd_bytes = cmd.encode('cyrillic')
+        v = self.c.query(cmd_bytes).dictresult()[0]['greeting']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
@@ -928,12 +929,12 @@ class TestUnicodeQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support latin9")
         result = 'smœrebrœd with pražská šunka (pay in ¢, £, €, or ¥)'
-        q = f"select '{result}'"
-        v = self.c.query(q).getresult()[0][0]
+        cmd = f"select '{result}'"
+        v = self.c.query(cmd).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('latin9')
-        v = self.c.query(q).getresult()[0][0]
+        cmd_bytes = cmd.encode('latin9')
+        v = self.c.query(cmd_bytes).getresult()[0][0]
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
@@ -943,12 +944,12 @@ class TestUnicodeQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support latin9")
         result = 'smœrebrœd with pražská šunka (pay in ¢, £, €, or ¥)'
-        q = f"select '{result}' as menu"
-        v = self.c.query(q).dictresult()[0]['menu']
+        cmd = f"select '{result}' as menu"
+        v = self.c.query(cmd).dictresult()[0]['menu']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
-        q = q.encode('latin9')
-        v = self.c.query(q).dictresult()[0]['menu']
+        cmd_bytes = cmd.encode('latin9')
+        v = self.c.query(cmd_bytes).dictresult()[0]['menu']
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
@@ -1698,6 +1699,7 @@ class TestInserttable(unittest.TestCase):
     """Test inserttable method."""
 
     cls_set_up = False
+    has_encoding = False
 
     @classmethod
     def setUpClass(cls):
@@ -1738,7 +1740,7 @@ class TestInserttable(unittest.TestCase):
         self.c.query("truncate table test")
         self.c.close()
 
-    data: Sequence[Tuple] = [
+    data: Sequence[tuple] = [
         (-1, -1, -1, True, '1492-10-12', '08:30:00',
          -1.2345, -1.75, -1.875, '-1.25', '-', 'r?', '!u', 'xyz'),
         (0, 0, 0, False, '1607-04-14', '09:00:00',
@@ -1868,7 +1870,7 @@ class TestInserttable(unittest.TestCase):
 
     def test_inserttable_multiple_rows(self):
         num_rows = 100
-        data = self.data[2:3] * num_rows
+        data = list(self.data[2:3]) * num_rows
         self.c.inserttable('test', data)
         r = self.c.query("select count(*) from test").getresult()[0][0]
         self.assertEqual(r, num_rows)
@@ -1892,13 +1894,13 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.get_back(), [])
 
     def test_inserttable_only_one_column(self):
-        data = [(42,)] * 50
+        data: list[tuple] = [(42,)] * 50
         self.c.inserttable('test', data, ['i4'])
         data = [tuple([42 if i == 1 else None for i in range(14)])] * 50
         self.assertEqual(self.get_back(), data)
 
     def test_inserttable_only_two_columns(self):
-        data = [(bool(i % 2), i * .5) for i in range(20)]
+        data: list[tuple] = [(bool(i % 2), i * .5) for i in range(20)]
         self.c.inserttable('test', data, ('b', 'f4'))
         # noinspection PyTypeChecker
         data = [(None,) * 3 + (bool(i % 2),) + (None,) * 3 + (i * .5,)
@@ -2021,7 +2023,7 @@ class TestInserttable(unittest.TestCase):
             self.skipTest("database does not support latin1")
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = '€' if self.has_encoding else '$'
-        row_unicode = (
+        row_unicode: tuple = (
             0, 0, 0, False, '1970-01-01', '00:00:00',
             0.0, 0.0, 0.0, '0.0',
             c, 'bäd', 'bäd', "for käse and pont-l'évêque pay in €")

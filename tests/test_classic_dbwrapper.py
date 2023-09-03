@@ -9,19 +9,21 @@ Contributed by Christoph Zwerschke.
 These tests need a database to test against.
 """
 
+from __future__ import annotations
+
 import gc
 import json
 import os
 import sys
 import tempfile
 import unittest
-from collections import OrderedDict
 from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from io import StringIO
 from operator import itemgetter
 from time import strftime
+from typing import Any, ClassVar
 from uuid import UUID
 
 import pg  # the module under test
@@ -51,20 +53,19 @@ class TestAttrDict(unittest.TestCase):
     """Test the simple ordered dictionary for attribute names."""
 
     cls = pg.AttrDict
-    base = OrderedDict
 
     def test_init(self):
         a = self.cls()
-        self.assertIsInstance(a, self.base)
-        self.assertEqual(a, self.base())
+        self.assertIsInstance(a, dict)
+        self.assertEqual(a, {})
         items = [('id', 'int'), ('name', 'text')]
         a = self.cls(items)
-        self.assertIsInstance(a, self.base)
-        self.assertEqual(a, self.base(items))
+        self.assertIsInstance(a, dict)
+        self.assertEqual(a, dict(items))
         iteritems = iter(items)
         a = self.cls(iteritems)
-        self.assertIsInstance(a, self.base)
-        self.assertEqual(a, self.base(items))
+        self.assertIsInstance(a, dict)
+        self.assertEqual(a, dict(items))
 
     def test_iter(self):
         a = self.cls()
@@ -127,7 +128,7 @@ class TestAttrDict(unittest.TestCase):
         self.assertEqual(a['id'], 1)
         for method in 'clear', 'update', 'pop', 'setdefault', 'popitem':
             method = getattr(a, method)
-            self.assertRaises(TypeError, method, a)
+            self.assertRaises(TypeError, method, a)  # type: ignore
 
 
 class TestDBClassInit(unittest.TestCase):
@@ -193,7 +194,7 @@ class TestDBClassBasic(unittest.TestCase):
             'locreate', 'loimport',
             'notification_handler',
             'options',
-            'parameter', 'pkey', 'poll', 'port',
+            'parameter', 'pkey', 'pkeys', 'poll', 'port',
             'prepare', 'protocol_version', 'putline',
             'query', 'query_formatted', 'query_prepared',
             'release', 'reopen', 'reset', 'rollback',
@@ -416,11 +417,12 @@ class TestDBClass(unittest.TestCase):
     cls_set_up = False
 
     regtypes = None
+    supports_oids = False
 
     @classmethod
     def setUpClass(cls):
         db = DB()
-        cls.oids = db.server_version < 120000
+        cls.supports_oids = db.server_version < 120000
         db.query("drop table if exists test cascade")
         db.query("create table test ("
                  "i2 smallint, i4 integer, i8 bigint,"
@@ -469,21 +471,21 @@ class TestDBClass(unittest.TestCase):
         if not as_query and not definition.startswith('('):
             definition = f'({definition})'
         with_oids = 'with oids' if oids else (
-            'without oids' if self.oids else '')
-        q = ['create', temporary, table]
+            'without oids' if self.supports_oids else '')
+        cmd_parts = ['create', temporary, table]
         if as_query:
-            q.extend([with_oids, definition])
+            cmd_parts.extend([with_oids, definition])
         else:
-            q.extend([definition, with_oids])
-        q = ' '.join(q)
-        query(q)
+            cmd_parts.extend([definition, with_oids])
+        cmd = ' '.join(cmd_parts)
+        query(cmd)
         if values:
             for params in values:
                 if not isinstance(params, (list, tuple)):
                     params = [params]
                 values = ', '.join(f'${n + 1}' for n in range(len(params)))
-                q = f"insert into {table} values ({values})"
-                query(q, params)
+                cmd = f"insert into {table} values ({values})"
+                query(cmd, params)
 
     def test_class_name(self):
         self.assertEqual(self.db.__class__.__name__, 'DB')
@@ -494,7 +496,7 @@ class TestDBClass(unittest.TestCase):
 
     def test_escape_literal(self):
         f = self.db.escape_literal
-        r = f(b"plain")
+        r: Any = f(b"plain")
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b"'plain'")
         r = f("plain")
@@ -846,7 +848,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, "Hello, World!")
 
     def test_create_table_with_oids(self):
-        if not self.oids:
+        if not self.supports_oids:
             self.skipTest("database does not support tables with oids")
         table = 'test hello world'
         values = [(2, "World!"), (1, "Hello")]
@@ -893,7 +895,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, '5')
 
     def test_query_with_oids(self):
-        if not self.oids:
+        if not self.supports_oids:
             self.skipTest("database does not support tables with oids")
         query = self.db.query
         table = 'test_table'
@@ -1175,6 +1177,16 @@ class TestDBClass(unittest.TestCase):
             # we get the changed primary key when the cache is flushed
             self.assertEqual(pkey(f'{t}1', flush=True), 'x')
 
+    def test_pkeys(self):
+        pkeys = self.db.pkeys
+        t = 'pkeys_test_'
+        self.create_table(f'{t}0', 'a int')
+        self.create_table(f'{t}1', 'a int primary key, b int')
+        self.create_table(f'{t}2', 'a int, b int, c int, primary key (a, c)')
+        self.assertRaises(KeyError, pkeys, f'{t}0')
+        self.assertEqual(pkeys(f'{t}1'), ('a',))
+        self.assertEqual(pkeys(f'{t}2'), ('a', 'c'))
+
     def test_get_databases(self):
         databases = self.db.get_databases()
         self.assertIn('template0', databases)
@@ -1194,11 +1206,11 @@ class TestDBClass(unittest.TestCase):
         before_tables = get_tables()
         self.assertIsInstance(before_tables, list)
         for t in before_tables:
-            t = t.split('.', 1)
-            self.assertGreaterEqual(len(t), 2)
-            if len(t) > 2:
-                self.assertTrue(t[1].startswith('"'))
-            t = t[0]
+            s = t.split('.', 1)
+            self.assertGreaterEqual(len(s), 2)
+            if len(s) > 2:
+                self.assertTrue(s[1].startswith('"'))
+            t = s[0]
             self.assertNotEqual(t, 'information_schema')
             self.assertFalse(t.startswith('pg_'))
         for t in tables:
@@ -1392,41 +1404,37 @@ class TestDBClass(unittest.TestCase):
     def test_get_attnames_is_ordered(self):
         get_attnames = self.db.get_attnames
         r = get_attnames('test', flush=True)
-        self.assertIsInstance(r, OrderedDict)
+        self.assertIsInstance(r, dict)
         if self.regtypes:
-            self.assertEqual(r, OrderedDict([
-                ('i2', 'smallint'), ('i4', 'integer'), ('i8', 'bigint'),
-                ('d', 'numeric'), ('f4', 'real'), ('f8', 'double precision'),
-                ('m', 'money'), ('v4', 'character varying'),
-                ('c4', 'character'), ('t', 'text')]))
+            self.assertEqual(r, {
+                'i2': 'smallint', 'i4': 'integer', 'i8': 'bigint',
+                'd': 'numeric', 'f4': 'real', 'f8': 'double precision',
+                'm': 'money', 'v4': 'character varying',
+                'c4': 'character', 't': 'text'})
         else:
-            self.assertEqual(r, OrderedDict([
-                ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
-                ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
-                ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
-        if OrderedDict is not dict:
-            r = ' '.join(list(r.keys()))
-            self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
+            self.assertEqual(r, {
+                'i2': 'int', 'i4': 'int', 'i8': 'int',
+                'd': 'num', 'f4': 'float', 'f8': 'float', 'm': 'money',
+                'v4': 'text', 'c4': 'text', 't': 'text'})
+        r = ' '.join(list(r.keys()))
+        self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
         table = 'test table for get_attnames'
         self.create_table(
             table, 'n int, alpha smallint, v varchar(3),'
                    ' gamma char(5), tau text, beta bool')
         r = get_attnames(table)
-        self.assertIsInstance(r, OrderedDict)
+        self.assertIsInstance(r, dict)
         if self.regtypes:
-            self.assertEqual(r, OrderedDict([
-                ('n', 'integer'), ('alpha', 'smallint'),
-                ('v', 'character varying'), ('gamma', 'character'),
-                ('tau', 'text'), ('beta', 'boolean')]))
+            self.assertEqual(r, {
+                'n': 'integer', 'alpha': 'smallint',
+                'v': 'character varying', 'gamma': 'character',
+                'tau': 'text', 'beta': 'boolean'})
         else:
-            self.assertEqual(r, OrderedDict([
-                ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
-                ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
-        if OrderedDict is not dict:
-            r = ' '.join(list(r.keys()))
-            self.assertEqual(r, 'n alpha v gamma tau beta')
-        else:
-            self.skipTest('OrderedDict is not supported')
+            self.assertEqual(r, {
+                'n': 'int', 'alpha': 'int', 'v': 'text',
+                'gamma': 'text', 'tau': 'text', 'beta': 'bool'})
+        r = ' '.join(list(r.keys()))
+        self.assertEqual(r, 'n alpha v gamma tau beta')
 
     def test_get_attnames_is_attr_dict(self):
         AttrDict = pg.AttrDict  # noqa: N806
@@ -1541,7 +1549,7 @@ class TestDBClass(unittest.TestCase):
         self.create_table(table, 'n integer, t text',
                          values=enumerate('xyz', start=1))
         self.assertRaises(pg.ProgrammingError, get, table, 2)
-        r = get(table, 2, 'n')
+        r: Any = get(table, 2, 'n')
         self.assertIsInstance(r, dict)
         self.assertEqual(r, dict(n=2, t='y'))
         r = get(table, 1, 'n')
@@ -1554,7 +1562,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(pg.DatabaseError, get, table, 4, 'n')
         self.assertRaises(pg.DatabaseError, get, table, 'y')
         self.assertRaises(pg.DatabaseError, get, table, 2, 't')
-        s = dict(n=3)
+        s: dict = dict(n=3)
         self.assertRaises(pg.ProgrammingError, get, table, s)
         r = get(table, s, 'n')
         self.assertIs(r, s)
@@ -1588,7 +1596,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(KeyError, get, table, s)
 
     def test_get_with_oids(self):
-        if not self.oids:
+        if not self.supports_oids:
             self.skipTest("database does not support tables with oids")
         get = self.db.get
         query = self.db.query
@@ -1753,7 +1761,7 @@ class TestDBClass(unittest.TestCase):
                    ' d numeric, f4 real, f8 double precision, m money,'
                    ' v4 varchar(4), c4 char(4), t text,'
                    ' b boolean, ts timestamp')
-        tests = [
+        tests: list[dict | tuple[dict, dict]] = [
             dict(i2=None, i4=None, i8=None),
             (dict(i2='', i4='', i8=''), dict(i2=None, i4=None, i8=None)),
             (dict(i2=0, i4=0, i8=0), dict(i2=0, i4=0, i8=0)),
@@ -1798,8 +1806,8 @@ class TestDBClass(unittest.TestCase):
             dict(ts='current_timestamp')]
         for test in tests:
             if isinstance(test, dict):
-                data = test
-                change = {}
+                data: dict = test
+                change: dict = {}
             else:
                 data, change = test
             expect = data.copy()
@@ -1835,7 +1843,7 @@ class TestDBClass(unittest.TestCase):
             query(f'truncate table "{table}"')
 
     def test_insert_with_oids(self):
-        if not self.oids:
+        if not self.supports_oids:
             self.skipTest("database does not support tables with oids")
         insert = self.db.insert
         query = self.db.query
@@ -1910,7 +1918,7 @@ class TestDBClass(unittest.TestCase):
         table = 'test table for insert()'
         self.create_table(table, '"Prime!" smallint primary key,'
                                 ' "much space" integer, "Questions?" text')
-        r = {'Prime!': 11, 'much space': 2002, 'Questions?': 'What?'}
+        r: Any = {'Prime!': 11, 'much space': 2002, 'Questions?': 'What?'}
         r = insert(table, r)
         self.assertIsInstance(r, dict)
         self.assertEqual(r['Prime!'], 11)
@@ -1928,7 +1936,7 @@ class TestDBClass(unittest.TestCase):
         query = self.db.query
         query("truncate table test")
         q = 'select * from test_view order by i4 limit 3'
-        r = query(q).getresult()
+        r: Any = query(q).getresult()
         self.assertEqual(r, [])
         r = dict(i4=1234, v4='abcd')
         insert('test', r)
@@ -1993,7 +2001,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, 'u')
 
     def test_update_with_oids(self):
-        if not self.oids:
+        if not self.supports_oids:
             self.skipTest("database does not support tables with oids")
         update = self.db.update
         get = self.db.get
@@ -2133,7 +2141,7 @@ class TestDBClass(unittest.TestCase):
         self.create_table(table, '"Prime!" smallint primary key,'
                                 ' "much space" integer, "Questions?" text',
                          values=[(13, 3003, 'Why!')])
-        r = {'Prime!': 13, 'much space': 7007, 'Questions?': 'When?'}
+        r: Any = {'Prime!': 13, 'much space': 7007, 'Questions?': 'When?'}
         r = update(table, r)
         self.assertIsInstance(r, dict)
         self.assertEqual(r['Prime!'], 13)
@@ -2166,7 +2174,7 @@ class TestDBClass(unittest.TestCase):
         self.create_table(table, table_def)
         i, d = 35, 1001
         j = i + 7
-        r = query(f'insert into {table} (i, d) values ({i}, {d})')
+        r: Any = query(f'insert into {table} (i, d) values ({i}, {d})')
         self.assertEqual(r, '1')
         r = get(table, d)
         self.assertIsInstance(r, dict)
@@ -2185,8 +2193,8 @@ class TestDBClass(unittest.TestCase):
                           'test', i2=2, i4=4, i8=8)
         table = 'upsert_test_table'
         self.create_table(table, 'n integer primary key, t text')
-        s = dict(n=1, t='x')
-        r = upsert(table, s)
+        s: dict = dict(n=1, t='x')
+        r: Any = upsert(table, s)
         self.assertIs(r, s)
         self.assertEqual(r['n'], 1)
         self.assertEqual(r['t'], 'x')
@@ -2252,7 +2260,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, [(1, 'x2'), (2, 'y3')])
 
     def test_upsert_with_oids(self):
-        if not self.oids:
+        if not self.supports_oids:
             self.skipTest("database does not support tables with oids")
         upsert = self.db.upsert
         get = self.db.get
@@ -2260,7 +2268,7 @@ class TestDBClass(unittest.TestCase):
         self.create_table('test_table', 'n int', oids=True, values=[1])
         self.assertRaises(pg.ProgrammingError,
                           upsert, 'test_table', dict(n=2))
-        r = get('test_table', 1, 'n')
+        r: Any = get('test_table', 1, 'n')
         self.assertIsInstance(r, dict)
         self.assertEqual(r['n'], 1)
         qoid = 'oid(test_table)'
@@ -2338,8 +2346,8 @@ class TestDBClass(unittest.TestCase):
         table = 'upsert_test_table_2'
         self.create_table(
             table, 'n integer, m integer, t text, primary key (n, m)')
-        s = dict(n=1, m=2, t='x')
-        r = upsert(table, s)
+        s: dict = dict(n=1, m=2, t='x')
+        r: Any = upsert(table, s)
         self.assertIs(r, s)
         self.assertEqual(r['n'], 1)
         self.assertEqual(r['m'], 2)
@@ -2400,8 +2408,8 @@ class TestDBClass(unittest.TestCase):
         table = 'test table for upsert()'
         self.create_table(table, '"Prime!" smallint primary key,'
                                 ' "much space" integer, "Questions?" text')
-        s = {'Prime!': 31, 'much space': 9009, 'Questions?': 'Yes.'}
-        r = upsert(table, s)
+        s: dict = {'Prime!': 31, 'much space': 9009, 'Questions?': 'Yes.'}
+        r: Any = upsert(table, s)
         self.assertIs(r, s)
         self.assertEqual(r['Prime!'], 31)
         self.assertEqual(r['much space'], 9009)
@@ -2437,7 +2445,7 @@ class TestDBClass(unittest.TestCase):
         self.create_table(table, table_def)
         i, d = 35, 1001
         j = i + 7
-        r = upsert(table, {'i': i, 'd': d, 'a': 1, 'j': j})
+        r: Any = upsert(table, {'i': i, 'd': d, 'a': 1, 'j': j})
         self.assertIsInstance(r, dict)
         self.assertEqual(r, {'a': 1, 'd': d, 'i': i, 'j': j})
         r['i'] += 1
@@ -2452,7 +2460,7 @@ class TestDBClass(unittest.TestCase):
     def test_clear(self):
         clear = self.db.clear
         f = False if pg.get_bool() else 'f'
-        r = clear('test')
+        r: Any = clear('test')
         result = dict(
             i2=0, i4=0, i8=0, d=0, f4=0, f8=0, m=0, v4='', c4='', t='')
         self.assertEqual(r, result)
@@ -2491,8 +2499,8 @@ class TestDBClass(unittest.TestCase):
         self.create_table(table, 'n integer primary key, t text',
                          oids=False, values=enumerate('xyz', start=1))
         self.assertRaises(pg.DatabaseError, self.db.get, table, 4)
-        r = self.db.get(table, 1)
-        s = delete(table, r)
+        r: Any = self.db.get(table, 1)
+        s: Any = delete(table, r)
         self.assertEqual(s, 1)
         r = self.db.get(table, 3)
         s = delete(table, r)
@@ -2516,15 +2524,15 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(s, 0)
 
     def test_delete_with_oids(self):
-        if not self.oids:
+        if not self.supports_oids:
             self.skipTest("database does not support tables with oids")
         delete = self.db.delete
         get = self.db.get
         query = self.db.query
         self.create_table('test_table', 'n int', oids=True, values=range(1, 7))
-        r = dict(n=3)
+        r: Any = dict(n=3)
         self.assertRaises(pg.ProgrammingError, delete, 'test_table', r)
-        s = get('test_table', 1, 'n')
+        s: Any = get('test_table', 1, 'n')
         qoid = 'oid(test_table)'
         self.assertIn(qoid, s)
         r = delete('test_table', s)
@@ -2618,7 +2626,7 @@ class TestDBClass(unittest.TestCase):
                          values=enumerate('abc', start=1))
         self.assertRaises(KeyError, self.db.delete, table, dict(t='b'))
         self.assertEqual(self.db.delete(table, dict(n=2)), 1)
-        r = query(f'select t from "{table}" where n=2').getresult()
+        r: Any = query(f'select t from "{table}" where n=2').getresult()
         self.assertEqual(r, [])
         self.assertEqual(self.db.delete(table, dict(n=2)), 0)
         r = query(f'select t from "{table}" where n=3').getresult()[0][0]
@@ -2650,7 +2658,7 @@ class TestDBClass(unittest.TestCase):
             table, '"Prime!" smallint primary key,'
                    ' "much space" integer, "Questions?" text',
             values=[(19, 5005, 'Yes!')])
-        r = {'Prime!': 17}
+        r: Any = {'Prime!': 17}
         r = delete(table, r)
         self.assertEqual(r, 0)
         r = query(f'select count(*) from "{table}"').getresult()
@@ -2676,7 +2684,7 @@ class TestDBClass(unittest.TestCase):
                           delete, 'test_parent', None, n=2)
         self.assertRaises(pg.IntegrityError,
                           delete, 'test_parent *', None, n=2)
-        r = delete('test_child', None, n=2)
+        r: Any = delete('test_child', None, n=2)
         self.assertEqual(r, 1)
         self.assertEqual(query(q).getresult()[0], (3, 2))
         r = delete('test_parent', None, n=2)
@@ -2706,7 +2714,7 @@ class TestDBClass(unittest.TestCase):
         self.db.insert(table, dict(n=1, t='one'))
         self.db.insert(table, dict(n=2, t='too'))
         self.db.insert(table, dict(n=3, t='three'))
-        r = self.db.get(table, 2)
+        r: Any = self.db.get(table, 2)
         self.assertEqual(r['t'], 'too')
         self.db.update(table, dict(n=2, t='two'))
         r = self.db.get(table, 2)
@@ -2724,7 +2732,7 @@ class TestDBClass(unittest.TestCase):
         self.create_table('test_table', 'n smallint',
                           temporary=False, values=[1] * 3)
         q = "select count(*) from test_table"
-        r = query(q).getresult()[0][0]
+        r: Any = query(q).getresult()[0][0]
         self.assertEqual(r, 3)
         truncate('test_table')
         r = query(q).getresult()[0][0]
@@ -2757,7 +2765,7 @@ class TestDBClass(unittest.TestCase):
         for _n in range(3):
             query("insert into test_table (t) values ('test')")
         q = "select count(n), min(n), max(n) from test_table"
-        r = query(q).getresult()[0]
+        r: Any = query(q).getresult()[0]
         self.assertEqual(r, (3, 1, 3))
         truncate('test_table')
         r = query(q).getresult()[0]
@@ -2785,7 +2793,7 @@ class TestDBClass(unittest.TestCase):
                          values=range(3))
         q = ("select (select count(*) from test_parent),"
              " (select count(*) from test_child)")
-        r = query(q).getresult()[0]
+        r: Any = query(q).getresult()[0]
         self.assertEqual(r, (3, 3))
         self.assertRaises(pg.NotSupportedError, truncate, 'test_parent')
         truncate(['test_parent', 'test_child'])
@@ -2899,7 +2907,7 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(TypeError, get_as_list, None)
         query = self.db.query
         table = 'test_aslist'
-        r = query('select 1 as colname').namedresult()[0]
+        r: Any = query('select 1 as colname').namedresult()[0]
         self.assertIsInstance(r, tuple)
         named = hasattr(r, 'colname')
         names = [(1, 'Homer'), (2, 'Marge'),
@@ -2918,7 +2926,7 @@ class TestDBClass(unittest.TestCase):
                 self.assertEqual(t._asdict(), dict(id=n[0], name=n[1]))
         r = get_as_list(table, what='name')
         self.assertIsInstance(r, list)
-        expected = sorted((row[1],) for row in names)
+        expected: Any = sorted((row[1],) for row in names)
         self.assertEqual(r, expected)
         r = get_as_list(table, what='name, id')
         self.assertIsInstance(r, list)
@@ -3029,8 +3037,8 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(KeyError, get_as_dict, table,
                           keyname='rgb', what='name')
         r = get_as_dict(table)
-        self.assertIsInstance(r, OrderedDict)
-        expected = OrderedDict((row[0], row[1:]) for row in colors)
+        self.assertIsInstance(r, dict)
+        expected: Any = {row[0]: row[1:] for row in colors}
         self.assertEqual(r, expected)
         for key in r:
             self.assertIsInstance(key, int)
@@ -3045,9 +3053,9 @@ class TestDBClass(unittest.TestCase):
                 self.assertEqual(row._asdict(), dict(rgb=t[0], name=t[1]))
         self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname='rgb')
-        self.assertIsInstance(r, OrderedDict)
-        expected = OrderedDict((row[1], (row[0], row[2]))
-                               for row in sorted(colors, key=itemgetter(1)))
+        self.assertIsInstance(r, dict)
+        expected = {row[1]: (row[0], row[2])
+                    for row in sorted(colors, key=itemgetter(1))}
         self.assertEqual(r, expected)
         for key in r:
             self.assertIsInstance(key, str)
@@ -3063,8 +3071,8 @@ class TestDBClass(unittest.TestCase):
                 self.assertEqual(row._asdict(), dict(id=t[0], name=t[1]))
         self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname=['id', 'rgb'])
-        self.assertIsInstance(r, OrderedDict)
-        expected = OrderedDict((row[:2], row[2:]) for row in colors)
+        self.assertIsInstance(r, dict)
+        expected = {row[:2]: row[2:] for row in colors}
         self.assertEqual(r, expected)
         for key in r:
             self.assertIsInstance(key, tuple)
@@ -3084,8 +3092,8 @@ class TestDBClass(unittest.TestCase):
                 self.assertEqual(row._asdict(), dict(name=t[0]))
         self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname=['id', 'rgb'], scalar=True)
-        self.assertIsInstance(r, OrderedDict)
-        expected = OrderedDict((row[:2], row[2]) for row in colors)
+        self.assertIsInstance(r, dict)
+        expected = {row[:2]: row[2] for row in colors}
         self.assertEqual(r, expected)
         for key in r:
             self.assertIsInstance(key, tuple)
@@ -3097,9 +3105,9 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(table, keyname='rgb', what=['rgb', 'name'],
                         scalar=True)
-        self.assertIsInstance(r, OrderedDict)
-        expected = OrderedDict(
-            (row[1], row[2]) for row in sorted(colors, key=itemgetter(1)))
+        self.assertIsInstance(r, dict)
+        expected = {row[1]: row[2]
+                    for row in sorted(colors, key=itemgetter(1))}
         self.assertEqual(r, expected)
         for key in r:
             self.assertIsInstance(key, str)
@@ -3111,8 +3119,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r.keys(), expected.keys())
         r = get_as_dict(
             table, what='id, name', where="rgb like '#b%'", scalar=True)
-        self.assertIsInstance(r, OrderedDict)
-        expected = OrderedDict((row[0], row[2]) for row in colors[1:3])
+        self.assertIsInstance(r, dict)
+        expected = {row[0]: row[2] for row in colors[1:3]}
         self.assertEqual(r, expected)
         for key in r:
             self.assertIsInstance(key, int)
@@ -3140,31 +3148,31 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(len(r), 1)
         self.assertEqual(r[4][1], 'Desert')
         r = get_as_dict(table, order='id desc')
-        expected = OrderedDict((row[0], row[1:]) for row in reversed(colors))
+        expected = {row[0]: row[1:] for row in reversed(colors)}
         self.assertEqual(r, expected)
         r = get_as_dict(table, where='id > 5')
-        self.assertIsInstance(r, OrderedDict)
+        self.assertIsInstance(r, dict)
         self.assertEqual(len(r), 0)
         # test with unordered query
         expected = {row[0]: row[1:] for row in colors}
         r = get_as_dict(table, order=False)
         self.assertIsInstance(r, dict)
         self.assertEqual(r, expected)
-        self.assertNotIsInstance(self, OrderedDict)
+        self.assertNotIsInstance(self, dict)
         # test with arbitrary from clause
         from_table = f'(select id, lower(name) as n2 from "{table}") as t2'
         # primary key must be passed explicitly in this case
         self.assertRaises(pg.ProgrammingError, get_as_dict, from_table)
         r = get_as_dict(from_table, 'id')
-        self.assertIsInstance(r, OrderedDict)
-        expected = OrderedDict((row[0], (row[2].lower(),)) for row in colors)
+        self.assertIsInstance(r, dict)
+        expected = {row[0]: (row[2].lower(),) for row in colors}
         self.assertEqual(r, expected)
         # test without a primary key
         query(f'alter table "{table}" drop constraint "{table}_pkey"')
         self.assertRaises(KeyError, self.db.pkey, table, flush=True)
         self.assertRaises(pg.ProgrammingError, get_as_dict, table)
         r = get_as_dict(table, keyname='id')
-        expected = OrderedDict((row[0], row[1:]) for row in colors)
+        expected = {row[0]: row[1:] for row in colors}
         self.assertIsInstance(r, dict)
         self.assertEqual(r, expected)
         r = (1, '#007fff', 'Azure')
@@ -3783,14 +3791,17 @@ class TestDBClass(unittest.TestCase):
                 name='text', age='int', married='bool',
                 weight='float', salary='money'))
         decimal = pg.get_decimal()
+        bool_class: type
+        t: bool | str
+        f: bool | str
         if pg.get_bool():
             bool_class = bool
             t, f = True, False
         else:
             bool_class = str
             t, f = 't', 'f'
-        person = ('John Doe', 61, t, 99.5, decimal('93456.75'))
-        r = self.db.insert('test_person', None, person=person)
+        person: tuple = ('John Doe', 61, t, 99.5, decimal('93456.75'))
+        r: Any = self.db.insert('test_person', None, person=person)
         self.assertEqual(r['id'], 1)
         p = r['person']
         self.assertIsInstance(p, tuple)
@@ -4301,9 +4312,11 @@ class TestDBClass(unittest.TestCase):
 class TestDBClassNonStdOpts(TestDBClass):
     """Test the methods of the DB class with non-standard global options."""
 
+    saved_options: ClassVar[dict[str, Any]] = {}
+
     @classmethod
     def setUpClass(cls):
-        cls.saved_options = {}
+        cls.saved_options.clear()
         cls.set_option('decimal', float)
         not_bool = not pg.get_bool()
         cls.set_option('bool', not_bool)
@@ -4375,8 +4388,8 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertRaises(TypeError, format_query, '%s,%s', (1, 2), ('int2',))
         self.assertRaises(
             TypeError, format_query, '%s,%s', (1,), ('int2', 'int2'))
-        values = (3, 7.5, 'hello', True)
-        types = ('int4', 'float4', 'text', 'bool')
+        values: list | tuple = (3, 7.5, 'hello', True)
+        types: list | tuple = ('int4', 'float4', 'text', 'bool')
         sql, params = format_query("select %s,%s,%s,%s", values, types)
         self.assertEqual(sql, 'select $1,$2,$3,$4')
         self.assertEqual(params, [3, 7.5, 'hello', 't'])
@@ -4434,7 +4447,7 @@ class TestDBClassAdapter(unittest.TestCase):
 
     def test_adapt_query_typed_list_with_json(self):
         format_query = self.adapter.format_query
-        value = {'test': [1, "it's fine", 3]}
+        value: Any = {'test': [1, "it's fine", 3]}
         sql, params = format_query("select %s", (value,), 'json')
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['{"test": [1, "it\'s fine", 3]}'])
@@ -4449,7 +4462,7 @@ class TestDBClassAdapter(unittest.TestCase):
 
     def test_adapt_query_typed_with_hstore(self):
         format_query = self.adapter.format_query
-        value = {'one': "it's fine", 'two': 2}
+        value: Any = {'one': "it's fine", 'two': 2}
         sql, params = format_query("select %s", (value,), 'hstore')
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
@@ -4464,7 +4477,7 @@ class TestDBClassAdapter(unittest.TestCase):
 
     def test_adapt_query_typed_with_uuid(self):
         format_query = self.adapter.format_query
-        value = '12345678-1234-5678-1234-567812345678'
+        value: Any = '12345678-1234-5678-1234-567812345678'
         sql, params = format_query("select %s", (value,), 'uuid')
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['12345678-1234-5678-1234-567812345678'])
@@ -4482,8 +4495,8 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertRaises(
             TypeError, format_query,
             '%s,%s', dict(i1=1, i2=2), dict(i1='int2'))
-        values = dict(i=3, f=7.5, t='hello', b=True)
-        types = dict(i='int4', f='float4', t='text', b='bool')
+        values: dict = dict(i=3, f=7.5, t='hello', b=True)
+        types: dict = dict(i='int4', f='float4', t='text', b='bool')
         sql, params = format_query(
             "select %(i)s,%(f)s,%(t)s,%(b)s", values, types)
         self.assertEqual(sql, 'select $3,$2,$4,$1')
@@ -4523,7 +4536,7 @@ class TestDBClassAdapter(unittest.TestCase):
 
     def test_adapt_query_untyped_list(self):
         format_query = self.adapter.format_query
-        values = (3, 7.5, 'hello', True)
+        values: list | tuple = (3, 7.5, 'hello', True)
         sql, params = format_query("select %s,%s,%s,%s", values)
         self.assertEqual(sql, 'select $1,$2,$3,$4')
         self.assertEqual(params, [3, 7.5, 'hello', 't'])
@@ -4562,7 +4575,7 @@ class TestDBClassAdapter(unittest.TestCase):
 
     def test_adapt_query_untyped_dict(self):
         format_query = self.adapter.format_query
-        values = dict(i=3, f=7.5, t='hello', b=True)
+        values: dict = dict(i=3, f=7.5, t='hello', b=True)
         sql, params = format_query(
             "select %(i)s,%(f)s,%(t)s,%(b)s", values)
         self.assertEqual(sql, 'select $3,$2,$4,$1')
@@ -4589,7 +4602,7 @@ class TestDBClassAdapter(unittest.TestCase):
 
     def test_adapt_query_inline_list(self):
         format_query = self.adapter.format_query
-        values = (3, 7.5, 'hello', True)
+        values: list | tuple = (3, 7.5, 'hello', True)
         sql, params = format_query("select %s,%s,%s,%s", values, inline=True)
         self.assertEqual(sql, "select 3,7.5,'hello',true")
         self.assertEqual(params, [])
@@ -4633,7 +4646,7 @@ class TestDBClassAdapter(unittest.TestCase):
 
     def test_adapt_query_inline_dict(self):
         format_query = self.adapter.format_query
-        values = dict(i=3, f=7.5, t='hello', b=True)
+        values: dict = dict(i=3, f=7.5, t='hello', b=True)
         sql, params = format_query(
             "select %(i)s,%(f)s,%(t)s,%(b)s", values, inline=True)
         self.assertEqual(sql, "select 3,7.5,'hello',true")
@@ -4683,6 +4696,7 @@ class TestSchemas(unittest.TestCase):
     """Test correct handling of schemas (namespaces)."""
 
     cls_set_up = False
+    with_oids = ""
 
     @classmethod
     def setUpClass(cls):
@@ -4823,11 +4837,11 @@ class TestSchemas(unittest.TestCase):
 
 class TestDebug(unittest.TestCase):
     """Test the debug attribute of the DB class."""
-
+ 
     def setUp(self):
         self.db = DB()
         self.query = self.db.query
-        self.debug = self.db.debug
+        self.debug = self.db.debug  # type: ignore
         self.output = StringIO()
         self.stdout, sys.stdout = sys.stdout, self.output
 
@@ -4877,7 +4891,7 @@ class TestDebug(unittest.TestCase):
             self.assertEqual(self.get_output(), "")
 
     def test_debug_is_callable(self):
-        output = []
+        output: list[str] = []
         self.db.debug = output.append
         self.db.query("select 1")
         self.db.query("select 2")
@@ -4885,7 +4899,7 @@ class TestDebug(unittest.TestCase):
         self.assertEqual(self.get_output(), "")
 
     def test_debug_multiple_args(self):
-        output = []
+        output: list[str] = []
         self.db.debug = output.append
         args = ['Error', 42, {1: 'a', 2: 'b'}, [3, 5, 7]]
         self.db._do_debug(*args)
@@ -4897,8 +4911,8 @@ class TestMemoryLeaks(unittest.TestCase):
     """Test that the DB class does not leak memory."""
 
     def get_leaks(self, fut):
-        ids = set()
-        objs = []
+        ids: set = set()
+        objs: list = []
         add_ids = ids.update
         gc.collect()
         objs[:] = gc.get_objects()

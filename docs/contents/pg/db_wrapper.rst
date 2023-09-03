@@ -58,7 +58,7 @@ pkey -- return the primary key of a table
     Return the primary key of a table
 
     :param str table: name of table
-    :returns: Name of the field which is the primary key of the table
+    :returns: Name of the field that is the primary key of the table
     :rtype: str
     :raises KeyError: the table does not have a primary key
 
@@ -66,6 +66,22 @@ This method returns the primary key of a table.  Single primary keys are
 returned as strings unless you set the composite flag.  Composite primary
 keys are always represented as tuples.  Note that this raises a KeyError
 if the table does not have a primary key.
+
+pkeys -- return the primary keys of a table
+-------------------------------------------
+
+.. method:: DB.pkeys(table)
+
+    Return the primary keys of a table as a tuple
+
+    :param str table: name of table
+    :returns: Names of the fields that are the primary keys of the table
+    :rtype: tuple
+    :raises KeyError: the table does not have a primary key
+
+This method returns the primary keys of a table as a tuple, i.e.
+single primary keys are also returned as a tuple with one item.
+Note that this raises a KeyError if the table does not have a primary key.
 
 get_databases -- get list of databases in the system
 ----------------------------------------------------

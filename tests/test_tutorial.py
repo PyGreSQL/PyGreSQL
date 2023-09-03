@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import unittest
+from typing import Any
 
 from pg import DB
 from pgdb import connect
@@ -29,7 +30,7 @@ class TestClassicTutorial(unittest.TestCase):
 
     def test_all_steps(self):
         db = self.db
-        r = db.get_tables()
+        r: Any = db.get_tables()
         self.assertIsInstance(r, list)
         self.assertIn('public.fruits', r)
         r = db.get_attnames('fruits')

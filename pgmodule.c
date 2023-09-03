@@ -21,7 +21,7 @@
 static PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
     *InternalError, *OperationalError, *ProgrammingError, *IntegrityError,
     *DataError, *NotSupportedError, *InvalidResultError, *NoResultError,
-    *MultipleResultsError;
+    *MultipleResultsError, *Connection, *Query;
 
 #define _TOSTRING(x) #x
 #define TOSTRING(x) _TOSTRING(x)
@@ -1304,6 +1304,12 @@ PyInit__pg(void)
     MultipleResultsError = PyErr_NewException("pg.MultipleResultsError",
                                               InvalidResultError, NULL);
     PyDict_SetItemString(dict, "MultipleResultsError", MultipleResultsError);
+
+    /* Types */
+    Connection = (PyObject *)&connType;
+    PyDict_SetItemString(dict, "Connection", Connection);
+    Query = (PyObject *)&queryType;
+    PyDict_SetItemString(dict, "Query", Query);
 
     /* Make the version available */
     s = PyUnicode_FromString(PyPgVersion);

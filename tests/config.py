@@ -26,9 +26,9 @@ if dbport:
     dbport = int(dbport)
 
 try:
-    from .LOCAL_PyGreSQL import *  # noqa: F403
+    from .LOCAL_PyGreSQL import *  # type: ignore  # noqa
 except (ImportError, ValueError):
-    try:  # noqa: SIM105
-        from LOCAL_PyGreSQL import *  # noqa: F403
+    try:  # noqa
+        from LOCAL_PyGreSQL import *  # type: ignore  # noqa
     except ImportError:
         pass
