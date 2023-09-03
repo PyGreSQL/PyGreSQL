@@ -1970,7 +1970,7 @@ class DB:
             if param == 'all':
                 if value is not None:
                     raise ValueError(
-                        'A value must ot be specified'
+                        'A value must not be specified'
                         " when parameter is 'all'")
                 params = {'all': None}
                 break
