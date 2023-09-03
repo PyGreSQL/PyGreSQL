@@ -1359,9 +1359,6 @@ class DbTypes(dict):
         return cast(value)
 
 
-_re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
-
-
 # The result rows for database operations are returned as named tuples
 # by default. Since creating namedtuple classes is a somewhat expensive
 # operation, we cache up to 1024 of these classes by default.

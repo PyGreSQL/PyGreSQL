@@ -64,7 +64,7 @@ Basic usage:
     connection.close() # close the connection
 """
 
-from __future__ import print_function, division
+from __future__ import division, print_function
 
 try:
     from _pg import *
@@ -116,19 +116,22 @@ __all__ = [
     'get_typecast', 'set_typecast', 'reset_typecast',
     'version', '__version__']
 
-from datetime import date, time, datetime, timedelta, tzinfo
-from time import localtime
+from datetime import date, datetime, time, timedelta, tzinfo
 from decimal import Decimal as StdDecimal
+from math import isinf, isnan
+from time import localtime
 from uuid import UUID as Uuid
-from math import isnan, isinf
+
 try:  # noinspection PyCompatibility
     from collections.abc import Iterable
 except ImportError:  # Python < 3.3
     from collections import Iterable
+
 from collections import namedtuple
 from functools import partial
+from json import dumps as jsonencode
+from json import loads as jsondecode
 from re import compile as regex
-from json import loads as jsondecode, dumps as jsonencode
 
 Decimal = StdDecimal
 
@@ -899,10 +902,6 @@ def _op_error(msg):
 
 
 # *** Row Tuples ***
-
-
-_re_fieldname = regex('^[A-Za-z][_a-zA-Z0-9]*$')
-
 
 # The result rows for database operations are returned as named tuples
 # by default. Since creating namedtuple classes is a somewhat expensive
