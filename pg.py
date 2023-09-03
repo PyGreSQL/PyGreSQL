@@ -2634,7 +2634,7 @@ class DB:
         If restart is set to True, sequences owned by columns of the truncated
         table(s) are automatically restarted.  If cascade is set to True, it
         also truncates all tables that have foreign-key references to any of
-        the named tables.  If the parameter only is not set to True, all the
+        the named tables.  If the parameter 'only' is not set to True, all the
         descendant tables (if any) will also be truncated. Optionally, a '*'
         can be specified after the table name to explicitly indicate that
         descendant tables are included.
