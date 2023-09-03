@@ -1,9 +1,11 @@
 #!/usr/bin/python
 
+from __future__ import annotations
+
 import gc
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any, Mapping
+from typing import Any, ClassVar
 from uuid import UUID as Uuid  # noqa: N811
 
 import pgdb
@@ -26,7 +28,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
 
     driver = pgdb
     connect_args = ()
-    connect_kw_args: Mapping[str, Any] = {
+    connect_kw_args: ClassVar[dict[str, Any]] = {
         'database': dbname, 'host': f"{dbhost or ''}:{dbport or -1}",
         'user': dbuser, 'password': dbpasswd}
 
@@ -159,8 +161,10 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         class TestCursor(pgdb.Cursor):
 
             def row_factory(self, row):
+                description = self.description
+                assert isinstance(description, list)
                 return {f'column {desc[0]}': value
-                        for desc, value in zip(self.description, row)}
+                        for desc, value in zip(description, row)}
 
         con = self._connect()
         con.cursor_type = TestCursor
@@ -186,7 +190,9 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         class TestCursor(pgdb.Cursor):
 
             def build_row_factory(self):
-                keys = [desc[0] for desc in self.description]
+                description = self.description
+                assert isinstance(description, list)
+                keys = [desc[0] for desc in description]
                 return lambda row: {
                     key: value for key, value in zip(keys, row)}
 
@@ -566,19 +572,37 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 inval = -inf
             elif inval in ('nan', 'NaN'):
                 inval = nan
-            if isinf(inval):
+            if isinf(inval):  # type: ignore
                 self.assertTrue(isinf(outval))
-                if inval < 0:
+                if inval < 0:  # type: ignore
                     self.assertTrue(outval < 0)
                 else:
                     self.assertTrue(outval > 0)
-            elif isnan(inval):
+            elif isnan(inval):  # type: ignore
                 self.assertTrue(isnan(outval))
             else:
                 self.assertEqual(inval, outval)
 
     def test_datetime(self):
         dt = datetime(2011, 7, 17, 15, 47, 42, 317509)
+        values = [dt.date(), dt.time(), dt, dt.time(), dt]
+        assert isinstance(values[3], time)
+        values[3] = values[3].replace(tzinfo=timezone.utc)
+        assert isinstance(values[4], datetime)
+        values[4] = values[4].replace(tzinfo=timezone.utc)
+        d = (dt.year, dt.month, dt.day)
+        t = (dt.hour, dt.minute, dt.second, dt.microsecond)
+        z = (timezone.utc,)
+        inputs = [
+            # input as objects
+            values,
+            # input as text
+            [v.isoformat() for v in values],  # type: ignore
+            # # input using type helpers
+            [pgdb.Date(*d), pgdb.Time(*t),
+             pgdb.Timestamp(*(d + t)), pgdb.Time(*(t + z)),
+             pgdb.Timestamp(*(d + t + z))]
+        ]
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
@@ -587,26 +611,11 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             cur.execute(f"create table {table} ("
                         "d date, t time,  ts timestamp,"
                         "tz timetz, tsz timestamptz)")
-            for n in range(3):
-                values = [dt.date(), dt.time(), dt, dt.time(), dt]
-                values[3] = values[3].replace(tzinfo=timezone.utc)
-                values[4] = values[4].replace(tzinfo=timezone.utc)
-                if n == 0:  # input as objects
-                    params = values
-                if n == 1:  # input as text
-                    params = [v.isoformat() for v in values]  # as text
-                elif n == 2:  # input using type helpers
-                    d = (dt.year, dt.month, dt.day)
-                    t = (dt.hour, dt.minute, dt.second, dt.microsecond)
-                    z = (timezone.utc,)
-                    params = [pgdb.Date(*d), pgdb.Time(*t),
-                              pgdb.Timestamp(*(d + t)), pgdb.Time(*(t + z)),
-                              pgdb.Timestamp(*(d + t + z))]
+            for params in inputs:
                 for datestyle in ('iso', 'postgres, mdy', 'postgres, dmy',
                                   'sql, mdy', 'sql, dmy', 'german'):
                     cur.execute(f"set datestyle to {datestyle}")
-                    if n != 1:
-                        # noinspection PyUnboundLocalVariable
+                    if not isinstance(params[0], str):
                         cur.execute("select %s,%s,%s,%s,%s", params)
                         row = cur.fetchone()
                         self.assertEqual(row, tuple(values))
@@ -615,11 +624,13 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                         " values (%s,%s,%s,%s,%s)", params)
                     cur.execute(f"select * from {table}")
                     d = cur.description
+                    assert isinstance(d, list)
                     for i in range(5):
-                        self.assertEqual(d[i].type_code, pgdb.DATETIME)
-                        self.assertNotEqual(d[i].type_code, pgdb.STRING)
-                        self.assertNotEqual(d[i].type_code, pgdb.ARRAY)
-                        self.assertNotEqual(d[i].type_code, pgdb.RECORD)
+                        tc = d[i].type_code
+                        self.assertEqual(tc, pgdb.DATETIME)
+                        self.assertNotEqual(tc, pgdb.STRING)
+                        self.assertNotEqual(tc, pgdb.ARRAY)
+                        self.assertNotEqual(tc, pgdb.RECORD)
                     self.assertEqual(d[0].type_code, pgdb.DATE)
                     self.assertEqual(d[1].type_code, pgdb.TIME)
                     self.assertEqual(d[2].type_code, pgdb.TIMESTAMP)
@@ -633,20 +644,20 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
 
     def test_interval(self):
         td = datetime(2011, 7, 17, 15, 47, 42, 317509) - datetime(1970, 1, 1)
+        inputs = [
+            # input as objects
+            td,
+            # input as text
+            f'{td.days} days {td.seconds} seconds'
+            f' {td.microseconds} microseconds',
+            # input using type helpers
+            pgdb.Interval(td.days, 0, 0, td.seconds, td.microseconds)]
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
             cur.execute(f"create table {table} (i interval)")
-            for n in range(3):
-                if n == 0:  # input as objects
-                    param = td
-                if n == 1:  # input as text
-                    param = (f'{td.days} days {td.seconds} seconds'
-                             f' {td.microseconds} microseconds')
-                elif n == 2:  # input using type helpers
-                    param = pgdb.Interval(
-                        td.days, 0, 0, td.seconds, td.microseconds)
+            for param in inputs:
                 for intervalstyle in ('sql_standard ', 'postgres',
                                       'postgres_verbose', 'iso_8601'):
                     cur.execute(f"set intervalstyle to {intervalstyle}")
@@ -705,7 +716,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertEqual(result, d)
 
     def test_insert_array(self):
-        values = [
+        values: list[tuple[Any, Any]] = [
             (None, None), ([], []), ([None], [[None], ['null']]),
             ([1, 2, 3], [['a', 'b'], ['c', 'd']]),
             ([20000, 25000, 25000, 30000],
@@ -819,15 +830,15 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
 
     def test_custom_type(self):
         values = [3, 5, 65]
-        values = list(map(PgBitString, values))
+        values = list(map(PgBitString, values))  # type: ignore
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:
             cur = con.cursor()
-            params = enumerate(values)  # params have __pg_repr__ method
+            seq_params = enumerate(values)  # params have __pg_repr__ method
             cur.execute(
                 f'create table "{table}" (n smallint, b bit varying(7))')
-            cur.executemany(f"insert into {table} values (%s,%s)", params)
+            cur.executemany(f"insert into {table} values (%s,%s)", seq_params)
             cur.execute(f"select * from {table}")
             rows = cur.fetchall()
         finally:
@@ -850,20 +861,29 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         try:
             cur = con.cursor()
             # change decimal type globally to int
-            int_type = lambda v: int(float(v))  # noqa: E731
-            self.assertTrue(pgdb.decimal_type(int_type) is int_type)
+
+            class CustomDecimal(str):
+
+                def __init__(self, value: Any) -> None:
+                    self.value = value
+
+                def __str__(self) -> str:
+                    return str(self.value).replace('.', ',')
+                
+            self.assertTrue(pgdb.decimal_type(CustomDecimal) is CustomDecimal)
             cur.execute('select 4.25')
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
-            self.assertTrue(isinstance(value, int))
-            self.assertEqual(value, 4)
+            self.assertTrue(isinstance(value, CustomDecimal))
+            self.assertEqual(str(value), '4,25')
             # change decimal type again to float
             self.assertTrue(pgdb.decimal_type(float) is float)
             cur.execute('select 4.25')
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
             # the connection still uses the old setting
-            self.assertTrue(isinstance(value, int))
+            self.assertTrue(isinstance(value, str))
+            self.assertEqual(str(value), '4,25')
             # bust the cache for type functions for the connection
             con.type_cache.reset_typecast()
             cur.execute('select 4.25')
@@ -1352,8 +1372,8 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
 
     def test_memory_leaks(self):
-        ids = set()
-        objs = []
+        ids: set = set()
+        objs: list = []
         add_ids = ids.update
         gc.collect()
         objs[:] = gc.get_objects()

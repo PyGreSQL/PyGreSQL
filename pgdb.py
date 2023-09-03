@@ -69,7 +69,7 @@ from __future__ import annotations
 from collections import namedtuple
 from collections.abc import Iterable
 from contextlib import suppress
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, tzinfo
 from decimal import Decimal as StdDecimal
 from functools import lru_cache, partial
 from inspect import signature
@@ -78,7 +78,16 @@ from json import loads as jsondecode
 from math import isinf, isnan
 from re import compile as regex
 from time import localtime
-from typing import Callable, ClassVar
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Generator,
+    Mapping,
+    NamedTuple,
+    Sequence,
+    TypeVar,
+)
 from uuid import UUID as Uuid  # noqa: N811
 
 try:
@@ -131,9 +140,14 @@ from _pg import (
     cast_array,
     cast_hstore,
     cast_record,
-    connect,
     unescape_bytea,
     version,
+)
+from _pg import (
+    Connection as Cnx,  # base connection
+)
+from _pg import (
+    connect as get_cnx,  # get base connection
 )
 
 __version__ = version
@@ -197,7 +211,7 @@ def _timezone_as_offset(tz: str) -> str:
     return _timezones.get(tz, '+0000')
 
 
-def decimal_type(decimal_type: type | None = None):
+def decimal_type(decimal_type: type | None = None) -> type:
     """Get or set global type to be used for decimal values.
 
     Note that connections cache cast functions. To be sure a global change
@@ -212,15 +226,15 @@ def decimal_type(decimal_type: type | None = None):
 
 def cast_bool(value: str) -> bool | None:
     """Cast boolean value in database format to bool."""
-    if value:
-        return value[0] in ('t', 'T')
+    return value[0] in ('t', 'T') if value else None
 
 
-def cast_money(value: str) -> Decimal | None:  # pyright: ignore
+def cast_money(value: str) -> StdDecimal | None:
     """Cast money value in database format to Decimal."""
-    if value:
-        value = value.replace('(', '-')
-        return Decimal(''.join(c for c in value if c.isdigit() or c in '.-'))
+    if not value:
+        return None
+    value = value.replace('(', '-')
+    return Decimal(''.join(c for c in value if c.isdigit() or c in '.-'))
 
 
 def cast_int2vector(value: str) -> list[int]:
@@ -228,7 +242,7 @@ def cast_int2vector(value: str) -> list[int]:
     return [int(v) for v in value.split()]
 
 
-def cast_date(value: str, connection) -> date:
+def cast_date(value: str, cnx: Cnx) -> date:
     """Cast a date value."""
     # The output format depends on the server setting DateStyle.  The default
     # setting ISO and the setting for German are actually unambiguous.  The
@@ -244,7 +258,7 @@ def cast_date(value: str, connection) -> date:
     value = values[0]
     if len(value) > 10:
         return date.max
-    format = connection.date_format()
+    format = cnx.date_format()
     return datetime.strptime(value, format).date()
 
 
@@ -270,7 +284,7 @@ def cast_timetz(value: str) -> time:
     return datetime.strptime(value, format).timetz()
 
 
-def cast_timestamp(value: str, connection) -> datetime:
+def cast_timestamp(value: str, cnx: Cnx) -> datetime:
     """Cast a timestamp value."""
     if value == '-infinity':
         return datetime.min
@@ -279,7 +293,7 @@ def cast_timestamp(value: str, connection) -> datetime:
     values = value.split()
     if values[-1] == 'BC':
         return datetime.min
-    format = connection.date_format()
+    format = cnx.date_format()
     if format.endswith('-%Y') and len(values) > 2:
         values = values[1:5]
         if len(values[3]) > 4:
@@ -293,7 +307,7 @@ def cast_timestamp(value: str, connection) -> datetime:
     return datetime.strptime(' '.join(values), ' '.join(formats))
 
 
-def cast_timestamptz(value: str, connection) -> datetime:
+def cast_timestamptz(value: str, cnx: Cnx) -> datetime:
     """Cast a timestamptz value."""
     if value == '-infinity':
         return datetime.min
@@ -302,7 +316,7 @@ def cast_timestamptz(value: str, connection) -> datetime:
     values = value.split()
     if values[-1] == 'BC':
         return datetime.min
-    format = connection.date_format()
+    format = cnx.date_format()
     if format.endswith('-%Y') and len(values) > 2:
         values = values[1:]
         if len(values[3]) > 4:
@@ -439,9 +453,9 @@ class Typecasts(dict):
         'int2vector': cast_int2vector, 'uuid': Uuid,
         'anyarray': cast_array, 'record': cast_record}
 
-    connection = None  # will be set in local connection specific instances
+    cnx: Cnx | None = None  # for local connection specific instances
 
-    def __missing__(self, typ):
+    def __missing__(self, typ: str) -> Callable | None:
         """Create a cast function if it is not cached.
 
         Note that this class never raises a KeyError,
@@ -464,26 +478,26 @@ class Typecasts(dict):
         return cast
 
     @staticmethod
-    def _needs_connection(func):
+    def _needs_connection(func: Callable) -> bool:
         """Check if a typecast function needs a connection argument."""
         try:
             args = get_args(func)
         except (TypeError, ValueError):
             return False
-        else:
-            return 'connection' in args[1:]
+        return 'cnx' in args[1:]
 
-    def _add_connection(self, cast):
+    def _add_connection(self, cast: Callable) -> Callable:
         """Add a connection argument to the typecast function if necessary."""
-        if not self.connection or not self._needs_connection(cast):
+        if not self.cnx or not self._needs_connection(cast):
             return cast
-        return partial(cast, connection=self.connection)
+        return partial(cast, cnx=self.cnx)
 
-    def get(self, typ, default=None):
+    def get(self, typ: str, default: Callable | None = None  # type: ignore
+            ) -> Callable | None:
         """Get the typecast function for the given database type."""
         return self[typ] or default
 
-    def set(self, typ, cast):
+    def set(self, typ: str | Sequence[str], cast: Callable | None) -> None:
         """Set a typecast function for the specified database type(s)."""
         if isinstance(typ, str):
             typ = [typ]
@@ -498,7 +512,7 @@ class Typecasts(dict):
                 self[t] = self._add_connection(cast)
                 self.pop(f'_{t}', None)
 
-    def reset(self, typ=None):
+    def reset(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecasts for the specified type(s) to their defaults.
 
         When no type is specified, all typecasts will be reset.
@@ -524,20 +538,21 @@ class Typecasts(dict):
                     self.pop(t, None)
                     self.pop(f'_{t}', None)
 
-    def create_array_cast(self, basecast):
+    def create_array_cast(self, basecast: Callable) -> Callable:
         """Create an array typecast for the given base cast."""
         cast_array = self['anyarray']
 
-        def cast(v):
+        def cast(v: Any) -> list:
             return cast_array(v, basecast)
         return cast
 
-    def create_record_cast(self, name, fields, casts):
+    def create_record_cast(self, name: str, fields: Sequence[str],
+                           casts: Sequence[str]) -> Callable:
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
-        record = namedtuple(name, fields)
+        record = namedtuple(name, fields)  # type: ignore
 
-        def cast(v):
+        def cast(v: Any) -> record:
             # noinspection PyArgumentList
             return record(*cast_record(v, casts))
         return cast
@@ -546,12 +561,12 @@ class Typecasts(dict):
 _typecasts = Typecasts()  # this is the global typecast dictionary
 
 
-def get_typecast(typ):
-    """Get the global typecast function for the given database type(s)."""
+def get_typecast(typ: str) -> Callable | None:
+    """Get the global typecast function for the given database type."""
     return _typecasts.get(typ)
 
 
-def set_typecast(typ, cast):
+def set_typecast(typ: str | Sequence[str], cast: Callable | None) -> None:
     """Set a global typecast function for the given database type(s).
 
     Note that connections cache cast functions. To be sure a global change
@@ -560,7 +575,7 @@ def set_typecast(typ, cast):
     _typecasts.set(typ, cast)
 
 
-def reset_typecast(typ=None):
+def reset_typecast(typ: str | Sequence[str] | None = None) -> None:
     """Reset the global typecasts for the given type(s) to their default.
 
     When no type is specified, all typecasts will be reset.
@@ -576,10 +591,11 @@ class LocalTypecasts(Typecasts):
 
     defaults = _typecasts
 
-    connection = None  # will be set in a connection specific instance
+    cnx: Cnx | None = None  # set in connection specific instances
 
-    def __missing__(self, typ):
+    def __missing__(self, typ: str) -> Callable | None:
         """Create a cast function if it is not cached."""
+        cast: Callable | None
         if typ.startswith('_'):
             base_cast = self[typ[1:]]
             cast = self.create_array_cast(base_cast)
@@ -594,13 +610,13 @@ class LocalTypecasts(Typecasts):
                 fields = self.get_fields(typ)
                 if fields:
                     casts = [self[field.type] for field in fields]
-                    fields = [field.name for field in fields]
-                    cast = self.create_record_cast(typ, fields, casts)
+                    field_names = [field.name for field in fields]
+                    cast = self.create_record_cast(typ, field_names, casts)
                     self[typ] = cast
         return cast
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_fields(self, typ):
+    def get_fields(self, typ: str) -> list[FieldInfo]:
         """Return the fields for the given record type.
 
         This method will be replaced with a method that looks up the fields
@@ -616,9 +632,17 @@ class TypeCode(str):
     but carry some additional information.
     """
 
+    oid: int
+    len: int
+    type: str
+    category: str
+    delim: str
+    relid: int
+
     # noinspection PyShadowingBuiltins
     @classmethod
-    def create(cls, oid, name, len, type, category, delim, relid):
+    def create(cls, oid: int, name: str, len: int, type: str, category: str,
+               delim: str, relid: int) -> TypeCode:
         """Create a type code for a PostgreSQL data type."""
         self = cls(name)
         self.oid = oid
@@ -640,21 +664,22 @@ class TypeCache(dict):
     important information on the associated database type.
     """
 
-    def __init__(self, cnx):
+    def __init__(self, cnx: Cnx) -> None:
         """Initialize type cache for connection."""
         super().__init__()
         self._escape_string = cnx.escape_string
         self._src = cnx.source()
         self._typecasts = LocalTypecasts()
-        self._typecasts.get_fields = self.get_fields
-        self._typecasts.connection = cnx
+        self._typecasts.get_fields = self.get_fields  # type: ignore
+        self._typecasts.cnx = cnx
         self._query_pg_type = (
             "SELECT oid, typname,"
             " typlen, typtype, typcategory, typdelim, typrelid"
             " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) {}")
 
-    def __missing__(self, key):
+    def __missing__(self, key: int | str) -> TypeCode:
         """Get the type info from the database if it is not cached."""
+        oid: int | str
         if isinstance(key, int):
             oid = key
         else:
@@ -677,43 +702,48 @@ class TypeCache(dict):
         self[type_code.oid] = self[str(type_code)] = type_code
         return type_code
 
-    def get(self, key, default=None):
+    def get(self, key: int | str,  # type: ignore
+            default: TypeCode | None = None) -> TypeCode | None:
         """Get the type even if it is not cached."""
         try:
             return self[key]
         except KeyError:
             return default
 
-    def get_fields(self, typ):
+    def get_fields(self, typ: int | str | TypeCode) -> list[FieldInfo] | None:
         """Get the names and types of the fields of composite types."""
-        if not isinstance(typ, TypeCode):
-            typ = self.get(typ)
-            if not typ:
+        if isinstance(typ, TypeCode):
+            relid = typ.relid
+        else:
+            type_code = self.get(typ)
+            if not type_code:
                 return None
-        if not typ.relid:
+            relid = type_code.relid
+        if not relid:
             return None  # this type is not composite
         self._src.execute(
             "SELECT attname, atttypid"  # noqa: S608
             " FROM pg_catalog.pg_attribute"
-            f" WHERE attrelid OPERATOR(pg_catalog.=) {typ.relid}"
+            f" WHERE attrelid OPERATOR(pg_catalog.=) {relid}"
             " AND attnum OPERATOR(pg_catalog.>) 0"
             " AND NOT attisdropped ORDER BY attnum")
         return [FieldInfo(name, self.get(int(oid)))
                 for name, oid in self._src.fetch(-1)]
 
-    def get_typecast(self, typ):
+    def get_typecast(self, typ: str) -> Callable | None:
         """Get the typecast function for the given database type."""
         return self._typecasts[typ]
 
-    def set_typecast(self, typ, cast):
+    def set_typecast(self, typ: str | Sequence[str],
+                     cast: Callable | None) -> None:
         """Set a typecast function for the specified database type(s)."""
         self._typecasts.set(typ, cast)
 
-    def reset_typecast(self, typ=None):
+    def reset_typecast(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecast function for the specified database type(s)."""
         self._typecasts.reset(typ)
 
-    def typecast(self, value, typ):
+    def typecast(self, value: Any, typ: str) -> Any:
         """Cast the given value according to the given database type."""
         if value is None:
             # for NULL values, no typecast is necessary
@@ -724,13 +754,13 @@ class TypeCache(dict):
             return value
         return cast(value)
 
-    def get_row_caster(self, types):
+    def get_row_caster(self, types: Sequence[str]) -> Callable:
         """Get a typecast function for a complete row of values."""
         typecasts = self._typecasts
         casts = [typecasts[typ] for typ in types]
         casts = [cast if cast is not str else None for cast in casts]
 
-        def row_caster(row):
+        def row_caster(row: Sequence) -> Sequence:
             return [value if cast is None or value is None else cast(value)
                     for cast, value in zip(casts, row)]
 
@@ -743,22 +773,26 @@ class _QuoteDict(dict):
     The quote attribute must be set to the desired quote function.
     """
 
-    def __getitem__(self, key):
+    quote: Callable[[str], str]
+
+    def __getitem__(self, key: str) -> str:
         # noinspection PyUnresolvedReferences
         return self.quote(super().__getitem__(key))
 
 
 # *** Error Messages ***
 
+E = TypeVar('E', bound=DatabaseError)
 
-def _db_error(msg, cls=DatabaseError):
+
+def _db_error(msg: str, cls:type[E] = DatabaseError) -> type[E]:
     """Return DatabaseError with empty sqlstate attribute."""
     error = cls(msg)
     error.sqlstate = None
     return error
 
 
-def _op_error(msg):
+def _op_error(msg: str) -> OperationalError:
     """Return OperationalError."""
     return _db_error(msg, OperationalError)
 
@@ -771,16 +805,16 @@ def _op_error(msg):
 
 # noinspection PyUnresolvedReferences
 @lru_cache(maxsize=1024)
-def _row_factory(names):
+def _row_factory(names: Sequence[str]) -> Callable[[Sequence], NamedTuple]:
     """Get a namedtuple factory for row results with the given names."""
     try:
-        return namedtuple('Row', names, rename=True)._make
+        return namedtuple('Row', names, rename=True)._make  # type: ignore
     except ValueError:  # there is still a problem with the field names
         names = [f'column_{n}' for n in range(len(names))]
-        return namedtuple('Row', names)._make
+        return namedtuple('Row', names)._make  # type: ignore
 
 
-def set_row_factory_size(maxsize):
+def set_row_factory_size(maxsize: int | None) -> None:
     """Change the size of the namedtuple factory cache.
 
     If maxsize is set to None, the cache can grow without bound.
@@ -795,46 +829,51 @@ def set_row_factory_size(maxsize):
 class Cursor:
     """Cursor object."""
 
-    def __init__(self, dbcnx):
+    def __init__(self, connection: Connection) -> None:
         """Create a cursor object for the database connection."""
-        self.connection = self._dbcnx = dbcnx
-        self._cnx = dbcnx._cnx
-        self.type_cache = dbcnx.type_cache
+        self.connection = self._connection = connection
+        cnx = connection._cnx
+        if not cnx:
+            raise _op_error("Connection has been closed")
+        self._cnx = cnx
+        self.type_cache = connection.type_cache
         self._src = self._cnx.source()
         # the official attribute for describing the result columns
-        self._description = None
+        self._description: list[CursorDescription] | bool | None = None
         if self.row_factory is Cursor.row_factory:
             # the row factory needs to be determined dynamically
-            self.row_factory = None
+            self.row_factory = None  # type: ignore
         else:
-            self.build_row_factory = None
+            self.build_row_factory = None  # type: ignore
         self.rowcount = -1
         self.arraysize = 1
         self.lastrowid = None
 
-    def __iter__(self):
+    def __iter__(self) -> Cursor:
         """Make cursor compatible to the iteration protocol."""
         return self
 
-    def __enter__(self):
+    def __enter__(self) -> Cursor:
         """Enter the runtime context for the cursor object."""
         return self
 
-    def __exit__(self, et, ev, tb):
+    def __exit__(self, et: type[BaseException] | None,
+                 ev: BaseException | None, tb: Any) -> None:
         """Exit the runtime context for the cursor object."""
         self.close()
 
-    def _quote(self, value):
+    def _quote(self, value: Any) -> Any:
         """Quote value depending on its type."""
         if value is None:
             return 'NULL'
         if isinstance(value, (Hstore, Json)):
             value = str(value)
         if isinstance(value, (bytes, str)):
+            cnx = self._cnx
             if isinstance(value, Binary):
-                value = self._cnx.escape_bytea(value).decode('ascii')
+                value = cnx.escape_bytea(value).decode('ascii')
             else:
-                value = self._cnx.escape_string(value)
+                value = cnx.escape_string(value)
             return f"'{value}'"
         if isinstance(value, float):
             if isinf(value):
@@ -887,7 +926,8 @@ class Cursor:
             value = self._quote(value)
         return value
 
-    def _quoteparams(self, string, parameters):
+    def _quoteparams(self, string: str,
+                     parameters: Mapping | Sequence | None) -> str:
         """Quote parameters.
 
         This function works for both mappings and sequences.
@@ -907,12 +947,15 @@ class Cursor:
             parameters = tuple(map(self._quote, parameters))
         return string % parameters
 
-    def _make_description(self, info):
+    def _make_description(self, info: tuple[int, str, int, int, int]
+                          ) -> CursorDescription:
         """Make the description tuple for the given field info."""
         name, typ, size, mod = info[1:]
         type_code = self.type_cache[typ]
         if mod > 0:
             mod -= 4
+        precision: int | None
+        scale: int | None
         if type_code == 'numeric':
             precision, scale = mod >> 16, mod & 0xffff
             size = precision
@@ -922,34 +965,39 @@ class Cursor:
             if size == -1:
                 size = mod
             precision = scale = None
-        return CursorDescription(name, type_code,
-                                 None, size, precision, scale, None)
+        return CursorDescription(
+            name, type_code, None, size, precision, scale, None)
 
     @property
-    def description(self):
+    def description(self) -> list[CursorDescription] | None:
         """Read-only attribute describing the result columns."""
-        descr = self._description
-        if self._description is True:
+        description = self._description
+        if description is None:
+            return None
+        if not isinstance(description, list):
             make = self._make_description
-            descr = [make(info) for info in self._src.listinfo()]
-            self._description = descr
-        return descr
+            description = [make(info) for info in self._src.listinfo()]
+            self._description = description
+        return description
 
     @property
-    def colnames(self):
+    def colnames(self) -> Sequence[str] | None:
         """Unofficial convenience method for getting the column names."""
-        return [d[0] for d in self.description]
+        description = self.description
+        return None if description is None else [d[0] for d in description]
 
     @property
-    def coltypes(self):
+    def coltypes(self) -> Sequence[TypeCode] | None:
         """Unofficial convenience method for getting the column types."""
-        return [d[1] for d in self.description]
+        description = self.description
+        return None if description is None else [d[1] for d in description]
 
-    def close(self):
+    def close(self) -> None:
         """Close the cursor object."""
         self._src.close()
 
-    def execute(self, operation, parameters=None):
+    def execute(self, operation: str, parameters: Sequence | None = None
+                ) -> Cursor:
         """Prepare and execute a database operation (query or command)."""
         # The parameters may also be specified as list of tuples to e.g.
         # insert multiple rows in a single operation, but this kind of
@@ -960,22 +1008,22 @@ class Cursor:
                 and all(isinstance(p, tuple) for p in parameters)
                 and all(len(p) == len(parameters[0]) for p in parameters[1:])):
             return self.executemany(operation, parameters)
-        else:
-            # not a list of tuples
-            return self.executemany(operation, [parameters])
+        # not a list of tuples
+        return self.executemany(operation, [parameters])
 
-    def executemany(self, operation, seq_of_parameters):
+    def executemany(self, operation: str,
+                    seq_of_parameters: Sequence[Sequence | None]) -> Cursor:
         """Prepare operation and execute it against a parameter sequence."""
         if not seq_of_parameters:
             # don't do anything without parameters
-            return
+            return self
         self._description = None
         self.rowcount = -1
         # first try to execute all queries
         rowcount = 0
         sql = "BEGIN"
         try:
-            if not self._dbcnx._tnx and not self._dbcnx.autocommit:
+            if not self._connection._tnx and not self._connection.autocommit:
                 try:
                     self._src.execute(sql)
                 except DatabaseError:
@@ -983,7 +1031,7 @@ class Cursor:
                 except Exception as e:
                     raise _op_error("Can't start transaction") from e
                 else:
-                    self._dbcnx._tnx = True
+                    self._connection._tnx = True
             for parameters in seq_of_parameters:
                 sql = operation
                 sql = self._quoteparams(sql, parameters)
@@ -1005,8 +1053,9 @@ class Cursor:
             self._description = True  # fetch on demand
             self.rowcount = self._src.ntuples
             self.lastrowid = None
-            if self.build_row_factory:
-                self.row_factory = self.build_row_factory()
+            build_row_factory = self.build_row_factory
+            if build_row_factory:  # type: ignore
+                self.row_factory = build_row_factory()  # type: ignore
         else:
             self.rowcount = rowcount
             self.lastrowid = self._src.oidstatus()
@@ -1014,7 +1063,7 @@ class Cursor:
         # "cursor.execute(...).fetchall()" or "for row in cursor.execute(...)"
         return self
 
-    def fetchone(self):
+    def fetchone(self) -> Sequence | None:
         """Fetch the next row of a query result set."""
         res = self.fetchmany(1, False)
         try:
@@ -1022,11 +1071,12 @@ class Cursor:
         except IndexError:
             return None
 
-    def fetchall(self):
+    def fetchall(self) -> Sequence[Sequence]:
         """Fetch all (remaining) rows of a query result."""
         return self.fetchmany(-1, False)
 
-    def fetchmany(self, size=None, keep=False):
+    def fetchmany(self, size: int | None = None, keep: bool = False
+                  ) -> Sequence[Sequence]:
         """Fetch the next set of rows of a query result.
 
         The number of rows to fetch per call is specified by the
@@ -1046,6 +1096,9 @@ class Cursor:
             raise _db_error(str(err)) from err
         row_factory = self.row_factory
         coltypes = self.coltypes
+        if coltypes is None:
+            # cannot determine column types, return raw result
+            return [row_factory(row) for row in result]
         if len(result) > 5:
             # optimize the case where we really fetch many values
             # by looking up all type casting functions upfront
@@ -1055,7 +1108,8 @@ class Cursor:
         return [row_factory([cast_value(value, typ)
                 for typ, value in zip(coltypes, row)]) for row in result]
 
-    def callproc(self, procname, parameters=None):
+    def callproc(self, procname: str, parameters: Sequence | None = None
+                 ) -> Sequence | None:
         """Call a stored database procedure with the given name.
 
         The sequence of parameters must contain one entry for each input
@@ -1073,15 +1127,17 @@ class Cursor:
         return parameters
 
     # noinspection PyShadowingBuiltins
-    def copy_from(self, stream, table,
-                  format=None, sep=None, null=None, size=None, columns=None):
+    def copy_from(self, stream: Any, table: str,
+                  format: str | None = None, sep: str | None = None,
+                  null: str | None = None, size: int | None  = None,
+                  columns: Sequence[str] | None = None) -> Cursor:
         """Copy data from an input stream to the specified table.
 
         The input stream can be a file-like object with a read() method or
         it can also be an iterable returning a row or multiple rows of input
         on each iteration.
 
-        The format must be text, csv or binary. The sep option sets the
+        The format must be 'text', 'csv' or 'binary'. The sep option sets the
         column separator (delimiter) used in the non binary formats.
         The null option sets the textual representation of NULL in the input.
 
@@ -1098,6 +1154,8 @@ class Cursor:
             if size:
                 raise ValueError(
                     "Size must only be set for file-like objects") from e
+            input_type: type | tuple[type, ...]
+            type_name: str
             if binary_format:
                 input_type = bytes
                 type_name = 'byte strings'
@@ -1116,12 +1174,12 @@ class Cursor:
                         if not stream.endswith(b'\n'):
                             stream += b'\n'
 
-                def chunks():
+                def chunks() -> Generator:
                     yield stream
 
             elif isinstance(stream, Iterable):
 
-                def chunks():
+                def chunks() -> Generator:
                     for chunk in stream:
                         if not isinstance(chunk, input_type):
                             raise ValueError(
@@ -1143,7 +1201,7 @@ class Cursor:
                 raise TypeError("The size option must be an integer")
             if size > 0:
 
-                def chunks():
+                def chunks() -> Generator:
                     while True:
                         buffer = read(size)
                         yield buffer
@@ -1152,19 +1210,18 @@ class Cursor:
 
             else:
 
-                def chunks():
+                def chunks() -> Generator:
                     yield read()
 
         if not table or not isinstance(table, str):
             raise TypeError("Need a table to copy to")
         if table.lower().startswith('select '):
             raise ValueError("Must specify a table, not a query")
-        else:
-            table = '.'.join(map(
-                self.connection._cnx.escape_identifier, table.split('.', 1)))
-        operation = [f'copy {table}']
+        cnx = self._cnx
+        table = '.'.join(map(cnx.escape_identifier, table.split('.', 1)))
+        operation_parts = [f'copy {table}']
         options = []
-        params = []
+        parameters = []
         if format is not None:
             if not isinstance(format, str):
                 raise TypeError("The format option must be be a string")
@@ -1181,25 +1238,23 @@ class Cursor:
                 raise ValueError(
                     "The sep option must be a single one-byte character")
             options.append('delimiter %s')
-            params.append(sep)
+            parameters.append(sep)
         if null is not None:
             if not isinstance(null, str):
                 raise TypeError("The null option must be a string")
             options.append('null %s')
-            params.append(null)
+            parameters.append(null)
         if columns:
             if not isinstance(columns, str):
-                columns = ','.join(map(
-                    self.connection._cnx.escape_identifier, columns))
-            operation.append(f'({columns})')
-        operation.append("from stdin")
+                columns = ','.join(map(cnx.escape_identifier, columns))
+            operation_parts.append(f'({columns})')
+        operation_parts.append("from stdin")
         if options:
-            options = ','.join(options)
-            operation.append(f'({options})')
-        operation = ' '.join(operation)
+            operation_parts.append(f"({','.join(options)})")
+        operation = ' '.join(operation_parts)
 
         putdata = self._src.putdata
-        self.execute(operation, params)
+        self.execute(operation, parameters)
 
         try:
             for chunk in chunks():
@@ -1215,8 +1270,10 @@ class Cursor:
         return self
 
     # noinspection PyShadowingBuiltins
-    def copy_to(self, stream, table,
-                format=None, sep=None, null=None, decode=None, columns=None):
+    def copy_to(self, stream: Any, table: str,
+                format: str | None = None, sep: str | None = None,
+                null: str | None = None, decode: bool | None = None,
+                columns: Sequence[str] | None = None) -> Cursor | Generator:
         """Copy data from the specified table to an output stream.
 
         The output stream can be a file-like object with a write() method or
@@ -1227,7 +1284,7 @@ class Cursor:
 
         Note that you can also use a select query instead of the table name.
 
-        The format must be text, csv or binary. The sep option sets the
+        The format must be 'text', 'csv' or 'binary'. The sep option sets the
         column separator (delimiter) used in the non binary formats.
         The null option sets the textual representation of NULL in the output.
 
@@ -1235,23 +1292,25 @@ class Cursor:
         columns are specified, all of them will be copied.
         """
         binary_format = format == 'binary'
-        if stream is not None:
+        if stream is None:
+            write = None
+        else:
             try:
                 write = stream.write
             except AttributeError as e:
                 raise TypeError("Need an output stream to copy to") from e
         if not table or not isinstance(table, str):
             raise TypeError("Need a table to copy to")
+        cnx = self._cnx
         if table.lower().startswith('select '):
             if columns:
                 raise ValueError("Columns must be specified in the query")
             table = f'({table})'
         else:
-            table = '.'.join(map(
-                self.connection._cnx.escape_identifier, table.split('.', 1)))
-        operation = [f'copy {table}']
+            table = '.'.join(map(cnx.escape_identifier, table.split('.', 1)))
+        operation_parts = [f'copy {table}']
         options = []
-        params = []
+        parameters = []
         if format is not None:
             if not isinstance(format, str):
                 raise TypeError("The format option must be a string")
@@ -1268,12 +1327,12 @@ class Cursor:
                 raise ValueError(
                     "The sep option must be a single one-byte character")
             options.append('delimiter %s')
-            params.append(sep)
+            parameters.append(sep)
         if null is not None:
             if not isinstance(null, str):
                 raise TypeError("The null option must be a string")
             options.append('null %s')
-            params.append(null)
+            parameters.append(null)
         if decode is None:
             decode = format != 'binary'
         else:
@@ -1284,20 +1343,18 @@ class Cursor:
                     "The decode option is not allowed with binary format")
         if columns:
             if not isinstance(columns, str):
-                columns = ','.join(map(
-                    self.connection._cnx.escape_identifier, columns))
-            operation.append(f'({columns})')
+                columns = ','.join(map(cnx.escape_identifier, columns))
+            operation_parts.append(f'({columns})')
 
-        operation.append("to stdout")
+        operation_parts.append("to stdout")
         if options:
-            options = ','.join(options)
-            operation.append(f'({options})')
-        operation = ' '.join(operation)
+            operation_parts.append(f"({','.join(options)})")
+        operation = ' '.join(operation_parts)
 
         getdata = self._src.getdata
-        self.execute(operation, params)
+        self.execute(operation, parameters)
 
-        def copy():
+        def copy() -> Generator:
             self.rowcount = 0
             while True:
                 row = getdata(decode)
@@ -1308,7 +1365,7 @@ class Cursor:
                 self.rowcount += 1
                 yield row
 
-        if stream is None:
+        if write is None:
             # no input stream, return the generator
             return copy()
 
@@ -1320,7 +1377,7 @@ class Cursor:
         # return the cursor object, so you can chain operations
         return self
 
-    def __next__(self):
+    def __next__(self) -> Sequence:
         """Return the next row (support for the iteration protocol)."""
         res = self.fetchone()
         if res is None:
@@ -1332,22 +1389,22 @@ class Cursor:
     next = __next__
 
     @staticmethod
-    def nextset():
+    def nextset() -> bool | None:
         """Not supported."""
         raise NotSupportedError("The nextset() method is not supported")
 
     @staticmethod
-    def setinputsizes(sizes):
+    def setinputsizes(sizes: Sequence[int]) -> None:
         """Not supported."""
         pass  # unsupported, but silently passed
 
     @staticmethod
-    def setoutputsize(size, column=0):
+    def setoutputsize(size: int, column: int = 0) -> None:
         """Not supported."""
         pass  # unsupported, but silently passed
 
     @staticmethod
-    def row_factory(row):
+    def row_factory(row: Sequence) -> Sequence:
         """Process rows before they are returned.
 
         You can overwrite this statically with a custom row factory, or
@@ -1367,7 +1424,7 @@ class Cursor:
         """
         raise NotImplementedError
 
-    def build_row_factory(self):
+    def build_row_factory(self) -> Callable[[Sequence], Sequence] | None:
         """Build a row factory based on the current description.
 
         This implementation builds a row factory for creating named tuples.
@@ -1375,8 +1432,7 @@ class Cursor:
         different row factories whenever the column description changes.
         """
         names = self.colnames
-        if names:
-            return _row_factory(tuple(names))
+        return _row_factory(tuple(names)) if names else None
 
 
 CursorDescription = namedtuple('CursorDescription', (
@@ -1401,7 +1457,7 @@ class Connection:
     DataError = DataError
     NotSupportedError = NotSupportedError
 
-    def __init__(self, cnx):
+    def __init__(self, cnx: Cnx) -> None:
         """Create a database connection object."""
         self._cnx = cnx  # connection
         self._tnx = False  # transaction state
@@ -1413,7 +1469,7 @@ class Connection:
         except Exception as e:
             raise _op_error("Invalid connection") from e
 
-    def __enter__(self):
+    def __enter__(self) -> Connection:
         """Enter the runtime context for the connection object.
 
         The runtime context can be used for running transactions.
@@ -1421,8 +1477,11 @@ class Connection:
         This also starts a transaction in autocommit mode.
         """
         if self.autocommit:
+            cnx = self._cnx
+            if not cnx:
+                raise _op_error("Connection has been closed")
             try:
-                self._cnx.source().execute("BEGIN")
+                cnx.source().execute("BEGIN")
             except DatabaseError:
                 raise  # database provides error message
             except Exception as e:
@@ -1431,7 +1490,8 @@ class Connection:
                 self._tnx = True
         return self
 
-    def __exit__(self, et, ev, tb):
+    def __exit__(self, et: type[BaseException] | None,
+                 ev: BaseException | None, tb: Any) -> None:
         """Exit the runtime context for the connection object.
 
         This does not close the connection, but it ends a transaction.
@@ -1441,103 +1501,101 @@ class Connection:
         else:
             self.rollback()
 
-    def close(self):
+    def close(self) -> None:
         """Close the connection object."""
-        if self._cnx:
-            if self._tnx:
-                with suppress(DatabaseError):
-                    self.rollback()
-            self._cnx.close()
-            self._cnx = None
-        else:
+        if not self._cnx:
             raise _op_error("Connection has been closed")
+        if self._tnx:
+            with suppress(DatabaseError):
+                self.rollback()
+        self._cnx.close()
+        self._cnx = None           
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Check whether the connection has been closed or is broken."""
         try:
             return not self._cnx or self._cnx.status != 1
         except TypeError:
             return True
 
-    def commit(self):
+    def commit(self) -> None:
         """Commit any pending transaction to the database."""
-        if self._cnx:
-            if self._tnx:
-                self._tnx = False
-                try:
-                    self._cnx.source().execute("COMMIT")
-                except DatabaseError:
-                    raise  # database provides error message
-                except Exception as e:
-                    raise _op_error("Can't commit transaction") from e
-        else:
+        if not self._cnx:
             raise _op_error("Connection has been closed")
-
-    def rollback(self):
-        """Roll back to the start of any pending transaction."""
-        if self._cnx:
-            if self._tnx:
-                self._tnx = False
-                try:
-                    self._cnx.source().execute("ROLLBACK")
-                except DatabaseError:
-                    raise  # database provides error message
-                except Exception as e:
-                    raise _op_error("Can't rollback transaction") from e
-        else:
-            raise _op_error("Connection has been closed")
-
-    def cursor(self):
-        """Return a new cursor object using the connection."""
-        if self._cnx:
+        if self._tnx:
+            self._tnx = False
             try:
-                return self.cursor_type(self)
+                self._cnx.source().execute("COMMIT")
+            except DatabaseError:
+                raise  # database provides error message
             except Exception as e:
-                raise _op_error("Invalid connection") from e
-        else:
+                raise _op_error("Can't commit transaction") from e
+
+    def rollback(self) -> None:
+        """Roll back to the start of any pending transaction."""
+        if not self._cnx:
             raise _op_error("Connection has been closed")
+        if self._tnx:
+            self._tnx = False
+            try:
+                self._cnx.source().execute("ROLLBACK")
+            except DatabaseError:
+                raise  # database provides error message
+            except Exception as e:
+                raise _op_error("Can't rollback transaction") from e
+
+    def cursor(self) -> Cursor:
+        """Return a new cursor object using the connection."""
+        if not self._cnx:
+            raise _op_error("Connection has been closed")
+        try:
+            return self.cursor_type(self)
+        except Exception as e:
+            raise _op_error("Invalid connection") from e
 
     if shortcutmethods:  # otherwise do not implement and document this
 
-        def execute(self, operation, params=None):
+        def execute(self, operation: str,
+                    parameters: Sequence | None = None) -> Cursor:
             """Shortcut method to run an operation on an implicit cursor."""
             cursor = self.cursor()
-            cursor.execute(operation, params)
+            cursor.execute(operation, parameters)
             return cursor
 
-        def executemany(self, operation, param_seq):
+        def executemany(self, operation: str,
+                        seq_of_parameters: Sequence[Sequence | None]
+                        ) -> Cursor:
             """Shortcut method to run an operation against a sequence."""
             cursor = self.cursor()
-            cursor.executemany(operation, param_seq)
+            cursor.executemany(operation, seq_of_parameters)
             return cursor
 
 
 # *** Module Interface ***
 
-_connect = connect
-
-
-def connect(dsn=None,
-            user=None, password=None,
-            host=None, database=None, **kwargs):
+def connect(dsn: str | None = None,
+            user: str | None = None, password: str | None = None,
+            host: str | None = None, database: str | None = None,
+            **kwargs: Any) -> Connection:
     """Connect to a database."""
     # first get params from DSN
     dbport = -1
-    dbhost = ""
-    dbname = ""
-    dbuser = ""
-    dbpasswd = ""
-    dbopt = ""
-    try:
-        params = dsn.split(":")
-        dbhost = params[0]
-        dbname = params[1]
-        dbuser = params[2]
-        dbpasswd = params[3]
-        dbopt = params[4]
-    except (AttributeError, IndexError, TypeError):
-        pass
+    dbhost: str | None = ""
+    dbname: str | None = ""
+    dbuser: str | None = ""
+    dbpasswd: str | None = ""
+    dbopt: str | None = ""
+    if dsn:
+        try:
+            params = dsn.split(":", 4)
+            dbhost = params[0]
+            dbname = params[1]
+            dbuser = params[2]
+            dbpasswd = params[3]
+            dbopt = params[4]
+        except (AttributeError, IndexError, TypeError):
+            pass
 
     # override if necessary
     if user is not None:
@@ -1546,9 +1604,9 @@ def connect(dsn=None,
         dbpasswd = password
     if database is not None:
         dbname = database
-    if host is not None:
+    if host:
         try:
-            params = host.split(":")
+            params = host.split(":", 1)
             dbhost = params[0]
             dbport = int(params[1])
         except (AttributeError, IndexError, TypeError, ValueError):
@@ -1562,22 +1620,21 @@ def connect(dsn=None,
 
     # pass keyword arguments as connection info string
     if kwargs:
-        kwargs = list(kwargs.items())
-        if '=' in dbname:
-            dbname = [dbname]
+        kwarg_list = list(kwargs.items())
+        kw_parts = []
+        if dbname and '=' in dbname:
+            kw_parts.append(dbname)
         else:
-            kwargs.insert(0, ('dbname', dbname))
-            dbname = []
-        for kw, value in kwargs:
+            kwarg_list.insert(0, ('dbname', dbname))
+        for kw, value in kwarg_list:
             value = str(value)
             if not value or ' ' in value:
                 value = value.replace('\\', '\\\\').replace("'", "\\'")
                 value = f"'{value}'"
-            dbname.append(f'{kw}={value}')
-        dbname = ' '.join(dbname)
+            kw_parts.append(f'{kw}={value}')
+        dbname = ' '.join(kw_parts)
     # open the connection
-    # noinspection PyArgumentList
-    cnx = _connect(dbname, dbhost, dbport, dbopt, dbuser, dbpasswd)
+    cnx = get_cnx(dbname, dbhost, dbport, dbopt, dbuser, dbpasswd)
     return Connection(cnx)
 
 
@@ -1590,67 +1647,61 @@ class DbType(frozenset):
     We must thus use type names as internal type codes.
     """
 
-    def __new__(cls, values):
+    def __new__(cls, values: str | Iterable[str]) -> DbType:
         """Create new type object."""
         if isinstance(values, str):
             values = values.split()
-        return super().__new__(cls, values)
+        return super().__new__(cls, values)  # type: ignore
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         """Check whether types are considered equal."""
         if isinstance(other, str):
             if other.startswith('_'):
                 other = other[1:]
             return other in self
-        else:
-            return super().__eq__(other)
+        return super().__eq__(other)
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         """Check whether types are not considered equal."""
         if isinstance(other, str):
             if other.startswith('_'):
                 other = other[1:]
             return other not in self
-        else:
-            return super().__ne__(other)
+        return super().__ne__(other)
 
 
 class ArrayType:
     """Type class for PostgreSQL array types."""
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, str):
             return other.startswith('_')
-        else:
-            return isinstance(other, ArrayType)
+        return isinstance(other, ArrayType)
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         if isinstance(other, str):
             return not other.startswith('_')
-        else:
-            return not isinstance(other, ArrayType)
+        return not isinstance(other, ArrayType)
 
 
 class RecordType:
     """Type class for PostgreSQL record types."""
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, TypeCode):
             # noinspection PyUnresolvedReferences
             return other.type == 'c'
-        elif isinstance(other, str):
+        if isinstance(other, str):
             return other == 'record'
-        else:
-            return isinstance(other, RecordType)
+        return isinstance(other, RecordType)
 
-    def __ne__(self, other):
+    def __ne__(self, other: Any) -> bool:
         if isinstance(other, TypeCode):
             # noinspection PyUnresolvedReferences
             return other.type != 'c'
-        elif isinstance(other, str):
+        if isinstance(other, str):
             return other != 'record'
-        else:
-            return not isinstance(other, RecordType)
+        return not isinstance(other, RecordType)
 
 
 # Mandatory type objects defined by DB-API 2 specs:
@@ -1691,35 +1742,38 @@ RECORD = RecordType()
 
 # Mandatory type helpers defined by DB-API 2 specs:
 
-def Date(year, month, day):  # noqa: N802
+def Date(year: int, month: int, day: int) -> date:  # noqa: N802
     """Construct an object holding a date value."""
     return date(year, month, day)
 
 
-def Time(hour, minute=0, second=0, microsecond=0, tzinfo=None):  # noqa: N802
+def Time(hour: int, minute: int = 0,  # noqa: N802
+         second: int = 0, microsecond: int = 0,
+         tzinfo: tzinfo | None = None) -> time:
     """Construct an object holding a time value."""
     return time(hour, minute, second, microsecond, tzinfo)
 
 
-def Timestamp(year, month, day,    # noqa: N802
-              hour=0, minute=0, second=0, microsecond=0,
-              tzinfo=None):
+def Timestamp(year: int, month: int, day: int,  # noqa: N802
+              hour: int = 0, minute: int = 0,
+              second: int = 0, microsecond: int = 0,
+              tzinfo: tzinfo | None = None) -> datetime:
     """Construct an object holding a time stamp value."""
-    return datetime(year, month, day, hour, minute, second, microsecond,
-                    tzinfo)
+    return datetime(year, month, day, hour, minute,
+                    second, microsecond, tzinfo)
 
 
-def DateFromTicks(ticks):  # noqa: N802
+def DateFromTicks(ticks: float | None) -> date:  # noqa: N802
     """Construct an object holding a date value from the given ticks value."""
     return Date(*localtime(ticks)[:3])
 
 
-def TimeFromTicks(ticks):  # noqa: N802
+def TimeFromTicks(ticks: float | None) -> time:  # noqa: N802
     """Construct an object holding a time value from the given ticks value."""
     return Time(*localtime(ticks)[3:6])
 
 
-def TimestampFromTicks(ticks):  # noqa: N802
+def TimestampFromTicks(ticks: float | None) -> datetime:  # noqa: N802
     """Construct an object holding a time stamp from the given ticks value."""
     return Timestamp(*localtime(ticks)[:6])
 
@@ -1730,11 +1784,13 @@ class Binary(bytes):
 
 # Additional type helpers for PyGreSQL:
 
-def Interval(days,  # noqa: N802
-             hours=0, minutes=0, seconds=0, microseconds=0):
+def Interval(days: int | float,  # noqa: N802
+             hours: int | float = 0, minutes: int | float = 0,
+             seconds: int | float = 0, microseconds: int | float = 0
+             ) -> timedelta:
     """Construct an object holding a time interval value."""
-    return timedelta(days, hours=hours, minutes=minutes, seconds=seconds,
-                     microseconds=microseconds)
+    return timedelta(days, hours=hours, minutes=minutes,
+                     seconds=seconds, microseconds=microseconds)
 
 
 Uuid = Uuid  # Construct an object holding a UUID value
@@ -1747,7 +1803,7 @@ class Hstore(dict):
     _re_escape = regex(r'(["\\])')
 
     @classmethod
-    def _quote(cls, s):
+    def _quote(cls, s: Any) -> Any:
         if s is None:
             return 'NULL'
         if not isinstance(s, str):
@@ -1760,7 +1816,7 @@ class Hstore(dict):
             s = f'"{s}"'
         return s
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Create a printable representation of the hstore value."""
         q = self._quote
         return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
@@ -1769,12 +1825,13 @@ class Hstore(dict):
 class Json:
     """Construct a wrapper for holding an object serializable to JSON."""
 
-    def __init__(self, obj, encode=None):
+    def __init__(self, obj: Any,
+                 encode: Callable[[Any], str] | None = None) -> None:
         """Initialize the JSON object."""
         self.obj = obj
         self.encode = encode or jsonencode
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Create a printable representation of the JSON object."""
         obj = self.obj
         if isinstance(obj, str):
@@ -1785,11 +1842,11 @@ class Json:
 class Literal:
     """Construct a wrapper for holding a literal SQL string."""
 
-    def __init__(self, sql):
+    def __init__(self, sql: str) -> None:
         """Initialize literal SQL string."""
         self.sql = sql
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a printable representation of the SQL string."""
         return self.sql
 

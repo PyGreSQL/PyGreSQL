@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 import unittest
 from contextlib import suppress
-from typing import Any, Mapping
+from typing import Any, ClassVar
 
 __version__ = '1.15.0'
 
@@ -22,7 +22,7 @@ class DatabaseAPI20Test(unittest.TestCase):
     This implementation tests Gadfly, but the TestCase
     is structured so that other self.drivers can subclass this
     test case to ensure compliance with the DB-API. It is
-    expected that this TestCase may be expanded in the future
+    expected that this TestCase may be expanded i  qn the future
     if ambiguities or edge conditions are discovered.
 
     The 'Optional Extensions' are not yet being tested.
@@ -43,7 +43,7 @@ class DatabaseAPI20Test(unittest.TestCase):
     # method is to be found
     driver: Any = None
     connect_args: tuple = ()  # List of arguments to pass to connect
-    connect_kw_args: Mapping[str, Any] = {}  # Keyword arguments for connect
+    connect_kw_args: ClassVar[dict[str, Any]] = {}  # Keyword arguments
     table_prefix = 'dbapi20test_'  # If you need to specify a prefix for tables
 
     ddl1 = f'create table {table_prefix}booze (name varchar(20))'

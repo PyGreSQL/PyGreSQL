@@ -5,8 +5,9 @@ Version 6.0 (to be released)
 ----------------------------
 - Removed support for Python versions older than 3.7 (released June 2017)
   and PostgreSQL older than version 10 (released October 2017).
+- Added method `pkeys()` to the `pg.DB` object.
 - Removed deprecated function `pg.pgnotify()`.
-- Removed the deprecated method `ntuples()` of the `pg.Query` object.
+- Removed deprecated method `ntuples()` of the `pg.Query` object.
 - Renamed `pgdb.Type` to `pgdb.DbType` to avoid confusion with `typing.Type`.
 - Modernized code and tools for development, testing, linting and building.
 

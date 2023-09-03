@@ -139,7 +139,7 @@ class TestDbApi20Tutorial(unittest.TestCase):
         cursor.executemany("insert into fruits (name) values (%s)", parameters)
         con.commit()
         cursor.execute('select * from fruits where id=1')
-        r = cursor.fetchone()
+        r: Any = cursor.fetchone()
         self.assertIsInstance(r, tuple)
         self.assertEqual(len(r), 2)
         r = str(r)

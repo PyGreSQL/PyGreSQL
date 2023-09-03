@@ -680,7 +680,8 @@ _source_buildinfo(sourceObject *self, int num)
 
 /* Lists fields info. */
 static char source_listinfo__doc__[] =
-    "listinfo() -- get information for all fields (position, name, type oid)";
+    "listinfo() -- get information for all fields"
+    " (position, name, type oid, size, type modifier)";
 
 static PyObject *
 source_listInfo(sourceObject *self, PyObject *noargs)

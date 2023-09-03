@@ -242,7 +242,8 @@ class Hstore(dict):
 class Json:
     """Wrapper class for marking Json values."""
 
-    def __init__(self, obj: Any, encode: Callable | None = None) -> None:
+    def __init__(self, obj: Any,
+                 encode: Callable[[Any], str] | None = None) -> None:
         """Initialize the JSON object."""
         self.obj = obj
         self.encode = encode or jsonencode
@@ -1014,7 +1015,7 @@ class Typecasts(dict):
 
     connection: DB | None = None  # set in a connection specific instance
 
-    def __missing__(self, typ: Any) -> Callable | None:
+    def __missing__(self, typ: str) -> Callable | None:
         """Create a cast function if it is not cached.
 
         Note that this class never raises a KeyError,
@@ -1047,8 +1048,7 @@ class Typecasts(dict):
             args = get_args(func)
         except (TypeError, ValueError):
             return False
-        else:
-            return 'connection' in args[1:]
+        return 'connection' in args[1:]
 
     def _add_connection(self, cast: Callable) -> Callable:
         """Add a connection argument to the typecast function if necessary."""
@@ -1056,11 +1056,12 @@ class Typecasts(dict):
             return cast
         return partial(cast, connection=self.connection)
 
-    def get(self, typ: Any, default: Any = None) -> Any:
+    def get(self, typ: str, default: Callable | None = None # type: ignore
+            ) -> Callable | None:
         """Get the typecast function for the given database type."""
         return self[typ] or default
 
-    def set(self, typ: Any, cast: Callable) -> None:
+    def set(self, typ: str | Sequence[str], cast: Callable | None) -> None:
         """Set a typecast function for the specified database type(s)."""
         if isinstance(typ, str):
             typ = [typ]
@@ -1075,7 +1076,7 @@ class Typecasts(dict):
                 self[t] = self._add_connection(cast)
                 self.pop(f'_{t}', None)
 
-    def reset(self, typ: Any = None) -> None:
+    def reset(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecasts for the specified type(s) to their defaults.
 
         When no type is specified, all typecasts will be reset.
@@ -1089,12 +1090,13 @@ class Typecasts(dict):
                 self.pop(t, None)
 
     @classmethod
-    def get_default(cls, typ: Any) -> Any:
+    def get_default(cls, typ: str) -> Any:
         """Get the default typecast function for the given database type."""
         return cls.defaults.get(typ)
 
     @classmethod
-    def set_default(cls, typ: Any, cast: Callable | None) -> None:
+    def set_default(cls, typ: str | Sequence[str],
+                    cast: Callable | None) -> None:
         """Set a default typecast function for the given database type(s)."""
         if isinstance(typ, str):
             typ = [typ]
@@ -1130,7 +1132,7 @@ class Typecasts(dict):
         """Create an array typecast for the given base cast."""
         cast_array = self['anyarray']
 
-        def cast(v: Any) -> Callable:
+        def cast(v: Any) -> list:
             return cast_array(v, basecast)
         return cast
 
@@ -1146,12 +1148,12 @@ class Typecasts(dict):
         return cast
 
 
-def get_typecast(typ: Any) -> Callable | None:
-    """Get the global typecast function for the given database type(s)."""
+def get_typecast(typ: str) -> Callable | None:
+    """Get the global typecast function for the given database type."""
     return Typecasts.get_default(typ)
 
 
-def set_typecast(typ: Any, cast: Callable | None) -> None:
+def set_typecast(typ: str | Sequence[str], cast: Callable | None) -> None:
     """Set a global typecast function for the given database type(s).
 
     Note that connections cache cast functions. To be sure a global change
@@ -1254,7 +1256,8 @@ class DbTypes(dict):
         self[typ.oid] = self[typ.pgtype] = typ
         return typ
 
-    def get(self, key: int | str, default: Any = None) -> Any:
+    def get(self, key: int | str,  # type: ignore
+            default: DbType | None = None) -> DbType | None:
         """Get the type even if it is not cached."""
         try:
             return self[key]
@@ -1271,27 +1274,27 @@ class DbTypes(dict):
             return None
         return self._db.get_attnames(typ.relid, with_oid=False)
 
-    def get_typecast(self, typ: Any) -> Callable:
+    def get_typecast(self, typ: Any) -> Callable | None:
         """Get the typecast function for the given database type."""
         return self._typecasts.get(typ)
 
-    def set_typecast(self, typ: Any, cast: Callable) -> None:
+    def set_typecast(self, typ: str | Sequence[str], cast: Callable) -> None:
         """Set a typecast function for the specified database type(s)."""
         self._typecasts.set(typ, cast)
 
-    def reset_typecast(self, typ: Any = None) -> None:
+    def reset_typecast(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecast function for the specified database type(s)."""
         self._typecasts.reset(typ)
 
-    def typecast(self, value: Any, typ: Any) -> Callable | None:
+    def typecast(self, value: Any, typ: str) -> Any:
         """Cast the given value according to the given database type."""
         if value is None:
             # for NULL values, no typecast is necessary
             return None
         if not isinstance(typ, DbType):
-            typ = self.get(typ)
-            if typ:
-                typ = typ.pgtype
+            db_type = self.get(typ)
+            if db_type:
+                typ = db_type.pgtype
         cast = self.get_typecast(typ) if typ else None
         if not cast or cast is str:
             # no typecast is necessary
@@ -1373,6 +1376,7 @@ class _MemoryQuery:
     def __iter__(self) -> Iterator[Any]:
         return iter(self.result)
 
+# Error messages
 
 E = TypeVar('E', bound=DatabaseError)
 

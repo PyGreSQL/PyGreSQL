@@ -23,7 +23,7 @@ from decimal import Decimal
 from io import StringIO
 from operator import itemgetter
 from time import strftime
-from typing import Any, ClassVar
+from typing import Any, Callable, ClassVar
 from uuid import UUID
 
 import pg  # the module under test
@@ -4910,7 +4910,7 @@ class TestDebug(unittest.TestCase):
 class TestMemoryLeaks(unittest.TestCase):
     """Test that the DB class does not leak memory."""
 
-    def get_leaks(self, fut):
+    def get_leaks(self, fut: Callable):
         ids: set = set()
         objs: list = []
         add_ids = ids.update

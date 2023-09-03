@@ -14,7 +14,7 @@ from __future__ import annotations  #
 import unittest
 from collections.abc import Iterable
 from contextlib import suppress
-from typing import Sequence
+from typing import ClassVar
 
 import pgdb  # the module under test
 
@@ -101,6 +101,11 @@ class TestCopy(unittest.TestCase):
 
     cls_set_up = False
 
+    data: ClassVar[list[tuple[int, str]]] = [
+        (1935, 'Luciano Pavarotti'),
+        (1941, 'Plácido Domingo'),
+        (1946, 'José Carreras')]
+
     @staticmethod
     def connect():
         host = f"{dbhost or ''}:{dbport or -1}"
@@ -122,8 +127,9 @@ class TestCopy(unittest.TestCase):
             cur.execute("set client_encoding=utf8")
             cur.execute("select 'Plácido and José'").fetchone()
         except (pgdb.DataError, pgdb.NotSupportedError):
-            cls.data[1] = (1941, 'Plaacido Domingo')
-            cls.data[2] = (1946, 'Josee Carreras')
+            cls.data[1:3] = [
+                (1941, 'Plaacido Domingo'),
+                (1946, 'Josee Carreras')]
             cls.can_encode = False
         cur.close()
         con.close()
@@ -151,11 +157,6 @@ class TestCopy(unittest.TestCase):
             self.con.rollback()
         with suppress(Exception):
             self.con.close()
-
-    data: Sequence[tuple[int, str]] = [
-        (1935, 'Luciano Pavarotti'),
-        (1941, 'Plácido Domingo'),
-        (1946, 'José Carreras')]
 
     can_encode = True
 
@@ -405,9 +406,9 @@ class TestCopyTo(TestCopy):
         self.assertIsInstance(ret, Iterable)
         rows = list(ret)
         self.assertEqual(len(rows), 3)
-        rows = ''.join(rows)
-        self.assertIsInstance(rows, str)
-        self.assertEqual(rows, self.data_text)
+        text = ''.join(rows)
+        self.assertIsInstance(text, str)
+        self.assertEqual(text, self.data_text)
         self.check_rowcount()
 
     def test_generator_with_schema_name(self):
@@ -419,9 +420,9 @@ class TestCopyTo(TestCopy):
         self.assertIsInstance(ret, Iterable)
         rows = list(ret)
         self.assertEqual(len(rows), 3)
-        rows = b''.join(rows)
-        self.assertIsInstance(rows, bytes)
-        self.assertEqual(rows, self.data_text.encode())
+        byte_text = b''.join(rows)
+        self.assertIsInstance(byte_text, bytes)
+        self.assertEqual(byte_text, self.data_text.encode())
 
     def test_rowcount_increment(self):
         ret = self.copy_to()
@@ -477,9 +478,9 @@ class TestCopyTo(TestCopy):
         self.assertIsInstance(ret, Iterable)
         rows = list(ret)
         self.assertEqual(len(rows), 3)
-        rows = ''.join(rows)
-        self.assertIsInstance(rows, str)
-        self.assertEqual(rows, self.data_csv)
+        csv = ''.join(rows)
+        self.assertIsInstance(csv, str)
+        self.assertEqual(csv, self.data_csv)
         self.check_rowcount(3)
 
     def test_csv_with_sep(self):

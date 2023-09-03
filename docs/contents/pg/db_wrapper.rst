@@ -83,6 +83,8 @@ This method returns the primary keys of a table as a tuple, i.e.
 single primary keys are also returned as a tuple with one item.
 Note that this raises a KeyError if the table does not have a primary key.
 
+.. versionadded:: 6.0
+
 get_databases -- get list of databases in the system
 ----------------------------------------------------
 
