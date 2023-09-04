@@ -117,13 +117,8 @@ Using the method :meth:`DB.get_as_dict`, you can easily import the whole table
 into a Python dictionary mapping the primary key *id* to the *name*::
 
     >>> db.get_as_dict('fruits', scalar=True)
-    OrderedDict([(1, 'apple'),
-                 (2, 'banana'),
-                 (3, 'cherimaya'),
-                 (4, 'durian'),
-                 (5, 'eggfruit'),
-                 (6, 'fig'),
-                 (7, 'grapefruit')])
+    {1: 'apple', 2: 'banana', 3: 'cherimaya', 4: 'durian', 5: 'eggfruit',
+     6: 'fig', 7: 'grapefruit', 8: 'apple', 9: 'banana'}
 
 To change a single row in the database, you can use the :meth:`DB.update`
 method. For instance, if you want to capitalize the name 'banana'::

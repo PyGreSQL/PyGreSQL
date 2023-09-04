@@ -340,8 +340,8 @@ be used for all result sets. If you overwrite this method, the method
 will be ignored.
 
 Note that named tuples are very efficient and can be easily converted to
-dicts (even OrderedDicts) by calling ``row._asdict()``. If you still want
-to return rows as dicts, you can create a custom cursor class like this::
+dicts by calling ``row._asdict()``. If you still want to return rows as dicts,
+you can create a custom cursor class like this::
 
     class DictCursor(pgdb.Cursor):
 

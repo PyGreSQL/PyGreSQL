@@ -823,7 +823,7 @@ has only one column anyway.
     :param int offset: number of rows to be skipped (the OFFSET clause)
     :param bool scalar: whether only the first column shall be returned
     :returns: the content of the table as a list
-    :rtype: dict or OrderedDict
+    :rtype: dict
     :raises TypeError: the table name has not been specified
     :raises KeyError: keyname(s) are invalid or not part of the result
     :raises pg.ProgrammingError: no keyname(s) and table has no primary key
@@ -837,10 +837,9 @@ The rows will be also named tuples unless the *scalar* option has been set
 to *True*.  With the optional parameter *keyname* you can specify a different
 set of columns to be used as the keys of the dictionary.
 
-If the Python version supports it, the dictionary will be an *OrderedDict*
-using the order specified with the *order* parameter or the key column(s)
-if not specified.  You can set *order* to *False* if you don't care about the
-ordering.  In this case the returned dictionary will be an ordinary one.
+The dictionary will be ordered using the order specified with the *order*
+parameter or the key column(s) if not specified.  You can set *order* to
+*False* if you don't care about the ordering.
 
 .. versionadded:: 5.0
 

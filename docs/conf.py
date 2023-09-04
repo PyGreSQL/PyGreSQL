@@ -41,7 +41,7 @@ nitpick_ignore = [
                   'list', 'object', 'set', 'str', 'tuple',
                   'False', 'True', 'None',
                   'namedtuple', 'namedtuples',
-                  'OrderedDict', 'decimal.Decimal',
+                  'decimal.Decimal',
                   'bytes/str', 'list of namedtuples', 'tuple of callables',
                   'first field', 'type of first field',
                   'Notice', 'DATETIME'),

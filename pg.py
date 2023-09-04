@@ -2638,12 +2638,13 @@ class DB:
         self._do_debug(cmd)
         return self._valid_db.query(cmd)
 
-    def get_as_list(self, table: str,
-                    what: str | list[str] | tuple[str, ...] | None = None,
-                    where: str | list[str] | tuple[str, ...] | None = None,
-                    order: str | list[str] | tuple[str, ...] | None = None,
-                    limit: int | None = None, offset: int | None = None,
-                    scalar: bool = False) -> list:
+    def get_as_list(
+            self, table: str,
+            what: str | list[str] | tuple[str, ...] | None = None,
+            where: str | list[str] | tuple[str, ...] | None = None,
+            order: str | list[str] | tuple[str, ...] | bool | None = None,
+            limit: int | None = None, offset: int | None = None,
+            scalar: bool = False) -> list:
         """Get a table as a list.
 
         This gets a convenient representation of the table as a list
@@ -2686,13 +2687,13 @@ class DB:
             if isinstance(where, (list, tuple)):
                 where = ' AND '.join(map(str, where))
             cmd_parts.extend(['WHERE', where])
-        if order is None:
+        if order is None or order is True:
             try:
                 order = self.pkeys(table)
             except (KeyError, ProgrammingError):
                 with suppress(KeyError, ProgrammingError):
                     order = list(self.get_attnames(table))
-        if order:
+        if order and not isinstance(order, bool):
             if isinstance(order, (list, tuple)):
                 order = ', '.join(map(str, order))
             cmd_parts.extend(['ORDER BY', order])
@@ -2708,13 +2709,14 @@ class DB:
             res = [row[0] for row in res]
         return res
 
-    def get_as_dict(self, table: str,
-                    keyname: str | list[str] | tuple[str, ...] | None = None, 
-                    what: str | list[str] | tuple[str, ...] | None = None,
-                    where: str | list[str] | tuple[str, ...] | None = None,
-                    order: str | list[str] | tuple[str, ...] | None = None,
-                    limit: int | None = None, offset: int | None = None,
-                    scalar: bool = False) -> dict:
+    def get_as_dict(
+            self, table: str,
+            keyname: str | list[str] | tuple[str, ...] | None = None, 
+            what: str | list[str] | tuple[str, ...] | None = None,
+            where: str | list[str] | tuple[str, ...] | None = None,
+            order: str | list[str] | tuple[str, ...] | bool | None = None,
+            limit: int | None = None, offset: int | None = None,
+            scalar: bool = False) -> dict:
         """Get a table as a dictionary.
 
         This method is similar to get_as_list(), but returns the table
@@ -2728,11 +2730,9 @@ class DB:
         set of columns to be used as the keys of the dictionary.  It must
         be set as a string, list or a tuple.
 
-        If the Python version supports it, the dictionary will be an
-        dict using the order specified with the 'order' parameter
-        or the key column(s) if not specified.  You can set 'order' to False
-        if you don't care about the ordering.  In this case the returned
-        dictionary will be an ordinary one.
+        The dictionary will be ordered using the order specified with the
+        'order' parameter or the key column(s) if not specified.  You can
+        set 'order' to False if you don't care about the ordering.
         """
         if not table:
             raise TypeError('The table name is missing')
@@ -2759,9 +2759,9 @@ class DB:
             if isinstance(where, (list, tuple)):
                 where = ' AND '.join(map(str, where))
             cmd_parts.extend(['WHERE', where])
-        if order is None:
+        if order is None or order is True:
             order = keyname
-        if order:
+        if order and not isinstance(order, bool):
             if isinstance(order, (list, tuple)):
                 order = ', '.join(map(str, order))
             cmd_parts.extend(['ORDER BY', order])
