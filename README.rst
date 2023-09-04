@@ -7,15 +7,16 @@ powerful PostgreSQL features from Python.
 
 PyGreSQL should run on most platforms where PostgreSQL and Python is running.
 It is based on the PyGres95 code written by Pascal Andre.
-D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with version 2.0
+D'Arcy J. M. Cain renamed it to PyGreSQL starting with version 2.0
 and serves as the "BDFL" of PyGreSQL.
+Christoph Zwerschke volunteered as another maintainer and has been the main 
+contributor since version 3.7 of PyGreSQL.
 
 The following Python versions are supported:
 
 * PyGreSQL 4.x and earlier: Python 2 only
 * PyGreSQL 5.x: Python 2 and Python 3
 * PyGreSQL 6.x and newer: Python 3 only
-
 
 Installation
 ------------
@@ -31,6 +32,6 @@ Documentation
 -------------
 
 The documentation is available at
-`pygresql.github.io/PyGreSQL/ <http://pygresql.github.io/PyGreSQL/>`_
-and at `pygresql.readthedocs.io <https://pygresql.readthedocs.io/>`_,
+`pygresql.github.io/ <http://pygresql.github.io/>`_ and at
+`pygresql.readthedocs.io <https://pygresql.readthedocs.io/>`_,
 where you can also find the documentation for older versions.
