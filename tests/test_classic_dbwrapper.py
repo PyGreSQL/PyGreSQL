@@ -3348,24 +3348,26 @@ class TestDBClass(unittest.TestCase):
     def test_upsert_bytea(self):
         self.create_table('bytea_test', 'n smallint primary key, data bytea')
         s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
-        r = dict(n=7, data=s)
-        r = self.db.upsert('bytea_test', r)
-        self.assertIsInstance(r, dict)
-        self.assertIn('n', r)
-        self.assertEqual(r['n'], 7)
-        self.assertIn('data', r)
+        d = dict(n=7, data=s)
+        d = self.db.upsert('bytea_test', d)
+        self.assertIsInstance(d, dict)
+        self.assertIn('n', d)
+        self.assertEqual(d['n'], 7)
+        self.assertIn('data', d)
+        data = d['data']
         if pg.get_bytea_escaped():
-            self.assertNotEqual(r['data'], s)
-            r['data'] = pg.unescape_bytea(r['data'])
-        self.assertIsInstance(r['data'], bytes)
-        self.assertEqual(r['data'], s)
-        r['data'] = None
-        r = self.db.upsert('bytea_test', r)
-        self.assertIsInstance(r, dict)
-        self.assertIn('n', r)
-        self.assertEqual(r['n'], 7)
-        self.assertIn('data', r)
-        self.assertIsNone(r['data'])
+            self.assertNotEqual(data, s)
+            self.assertIsInstance(data, str)
+            data = pg.unescape_bytea(data)  # type: ignore
+        self.assertIsInstance(data, bytes)
+        self.assertEqual(data, s)
+        d['data'] = None
+        d = self.db.upsert('bytea_test', d)
+        self.assertIsInstance(d, dict)
+        self.assertIn('n', d)
+        self.assertEqual(d['n'], 7)
+        self.assertIn('data', d)
+        self.assertIsNone(d['data'])
 
     def test_insert_get_json(self):
         self.create_table('json_test', 'n smallint primary key, data json')

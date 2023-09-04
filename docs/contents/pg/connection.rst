@@ -616,7 +616,7 @@ getline -- get a line from server socket
 
     Get a line from server socket
 
-    :returns:  the line read
+    :returns: the line read
     :rtype: str
     :raises TypeError: invalid connection
     :raises TypeError: too many parameters
@@ -666,7 +666,7 @@ getlo -- build a large object from given oid
     :param int oid: OID of the existing large object
     :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
-    :raises TypeError:  invalid connection, bad parameter type, or too many parameters
+    :raises TypeError: invalid connection, bad parameter type, or too many parameters
     :raises ValueError: bad OID value (0 is invalid_oid)
 
 This method allows reusing a previously created large object through the

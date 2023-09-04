@@ -89,8 +89,12 @@ module = [
 disallow_untyped_defs = false
 
 [tool.setuptools]
-py-modules = ["pg", "pgdb"]
+packages = ["pg", "pgdb"]
 license-files = ["LICENSE.txt"]
+
+[tool.setuptools.package-data]
+pg = ["pg.typed"]
+pgdb = ["pg.typed"]
 
 [build-system]
 requires = ["setuptools>=68", "wheel>=0.41"]

@@ -16,11 +16,10 @@ On Windows, you also need to make sure that the directory that contains
 The current version of PyGreSQL has been tested with Python versions
 3.7 to 3.11, and PostgreSQL versions 10 to 15.
 
-PyGreSQL will be installed as three modules, a shared library called
-``_pg.so`` (on Linux) or a DLL called ``_pg.pyd`` (on Windows), and two pure
-Python wrapper modules called ``pg.py`` and ``pgdb.py``.
-All three files will be installed directly into the Python site-packages
-directory. To uninstall PyGreSQL, simply remove these three files.
+PyGreSQL will be installed as two packages named ``pg`` (for the classic
+interface) and ``pgdb`` (for the DB API 2 compliant interface). The former
+also contains a shared library called ``_pg.so`` (on Linux) or a DLL called
+``_pg.pyd`` (on Windows) and a stub file ``_pg.pyi`` for this library.
 
 
 Installing with Pip

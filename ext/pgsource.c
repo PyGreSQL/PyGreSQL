@@ -119,8 +119,8 @@ source_setattr(sourceObject *self, char *name, PyObject *v)
 
 /* Close object. */
 static char source_close__doc__[] =
-    "close() -- close query object without deleting it\n\n"
-    "All instances of the query object can no longer be used after this "
+    "close() -- close source object without deleting it\n\n"
+    "All instances of the source object can no longer be used after this "
     "call.\n";
 
 static PyObject *

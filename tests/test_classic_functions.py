@@ -287,11 +287,11 @@ class TestParseArray(unittest.TestCase):
     def test_parser_too_deeply_nested(self):
         f = pg.cast_array
         for n in 3, 5, 9, 12, 16, 32, 64, 256:
-            r = '{' * n + 'a,b,c' + '}' * n
+            s = '{' * n + 'a,b,c' + '}' * n
             if n > 16:  # hard coded maximum depth
-                self.assertRaises(ValueError, f, r)
+                self.assertRaises(ValueError, f, s)
             else:
-                r = f(r)
+                r = f(s)
                 for _i in range(n - 1):
                     self.assertIsInstance(r, list)
                     self.assertEqual(len(r), 1)
@@ -537,9 +537,9 @@ class TestParseRecord(unittest.TestCase):
     def test_parser_many_elements(self):
         f = pg.cast_record
         for n in 3, 5, 9, 12, 16, 32, 64, 256:
-            r = ','.join(map(str, range(n)))
-            r = f'({r})'
-            r = f(r, int)
+            s = ','.join(map(str, range(n)))
+            s = f'({s})'
+            r = f(s, int)
             self.assertEqual(r, tuple(range(n)))
 
     def test_parser_cast_uniform(self):
@@ -877,27 +877,27 @@ class TestEscapeFunctions(unittest.TestCase):
 
     def test_escape_string(self):
         f = pg.escape_string
-        r = f(b'plain')
-        self.assertIsInstance(r, bytes)
-        self.assertEqual(r, b'plain')
-        r = f('plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
-        r = f("that's cheese")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "that''s cheese")
+        b = f(b'plain')
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(b, b'plain')
+        s = f('plain')
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, 'plain')
+        s = f("that's cheese")
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, "that''s cheese")
 
     def test_escape_bytea(self):
         f = pg.escape_bytea
-        r = f(b'plain')
-        self.assertIsInstance(r, bytes)
-        self.assertEqual(r, b'plain')
-        r = f('plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
-        r = f("that's cheese")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "that''s cheese")
+        b = f(b'plain')
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(b, b'plain')
+        s = f('plain')
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, 'plain')
+        s = f("that's cheese")
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, "that''s cheese")
 
     def test_unescape_bytea(self):
         f = pg.unescape_bytea

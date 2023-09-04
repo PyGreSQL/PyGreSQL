@@ -75,9 +75,9 @@ current position.
 
 .. method:: LargeObject.write(string)
 
-    Read data to large object
+    Write data to large object
 
-    :param bytes string: string buffer to be written
+    :param bytes data: buffer of bytes to be written
     :rtype: None
     :raises TypeError: invalid connection, bad parameter type, or too many parameters
     :raises IOError: object is not opened, or write error

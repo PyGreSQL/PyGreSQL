@@ -1,14 +1,20 @@
 
-include *.c
-include *.h
-include *.py
+include setup.py
+
+recursive-include pg pgdb tests *.py
+
+include pg/*.pyi
+include pg/py.typed
+include pgdb/py.typed
+
+include ext/*.c
+include ext/*.h
 
 include README.rst
 include LICENSE.txt
 
 include tox.ini
-
-recursive-include tests *.py
+include pyproject.toml
 
 include docs/Makefile
 include docs/make.bat

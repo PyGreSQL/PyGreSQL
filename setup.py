@@ -33,9 +33,6 @@ with open('README.rst') as f:
 # classic interface, and "pgdb" for the modern DB-API 2.0 interface.
 # These two top-level Python modules share the same C extension "_pg".
 
-py_modules = ['pg', 'pgdb']
-c_sources = ['pgmodule.c']
-
 def pg_config(s):
     """Retrieve information about installed version of PostgreSQL."""
     f = os.popen(f'pg_config --{s}')  # noqa: S605
@@ -127,27 +124,27 @@ class build_pg_ext(build_ext):  # noqa: N801
 
 
 setup(
-    name="PyGreSQL",
+    name='PyGreSQL',
     version=version,
-    description="Python PostgreSQL Interfaces",
+    description='Python PostgreSQL Interfaces',
     long_description=long_description,
     long_description_content_type='text/x-rst',
-    keywords="pygresql postgresql database api dbapi",
+    keywords='pygresql postgresql database api dbapi',
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",
-    url="https://pygresql.github.io/",
-    download_url="https://pygresql.github.io/contents/download/",
+    url='https://pygresql.github.io/',
+    download_url='https://pygresql.github.io/contents/download/',
     project_urls={
-        "Documentation": "https://pygresql.github.io/contents/",
-        "Issue Tracker": "https://github.com/PyGreSQL/PyGreSQL/issues/",
-        "Mailing List": "https://mail.vex.net/mailman/listinfo/pygresql",
-        "Source Code": "https://github.com/PyGreSQL/PyGreSQL"},
+        'Documentation': 'https://pygresql.github.io/contents/',
+        'Issue Tracker': 'https://github.com/PyGreSQL/PyGreSQL/issues/',
+        'Mailing List': 'https://mail.vex.net/mailman/listinfo/pygresql',
+        'Source Code': 'https://github.com/PyGreSQL/PyGreSQL'},
     classifiers=[
-        "Development Status :: 6 - Mature",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: PostgreSQL License",
-        "Operating System :: OS Independent",
-        "Programming Language :: C",
+        'Development Status :: 6 - Mature',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: PostgreSQL License',
+        'Operating System :: OS Independent',
+        'Programming Language :: C',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.7',
@@ -155,16 +152,17 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
-        "Programming Language :: SQL",
-        "Topic :: Database",
-        "Topic :: Database :: Front-Ends",
-        "Topic :: Software Development :: Libraries :: Python Modules"],
-    license="PostgreSQL",
-    py_modules=py_modules,
+        'Programming Language :: SQL',
+        'Topic :: Database',
+        'Topic :: Database :: Front-Ends',
+        'Topic :: Software Development :: Libraries :: Python Modules'],
+    license='PostgreSQL',
     test_suite='tests.discover',
     zip_safe=False,
+    packages=["pg", "pgdb"],
+    package_data={"pg": ["py.typed"], "pgdb": ["py.typed"]},
     ext_modules=[Extension(
-        '_pg', c_sources,
+        'pg._pg', ["ext/pgmodule.c"],
         include_dirs=include_dirs, library_dirs=library_dirs,
         define_macros=define_macros, undef_macros=undef_macros,
         libraries=libraries, extra_compile_args=extra_compile_args)],

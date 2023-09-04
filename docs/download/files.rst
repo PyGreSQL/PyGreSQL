@@ -3,31 +3,26 @@ Distribution files
 
 ============== =
 
-pgmodule.c     the main source file for the C extension module (_pg)
-pgconn.c       the connection object
-pginternal.c   internal functions
-pglarge.c      large object support
-pgnotice.c     the notice object
-pgquery.c      the query object
-pgsource.c     the source object
+pg/            the "classic" PyGreSQL module
 
-pgtypes.h      PostgreSQL type definitions
+pgdb/          a DB-SIG DB-API 2.0 compliant API wrapper for PyGreSQL
 
-pg.py          the "classic" PyGreSQL module
-pgdb.py        a DB-SIG DB-API 2.0 compliant API wrapper for PyGreSQL
+ext/           the source files for the C extension
 
-setup.py       the Python setup script
-
-               To install PyGreSQL, you can run "python setup.py install".
-
-setup.cfg      the Python setup configuration
-
-docs/          documentation directory
+docs/          the documentation directory
 
                The documentation has been created with Sphinx.
                All text files are in ReST format; a HTML version of
                the documentation can be created with "make html".
 
 tests/         a suite of unit tests for PyGreSQL
+
+pyproject.toml contains project metadata and the build system requirements
+
+setup.py       the Python setup script used for building the C extension
+
+LICENSE.text   contains the license information for PyGreSQL
+
+README.rst     a summary of the PyGreSQL project
 
 ============== =

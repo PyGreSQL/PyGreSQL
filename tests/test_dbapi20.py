@@ -869,7 +869,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
 
                 def __str__(self) -> str:
                     return str(self.value).replace('.', ',')
-                
+
             self.assertTrue(pgdb.decimal_type(CustomDecimal) is CustomDecimal)
             cur.execute('select 4.25')
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)

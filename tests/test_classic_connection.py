@@ -19,7 +19,7 @@ from collections import namedtuple
 from collections.abc import Iterable
 from contextlib import suppress
 from decimal import Decimal
-from typing import Sequence
+from typing import Any, Sequence
 
 import pg  # the module under test
 
@@ -999,7 +999,7 @@ class TestParamQueries(unittest.TestCase):
             self.assertEqual(query(q, (False,)).getresult(), r_false)
             self.assertEqual(query(q, (True,)).getresult(), r_true)
         finally:
-            if bool_enabled is not None:
+            if bool_enabled_default is not None:
                 pg.set_bool(bool_enabled_default)
 
     def test_query_with_bool_params_not_default(self):
@@ -1557,7 +1557,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.single()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.NoResultError)
@@ -1577,7 +1577,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.single()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.MultipleResultsError)
@@ -1588,7 +1588,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.singledict()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.NoResultError)
@@ -1608,7 +1608,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.singledict()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.MultipleResultsError)
@@ -1619,7 +1619,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.singlenamed()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.NoResultError)
@@ -1627,7 +1627,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
 
     def test_single_named_with_single_row(self):
         q = self.c.query("select 1 as one, 2 as two")
-        r = q.singlenamed()
+        r: Any = q.singlenamed()
         self.assertEqual(r._fields, ('one', 'two'))
         self.assertEqual(r.one, 1)
         self.assertEqual(r.two, 2)
@@ -1643,7 +1643,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.singlenamed()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.MultipleResultsError)
@@ -1654,7 +1654,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.singlescalar()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.NoResultError)
@@ -1674,7 +1674,7 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         try:
             q.singlescalar()
         except pg.InvalidResultError as e:
-            r = e
+            r: Any = e
         else:
             r = None
         self.assertIsInstance(r, pg.MultipleResultsError)
@@ -2685,38 +2685,38 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
     def test_escape_string(self):
         self.assertTrue(self.cls_set_up)
         f = pg.escape_string
-        r = f(b'plain')
-        self.assertIsInstance(r, bytes)
-        self.assertEqual(r, b'plain')
-        r = f('plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
-        r = f("das is' käse".encode())
-        self.assertIsInstance(r, bytes)
-        self.assertEqual(r, "das is'' käse".encode())
-        r = f("that's cheesy")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "that''s cheesy")
-        r = f(r"It's bad to have a \ inside.")
-        self.assertEqual(r, r"It''s bad to have a \\ inside.")
+        b = f(b'plain')
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(b, b'plain')
+        s = f('plain')
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, 'plain')
+        b = f("das is' käse".encode())
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(b, "das is'' käse".encode())
+        s = f("that's cheesy")
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, "that''s cheesy")
+        s = f(r"It's bad to have a \ inside.")
+        self.assertEqual(s, r"It''s bad to have a \\ inside.")
 
     def test_escape_bytea(self):
         self.assertTrue(self.cls_set_up)
         f = pg.escape_bytea
-        r = f(b'plain')
-        self.assertIsInstance(r, bytes)
-        self.assertEqual(r, b'plain')
-        r = f('plain')
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, 'plain')
-        r = f("das is' käse".encode())
-        self.assertIsInstance(r, bytes)
-        self.assertEqual(r, b"das is'' k\\\\303\\\\244se")
-        r = f("that's cheesy")
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, "that''s cheesy")
-        r = f(b'O\x00ps\xff!')
-        self.assertEqual(r, b'O\\\\000ps\\\\377!')
+        b = f(b'plain')
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(b, b'plain')
+        s = f('plain')
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, 'plain')
+        b = f("das is' käse".encode())
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(b, b"das is'' k\\\\303\\\\244se")
+        s = f("that's cheesy")
+        self.assertIsInstance(s, str)
+        self.assertEqual(s, "that''s cheesy")
+        b = f(b'O\x00ps\xff!')
+        self.assertEqual(b, b'O\\\\000ps\\\\377!')
 
 
 if __name__ == '__main__':

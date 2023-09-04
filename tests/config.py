@@ -18,12 +18,9 @@ get = environ.get
 
 dbname = get('PYGRESQL_DB', get('PGDATABASE', 'test'))
 dbhost = get('PYGRESQL_HOST', get('PGHOST', 'localhost'))
-dbport = get('PYGRESQL_PORT', get('PGPORT', 5432))
+dbport = int(get('PYGRESQL_PORT', get('PGPORT', 5432)))
 dbuser = get('PYGRESQL_USER', get('PGUSER'))
 dbpasswd = get('PYGRESQL_PASSWD', get('PGPASSWORD'))
-
-if dbport:
-    dbport = int(dbport)
 
 try:
     from .LOCAL_PyGreSQL import *  # type: ignore  # noqa

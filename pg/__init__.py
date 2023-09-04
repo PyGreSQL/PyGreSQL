@@ -51,7 +51,7 @@ from typing import (
 from uuid import UUID
 
 try:
-    from _pg import version
+    from ._pg import version
 except ImportError as e:  # noqa: F841
     import os
     libpq = 'libpq.'
@@ -66,7 +66,7 @@ except ImportError as e:  # noqa: F841
             for path in paths:
                 with add_dll_dir(os.path.abspath(path)):
                     try:
-                        from _pg import version  # type: ignore
+                        from ._pg import version
                     except ImportError:
                         pass
                     else:
@@ -85,13 +85,17 @@ else:
     del version
 
 # import objects from extension module
-from _pg import (
+from ._pg import (
     INV_READ,
     INV_WRITE,
     POLLING_FAILED,
     POLLING_OK,
     POLLING_READING,
     POLLING_WRITING,
+    RESULT_DDL,
+    RESULT_DML,
+    RESULT_DQL,
+    RESULT_EMPTY,
     SEEK_CUR,
     SEEK_END,
     SEEK_SET,
@@ -167,6 +171,7 @@ __all__ = [
     'Connection', 'Query',
     'INV_READ', 'INV_WRITE',
     'POLLING_OK', 'POLLING_FAILED', 'POLLING_READING', 'POLLING_WRITING',
+    'RESULT_DDL', 'RESULT_DML', 'RESULT_DQL', 'RESULT_EMPTY',
     'SEEK_CUR', 'SEEK_END', 'SEEK_SET',
     'TRANS_ACTIVE', 'TRANS_IDLE', 'TRANS_INERROR',
     'TRANS_INTRANS', 'TRANS_UNKNOWN',
@@ -185,6 +190,8 @@ __all__ = [
 ]
 
 # Auxiliary classes and functions that are independent of a DB connection:
+
+SomeNamedTuple = Any  # alias for accessing arbitrary named tuples
 
 def get_args(func: Callable) -> list:
     return list(signature(func).parameters)
@@ -1188,7 +1195,7 @@ class DbType(str):
     category: str
     delim: str
     relid: int
-    
+
     _get_attnames: Callable[[DbType], AttrDict]
 
     @property
@@ -1336,14 +1343,14 @@ def _dictiter(q: Query) -> Generator[dict[str, Any], None, None]:
         yield dict(zip(fields, r))
 
 
-def _namediter(q: Query) -> Generator[NamedTuple, None, None]:
+def _namediter(q: Query) -> Generator[SomeNamedTuple, None, None]:
     """Get query result as an iterator of named tuples."""
     row = _row_factory(q.listfields())
     for r in q:
         yield row(r)
 
 
-def _namednext(q: Query) -> NamedTuple:
+def _namednext(q: Query) -> SomeNamedTuple:
     """Get next row from query result as a named tuple."""
     return _row_factory(q.listfields())(next(q))
 
@@ -1378,23 +1385,29 @@ class _MemoryQuery:
 
 # Error messages
 
-E = TypeVar('E', bound=DatabaseError)
+E = TypeVar('E', bound=Error)
 
-def _db_error(msg: str, cls:type[E] = DatabaseError) -> type[E]:
-    """Return DatabaseError with empty sqlstate attribute."""
+def _error(msg: str, cls: type[E]) -> E:
+    """Return specified error object with empty sqlstate attribute."""
     error = cls(msg)
-    error.sqlstate = None
+    if isinstance(error, DatabaseError):
+        error.sqlstate = None
     return error
+
+
+def _db_error(msg: str) -> DatabaseError:
+    """Return DatabaseError."""
+    return _error(msg, DatabaseError)
 
 
 def _int_error(msg: str) -> InternalError:
     """Return InternalError."""
-    return _db_error(msg, InternalError)
+    return _error(msg, InternalError)
 
 
 def _prg_error(msg: str) -> ProgrammingError:
     """Return ProgrammingError."""
-    return _db_error(msg, ProgrammingError)
+    return _error(msg, ProgrammingError)
 
 
 # Initialize the C module
@@ -1468,7 +1481,7 @@ class NotificationHandler:
             self.listening = False
 
     def notify(self, db: DB | None = None, stop: bool = False,
-               payload: str | None = None) -> None:
+               payload: str | None = None) -> Query | None:
         """Generate a notification.
 
         Optionally, you can pass a payload with the notification.
@@ -1480,16 +1493,17 @@ class NotificationHandler:
         must pass a different database connection since PyGreSQL database
         connections are not thread-safe.
         """
-        if self.listening:
+        if not self.listening:
+            return None
+        if not db:
+            db = self.db
             if not db:
-                db = self.db
-                if not db:
-                    return
-            event = self.stop_event if stop else self.event
-            cmd = f'notify "{event}"'
-            if payload:
-                cmd += f", '{payload}'"
-            return db.query(cmd)
+                return None
+        event = self.stop_event if stop else self.event
+        cmd = f'notify "{event}"'
+        if payload:
+            cmd += f", '{payload}'"
+        return db.query(cmd)
 
     def __call__(self) -> None:
         """Invoke the notification handler.
@@ -1545,6 +1559,7 @@ class DB:
     """Wrapper class for the _pg connection type."""
 
     db: Connection | None = None  # invalid fallback for underlying connection
+    _db_args: Any  # either the connectoin args or the underlying connection
 
     def __init__(self, *args: Any, **kw: Any) -> None:
         """Create a new connection.
@@ -1730,7 +1745,7 @@ class DB:
 
         All derived queries and large objects derived from this connection
         will not be usable after this call.
-        """            
+        """
         self._valid_db.reset()
 
     def reopen(self) -> None:
@@ -1741,7 +1756,8 @@ class DB:
         """
         # There is no such shared library function.
         if self._closeable:
-            db = connect(*self._db_args[0], **self._db_args[1])
+            args, kw = self._db_args
+            db = connect(*args, **kw)
             if self.db:
                 self.db.set_cast_hook(None)
                 self.db.close()
@@ -1750,7 +1766,7 @@ class DB:
         else:
             self.db = self._db_args
 
-    def begin(self, mode: str | None = None) -> None:
+    def begin(self, mode: str | None = None) -> Query:
         """Begin a transaction."""
         qstr = 'BEGIN'
         if mode:
@@ -1759,13 +1775,13 @@ class DB:
 
     start = begin
 
-    def commit(self) -> None:
+    def commit(self) -> Query:
         """Commit the current transaction."""
         return self.query('COMMIT')
 
     end = commit
 
-    def rollback(self, name: str | None = None) -> None:
+    def rollback(self, name: str | None = None) -> Query:
         """Roll back the current transaction."""
         qstr = 'ROLLBACK'
         if name:
@@ -1774,11 +1790,11 @@ class DB:
 
     abort = rollback
 
-    def savepoint(self, name: str) -> None:
+    def savepoint(self, name: str) -> Query:
         """Define a new savepoint within the current transaction."""
         return self.query('SAVEPOINT ' + name)
 
-    def release(self, name: str) -> None:
+    def release(self, name: str) -> Query:
         """Destroy a previously defined savepoint."""
         return self.query('RELEASE ' + name)
 
@@ -1983,7 +1999,7 @@ class DB:
         self._do_debug('EXECUTE', name)
         return db.query_prepared(name)
 
-    def prepare(self, name: str, command: str) -> Query:
+    def prepare(self, name: str, command: str) -> None:
         """Create a prepared SQL statement.
 
         This creates a prepared statement for the given command with the
@@ -1999,7 +2015,7 @@ class DB:
         if name is None:
             name = ''
         self._do_debug('prepare', name, command)
-        return self._valid_db.prepare(name, command)
+        self._valid_db.prepare(name, command)
 
     def describe_prepared(self, name: str | None = None) -> Query:
         """Describe a prepared SQL statement.
@@ -2057,17 +2073,17 @@ class DB:
                    " {}::pg_catalog.regclass"
                    " AND i.indisprimary ORDER BY a.attnum").format(
                   _quote_if_unqualified('$1', table))
-            pkey = self._valid_db.query(cmd, (table,)).getresult()
-            if not pkey:
+            res = self._valid_db.query(cmd, (table,)).getresult()
+            if not res:
                 raise KeyError(f'Table {table} has no primary key') from e
             # we want to use the order defined in the primary key index here,
             # not the order as defined by the columns in the table
-            if len(pkey) > 1:
-                indkey = pkey[0][2]
+            if len(res) > 1:
+                indkey = res[0][2]
                 pkey = tuple(row[0] for row in sorted(
-                    pkey, key=lambda row: indkey.index(row[1])))
+                    res, key=lambda row: indkey.index(row[1])))
             else:
-                pkey = pkey[0][0]
+                pkey = res[0][0]
             pkeys[table] = pkey  # cache it
         if composite and not isinstance(pkey, tuple):
             pkey = (pkey,)
@@ -2075,7 +2091,7 @@ class DB:
 
     def pkeys(self, table: str) -> tuple[str, ...]:
         """Get the primary key of a table as a tuple.
-        
+
         Same as pkey() with 'composite' set to True.
         """
         return self.pkey(table, True)  # type: ignore
@@ -2146,9 +2162,9 @@ class DB:
                 cmd = f"({cmd} OR a.attname OPERATOR(pg_catalog.=) 'oid')"
             cmd = self._query_attnames.format(
                 _quote_if_unqualified('$1', table), cmd)
-            names = self._valid_db.query(cmd, (table,)).getresult()
+            res = self._valid_db.query(cmd, (table,)).getresult()
             types = self.dbtypes
-            names = AttrDict((name[0], types.add(*name[1:])) for name in names)
+            names = AttrDict((name[0], types.add(*name[1:])) for name in res)
             attnames[table] = names  # cache it
         return names
 
@@ -2172,8 +2188,8 @@ class DB:
             cmd = f"{cmd} AND {self._query_generated}"
             cmd = self._query_attnames.format(
                 _quote_if_unqualified('$1', table), cmd)
-            names = self._valid_db.query(cmd, (table,)).getresult()
-            names = frozenset(name[0] for name in names)
+            res = self._valid_db.query(cmd, (table,)).getresult()
+            names = frozenset(name[0] for name in res)
             generated[table] = names  # cache it
         return names
 
@@ -2578,7 +2594,7 @@ class DB:
         cmd = f'DELETE FROM {t} WHERE {where}'  # noqa: S608
         self._do_debug(cmd, params)
         res = self._valid_db.query(cmd, params)
-        return int(res)
+        return int(res)  # type: ignore
 
     def truncate(self, table: str | list[str] | tuple[str, ...] |
                  set[str] | frozenset[str], restart: bool = False,
@@ -2660,7 +2676,7 @@ class DB:
         The parameter 'where' can restrict the query to only return a
         subset of the table rows.  It can be a string, list or a tuple
         of SQL expressions that all need to be fulfilled.
-        
+
         The parameter 'order' specifies the ordering of the rows.  It can
         also be a string, list or a tuple.  If no ordering is specified,
         the result will be ordered by the primary key(s) or all columns if
@@ -2806,7 +2822,7 @@ class DB:
             if key_tuple:
                 keys = _namediter(_MemoryQuery(keys, keynames))  # type: ignore
             if row_is_tuple:
-                fields = [f for f in fields if f not in keyset]
+                fields = tuple(f for f in fields if f not in keyset)
                 rows = _namediter(_MemoryQuery(rows, fields))  # type: ignore
         # noinspection PyArgumentList
         return dict(zip(keys, rows))
@@ -2824,6 +2840,6 @@ class DB:
 # if run as script, print some information
 
 if __name__ == '__main__':
-    print('PyGreSQL version' + version)
-    print('')
+    print('PyGreSQL version', version)
+    print()
     print(__doc__)

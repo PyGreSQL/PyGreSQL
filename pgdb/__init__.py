@@ -90,42 +90,8 @@ from typing import (
 )
 from uuid import UUID as Uuid  # noqa: N811
 
-try:
-    from _pg import version
-except ImportError as e:  # noqa: F841
-    import os
-    libpq = 'libpq.'
-    if os.name == 'nt':
-        libpq += 'dll'
-        import sys
-        paths = [path for path in os.environ["PATH"].split(os.pathsep)
-                 if os.path.exists(os.path.join(path, libpq))]
-        if sys.version_info >= (3, 8):
-            # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
-            add_dll_dir = os.add_dll_directory  # type: ignore
-            for path in paths:
-                with add_dll_dir(os.path.abspath(path)):
-                    try:
-                        from _pg import version  # type: ignore
-                    except ImportError:
-                        pass
-                    else:
-                        del version
-                        e = None  # type: ignore
-                        break
-        if paths:
-            libpq = 'compatible ' + libpq
-    else:
-        libpq += 'so'
-    if e:
-        raise ImportError(
-            "Cannot import shared library for PyGreSQL,\n"
-            f"probably because no {libpq} is installed.\n{e}") from e
-else:
-    del version
-
 # import objects from extension module
-from _pg import (
+from pg import (
     RESULT_DQL,
     DatabaseError,
     DataError,
@@ -143,10 +109,10 @@ from _pg import (
     unescape_bytea,
     version,
 )
-from _pg import (
+from pg import (
     Connection as Cnx,  # base connection
 )
-from _pg import (
+from pg import (
     connect as get_cnx,  # get base connection
 )
 
@@ -694,10 +660,9 @@ class TypeCache(dict):
             res = self._src.fetch(1)
         if not res:
             raise KeyError(f'Type {key} could not be found')
-        res = res[0]
+        r = res[0]
         type_code = TypeCode.create(
-            int(res[0]), res[1], int(res[2]),
-            res[3], res[4], res[5], int(res[6]))
+            int(r[0]), r[1], int(r[2]), r[3], r[4], r[5], int(r[6]))
         # noinspection PyUnresolvedReferences
         self[type_code.oid] = self[str(type_code)] = type_code
         return type_code
@@ -782,19 +747,30 @@ class _QuoteDict(dict):
 
 # *** Error Messages ***
 
-E = TypeVar('E', bound=DatabaseError)
+E = TypeVar('E', bound=Error)
 
 
-def _db_error(msg: str, cls:type[E] = DatabaseError) -> type[E]:
-    """Return DatabaseError with empty sqlstate attribute."""
+def _error(msg: str, cls: type[E]) -> E:
+    """Return specified error object with empty sqlstate attribute."""
     error = cls(msg)
-    error.sqlstate = None
+    if isinstance(error, DatabaseError):
+        error.sqlstate = None
     return error
+
+
+def _db_error(msg: str) -> DatabaseError:
+    """Return DatabaseError."""
+    return _error(msg, DatabaseError)
+
+
+def _if_error(msg: str) -> InterfaceError:
+    """Return InterfaceError."""
+    return _error(msg, InterfaceError)
 
 
 def _op_error(msg: str) -> OperationalError:
     """Return OperationalError."""
-    return _db_error(msg, OperationalError)
+    return _error(msg, OperationalError)
 
 
 # *** Row Tuples ***
@@ -835,8 +811,8 @@ class Cursor:
         cnx = connection._cnx
         if not cnx:
             raise _op_error("Connection has been closed")
-        self._cnx = cnx
-        self.type_cache = connection.type_cache
+        self._cnx: Cnx = cnx
+        self.type_cache: TypeCache = connection.type_cache
         self._src = self._cnx.source()
         # the official attribute for describing the result columns
         self._description: list[CursorDescription] | bool | None = None
@@ -845,9 +821,9 @@ class Cursor:
             self.row_factory = None  # type: ignore
         else:
             self.build_row_factory = None  # type: ignore
-        self.rowcount = -1
-        self.arraysize = 1
-        self.lastrowid = None
+        self.rowcount: int | None = -1
+        self.arraysize: int = 1
+        self.lastrowid: int | None = None
 
     def __iter__(self) -> Cursor:
         """Make cursor compatible to the iteration protocol."""
@@ -1044,8 +1020,7 @@ class Cursor:
             raise  # database provides error message
         except Error as err:
             # noinspection PyTypeChecker
-            raise _db_error(
-                f"Error in '{sql}': '{err}'", InterfaceError) from err
+            raise _if_error(f"Error in '{sql}': '{err}'") from err
         except Exception as err:
             raise _op_error(f"Internal error in '{sql}': {err}") from err
         # then initialize result raw count and description
@@ -1264,7 +1239,8 @@ class Cursor:
             # the following call will re-raise the error
             putdata(error)
         else:
-            self.rowcount = putdata(None)
+            rowcount = putdata(None)
+            self.rowcount = -1 if rowcount is None else rowcount
 
         # return the cursor object, so you can chain operations
         return self
@@ -1459,7 +1435,7 @@ class Connection:
 
     def __init__(self, cnx: Cnx) -> None:
         """Create a database connection object."""
-        self._cnx = cnx  # connection
+        self._cnx: Cnx | None = cnx  # connection
         self._tnx = False  # transaction state
         self.type_cache = TypeCache(cnx)
         self.cursor_type = Cursor
@@ -1509,7 +1485,7 @@ class Connection:
             with suppress(DatabaseError):
                 self.rollback()
         self._cnx.close()
-        self._cnx = None           
+        self._cnx = None
 
     @property
     def closed(self) -> bool:
@@ -1857,5 +1833,5 @@ class Literal:
 
 if __name__ == '__main__':
     print('PyGreSQL version', version)
-    print('')
+    print()
     print(__doc__)

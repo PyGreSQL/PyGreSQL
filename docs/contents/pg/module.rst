@@ -349,8 +349,7 @@ get/set_decimal -- decimal type to be used for numeric values
     :rtype: class
 
 This function returns the Python class that is used by PyGreSQL to hold
-PostgreSQL numeric values. The default class is :class:`decimal.Decimal`
-if available, otherwise the :class:`float` type is used.
+PostgreSQL numeric values. The default class is :class:`decimal.Decimal`.
 
 .. function:: set_decimal(cls)
 
@@ -360,8 +359,7 @@ if available, otherwise the :class:`float` type is used.
 
 This function can be used to specify the Python class that shall
 be used by PyGreSQL to hold PostgreSQL numeric values.
-The default class is :class:`decimal.Decimal` if available,
-otherwise the :class:`float` type is used.
+The default class is :class:`decimal.Decimal`.
 
 get/set_decimal_point -- decimal mark used for monetary values
 --------------------------------------------------------------
@@ -639,7 +637,7 @@ are not supported by default in PostgreSQL.
     :param str string: the string with the text representation of the array
     :param cast: a typecast function for the elements of the array
     :type cast: callable or None
-    :param delim: delimiter character between adjacent elements
+    :param bytes delim: delimiter character between adjacent elements
     :type str: byte string with a single character
     :returns: a list representing the PostgreSQL array in Python
     :rtype: list
@@ -667,7 +665,7 @@ then a comma will be used by default.
     :param str string: the string with the text representation of the record
     :param cast: typecast function(s) for the elements of the record
     :type cast: callable, list or tuple of callables, or None
-    :param delim: delimiter character between adjacent elements
+    :param bytes delim: delimiter character between adjacent elements
     :type str: byte string with a single character
     :returns: a tuple representing the PostgreSQL record in Python
     :rtype: tuple

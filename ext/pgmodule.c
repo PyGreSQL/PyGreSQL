@@ -180,7 +180,7 @@ typedef struct {
 
 /* Connect to a database. */
 static char pg_connect__doc__[] =
-    "connect(dbname, host, port, opt, user, passwd, wait) -- connect to a "
+    "connect(dbname, host, port, opt, user, passwd, nowait) -- connect to a "
     "PostgreSQL database\n\n"
     "The connection uses the specified parameters (optional, keywords "
     "aware).\n";
