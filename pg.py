@@ -164,7 +164,7 @@ __all__ = [
     'InvalidResultError', 'MultipleResultsError',
     'NoResultError', 'NotSupportedError',
     'OperationalError', 'ProgrammingError',
-    'Query',
+    'Connection', 'Query',
     'INV_READ', 'INV_WRITE',
     'POLLING_OK', 'POLLING_FAILED', 'POLLING_READING', 'POLLING_WRITING',
     'SEEK_CUR', 'SEEK_END', 'SEEK_SET',
