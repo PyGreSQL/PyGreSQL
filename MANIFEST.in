@@ -1,11 +1,9 @@
 
 include setup.py
 
-recursive-include pg pgdb tests *.py
-
-include pg/*.pyi
-include pg/py.typed
-include pgdb/py.typed
+recursive-include pg *.py *.pyi py.typed
+recursive-include pgdb *.py py.typed
+recursive-include tests *.py
 
 include ext/*.c
 include ext/*.h
