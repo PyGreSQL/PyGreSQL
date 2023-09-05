@@ -49,88 +49,6 @@ def DB():  # noqa: N802
     return db
 
 
-class TestAttrDict(unittest.TestCase):
-    """Test the simple ordered dictionary for attribute names."""
-
-    cls = pg.AttrDict
-
-    def test_init(self):
-        a = self.cls()
-        self.assertIsInstance(a, dict)
-        self.assertEqual(a, {})
-        items = [('id', 'int'), ('name', 'text')]
-        a = self.cls(items)
-        self.assertIsInstance(a, dict)
-        self.assertEqual(a, dict(items))
-        iteritems = iter(items)
-        a = self.cls(iteritems)
-        self.assertIsInstance(a, dict)
-        self.assertEqual(a, dict(items))
-
-    def test_iter(self):
-        a = self.cls()
-        self.assertEqual(list(a), [])
-        keys = ['id', 'name', 'age']
-        items = [(key, None) for key in keys]
-        a = self.cls(items)
-        self.assertEqual(list(a), keys)
-
-    def test_keys(self):
-        a = self.cls()
-        self.assertEqual(list(a.keys()), [])
-        keys = ['id', 'name', 'age']
-        items = [(key, None) for key in keys]
-        a = self.cls(items)
-        self.assertEqual(list(a.keys()), keys)
-
-    def test_values(self):
-        a = self.cls()
-        self.assertEqual(list(a.values()), [])
-        items = [('id', 'int'), ('name', 'text')]
-        values = [item[1] for item in items]
-        a = self.cls(items)
-        self.assertEqual(list(a.values()), values)
-
-    def test_items(self):
-        a = self.cls()
-        self.assertEqual(list(a.items()), [])
-        items = [('id', 'int'), ('name', 'text')]
-        a = self.cls(items)
-        self.assertEqual(list(a.items()), items)
-
-    def test_get(self):
-        a = self.cls([('id', 1)])
-        try:
-            self.assertEqual(a['id'], 1)
-        except KeyError:
-            self.fail('AttrDict should be readable')
-
-    def test_set(self):
-        a = self.cls()
-        try:
-            a['id'] = 1
-        except TypeError:
-            pass
-        else:
-            self.fail('AttrDict should be read-only')
-
-    def test_del(self):
-        a = self.cls([('id', 1)])
-        try:
-            del a['id']
-        except TypeError:
-            pass
-        else:
-            self.fail('AttrDict should be read-only')
-
-    def test_write_methods(self):
-        a = self.cls([('id', 1)])
-        self.assertEqual(a['id'], 1)
-        for method in 'clear', 'update', 'pop', 'setdefault', 'popitem':
-            method = getattr(a, method)
-            self.assertRaises(TypeError, method, a)  # type: ignore
-
-
 class TestDBClassInit(unittest.TestCase):
     """Test proper handling of errors when creating DB instances."""
 
@@ -491,8 +409,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(self.db.__class__.__name__, 'DB')
 
     def test_module_name(self):
-        self.assertEqual(self.db.__module__, 'pg')
-        self.assertEqual(self.db.__class__.__module__, 'pg')
+        self.assertEqual(self.db.__module__, 'pg.db')
+        self.assertEqual(self.db.__class__.__module__, 'pg.db')
 
     def test_escape_literal(self):
         f = self.db.escape_literal
@@ -1437,21 +1355,21 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r, 'n alpha v gamma tau beta')
 
     def test_get_attnames_is_attr_dict(self):
-        AttrDict = pg.AttrDict  # noqa: N806
+        from pg.attrs import AttrDict
         get_attnames = self.db.get_attnames
         r = get_attnames('test', flush=True)
         self.assertIsInstance(r, AttrDict)
         if self.regtypes:
-            self.assertEqual(r, AttrDict([
-                ('i2', 'smallint'), ('i4', 'integer'), ('i8', 'bigint'),
-                ('d', 'numeric'), ('f4', 'real'), ('f8', 'double precision'),
-                ('m', 'money'), ('v4', 'character varying'),
-                ('c4', 'character'), ('t', 'text')]))
+            self.assertEqual(r, AttrDict({
+                'i2': 'smallint', 'i4': 'integer', 'i8': 'bigint',
+                'd': 'numeric', 'f4': 'real', 'f8': 'double precision',
+                'm': 'money', 'v4': 'character varying',
+                'c4': 'character', 't': 'text'}))
         else:
-            self.assertEqual(r, AttrDict([
-                ('i2', 'int'), ('i4', 'int'), ('i8', 'int'),
-                ('d', 'num'), ('f4', 'float'), ('f8', 'float'), ('m', 'money'),
-                ('v4', 'text'), ('c4', 'text'), ('t', 'text')]))
+            self.assertEqual(r, AttrDict({
+                'i2': 'int', 'i4': 'int', 'i8': 'int',
+                'd': 'num', 'f4': 'float', 'f8': 'float', 'm': 'money',
+                'v4': 'text', 'c4': 'text', 't': 'text'}))
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
         table = 'test table for get_attnames'
@@ -1461,14 +1379,14 @@ class TestDBClass(unittest.TestCase):
         r = get_attnames(table)
         self.assertIsInstance(r, AttrDict)
         if self.regtypes:
-            self.assertEqual(r, AttrDict([
-                ('n', 'integer'), ('alpha', 'smallint'),
-                ('v', 'character varying'), ('gamma', 'character'),
-                ('tau', 'text'), ('beta', 'boolean')]))
+            self.assertEqual(r, AttrDict({
+                'n': 'integer', 'alpha': 'smallint',
+                'v': 'character varying', 'gamma': 'character',
+                'tau': 'text', 'beta': 'boolean'}))
         else:
-            self.assertEqual(r, AttrDict([
-                ('n', 'int'), ('alpha', 'int'), ('v', 'text'),
-                ('gamma', 'text'), ('tau', 'text'), ('beta', 'bool')]))
+            self.assertEqual(r, AttrDict({
+                'n': 'int', 'alpha': 'int', 'v': 'text',
+                'gamma': 'text', 'tau': 'text', 'beta': 'bool'}))
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'n alpha v gamma tau beta')
 
@@ -4204,7 +4122,8 @@ class TestDBClass(unittest.TestCase):
         self.assertNotIn('bool', dbtypes)
         self.assertIs(get_typecast('int4'), int)
         self.assertIs(get_typecast('float4'), float)
-        self.assertIs(get_typecast('bool'), pg.cast_bool)
+        from pg.cast import cast_bool
+        self.assertIs(get_typecast('bool'), cast_bool)
         cast_circle = get_typecast('circle')
         self.addCleanup(set_typecast, 'circle', cast_circle)
         squared_circle = lambda v: f'Squared Circle: {v}'  # noqa: E731
@@ -4416,14 +4335,19 @@ class TestDBClassAdapter(unittest.TestCase):
         values = [(3, 7.5, 'hello', True, [123], ['abc'])]
         t = self.adapter.simple_type
         typ = t('record')
-        typ._get_attnames = lambda _self: pg.AttrDict([
-            ('i', t('int')), ('f', t('float')),
-            ('t', t('text')), ('b', t('bool')),
-            ('i3', t('int[]')), ('t3', t('text[]'))])
+        from pg.attrs import AttrDict
+        typ._get_attnames = lambda _self: AttrDict({
+            'i': t('int'), 'f': t('float'),
+            't': t('text'), 'b': t('bool'),
+            'i3': t('int[]'), 't3': t('text[]')})
         types = [typ]
         sql, params = format_query('select %s', values, types)
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(3,7.5,hello,t,{123},{abc})'])
+        values = [(0, -3.25, '', False, [0], [''])]
+        sql, params = format_query('select %s', values, types)
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['(0,-3.25,"",f,{0},"{\\"\\"}")'])
 
     def test_adapt_query_typed_list_with_types_as_string(self):
         format_query = self.adapter.format_query
@@ -4527,14 +4451,19 @@ class TestDBClassAdapter(unittest.TestCase):
         values = dict(record=(3, 7.5, 'hello', True, [123], ['abc']))
         t = self.adapter.simple_type
         typ = t('record')
-        typ._get_attnames = lambda _self: pg.AttrDict([
-            ('i', t('int')), ('f', t('float')),
-            ('t', t('text')), ('b', t('bool')),
-            ('i3', t('int[]')), ('t3', t('text[]'))])
+        from pg.attrs import AttrDict
+        typ._get_attnames = lambda _self: AttrDict({
+            'i': t('int'), 'f': t('float'),
+            't': t('text'), 'b': t('bool'),
+            'i3': t('int[]'), 't3': t('text[]')})
         types = dict(record=typ)
         sql, params = format_query('select %(record)s', values, types)
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(3,7.5,hello,t,{123},{abc})'])
+        values = dict(record=(0, -3.25, '', False, [0], ['']))
+        sql, params = format_query('select %(record)s', values, types)
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['(0,-3.25,"",f,{0},"{\\"\\"}")'])
 
     def test_adapt_query_untyped_list(self):
         format_query = self.adapter.format_query
@@ -4560,6 +4489,10 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query('select %s', values)
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(3,7.5,hello,t,{123},{abc})'])
+        values = [(0, -3.25, '', False, [0], [''])]
+        sql, params = format_query('select %s', values)
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['(0,-3.25,"",f,{0},"{\\"\\"}")'])
 
     def test_adapt_query_untyped_list_with_json(self):
         format_query = self.adapter.format_query
@@ -4601,6 +4534,10 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query('select %(record)s', values)
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(3,7.5,hello,t,{123},{abc})'])
+        values = dict(record=(0, -3.25, '', False, [0], ['']))
+        sql, params = format_query('select %(record)s', values)
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['(0,-3.25,"",f,{0},"{\\"\\"}")'])
 
     def test_adapt_query_inline_list(self):
         format_query = self.adapter.format_query
@@ -4628,6 +4565,11 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query('select %s', values, inline=True)
         self.assertEqual(
             sql, "select (3,7.5,'hello',true,ARRAY[123],ARRAY['abc'])")
+        self.assertEqual(params, [])
+        values = [(0, -3.25, '', False, [0], [''])]
+        sql, params = format_query('select %s', values, inline=True)
+        self.assertEqual(
+            sql, "select (0,-3.25,'',false,ARRAY[0],ARRAY[''])")
         self.assertEqual(params, [])
 
     def test_adapt_query_inline_list_with_json(self):
@@ -4675,6 +4617,11 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query('select %(record)s', values, inline=True)
         self.assertEqual(
             sql, "select (3,7.5,'hello',true,ARRAY[123],ARRAY['abc'])")
+        self.assertEqual(params, [])
+        values = dict(record=(0, -3.25, '', False, [0], ['']))
+        sql, params = format_query('select %(record)s', values, inline=True)
+        self.assertEqual(
+            sql, "select (0,-3.25,'',false,ARRAY[0],ARRAY[''])")
         self.assertEqual(params, [])
 
     def test_adapt_query_with_pg_repr(self):

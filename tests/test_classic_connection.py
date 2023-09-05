@@ -2353,7 +2353,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsNone(r)
 
     def test_set_decimal_point(self):
-        d = pg.Decimal
+        d = Decimal
         point = pg.get_decimal_point()
         self.assertRaises(TypeError, pg.set_decimal_point)
         # error if decimal point is not a string
@@ -2480,7 +2480,7 @@ class TestConfigFunctions(unittest.TestCase):
         decimal_class = pg.get_decimal()
         # error if a parameter is passed
         self.assertRaises(TypeError, pg.get_decimal, decimal_class)
-        self.assertIs(decimal_class, pg.Decimal)  # the default setting
+        self.assertIs(decimal_class, Decimal)  # the default setting
         pg.set_decimal(int)
         try:
             r = pg.get_decimal()
@@ -2499,7 +2499,6 @@ class TestConfigFunctions(unittest.TestCase):
             r = query("select 3425::numeric")
         except pg.DatabaseError:
             self.skipTest('database does not support numeric')
-            r = None
         r = r.getresult()[0][0]
         self.assertIsInstance(r, decimal_class)
         self.assertEqual(r, decimal_class('3425'))
@@ -2557,7 +2556,6 @@ class TestConfigFunctions(unittest.TestCase):
             r = query("select true::bool")
         except pg.ProgrammingError:
             self.skipTest('database does not support bool')
-            r = None
         r = r.getresult()[0][0]
         self.assertIsInstance(r, bool)
         self.assertEqual(r, True)
@@ -2620,7 +2618,6 @@ class TestConfigFunctions(unittest.TestCase):
             r = query("select 'data'::bytea")
         except pg.ProgrammingError:
             self.skipTest('database does not support bytea')
-            r = None
         r = r.getresult()[0][0]
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'data')
@@ -2653,7 +2650,8 @@ class TestConfigFunctions(unittest.TestCase):
                     else:
                         self.assertEqual(r, (1, 2, 3))
                         self.assertEqual(r._fields, ('a', 'b', 'c'))
-            info = pg._row_factory.cache_info()
+            from pg.helpers import _row_factory
+            info = _row_factory.cache_info()
             self.assertEqual(info.maxsize, maxsize)
             self.assertEqual(info.hits + info.misses, 6)
             self.assertEqual(

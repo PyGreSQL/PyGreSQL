@@ -15,6 +15,7 @@ import json
 import re
 import unittest
 from datetime import timedelta
+from decimal import Decimal
 from typing import Any, Sequence
 
 import pg  # the module under test
@@ -854,15 +855,15 @@ class TestCastInterval(unittest.TestCase):
              'P-10M-3DT3H55M5.999993S'))]
 
     def test_cast_interval(self):
+        from pg.cast import cast_interval
         for result, values in self.intervals:
-            f = pg.cast_interval
             years, mons, days, hours, mins, secs, usecs = result
             days += 365 * years + 30 * mons
             interval = timedelta(
                 days=days, hours=hours, minutes=mins,
                 seconds=secs, microseconds=usecs)
             for value in values:
-                self.assertEqual(f(value), interval)
+                self.assertEqual(cast_interval(value), interval)
 
 
 class TestEscapeFunctions(unittest.TestCase):
@@ -970,10 +971,10 @@ class TestConfigFunctions(unittest.TestCase):
 
     def test_get_decimal(self):
         r = pg.get_decimal()
-        self.assertIs(r, pg.Decimal)
+        self.assertIs(r, Decimal)
 
     def test_set_decimal(self):
-        decimal_class = pg.Decimal
+        decimal_class = Decimal
         try:
             pg.set_decimal(int)
             r = pg.get_decimal()

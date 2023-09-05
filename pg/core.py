@@ -1,30 +1,41 @@
-#!/usr/bin/python
-#
-# PyGreSQL - a Python interface for the PostgreSQL database.
-#
-# This file contains the classic pg module.
-#
-# Copyright (c) 2023 by the PyGreSQL Development Team
-#
-# The notification handler is based on pgnotify which is
-# Copyright (c) 2001 Ng Pheng Siong. All rights reserved.
-#
-# Please see the LICENSE.TXT file for specific restrictions.
+"""Core functionality from extension module."""
 
-"""PyGreSQL classic interface.
+try:
+    from ._pg import version
+except ImportError as e:  # noqa: F841
+    import os
+    libpq = 'libpq.'
+    if os.name == 'nt':
+        libpq += 'dll'
+        import sys
+        paths = [path for path in os.environ["PATH"].split(os.pathsep)
+                 if os.path.exists(os.path.join(path, libpq))]
+        if sys.version_info >= (3, 8):
+            # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
+            add_dll_dir = os.add_dll_directory  # type: ignore
+            for path in paths:
+                with add_dll_dir(os.path.abspath(path)):
+                    try:
+                        from ._pg import version
+                    except ImportError:
+                        pass
+                    else:
+                        del version
+                        e = None  # type: ignore
+                        break
+        if paths:
+            libpq = 'compatible ' + libpq
+    else:
+        libpq += 'so'
+    if e:
+        raise ImportError(
+            "Cannot import shared library for PyGreSQL,\n"
+            f"probably because no {libpq} is installed.\n{e}") from e
+else:
+    del version
 
-This pg module implements some basic database management stuff.
-It includes the _pg module and builds on it, providing the higher
-level wrapper class named DB with additional functionality.
-This is known as the "classic" ("old style") PyGreSQL interface.
-For a DB-API 2 compliant interface use the newer pgdb module.
-"""
-
-from __future__ import annotations
-
-from .adapt import Adapter, Bytea, Hstore, Json, Literal
-from .cast import Typecasts, get_typecast, set_typecast
-from .core import (
+# import objects from extension module
+from ._pg import (
     INV_READ,
     INV_WRITE,
     POLLING_FAILED,
@@ -94,16 +105,8 @@ from .core import (
     unescape_bytea,
     version,
 )
-from .db import DB
-from .helpers import init_core, set_row_factory_size
-from .notify import NotificationHandler
-
-__version__ = version
 
 __all__ = [
-    'DB', 'Adapter',
-    'NotificationHandler', 'Typecasts',
-    'Bytea', 'Hstore', 'Json', 'Literal',
     'Error', 'Warning',
     'DataError', 'DatabaseError',
     'IntegrityError', 'InterfaceError', 'InternalError',
@@ -122,14 +125,11 @@ __all__ = [
     'get_array', 'get_bool', 'get_bytea_escaped',
     'get_datestyle', 'get_decimal', 'get_decimal_point',
     'get_defbase', 'get_defhost', 'get_defopt', 'get_defport', 'get_defuser',
-    'get_jsondecode', 'get_pqlib_version', 'get_typecast',
+    'get_jsondecode', 'get_pqlib_version',
     'set_array', 'set_bool', 'set_bytea_escaped',
     'set_datestyle', 'set_decimal', 'set_decimal_point',
     'set_defbase', 'set_defhost', 'set_defopt',
     'set_defpasswd', 'set_defport', 'set_defuser',
     'set_jsondecode', 'set_query_helpers',
-    'set_row_factory_size', 'set_typecast',
-    'version', '__version__',
+    'version',
 ]
-
-init_core()
