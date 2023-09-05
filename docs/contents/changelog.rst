@@ -5,10 +5,17 @@ Version 6.0 (to be released)
 ----------------------------
 - Removed support for Python versions older than 3.7 (released June 2017)
   and PostgreSQL older than version 10 (released October 2017).
+- Converted the standalone modules `pg` and `pgdb` to packages with
+  several submodules each. The C extension module is now part of the
+  `pg` package and wrapped into the pure Python module `pg.core`.
+- Added type hints and included a stub file for the C extension module.
 - Added method `pkeys()` to the `pg.DB` object.
 - Removed deprecated function `pg.pgnotify()`.
 - Removed deprecated method `ntuples()` of the `pg.Query` object.
 - Renamed `pgdb.Type` to `pgdb.DbType` to avoid confusion with `typing.Type`.
+- `pg` and `pgdb` now use a shared row factory cache.
+- The function  `set_row_factory_size()` has been removed. The row cache is now
+  available as a `RowCache` class with methods `change_size()` and `clear()`.
 - Modernized code and tools for development, testing, linting and building.
 
 Version 5.2.5 (2023-08-28)

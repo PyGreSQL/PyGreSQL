@@ -1,4 +1,4 @@
-"""Adaption of parameters."""
+"""Adaptation of parameters."""
 
 from __future__ import annotations
 

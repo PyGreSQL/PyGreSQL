@@ -3164,7 +3164,7 @@ class TestDBClass(unittest.TestCase):
                 query("insert into test_table values (6)")
                 query("insert into test_table values (-1)")
         except pg.IntegrityError as error:
-            self.assertTrue('check' in str(error))
+            self.assertIn('check', str(error))
         with self.db:
             query("insert into test_table values (7)")
         r = [r[0] for r in query(
@@ -3276,7 +3276,8 @@ class TestDBClass(unittest.TestCase):
         if pg.get_bytea_escaped():
             self.assertNotEqual(data, s)
             self.assertIsInstance(data, str)
-            data = pg.unescape_bytea(data)  # type: ignore
+            assert isinstance(data, str)  # type guard
+            data = pg.unescape_bytea(data)
         self.assertIsInstance(data, bytes)
         self.assertEqual(data, s)
         d['data'] = None

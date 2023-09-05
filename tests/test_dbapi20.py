@@ -5,6 +5,7 @@ from __future__ import annotations
 import gc
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
 from typing import Any, ClassVar
 from uuid import UUID as Uuid  # noqa: N811
 
@@ -443,7 +444,6 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertRaises(pgdb.OperationalError, cur.fetchone)
 
     def test_fetch_2_rows(self):
-        Decimal = pgdb.decimal_type()  # noqa: N806
         values = ('test', pgdb.Binary(b'\xff\x52\xb2'),
                   True, 5, 6, 5.7, Decimal('234.234234'), Decimal('75.45'),
                   pgdb.Date(2011, 7, 17), pgdb.Time(15, 47, 42),
@@ -536,7 +536,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         try:
             cur.execute("select 1/0")
         except pgdb.DatabaseError as error:
-            self.assertTrue(isinstance(error, pgdb.DataError))
+            self.assertIsInstance(error, pgdb.DataError)
             # the SQLSTATE error code for division by zero is 22012
             # noinspection PyUnresolvedReferences
             self.assertEqual(error.sqlstate, '22012')
@@ -575,9 +575,9 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             if isinf(inval):  # type: ignore
                 self.assertTrue(isinf(outval))
                 if inval < 0:  # type: ignore
-                    self.assertTrue(outval < 0)
+                    self.assertLess(outval, 0)
                 else:
-                    self.assertTrue(outval > 0)
+                    self.assertGreater(outval, 0)
             elif isnan(inval):  # type: ignore
                 self.assertTrue(isnan(outval))
             else:
@@ -586,25 +586,27 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
     def test_datetime(self):
         dt = datetime(2011, 7, 17, 15, 47, 42, 317509)
         values = [dt.date(), dt.time(), dt, dt.time(), dt]
-        assert isinstance(values[3], time)
+        self.assertIsInstance(values[3], time)
+        assert isinstance(values[3], time)  # type guard
         values[3] = values[3].replace(tzinfo=timezone.utc)
-        assert isinstance(values[4], datetime)
+        self.assertIsInstance(values[4], datetime)
+        assert isinstance(values[4], datetime)  # type guard
         values[4] = values[4].replace(tzinfo=timezone.utc)
-        d = (dt.year, dt.month, dt.day)
-        t = (dt.hour, dt.minute, dt.second, dt.microsecond)
-        z = (timezone.utc,)
+        da = (dt.year, dt.month, dt.day)
+        ti = (dt.hour, dt.minute, dt.second, dt.microsecond)
+        tz = (timezone.utc,)
         inputs = [
             # input as objects
             values,
             # input as text
             [v.isoformat() for v in values],  # type: ignore
             # # input using type helpers
-            [pgdb.Date(*d), pgdb.Time(*t),
-             pgdb.Timestamp(*(d + t)), pgdb.Time(*(t + z)),
-             pgdb.Timestamp(*(d + t + z))]
+            [pgdb.Date(*da), pgdb.Time(*ti),
+             pgdb.Timestamp(*(da + ti)), pgdb.Time(*(ti + tz)),
+             pgdb.Timestamp(*(da + ti + tz))]
         ]
         table = self.table_prefix + 'booze'
-        con = self._connect()
+        con: pgdb.Connection = self._connect()
         try:
             cur = con.cursor()
             cur.execute("set timezone = UTC")
@@ -624,7 +626,8 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                         " values (%s,%s,%s,%s,%s)", params)
                     cur.execute(f"select * from {table}")
                     d = cur.description
-                    assert isinstance(d, list)
+                    self.assertIsInstance(d, list)
+                    assert d is not None  # type guard
                     for i in range(5):
                         tc = d[i].type_code
                         self.assertEqual(tc, pgdb.DATETIME)
@@ -855,8 +858,8 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             con.close()
 
     def test_set_decimal_type(self):
-        decimal_type = pgdb.decimal_type()
-        self.assertTrue(decimal_type is not None and callable(decimal_type))
+        from pgdb.cast import decimal_type
+        self.assertIs(decimal_type(), Decimal)
         con = self._connect()
         try:
             cur = con.cursor()
@@ -870,19 +873,19 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 def __str__(self) -> str:
                     return str(self.value).replace('.', ',')
 
-            self.assertTrue(pgdb.decimal_type(CustomDecimal) is CustomDecimal)
+            self.assertIs(decimal_type(CustomDecimal), CustomDecimal)
             cur.execute('select 4.25')
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
-            self.assertTrue(isinstance(value, CustomDecimal))
+            self.assertIsInstance(value, CustomDecimal)
             self.assertEqual(str(value), '4,25')
             # change decimal type again to float
-            self.assertTrue(pgdb.decimal_type(float) is float)
+            self.assertIs(decimal_type(float), float)
             cur.execute('select 4.25')
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
             # the connection still uses the old setting
-            self.assertTrue(isinstance(value, str))
+            self.assertIsInstance(value, str)
             self.assertEqual(str(value), '4,25')
             # bust the cache for type functions for the connection
             con.type_cache.reset_typecast()
@@ -890,12 +893,12 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             self.assertEqual(cur.description[0].type_code, pgdb.NUMBER)
             value = cur.fetchone()[0]
             # now the connection uses the new setting
-            self.assertTrue(isinstance(value, float))
+            self.assertIsInstance(value, float)
             self.assertEqual(value, 4.25)
         finally:
             con.close()
-            pgdb.decimal_type(decimal_type)
-        self.assertTrue(pgdb.decimal_type() is decimal_type)
+            decimal_type(Decimal)
+        self.assertIs(decimal_type(), Decimal)
 
     def test_global_typecast(self):
         try:
@@ -1272,7 +1275,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                         cur.execute(f"insert into {table} values (3)")
                         cur.execute(f"insert into {table} values (4)")
                 except con.IntegrityError as error:
-                    self.assertTrue('check' in str(error).lower())
+                    self.assertIn('check', str(error).lower())
                 with con:
                     cur.execute(f"insert into {table} values (5)")
                     cur.execute(f"insert into {table} values (6)")
@@ -1325,11 +1328,11 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertEqual('int8', pgdb.INTEGER)
         self.assertNotEqual('int4', pgdb.LONG)
         self.assertEqual('int8', pgdb.LONG)
-        self.assertTrue('char' in pgdb.STRING)
-        self.assertTrue(pgdb.NUMERIC <= pgdb.NUMBER)
-        self.assertTrue(pgdb.NUMBER >= pgdb.INTEGER)
-        self.assertTrue(pgdb.TIME <= pgdb.DATETIME)
-        self.assertTrue(pgdb.DATETIME >= pgdb.DATE)
+        self.assertIn('char', pgdb.STRING)
+        self.assertLess(pgdb.NUMERIC, pgdb.NUMBER)
+        self.assertGreaterEqual(pgdb.NUMBER, pgdb.INTEGER)
+        self.assertLessEqual(pgdb.TIME, pgdb.DATETIME)
+        self.assertGreaterEqual(pgdb.DATETIME, pgdb.DATE)
         self.assertEqual(pgdb.ARRAY, pgdb.ARRAY)
         self.assertNotEqual(pgdb.ARRAY, pgdb.STRING)
         self.assertEqual('_char', pgdb.ARRAY)
@@ -1349,12 +1352,13 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         row = cur.fetchone()
         self.assertEqual(row, data)
 
-    def test_set_row_factory_size(self):
+    def test_change_row_factory_cache_size(self):
+        from pg import RowCache
         queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
         con = self._connect()
         cur = con.cursor()
         for maxsize in (None, 0, 1, 2, 3, 10, 1024):
-            pgdb.set_row_factory_size(maxsize)
+            RowCache.change_size(maxsize)
             for _i in range(3):
                 for q in queries:
                     cur.execute(q)
@@ -1365,11 +1369,11 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                     else:
                         self.assertEqual(r, (1, 2, 3))
                         self.assertEqual(r._fields, ('a', 'b', 'c'))
-            info = pgdb._row_factory.cache_info()
+            info = RowCache.row_factory.cache_info()
             self.assertEqual(info.maxsize, maxsize)
             self.assertEqual(info.hits + info.misses, 6)
-            self.assertEqual(
-                info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
+            self.assertEqual(info.hits,
+                             0 if maxsize is not None and maxsize < 2 else 4)
 
     def test_memory_leaks(self):
         ids: set = set()

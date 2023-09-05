@@ -95,10 +95,8 @@ from .core import (
     version,
 )
 from .db import DB
-from .helpers import init_core, set_row_factory_size
+from .helpers import RowCache, init_core
 from .notify import NotificationHandler
-
-__version__ = version
 
 __all__ = [
     'DB', 'Adapter',
@@ -110,7 +108,7 @@ __all__ = [
     'InvalidResultError', 'MultipleResultsError',
     'NoResultError', 'NotSupportedError',
     'OperationalError', 'ProgrammingError',
-    'Connection', 'Query',
+    'Connection', 'Query', 'RowCache',
     'INV_READ', 'INV_WRITE',
     'POLLING_OK', 'POLLING_FAILED', 'POLLING_READING', 'POLLING_WRITING',
     'RESULT_DDL', 'RESULT_DML', 'RESULT_DQL', 'RESULT_EMPTY',
@@ -127,9 +125,10 @@ __all__ = [
     'set_datestyle', 'set_decimal', 'set_decimal_point',
     'set_defbase', 'set_defhost', 'set_defopt',
     'set_defpasswd', 'set_defport', 'set_defuser',
-    'set_jsondecode', 'set_query_helpers',
-    'set_row_factory_size', 'set_typecast',
+    'set_jsondecode', 'set_query_helpers', 'set_typecast',
     'version', '__version__',
 ]
+
+__version__ = version
 
 init_core()

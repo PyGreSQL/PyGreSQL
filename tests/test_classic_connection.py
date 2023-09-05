@@ -2250,7 +2250,7 @@ class TestNotificatons(unittest.TestCase):
             self.assertIsNone(self.c.getnotify())
             query("notify test_notify, 'test_payload'")
             r = getnotify()
-            self.assertTrue(isinstance(r, tuple))
+            self.assertIsInstance(r, tuple)
             self.assertEqual(len(r), 3)
             self.assertIsInstance(r[0], str)
             self.assertIsInstance(r[1], int)
@@ -2636,11 +2636,12 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, b'data')
 
-    def test_set_row_factory_size(self):
+    def test_change_row_factory_cache_size(self):
+        cache = pg.RowCache
         queries = ['select 1 as a, 2 as b, 3 as c', 'select 123 as abc']
         query = self.c.query
         for maxsize in (None, 0, 1, 2, 3, 10, 1024):
-            pg.set_row_factory_size(maxsize)
+            cache.change_size(maxsize)
             for _i in range(3):
                 for q in queries:
                     r = query(q).namedresult()[0]
@@ -2650,12 +2651,11 @@ class TestConfigFunctions(unittest.TestCase):
                     else:
                         self.assertEqual(r, (1, 2, 3))
                         self.assertEqual(r._fields, ('a', 'b', 'c'))
-            from pg.helpers import _row_factory
-            info = _row_factory.cache_info()
+            info = cache.row_factory.cache_info()
             self.assertEqual(info.maxsize, maxsize)
             self.assertEqual(info.hits + info.misses, 6)
-            self.assertEqual(
-                info.hits, 0 if maxsize is not None and maxsize < 2 else 4)
+            self.assertEqual(info.hits,
+                             0 if maxsize is not None and maxsize < 2 else 4)
 
 
 class TestStandaloneEscapeFunctions(unittest.TestCase):

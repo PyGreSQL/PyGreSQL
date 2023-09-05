@@ -97,12 +97,13 @@ class DatabaseAPI20Test(unittest.TestCase):
 
     def _connect(self):
         try:
-            r = self.driver.connect(
-                *self.connect_args, **self.connect_kw_args
-            )
+            con = self.driver.connect(
+                *self.connect_args, **self.connect_kw_args)
         except AttributeError:
             self.fail("No connect method found in self.driver module")
-        return r
+        if not isinstance(con, self.driver.Connection):
+            self.fail("The connect method does not return a Connection")
+        return con
 
     def test_connect(self):
         con = self._connect()

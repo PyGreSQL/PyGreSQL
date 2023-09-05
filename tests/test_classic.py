@@ -148,7 +148,7 @@ class UtilityTest(unittest.TestCase):
         try:
             db.query("INSERT INTO _test_schema VALUES (1234)")
         except DatabaseError as error:
-            self.assertTrue(isinstance(error, IntegrityError))
+            self.assertIsInstance(error, IntegrityError)
             # the SQLSTATE error code for unique violation is 23505
             # noinspection PyUnresolvedReferences
             self.assertEqual(error.sqlstate, '23505')
@@ -238,7 +238,7 @@ class UtilityTest(unittest.TestCase):
             self.assertTrue(arg_dict['called'])
             self.assertEqual(arg_dict['event'], 'event_1')
             self.assertEqual(arg_dict['extra'], 'payload 1')
-            self.assertTrue(isinstance(arg_dict['pid'], int))
+            self.assertIsInstance(arg_dict['pid'], int)
             self.assertFalse(self.notify_timeout)
             arg_dict['called'] = False
             self.assertTrue(thread.is_alive())
@@ -257,7 +257,7 @@ class UtilityTest(unittest.TestCase):
             self.assertTrue(arg_dict['called'])
             self.assertEqual(arg_dict['event'], 'stop_event_1')
             self.assertEqual(arg_dict['extra'], 'payload 2')
-            self.assertTrue(isinstance(arg_dict['pid'], int))
+            self.assertIsInstance(arg_dict['pid'], int)
             self.assertFalse(self.notify_timeout)
             thread.join(5)
             self.assertFalse(thread.is_alive())

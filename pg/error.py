@@ -4,9 +4,18 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from .core import DatabaseError, Error, InternalError, ProgrammingError
+from .core import (
+    DatabaseError,
+    Error,
+    InterfaceError,
+    InternalError,
+    OperationalError,
+    ProgrammingError,
+)
 
-__all__ = ['error', 'db_error', 'int_error', 'prg_error']
+__all__ = [
+    'error', 'db_error', 'if_error', 'int_error', 'op_error', 'prg_error'
+]
 
 # Error messages
 
@@ -33,3 +42,13 @@ def int_error(msg: str) -> InternalError:
 def prg_error(msg: str) -> ProgrammingError:
     """Return ProgrammingError."""
     return error(msg, ProgrammingError)
+
+
+def if_error(msg: str) -> InterfaceError:
+    """Return InterfaceError."""
+    return error(msg, InterfaceError)
+
+
+def op_error(msg: str) -> OperationalError:
+    """Return OperationalError."""
+    return error(msg, OperationalError)
