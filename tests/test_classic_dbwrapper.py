@@ -1360,16 +1360,16 @@ class TestDBClass(unittest.TestCase):
         r = get_attnames('test', flush=True)
         self.assertIsInstance(r, AttrDict)
         if self.regtypes:
-            self.assertEqual(r, AttrDict({
-                'i2': 'smallint', 'i4': 'integer', 'i8': 'bigint',
-                'd': 'numeric', 'f4': 'real', 'f8': 'double precision',
-                'm': 'money', 'v4': 'character varying',
-                'c4': 'character', 't': 'text'}))
+            self.assertEqual(r, AttrDict(
+                i2='smallint', i4='integer', i8='bigint',
+                d='numeric', f4='real', f8='double precision',
+                m='money', v4='character varying',
+                c4='character', t='text'))
         else:
-            self.assertEqual(r, AttrDict({
-                'i2': 'int', 'i4': 'int', 'i8': 'int',
-                'd': 'num', 'f4': 'float', 'f8': 'float', 'm': 'money',
-                'v4': 'text', 'c4': 'text', 't': 'text'}))
+            self.assertEqual(r, AttrDict(
+                i2='int', i4='int', i8='int',
+                d='num', f4='float', f8='float', m='money',
+                v4='text', c4='text', t='text'))
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'i2 i4 i8 d f4 f8 m v4 c4 t')
         table = 'test table for get_attnames'
@@ -1379,14 +1379,14 @@ class TestDBClass(unittest.TestCase):
         r = get_attnames(table)
         self.assertIsInstance(r, AttrDict)
         if self.regtypes:
-            self.assertEqual(r, AttrDict({
-                'n': 'integer', 'alpha': 'smallint',
-                'v': 'character varying', 'gamma': 'character',
-                'tau': 'text', 'beta': 'boolean'}))
+            self.assertEqual(r, AttrDict(
+                n='integer', alpha='smallint',
+                v='character varying', gamma='character',
+                tau='text', beta='boolean'))
         else:
-            self.assertEqual(r, AttrDict({
-                'n': 'int', 'alpha': 'int', 'v': 'text',
-                'gamma': 'text', 'tau': 'text', 'beta': 'bool'}))
+            self.assertEqual(r, AttrDict(
+                n='int', alpha='int', v='text',
+                gamma='text', tau='text', beta='bool'))
         r = ' '.join(list(r.keys()))
         self.assertEqual(r, 'n alpha v gamma tau beta')
 
@@ -4336,10 +4336,10 @@ class TestDBClassAdapter(unittest.TestCase):
         t = self.adapter.simple_type
         typ = t('record')
         from pg.attrs import AttrDict
-        typ._get_attnames = lambda _self: AttrDict({
-            'i': t('int'), 'f': t('float'),
-            't': t('text'), 'b': t('bool'),
-            'i3': t('int[]'), 't3': t('text[]')})
+        typ._get_attnames = lambda _self: AttrDict(
+            i=t('int'), f=t('float'),
+            t=t('text'), b=t('bool'),
+            i3=t('int[]'), t3=t('text[]'))
         types = [typ]
         sql, params = format_query('select %s', values, types)
         self.assertEqual(sql, 'select $1')
@@ -4452,10 +4452,10 @@ class TestDBClassAdapter(unittest.TestCase):
         t = self.adapter.simple_type
         typ = t('record')
         from pg.attrs import AttrDict
-        typ._get_attnames = lambda _self: AttrDict({
-            'i': t('int'), 'f': t('float'),
-            't': t('text'), 'b': t('bool'),
-            'i3': t('int[]'), 't3': t('text[]')})
+        typ._get_attnames = lambda _self: AttrDict(
+            i=t('int'), f=t('float'),
+            t=t('text'), b=t('bool'),
+            i3=t('int[]'), t3=t('text[]'))
         types = dict(record=typ)
         sql, params = format_query('select %(record)s', values, types)
         self.assertEqual(sql, 'select $1')
