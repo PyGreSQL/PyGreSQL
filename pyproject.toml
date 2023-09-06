@@ -33,13 +33,13 @@ classifiers = [
 file = "LICENSE.txt"
 
 [project.urls]
-homepage = "https://pygresql.github.io/"
-documentation = "https://pygresql.github.io/contents/"
-source = "https://github.com/PyGreSQL/PyGreSQL"
-issues = "https://github.com/PyGreSQL/PyGreSQL/issues/"
-changelog = "https://pygresql.github.io/contents/changelog.html"
-download = "https://pygresql.github.io/download/"
-"mailing list" = "https://mail.vex.net/mailman/listinfo/pygresql"
+Homepage = "https://pygresql.github.io/"
+Documentation = "https://pygresql.github.io/contents/"
+"Source Code" = "https://github.com/PyGreSQL/PyGreSQL"
+"Issue Tracker" = "https://github.com/PyGreSQL/PyGreSQL/issues/"
+Changelog = "https://pygresql.github.io/contents/changelog.html"
+Download = "https://pygresql.github.io/download/"
+"Mailing List" = "https://mail.vex.net/mailman/listinfo/pygresql"
 
 [tool.ruff]
 target-version = "py37"

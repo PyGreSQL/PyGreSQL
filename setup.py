@@ -133,7 +133,7 @@ setup(
     author="D'Arcy J. M. Cain",
     author_email="darcy@PyGreSQL.org",
     url='https://pygresql.github.io/',
-    download_url='https://pygresql.github.io/contents/download/',
+    download_url='https://pygresql.github.io/download/',
     project_urls={
         'Documentation': 'https://pygresql.github.io/contents/',
         'Issue Tracker': 'https://github.com/PyGreSQL/PyGreSQL/issues/',
