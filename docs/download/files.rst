@@ -3,11 +3,11 @@ Distribution files
 
 ============== =
 
-pg/            the "classic" PyGreSQL module
+pg/            the "classic" PyGreSQL package
 
 pgdb/          a DB-SIG DB-API 2.0 compliant API wrapper for PyGreSQL
 
-ext/           the source files for the C extension
+ext/           the source files for the C extension module
 
 docs/          the documentation directory
 
