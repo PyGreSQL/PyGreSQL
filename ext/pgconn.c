@@ -45,7 +45,7 @@ conn_getattr(connObject *self, PyObject *nameobj)
     /* postmaster host */
     if (!strcmp(name, "host")) {
         char *r = PQhost(self->cnx);
-        if (!r || r[0] == '/') /* Pg >= 9.6 can return a Unix socket path */
+        if (!r || r[0] == '/') /* this can return a Unix socket path */
             r = "localhost";
         return PyUnicode_FromString(r);
     }
@@ -1577,7 +1577,6 @@ conn_poll(connObject *self, PyObject *noargs)
 
     if (rc == PGRES_POLLING_FAILED) {
         set_error(InternalError, "Polling failed", self->cnx, NULL);
-        Py_XDECREF(self);
         return NULL;
     }
 
