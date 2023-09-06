@@ -30,11 +30,11 @@ sudo apt-get install -y python3.12 python3.12-dev python3.12-distutils
 
 # install build and testing tool
 
-python3.7 -m pip install build
-python3.8 -m pip install build
-python3.9 -m pip install build
-python3.10 -m pip install build
-python3.11 -m pip install build
+python3.7 -m pip install -U pip setuptools wheel build
+python3.8 -m pip install -U pip setuptools wheel build
+python3.9 -m pip install -U pip setuptools wheel build
+python3.10 -m pip install -U pip setuptools wheel build
+python3.11 -m pip install -U pip setuptools wheel build
 
 pip install ruff
 
