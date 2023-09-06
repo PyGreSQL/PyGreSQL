@@ -42,10 +42,12 @@ class DB:
                  opt: str | None = None,
                  user: str | None = None, passwd: str | None = None,
                  nowait: bool = False) -> None:
+        """Create a new connection using the specified parameters."""
         ...
 
     @overload
     def __init__(self, db: Connection | DB | DbApi2Connection) -> None:
+        """Create a connection wrapper based on an existing connection."""
         ...
 
     def __init__(self, *args: Any, **kw: Any) -> None: 
