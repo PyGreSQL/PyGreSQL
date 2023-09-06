@@ -6,13 +6,22 @@ from contextlib import suppress
 from json import dumps as jsonencode
 from json import loads as jsondecode
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Iterator,
+    Sequence,
+    TypeVar,
+    overload,
+)
 
 from . import Connection, connect
 from .adapt import Adapter, DbTypes
 from .attrs import AttrDict
 from .core import (
     InternalError,
+    LargeObject,
     ProgrammingError,
     Query,
     get_bool,
@@ -26,12 +35,32 @@ from .notify import NotificationHandler
 if TYPE_CHECKING:
     from pgdb.connection import Connection as DbApi2Connection
 
+try:
+    AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
+except TypeError:  # Python < 3.10
+    AnyStr = Any  # type: ignore
+
 __all__ = ['DB']
+
 
 # The actual PostgreSQL database connection interface:
 
 class DB:
-    """Wrapper class for the _pg connection type."""
+    """Wrapper class for the core connection type."""
+
+    dbname: str
+    host: str
+    port: int
+    options: str
+    error: str
+    status: int
+    user : str
+    protocol_version: int
+    server_version: int
+    socket: int
+    backend_pid: int
+    ssl_in_use: bool
+    ssl_attributes: dict[str, str | None]
 
     db: Connection | None = None  # invalid fallback for underlying connection
     _db_args: Any  # either the connect args or the underlying connection
@@ -1325,6 +1354,126 @@ class DB:
         """Get notification handler that will run the given callback."""
         return NotificationHandler(self, event, callback,
                                    arg_dict, timeout, stop_event)
+
+    # immediately wrapped methods
+
+    def send_query(self, cmd: str, args: Sequence | None = None) -> Query:
+        """Create a new asynchronous query object for this connection."""
+        if args is None:
+            return self._valid_db.send_query(cmd)
+        return self._valid_db.send_query(cmd, args)
+
+    def poll(self) -> int:
+        """Complete an asynchronous connection and get its state."""
+        return self._valid_db.poll()
+
+    def cancel(self) -> None:
+        """Abandon processing of current SQL command."""
+        self._valid_db.cancel()
+
+    def fileno(self) -> int:
+        """Get the socket used to connect to the database."""
+        return self._valid_db.fileno()
+
+    def get_cast_hook(self) -> Callable | None:
+        """Get the function that handles all external typecasting."""
+        return self._valid_db.get_cast_hook()
+
+    def set_cast_hook(self, hook: Callable | None) -> None:
+        """Set a function that will handle all external typecasting."""
+        self._valid_db.set_cast_hook(hook)
+
+    def get_notice_receiver(self) -> Callable | None:
+        """Get the current notice receiver."""
+        return self._valid_db.get_notice_receiver()
+
+    def set_notice_receiver(self, receiver: Callable | None) -> None:
+        """Set a custom notice receiver."""
+        self._valid_db.set_notice_receiver(receiver)
+
+    def getnotify(self) -> tuple[str, int, str] | None:
+        """Get the last notify from the server."""
+        return self._valid_db.getnotify()
+
+    def inserttable(self, table: str, values: Sequence[list|tuple],
+                    columns: list[str] | tuple[str, ...] | None = None) -> int:
+        """Insert a Python iterable into a database table."""
+        if columns is None:
+            return self._valid_db.inserttable(table, values)
+        return self._valid_db.inserttable(table, values, columns)
+
+    def transaction(self) -> int:
+        """Get the current in-transaction status of the server.
+
+        The status returned by this method can be TRANS_IDLE (currently idle),
+        TRANS_ACTIVE (a command is in progress), TRANS_INTRANS (idle, in a
+        valid transaction block), or TRANS_INERROR (idle, in a failed
+        transaction block).  TRANS_UNKNOWN is reported if the connection is
+        bad.  The status TRANS_ACTIVE is reported only when a query has been
+        sent to the server and not yet completed.
+        """
+        return self._valid_db.transaction()
+
+    def parameter(self, name: str) -> str | None:
+        """Look up a current parameter setting of the server."""
+        return self._valid_db.parameter(name)
+
+
+    def date_format(self) -> str:
+        """Look up the date format currently being used by the database."""
+        return self._valid_db.date_format()
+
+    def escape_literal(self, s: AnyStr) -> AnyStr:
+        """Escape a literal constant for use within SQL."""
+        return self._valid_db.escape_literal(s)
+
+    def escape_identifier(self, s: AnyStr) -> AnyStr:
+        """Escape an identifier for use within SQL."""
+        return self._valid_db.escape_identifier(s)
+
+    def escape_string(self, s: AnyStr) -> AnyStr:
+        """Escape a string for use within SQL."""
+        return self._valid_db.escape_string(s)
+
+    def escape_bytea(self, s: AnyStr) -> AnyStr:
+        """Escape binary data for use within SQL as type 'bytea'."""
+        return self._valid_db.escape_bytea(s)
+
+    def putline(self, line: str) -> None:
+        """Write a line to the server socket."""
+        self._valid_db.putline(line)
+
+    def getline(self) -> str:
+        """Get a line from server socket."""
+        return self._valid_db.getline()
+
+    def endcopy(self) -> None:
+        """Synchronize client and server."""
+        self._valid_db.endcopy()
+
+    def set_non_blocking(self, nb: bool) -> None:
+        """Set the non-blocking mode of the connection."""
+        self._valid_db.set_non_blocking(nb)
+
+    def is_non_blocking(self) -> bool:
+        """Get the non-blocking mode of the connection."""
+        return self._valid_db.is_non_blocking()
+
+    def locreate(self, mode: int) -> LargeObject:
+        """Create a large object in the database.
+
+        The valid values for 'mode' parameter are defined as the module level
+        constants INV_READ and INV_WRITE.
+        """
+        return self._valid_db.locreate(mode)
+
+    def getlo(self, oid: int) -> LargeObject:
+        """Build a large object from given oid."""
+        return self._valid_db.getlo(oid)
+
+    def loimport(self, filename: str) -> LargeObject:
+        """Import a file to a large object."""
+        return self._valid_db.loimport(filename)
 
 
 class _MemoryQuery:

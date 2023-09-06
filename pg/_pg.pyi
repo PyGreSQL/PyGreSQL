@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Sequence, TypeVar
 
-AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
+try:
+    AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
+except TypeError:  # Python < 3.10
+    AnyStr = Any  # type: ignore
 SomeNamedTuple = Any  # alias for accessing arbitrary named tuples
 
 version: str

@@ -21,7 +21,7 @@
 static PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
     *InternalError, *OperationalError, *ProgrammingError, *IntegrityError,
     *DataError, *NotSupportedError, *InvalidResultError, *NoResultError,
-    *MultipleResultsError, *Connection, *Query;
+    *MultipleResultsError, *Connection, *Query, *LargeObject;
 
 #define _TOSTRING(x) #x
 #define TOSTRING(x) _TOSTRING(x)
@@ -1310,6 +1310,8 @@ PyInit__pg(void)
     PyDict_SetItemString(dict, "Connection", Connection);
     Query = (PyObject *)&queryType;
     PyDict_SetItemString(dict, "Query", Query);
+    LargeObject = (PyObject *)&largeType;
+    PyDict_SetItemString(dict, "LargeObject", LargeObject);
 
     /* Make the version available */
     s = PyUnicode_FromString(PyPgVersion);
