@@ -6,7 +6,7 @@ from contextlib import suppress
 from json import dumps as jsonencode
 from json import loads as jsondecode
 from operator import itemgetter
-from typing import Any, Callable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence, overload
 
 from . import Connection, connect
 from .adapt import Adapter, DbTypes
@@ -23,6 +23,9 @@ from .error import db_error, int_error, prg_error
 from .helpers import namediter, oid_key, quote_if_unqualified
 from .notify import NotificationHandler
 
+if TYPE_CHECKING:
+    from pgdb.connection import Connection as DbApi2Connection
+
 __all__ = ['DB']
 
 # The actual PostgreSQL database connection interface:
@@ -33,33 +36,48 @@ class DB:
     db: Connection | None = None  # invalid fallback for underlying connection
     _db_args: Any  # either the connect args or the underlying connection
 
-    def __init__(self, *args: Any, **kw: Any) -> None:
+    @overload
+    def __init__(self, dbname: str | None = None,
+                 host: str | None = None, port: int = -1,
+                 opt: str | None = None,
+                 user: str | None = None, passwd: str | None = None,
+                 nowait: bool = False) -> None:
+        ...
+
+    @overload
+    def __init__(self, db: Connection | DB | DbApi2Connection) -> None:
+        ...
+
+    def __init__(self, *args: Any, **kw: Any) -> None: 
         """Create a new connection.
 
         You can pass either the connection parameters or an existing
-        _pg or pgdb connection. This allows you to use the methods
-        of the classic pg interface with a DB-API 2 pgdb connection.
+        pg or pgdb Connection. This allows you to use the methods
+        of the classic pg interface with a DB-API 2 pgdb Connection.
         """
-        if not args and len(kw) == 1:
+        if kw:
             db = kw.get('db')
-        elif not kw and len(args) == 1:
+            if db is not None and (args or len(kw) > 1):
+                raise TypeError("Conflicting connection parameters")
+        elif len(args) == 1 and not isinstance(args[0], str):
             db = args[0]
         else:
             db = None
         if db:
             if isinstance(db, DB):
-                db = db.db
+                db = db.db  # allow db to be a wrapped Connection
             else:
                 with suppress(AttributeError):
-                    # noinspection PyUnresolvedReferences
-                    db = db._cnx
-        if not db or not hasattr(db, 'db') or not hasattr(db, 'query'):
+                    db = db._cnx  # allow db to be a pgdb Connection
+            if not isinstance(db, Connection):
+                raise TypeError(
+                    "The 'db' argument must be a valid database connection.")
+            self._db_args = db
+            self._closeable = False
+        else:
             db = connect(*args, **kw)
             self._db_args = args, kw
             self._closeable = True
-        else:
-            self._db_args = db
-            self._closeable = False
         self.db = db
         self.dbname = db.db
         self._regtypes = False
@@ -97,7 +115,7 @@ class DB:
         self.debug: Any = None
 
     def __getattr__(self, name: str) -> Any:
-        """Get the specified attritbute of the connection."""
+        """Get the specified attribute of the connection."""
         # All undefined members are same as in underlying connection:
         if self.db:
             return getattr(self.db, name)

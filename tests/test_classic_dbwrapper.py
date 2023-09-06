@@ -301,12 +301,13 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertIsNone(db.db)
         db = pg.DB(self.db)
         self.assertEqual(self.db.db, db.db)
+        assert self.db.db is not None
         db = pg.DB(db=self.db.db)
         self.assertEqual(self.db.db, db.db)
 
     def test_existing_db_api2_connection(self):
 
-        class DBApi2Con:
+        class FakeDbApi2Connection:
 
             def __init__(self, cnx):
                 self._cnx = cnx
@@ -314,8 +315,8 @@ class TestDBClassBasic(unittest.TestCase):
             def close(self):
                 self._cnx.close()
 
-        db2 = DBApi2Con(self.db.db)
-        db = pg.DB(db2)
+        db2 = FakeDbApi2Connection(self.db.db)
+        db = pg.DB(db2)  # type: ignore
         self.assertEqual(self.db.db, db.db)
         db.close()
         self.assertIsNone(db.db)
