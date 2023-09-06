@@ -18,6 +18,9 @@ The following Python versions are supported:
 * PyGreSQL 5.x: Python 2 and Python 3
 * PyGreSQL 6.x and newer: Python 3 only
 
+The current version of PyGreSQL supports Python versions 3.7 to 3.12
+and PostgreSQL versions 10 to 16 on the server.
+
 Installation
 ------------
 
@@ -27,6 +30,9 @@ The simplest way to install PyGreSQL is to type::
 
 For other ways of installing PyGreSQL and requirements,
 see the documentation.
+
+Note that PyGreSQL also requires the libpq shared library to be
+installed and accessible on the client machine.
 
 Documentation
 -------------

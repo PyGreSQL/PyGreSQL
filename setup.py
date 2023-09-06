@@ -19,7 +19,7 @@ from distutils.sysconfig import get_python_inc, get_python_lib
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
-version = '6.0'
+version = '6.0b1'
 
 if not (3, 7) <= sys.version_info[:2] < (4, 0):
     raise Exception(
@@ -152,6 +152,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Programming Language :: SQL',
         'Topic :: Database',
         'Topic :: Database :: Front-Ends',

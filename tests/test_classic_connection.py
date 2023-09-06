@@ -174,7 +174,8 @@ class TestConnectObject(unittest.TestCase):
     def test_attribute_server_version(self):
         server_version = self.connection.server_version
         self.assertIsInstance(server_version, int)
-        self.assertTrue(100000 <= server_version < 160000)
+        self.assertGreaterEqual(server_version, 100000)
+        self.assertLess(server_version, 170000)
 
     def test_attribute_socket(self):
         socket = self.connection.socket

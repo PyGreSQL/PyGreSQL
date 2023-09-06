@@ -26,6 +26,7 @@ sudo apt-get install -y python3.8 python3.8-dev python3.8-distutils
 sudo apt-get install -y python3.9 python3.9-dev python3.9-distutils
 sudo apt-get install -y python3.10 python3.10-dev python3.10-distutils
 sudo apt-get install -y python3.11 python3.11-dev python3.11-distutils
+sudo apt-get install -y python3.12 python3.12-dev python3.12-distutils
 
 # install build and testing tool
 
@@ -43,7 +44,7 @@ sudo apt-get install -y tox clang-format
 
 sudo apt-get install -y postgresql libpq-dev
 
-for pghost in pg10 pg12 pg14 pg15
+for pghost in pg10 pg12 pg14 pg15 pg16
 do
     export PGHOST=$pghost
     export PGDATABASE=postgres
@@ -76,3 +77,7 @@ do
     psql -c "create extension hstore" test_latin9
     psql -c "create extension hstore" test_cyrillic
 done
+
+export PGDATABASE=test
+export PGUSER=test
+export PGPASSWORD=test

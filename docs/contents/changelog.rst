@@ -1,8 +1,9 @@
 ChangeLog
 =========
 
-Version 6.0 (to be released)
-----------------------------
+Version 6.0b1 (2023-09-06)
+--------------------------
+- Officially support Python 3.12 and PostgreSQL 16 (tested with rc versions).
 - Removed support for Python versions older than 3.7 (released June 2017)
   and PostgreSQL older than version 10 (released October 2017).
 - Converted the standalone modules `pg` and `pgdb` to packages with
