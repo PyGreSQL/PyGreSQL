@@ -10,7 +10,15 @@ project = 'PyGreSQL'
 author = 'The PyGreSQL team'
 copyright = '2023, ' + author
 
-version = release = '6.0b1'
+def project_version():
+    with open('../pyproject.toml') as f:
+        for d in f:
+            if d.startswith("version ="):
+                version = d.split("=")[1].strip().strip('"')
+                return version
+    raise Exception("Cannot determine PyGreSQL version")
+
+version = release = project_version()
 
 language = 'en'
 
