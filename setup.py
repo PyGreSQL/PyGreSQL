@@ -19,11 +19,9 @@ from distutils.sysconfig import get_python_inc, get_python_lib
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
-if not (3, 7) <= sys.version_info[:2] < (4, 0):
-    raise Exception(
-        f"Sorry, PyGreSQL {version} does not support this Python version")
 
 def project_version():
+    """Read the PyGreSQL version from the pyproject.toml file."""
     with open('pyproject.toml') as f:
         for d in f:
             if d.startswith("version ="):
@@ -31,13 +29,21 @@ def project_version():
                 return version
     raise Exception("Cannot determine PyGreSQL version")
 
+
 def project_readme():
+    """Get the content of the README file."""
     with open('README.rst') as f:
         return f.read()
 
+
 version = project_version()
 
+if not (3, 7) <= sys.version_info[:2] < (4, 0):
+    raise Exception(
+        f"Sorry, PyGreSQL {version} does not support this Python version")
+
 long_description = project_readme()
+
 
 # For historical reasons, PyGreSQL does not install itself as a single
 # "pygresql" package, but as two top-level modules "pg", providing the
