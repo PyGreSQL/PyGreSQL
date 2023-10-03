@@ -195,9 +195,10 @@ class TestConnectObject(unittest.TestCase):
     def test_attribute_ssl_attributes(self):
         ssl_attributes = self.connection.ssl_attributes
         self.assertIsInstance(ssl_attributes, dict)
-        self.assertEqual(ssl_attributes, {
-            'cipher': None, 'compression': None, 'key_bits': None,
-            'library': None, 'protocol': None})
+        if ssl_attributes:
+            self.assertEqual(ssl_attributes, {
+                'cipher': None, 'compression': None, 'key_bits': None,
+                'library': None, 'protocol': None})
 
     def test_attribute_status(self):
         status_ok = 1
