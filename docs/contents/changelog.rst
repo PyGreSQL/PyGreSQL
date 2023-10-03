@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+Version 6.0 (2023-10-03)
+------------------------
+- Tested with the recent releases of Python 3.12 and PostgreSQL 16.
+- Make pyproject.toml the only source of truth for the version number.
+- Please also note the changes already made in version 6.0b1.
+
 Version 6.0b1 (2023-09-06)
 --------------------------
 - Officially support Python 3.12 and PostgreSQL 16 (tested with rc versions).
