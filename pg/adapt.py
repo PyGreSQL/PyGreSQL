@@ -333,7 +333,7 @@ class Adapter:
 
     def _adapt_json(self, v: Any) -> str | None:
         """Adapt a json parameter."""
-        if not v:
+        if v is None:
             return None
         if isinstance(v, str):
             return v

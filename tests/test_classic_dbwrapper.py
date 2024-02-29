@@ -4390,6 +4390,14 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['{"test": [1, "it\'s fine", 3]}'])
 
+    def test_adapt_query_typed_list_with_empty_json(self):
+        format_query = self.adapter.format_query
+        values: Any = [None, 0, False, '', [], {}]
+        types = ('json',) * 6
+        sql, params = format_query("select %s,%s,%s,%s,%s,%s", values, types)
+        self.assertEqual(sql, 'select $1,$2,$3,$4,$5,$6')
+        self.assertEqual(params, [None, '0', 'false', '', '[]', '{}'])
+
     def test_adapt_query_typed_with_hstore(self):
         format_query = self.adapter.format_query
         value: Any = {'one': "it's fine", 'two': 2}
