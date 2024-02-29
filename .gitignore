@@ -7,7 +7,7 @@
 *.patch
 *.pid
 *.pstats
-*.py[co]
+*.py[cdo]
 *.so
 *.swp
 
