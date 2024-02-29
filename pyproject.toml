@@ -44,18 +44,6 @@ Download = "https://pygresql.github.io/download/"
 [tool.ruff]
 target-version = "py37"
 line-length = 79
-select = [
-  "E",   # pycodestyle
-  "F",   # pyflakes
-  "I",   # isort
-  "N",   # pep8-naming
-  "UP",  # pyupgrade
-  "D",   # pydocstyle
-  "B",   # bugbear
-  "S",   # bandit
-  "SIM", # simplify
-  "RUF", # ruff
-]
 exclude = [
     "__pycache__",
     "__pypackages__",
@@ -71,7 +59,22 @@ exclude = [
     "venv",
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "I",   # isort
+  "N",   # pep8-naming
+  "UP",  # pyupgrade
+  "D",   # pydocstyle
+  "B",   # bugbear
+  "S",   # bandit
+  "SIM", # simplify
+  "RUF", # ruff
+]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
 "tests/*.py" = ["D100", "D101", "D102", "D103", "D105", "D107", "S"]
 
 [tool.mypy]
