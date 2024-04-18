@@ -20,10 +20,6 @@ _build_doctrees/
 
 /local/
 /tests/LOCAL_*.py
-docker-compose.yml
-Dockerfile
-Vagrantfile
-Vagrantfile-*
 
 .coverage
 .tox/

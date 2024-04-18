@@ -1,0 +1,69 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+
+    env_file: dev.env
+
+    volumes:
+      - ..:/workspace:cached
+
+    command: sleep infinity
+
+  pg10:
+    image: postgres:10
+    restart: unless-stopped
+    volumes:
+      - postgres-data-10:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
+  pg12:
+    image: postgres:12
+    restart: unless-stopped
+    volumes:
+      - postgres-data-12:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
+  pg14:
+    image: postgres:14
+    restart: unless-stopped
+    volumes:
+      - postgres-data-14:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
+  pg15:
+    image: postgres:15
+    restart: unless-stopped
+    volumes:
+      - postgres-data-15:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
+  pg16:
+    image: postgres:16
+    restart: unless-stopped
+    volumes:
+      - postgres-data-16:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
+volumes:
+  postgres-data-10:
+  postgres-data-12:
+  postgres-data-14:
+  postgres-data-15:
+  postgres-data-16:
