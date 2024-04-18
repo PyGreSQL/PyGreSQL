@@ -802,8 +802,9 @@ class DB:
         adapt = params.add
         col = self.escape_identifier
         what = 'oid, *' if qoid else '*'
-        where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
-            col(k), adapt(row[k], attnames[k])) for k in keyname)
+        where = ' AND '.join(
+            f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
+            for k in keyname)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
@@ -913,8 +914,9 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
-            col(k), adapt(row[k], attnames[k])) for k in keynames)
+        where = ' AND '.join(
+            f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
+            for k in keynames)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']
@@ -1103,8 +1105,9 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        where = ' AND '.join('{} OPERATOR(pg_catalog.=) {}'.format(
-            col(k), adapt(row[k], attnames[k])) for k in keynames)
+        where = ' AND '.join(
+            f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
+            for k in keynames)
         if 'oid' in row:
             if qoid:
                 row[qoid] = row['oid']

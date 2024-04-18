@@ -33,7 +33,7 @@ class DbType(frozenset):
         """Create new type object."""
         if isinstance(values, str):
             values = values.split()
-        return super().__new__(cls, values)  # type: ignore
+        return super().__new__(cls, values)
 
     def __eq__(self, other: Any) -> bool:
         """Check whether types are considered equal."""
