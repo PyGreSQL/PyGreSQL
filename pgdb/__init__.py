@@ -4,7 +4,7 @@
 #
 # This file contains the DB-API 2 compatible pgdb module.
 #
-# Copyright (c) 2023 by the PyGreSQL Development Team
+# Copyright (c) 2024 by the PyGreSQL Development Team
 #
 # Please see the LICENSE.TXT file for specific restrictions.
 
