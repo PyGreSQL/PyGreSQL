@@ -78,7 +78,7 @@ ignore = ["D203", "D213"]
 "tests/*.py" = ["D100", "D101", "D102", "D103", "D105", "D107", "S"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 check_untyped_defs = true
 no_implicit_optional = true
 strict_optional = true
@@ -101,5 +101,5 @@ pg = ["pg.typed"]
 pgdb = ["pg.typed"]
 
 [build-system]
-requires = ["setuptools>=68", "wheel>=0.41"]
+requires = ["setuptools>=68", "wheel>=0.42"]
 build-backend = "setuptools.build_meta"

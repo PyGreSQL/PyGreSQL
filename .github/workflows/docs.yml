@@ -6,16 +6,17 @@ on:
       - main
 
 jobs:
-  build:
+  docs:
+    name: Build documentation
     runs-on: ubuntu-22.04
 
     steps:
-      - name: CHeck out repository
+      - name: Check out repository
         uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: 3.12
       - name: Install dependencies
         run: |
           sudo apt install libpq-dev

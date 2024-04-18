@@ -14,13 +14,13 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install tox
         run: pip install tox
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: 3.12
       - name: Run quality checks
         run: tox -e ruff,mypy,cformat,docs
         timeout-minutes: 5
