@@ -4,46 +4,49 @@
 
 export DEBIAN_FRONTEND=noninteractive
 
-sudo apt-get update
-sudo apt-get -y upgrade
+apt-get update
+apt-get -y upgrade
 
 # install base utilities and configure time zone
 
-sudo ln -fs /usr/share/zoneinfo/UTC /etc/localtime
-sudo apt-get install -y apt-utils software-properties-common
-sudo apt-get install -y tzdata
-sudo dpkg-reconfigure --frontend noninteractive tzdata
+ln -fs /usr/share/zoneinfo/UTC /etc/localtime
+apt-get install -y apt-utils software-properties-common
+ap-get install -y tzdata
+dpkg-reconfigure --frontend noninteractive tzdata
 
-sudo apt-get install -y rpm wget zip
+apt-get install -y rpm wget zip
 
 # install all supported Python versions
 
-sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt-get update
+add-apt-repository -y ppa:deadsnakes/ppa
+apt-get update
 
-sudo apt-get install -y python3.7 python3.7-dev python3.7-distutils
-sudo apt-get install -y python3.8 python3.8-dev python3.8-distutils
-sudo apt-get install -y python3.9 python3.9-dev python3.9-distutils
-sudo apt-get install -y python3.10 python3.10-dev python3.10-distutils
-sudo apt-get install -y python3.11 python3.11-dev python3.11-distutils
-sudo apt-get install -y python3.12 python3.12-dev python3.12-distutils
+apt-get install -y python3.7 python3.7-dev python3.7-distutils
+apt-get install -y python3.8 python3.8-dev python3.8-distutils
+apt-get install -y python3.9 python3.9-dev python3.9-distutils
+apt-get install -y python3.10 python3.10-dev python3.10-distutils
+apt-get install -y python3.11 python3.11-dev python3.11-distutils
+apt-get install -y python3.12 python3.12-dev python3.12-distutils
 
 # install build and testing tool
+
+python -m ensurepip -U
 
 python3.7 -m pip install -U pip setuptools wheel build
 python3.8 -m pip install -U pip setuptools wheel build
 python3.9 -m pip install -U pip setuptools wheel build
 python3.10 -m pip install -U pip setuptools wheel build
 python3.11 -m pip install -U pip setuptools wheel build
+python3.12 -m pip install -U pip setuptools wheel build
 
 pip install ruff
 
-sudo apt-get install -y tox clang-format
+apt-get install -y tox clang-format
 pip install -U tox
 
 # install PostgreSQL client tools
 
-sudo apt-get install -y postgresql libpq-dev
+apt-get install -y postgresql libpq-dev
 
 for pghost in pg10 pg12 pg14 pg15 pg16
 do
