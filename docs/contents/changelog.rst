@@ -1,6 +1,10 @@
 ChangeLog
 =========
 
+Version 6.0.1 (2024-04-19)
+--------------------------
+- Properly adapt falsy JSON values (#86)
+
 Version 6.0 (2023-10-03)
 ------------------------
 - Tested with the recent releases of Python 3.12 and PostgreSQL 16.
