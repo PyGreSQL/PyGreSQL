@@ -161,7 +161,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
 
         class TestCursor(pgdb.Cursor):
 
-            def row_factory(self, row):
+            def row_factory(self, row):  # type: ignore[override]
                 description = self.description
                 assert isinstance(description, list)
                 return {f'column {desc[0]}': value

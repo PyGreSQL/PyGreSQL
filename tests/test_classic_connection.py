@@ -1997,10 +1997,10 @@ class TestInserttable(unittest.TestCase):
         row_bytes = tuple(
             s.encode() if isinstance(s, str) else s
             for s in row_unicode)
-        data = [row_bytes] * 2
-        self.c.inserttable('test', data)
-        data = [row_unicode] * 2
-        self.assertEqual(self.get_back(), data)
+        data_bytes = [row_bytes] * 2
+        self.c.inserttable('test', data_bytes)
+        data_unicode = [row_unicode] * 2
+        self.assertEqual(self.get_back(), data_unicode)
 
     def test_inserttable_unicode_utf8(self):
         try:
