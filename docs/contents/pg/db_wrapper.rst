@@ -715,7 +715,7 @@ delete -- delete a row from a database table
     Delete a row from a database table
 
     :param str table: name of table
-    :param dict d: optional dictionary of values
+    :param dict row: optional dictionary of values
     :param col: optional keyword arguments for updating the dictionary
     :rtype: None
     :raises pg.ProgrammingError: table has no primary key,
