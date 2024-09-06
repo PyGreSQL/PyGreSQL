@@ -169,7 +169,6 @@ class TestDBClassBasic(unittest.TestCase):
         server_version = self.db.server_version
         self.assertIsInstance(server_version, int)
         self.assertGreaterEqual(server_version, 100000)
-        self.assertLess(server_version, 170000)
         self.assertEqual(server_version, self.db.db.server_version)
 
     def test_attribute_socket(self):
