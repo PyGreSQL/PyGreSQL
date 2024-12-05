@@ -14,7 +14,12 @@ from .core import (
 )
 
 __all__ = [
-    'error', 'db_error', 'if_error', 'int_error', 'op_error', 'prg_error'
+    'db_error',
+    'error',
+    'if_error',
+    'int_error',
+    'op_error',
+    'prg_error'
 ]
 
 # Error messages

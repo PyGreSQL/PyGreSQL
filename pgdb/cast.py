@@ -24,11 +24,24 @@ from pg.core import (
 from .typecode import TypeCode
 
 __all__ = [
-    'Decimal', 'decimal_type', 'cast_bool', 'cast_money',
-    'cast_int2vector', 'cast_date', 'cast_time', 'cast_interval',
-    'cast_timetz', 'cast_timestamp', 'cast_timestamptz',
-    'get_typecast', 'set_typecast', 'reset_typecast',
-    'Typecasts', 'LocalTypecasts', 'TypeCache', 'FieldInfo'
+    'Decimal',
+    'FieldInfo',
+    'LocalTypecasts',
+    'TypeCache',
+    'Typecasts',
+    'cast_bool',
+    'cast_date',
+    'cast_int2vector',
+    'cast_interval',
+    'cast_money',
+    'cast_time',
+    'cast_timestamp',
+    'cast_timestamptz',
+    'cast_timetz',
+    'decimal_type',
+    'get_typecast',
+    'reset_typecast',
+    'set_typecast'
 ]
 
 

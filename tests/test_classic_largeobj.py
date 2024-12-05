@@ -112,7 +112,7 @@ class TestCreatingLargeObjects(unittest.TestCase):
             fname = 'temp_test_pg_largeobj_import.txt'
             f = open(fname, 'wb')  # noqa: SIM115
         else:
-            f = tempfile.NamedTemporaryFile()
+            f = tempfile.NamedTemporaryFile()  # noqa: SIM115
             fname = f.name
         data = b'some data to be imported'
         f.write(data)
@@ -420,7 +420,7 @@ class TestLargeObjects(unittest.TestCase):
             fname = 'temp_test_pg_largeobj_export.txt'
             f = open(fname, 'wb')  # noqa: SIM115
         else:
-            f = tempfile.NamedTemporaryFile()
+            f = tempfile.NamedTemporaryFile()  # noqa: SIM115
             fname = f.name
         data = b'some data to be exported'
         self.obj.open(pg.INV_WRITE)
@@ -441,12 +441,11 @@ class TestLargeObjects(unittest.TestCase):
 
     def test_export_in_existent(self):
         export = self.obj.export
-        f = tempfile.NamedTemporaryFile()
-        self.obj.open(pg.INV_WRITE)
-        self.obj.close()
-        self.pgcnx.query(f'select lo_unlink({self.obj.oid})')
-        self.assertRaises(IOError, export, f.name)
-        f.close()
+        with tempfile.NamedTemporaryFile() as f:
+            self.obj.open(pg.INV_WRITE)
+            self.obj.close()
+            self.pgcnx.query(f'select lo_unlink({self.obj.oid})')
+            self.assertRaises(IOError, export, f.name)
 
 
 if __name__ == '__main__':

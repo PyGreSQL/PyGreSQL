@@ -27,6 +27,7 @@ apt-get install -y python3.9 python3.9-dev python3.9-distutils
 apt-get install -y python3.10 python3.10-dev python3.10-distutils
 apt-get install -y python3.11 python3.11-dev python3.11-distutils
 apt-get install -y python3.12 python3.12-dev python3.12-distutils
+apt-get install -y python3.13 python3.13-dev python3.13-distutils
 
 # install build and testing tool
 
@@ -38,6 +39,7 @@ python3.9 -m pip install -U pip setuptools wheel build
 python3.10 -m pip install -U pip setuptools wheel build
 python3.11 -m pip install -U pip setuptools wheel build
 python3.12 -m pip install -U pip setuptools wheel build
+python3.13 -m pip install -U pip setuptools wheel build
 
 pip install ruff
 
@@ -48,7 +50,7 @@ pip install -U tox
 
 apt-get install -y postgresql libpq-dev
 
-for pghost in pg10 pg12 pg14 pg15 pg16
+for pghost in pg10 pg12 pg14 pg15 pg16 pg17
 do
     export PGHOST=$pghost
     export PGDATABASE=postgres

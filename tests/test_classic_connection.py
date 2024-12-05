@@ -984,7 +984,7 @@ class TestParamQueries(unittest.TestCase):
             pg.set_bool(bool_enabled)
         try:
             bool_on = bool_enabled or bool_enabled is None
-            v_false, v_true = (False, True) if bool_on else 'ft'
+            v_false, v_true = (False, True) if bool_on else ('f', 't')
             r_false, r_true = [(v_false,)], [(v_true,)]
             self.assertEqual(query("select false").getresult(), r_false)
             self.assertEqual(query("select true").getresult(), r_true)

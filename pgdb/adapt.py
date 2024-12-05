@@ -12,12 +12,36 @@ from uuid import UUID as Uuid  # noqa: N811
 from .typecode import TypeCode
 
 __all__ = [
-    'DbType', 'ArrayType', 'RecordType',
-    'STRING', 'BINARY', 'NUMBER', 'DATETIME', 'ROWID', 'BOOL', 'SMALLINT',
-    'INTEGER', 'LONG', 'FLOAT', 'NUMERIC', 'MONEY', 'DATE', 'TIME',
-    'TIMESTAMP', 'INTERVAL', 'UUID', 'HSTORE', 'JSON', 'ARRAY', 'RECORD',
-    'Date', 'Time', 'Timestamp',
-    'DateFromTicks', 'TimeFromTicks', 'TimestampFromTicks'
+    'ARRAY',
+    'BINARY',
+    'BOOL',
+    'DATE',
+    'DATETIME',
+    'FLOAT',
+    'HSTORE',
+    'INTEGER',
+    'INTERVAL',
+    'JSON',
+    'LONG',
+    'MONEY',
+    'NUMBER',
+    'NUMERIC',
+    'RECORD',
+    'ROWID',
+    'SMALLINT',
+    'STRING',
+    'TIME',
+    'TIMESTAMP',
+    'UUID',
+    'ArrayType',
+    'Date',
+    'DateFromTicks',
+    'DbType',
+    'RecordType',
+    'Time',
+    'TimeFromTicks',
+    'Timestamp',
+    'TimestampFromTicks'
 
 ]
 

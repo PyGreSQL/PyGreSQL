@@ -21,8 +21,14 @@ if TYPE_CHECKING:
     from .db import DB
 
 __all__ = [
-    'Adapter', 'Bytea', 'DbType', 'DbTypes',
-    'Hstore', 'Literal', 'Json', 'UUID'
+    'UUID',
+    'Adapter',
+    'Bytea',
+    'DbType',
+    'DbTypes',
+    'Hstore',
+    'Json',
+    'Literal'
 ]
 
 

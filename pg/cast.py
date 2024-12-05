@@ -25,10 +25,20 @@ from .core import (
 from .tz import timezone_as_offset
 
 __all__ = [
-    'cast_bool', 'cast_json', 'cast_num', 'cast_money', 'cast_int2vector',
-    'cast_date', 'cast_time', 'cast_timetz', 'cast_interval',
-    'cast_timestamp','cast_timestamptz',
-    'Typecasts', 'get_typecast', 'set_typecast'
+    'Typecasts',
+    'cast_bool',
+    'cast_date',
+    'cast_int2vector',
+    'cast_interval',
+    'cast_json',
+    'cast_money',
+    'cast_num',
+    'cast_time',
+    'cast_timestamp',
+    'cast_timestamptz',
+    'cast_timetz',
+    'get_typecast',
+    'set_typecast'
 ]
 
 def get_args(func: Callable) -> list:

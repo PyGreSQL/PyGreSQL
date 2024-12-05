@@ -61,9 +61,20 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_PASSWORD: postgres
 
+  pg17:
+    image: postgres:17
+    restart: unless-stopped
+    volumes:
+      - postgres-data-17:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
 volumes:
   postgres-data-10:
   postgres-data-12:
   postgres-data-14:
   postgres-data-15:
   postgres-data-16:
+  postgres-data-17:

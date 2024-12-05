@@ -13,8 +13,14 @@ from .core import Query, set_decimal, set_jsondecode, set_query_helpers
 SomeNamedTuple = Any  # alias for accessing arbitrary named tuples
 
 __all__ = [
-    'quote_if_unqualified', 'oid_key', 'QuoteDict', 'RowCache',
-    'dictiter', 'namediter', 'namednext', 'scalariter'
+    'QuoteDict',
+    'RowCache',
+    'dictiter',
+    'namediter',
+    'namednext',
+    'oid_key',
+    'quote_if_unqualified',
+    'scalariter'
 ]
 
 
