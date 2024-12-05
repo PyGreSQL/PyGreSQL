@@ -136,7 +136,7 @@ class build_pg_ext(build_ext):  # noqa: N801
                     define_macros.append(('MS_WIN64', None))
             elif compiler == 'msvc':  # Microsoft Visual C++
                 extra_compile_args[1:] = [
-                    '-J', '-W3', '-WX',
+                    '-J', '-W3', '-WX', '-wd4391',
                     '-Dinline=__inline']  # needed for MSVC 9
 
 
