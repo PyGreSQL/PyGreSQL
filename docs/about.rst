@@ -8,7 +8,7 @@ powerful PostgreSQL features from Python.
 
     | This software is copyright © 1995, Pascal Andre.
     | Further modifications are copyright © 1997-2008 by D'Arcy J.M. Cain.
-    | Further modifications are copyright © 2009-2024 by the PyGreSQL team.
+    | Further modifications are copyright © 2009-2025 by the PyGreSQL team.
     | For licensing details, see the full :doc:`copyright`.
 
 **PostgreSQL** is a highly scalable, SQL compliant, open source

@@ -8,7 +8,7 @@
 
 project = 'PyGreSQL'
 author = 'The PyGreSQL team'
-copyright = '2024, ' + author
+copyright = '2025, ' + author
 
 def project_version():
     with open('../pyproject.toml') as f:
