@@ -26,8 +26,8 @@ apt-get install -y python3.8 python3.8-dev python3.8-distutils
 apt-get install -y python3.9 python3.9-dev python3.9-distutils
 apt-get install -y python3.10 python3.10-dev python3.10-distutils
 apt-get install -y python3.11 python3.11-dev python3.11-distutils
-apt-get install -y python3.12 python3.12-dev python3.12-distutils
-apt-get install -y python3.13 python3.13-dev python3.13-distutils
+apt-get install -y python3.12 python3.12-dev
+apt-get install -y python3.13 python3.13-dev
 
 # install build and testing tool
 
