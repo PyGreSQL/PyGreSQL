@@ -8,15 +8,16 @@ You can build the PyGreSQL distribution like this:
     python -m build -C strict -C memory-size
 """
 
+import contextlib
 import os
 import platform
 import re
 import sys
 import warnings
-from distutils.ccompiler import get_default_compiler
-from distutils.sysconfig import get_python_inc, get_python_lib
 
 from setuptools import Extension, setup
+from setuptools._distutils.ccompiler import get_default_compiler
+from setuptools._distutils.sysconfig import get_python_inc, get_python_lib
 from setuptools.command.build_ext import build_ext
 
 
@@ -42,7 +43,39 @@ if not (3, 8) <= sys.version_info[:2] < (4, 0):
     raise Exception(
         f"Sorry, PyGreSQL {version} does not support this Python version")
 
-long_description = project_readme()
+
+def patch_pyproject_toml():
+    """Patch pyproject.toml to make it work with old setuptools versions.
+    
+    This allows building PyGreSQL with Python < 3.9 which only supports
+    setuptools up to version 75, since our pyproject.toml requires version 77.
+    """
+    from setuptools import __version__ as version
+
+    try:
+        version = int(version.split('.', 1)[0])
+    except Exception:
+        return
+    if version >= 77:
+        return
+
+    from setuptools.config import pyprojecttoml
+
+    load_file = pyprojecttoml.load_file
+
+    def load_file_patched(filepath):
+        d = load_file(filepath)
+        with contextlib.suppress(KeyError):
+            p = d['project']
+            t = p['license']
+            f = p.pop('license-files')
+            p['license'] = {'text': t, 'files': f[0]}
+        return d
+
+    pyprojecttoml.load_file = load_file_patched
+
+
+patch_pyproject_toml()  # needed for Python < 3.9
 
 
 # For historical reasons, PyGreSQL does not install itself as a single
@@ -144,7 +177,7 @@ setup(
     name='PyGreSQL',
     version=version,
     description='Python PostgreSQL Interfaces',
-    long_description=long_description,
+    long_description=project_readme(),
     long_description_content_type='text/x-rst',
     keywords='pygresql postgresql database api dbapi',
     author="D'Arcy J. M. Cain",
