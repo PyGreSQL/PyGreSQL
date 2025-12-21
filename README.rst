@@ -10,7 +10,7 @@ It is based on the PyGres95 code written by Pascal Andre.
 D'Arcy J. M. Cain renamed it to PyGreSQL starting with version 2.0
 and serves as the "BDFL" of PyGreSQL.
 Christoph Zwerschke volunteered as another maintainer and has been the main 
-contributor since version 3.7 of PyGreSQL.
+contributor since version 3.8 of PyGreSQL.
 
 The following Python versions are supported:
 
@@ -18,8 +18,8 @@ The following Python versions are supported:
 * PyGreSQL 5.x: Python 2 and Python 3
 * PyGreSQL 6.x and newer: Python 3 only
 
-The current version of PyGreSQL supports Python versions 3.7 to 3.13
-and PostgreSQL versions 10 to 17 on the server.
+The current version of PyGreSQL supports Python versions 3.8 to 3.14
+and PostgreSQL versions 12 to 18 on the server.
 
 Installation
 ------------

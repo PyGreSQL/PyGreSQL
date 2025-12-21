@@ -11,21 +11,21 @@ services:
 
     command: sleep infinity
 
-  pg10:
-    image: postgres:10
-    restart: unless-stopped
-    volumes:
-      - postgres-data-10:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_DB: postgres
-      POSTGRES_PASSWORD: postgres
-
   pg12:
     image: postgres:12
     restart: unless-stopped
     volumes:
       - postgres-data-12:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
+  pg13:
+    image: postgres:13
+    restart: unless-stopped
+    volumes:
+      - postgres-data-13:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: postgres
@@ -71,10 +71,21 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_PASSWORD: postgres
 
+  pg18:
+    image: postgres:18
+    restart: unless-stopped
+    volumes:
+      - postgres-data-18:/var/lib/postgresql
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
 volumes:
-  postgres-data-10:
   postgres-data-12:
+  postgres-data-13:
   postgres-data-14:
   postgres-data-15:
   postgres-data-16:
   postgres-data-17:
+  postgres-data-18:

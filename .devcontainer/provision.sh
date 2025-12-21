@@ -21,25 +21,27 @@ apt-get install -y rpm wget zip
 add-apt-repository -y ppa:deadsnakes/ppa
 apt-get update
 
-apt-get install -y python3.7 python3.7-dev python3.7-distutils
 apt-get install -y python3.8 python3.8-dev python3.8-distutils
 apt-get install -y python3.9 python3.9-dev python3.9-distutils
 apt-get install -y python3.10 python3.10-dev python3.10-distutils
-apt-get install -y python3.11 python3.11-dev python3.11-distutils
-apt-get install -y python3.12 python3.12-dev
-apt-get install -y python3.13 python3.13-dev
+apt-get install -y python3.11 python3.11-dev python3.11-distutils 
+apt-get install -y python3.12 python3.12-dev python3.12-venv
+apt-get install -y python3.13 python3.13-dev python3.13-venv
+apt-get install -y python3.14 python3.14-dev python3.14-venv
 
 # install build and testing tool
 
-python -m ensurepip -U
+python3.12 -m ensurepip --upgrade --default-pip
+python3.13 -m ensurepip --upgrade --default-pip
+python3.14 -m ensurepip --upgrade --default-pip
 
-python3.7 -m pip install -U pip setuptools wheel build
 python3.8 -m pip install -U pip setuptools wheel build
 python3.9 -m pip install -U pip setuptools wheel build
 python3.10 -m pip install -U pip setuptools wheel build
 python3.11 -m pip install -U pip setuptools wheel build
 python3.12 -m pip install -U pip setuptools wheel build
 python3.13 -m pip install -U pip setuptools wheel build
+python3.14 -m pip install -U pip setuptools wheel build
 
 pip install ruff
 
@@ -50,7 +52,7 @@ pip install -U tox
 
 apt-get install -y postgresql libpq-dev
 
-for pghost in pg10 pg12 pg14 pg15 pg16 pg17
+for pghost in pg12 pg13 pg14 pg15 pg16 pg17 pg18
 do
     export PGHOST=$pghost
     export PGDATABASE=postgres

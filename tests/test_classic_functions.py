@@ -124,7 +124,7 @@ class TestHasConnect(unittest.TestCase):
         # noinspection PyUnresolvedReferences
         v = pg.get_pqlib_version()
         self.assertIsInstance(v, int)
-        self.assertGreater(v, 100000)  # >= 10.0
+        self.assertGreater(v, 120000)  # >= 12.0
         self.assertLess(v, 200000)  # < 20.0
 
 

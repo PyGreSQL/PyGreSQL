@@ -10,19 +10,18 @@ except ImportError as e:  # noqa: F841
         import sys
         paths = [path for path in os.environ["PATH"].split(os.pathsep)
                  if os.path.exists(os.path.join(path, libpq))]
-        if sys.version_info >= (3, 8):
-            # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
-            add_dll_dir = os.add_dll_directory  # type: ignore
-            for path in paths:
-                with add_dll_dir(os.path.abspath(path)):
-                    try:
-                        from ._pg import version
-                    except ImportError:
-                        pass
-                    else:
-                        del version
-                        e = None  # type: ignore
-                        break
+        # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
+        add_dll_dir = os.add_dll_directory  # type: ignore
+        for path in paths:
+            with add_dll_dir(os.path.abspath(path)):
+                try:
+                    from ._pg import version
+                except ImportError:
+                    pass
+                else:
+                    del version
+                    e = None  # type: ignore
+                    break
         if paths:
             libpq = 'compatible ' + libpq
     else:

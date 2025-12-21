@@ -15,22 +15,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { python: "3.7", postgres: "11" }
           - { python: "3.8", postgres: "12" }
           - { python: "3.9", postgres: "13" }
           - { python: "3.10", postgres: "14" }
           - { python: "3.11", postgres: "15" }
           - { python: "3.12", postgres: "16" }
           - { python: "3.13", postgres: "17" }
+          - { python: "3.14", postgres: "18" }
 
           # Opposite extremes of the supported Py/PG range, other architecture
-          - { python: "3.7", postgres: "17", architecture: "x86" }
-          - { python: "3.8", postgres: "16", architecture: "x86" }
-          - { python: "3.9", postgres: "15", architecture: "x86" }
-          - { python: "3.10", postgres: "14", architecture: "x86" }
-          - { python: "3.11", postgres: "13", architecture: "x86" }
-          - { python: "3.12", postgres: "12", architecture: "x86" }
-          - { python: "3.13", postgres: "11", architecture: "x86" }
+          - { python: "3.8", postgres: "18", architecture: "x86" }
+          - { python: "3.9", postgres: "17", architecture: "x86" }
+          - { python: "3.10", postgres: "16", architecture: "x86" }
+          - { python: "3.11", postgres: "15", architecture: "x86" }
+          - { python: "3.12", postgres: "14", architecture: "x86" }
+          - { python: "3.13", postgres: "13", architecture: "x86" }
+          - { python: "3.14", postgres: "12", architecture: "x86" }
 
     env:
       PYGRESQL_DB: test
@@ -55,11 +55,11 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install tox
         run: pip install tox
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
       - name: Run tests

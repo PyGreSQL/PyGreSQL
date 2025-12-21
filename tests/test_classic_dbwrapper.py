@@ -168,7 +168,7 @@ class TestDBClassBasic(unittest.TestCase):
     def test_attribute_server_version(self):
         server_version = self.db.server_version
         self.assertIsInstance(server_version, int)
-        self.assertGreaterEqual(server_version, 100000)  # >= 10.0
+        self.assertGreaterEqual(server_version, 120000)  # >= 12.0
         self.assertLess(server_version, 200000)  # < 20.0
         self.assertEqual(server_version, self.db.db.server_version)
 

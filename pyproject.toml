@@ -1,37 +1,35 @@
 [project]
 name = "PyGreSQL"
-version = "6.1.0"
-requires-python = ">=3.7"
+version = "6.2.0"
+requires-python = ">=3.8"
 authors = [
   {name = "D'Arcy J. M. Cain", email = "darcy@pygresql.org"},
   {name = "Christoph Zwerschke", email = "cito@online.de"},
 ]
 description = "Python PostgreSQL interfaces"
 readme = "README.rst"
+license = "PostgreSQL"
+license-files = ["LICENSE.txt"]
 keywords = ["pygresql", "postgresql", "database", "api", "dbapi"]
 classifiers = [
     "Development Status :: 6 - Mature",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: PostgreSQL License",
     "Operating System :: OS Independent",
     "Programming Language :: C",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: SQL",
     "Topic :: Database",
     "Topic :: Database :: Front-Ends",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-
-[project.license]
-file = "LICENSE.txt"
 
 [project.urls]
 Homepage = "https://pygresql.github.io/"
@@ -95,12 +93,11 @@ disallow_untyped_defs = false
 
 [tool.setuptools]
 packages = ["pg", "pgdb"]
-license-files = ["LICENSE.txt"]
 
 [tool.setuptools.package-data]
 pg = ["pg.typed"]
 pgdb = ["pg.typed"]
 
 [build-system]
-requires = ["setuptools>=68", "wheel>=0.42"]
+requires = ["setuptools>=80", "wheel>=0.45"]
 build-backend = "setuptools.build_meta"

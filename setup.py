@@ -38,7 +38,7 @@ def project_readme():
 
 version = project_version()
 
-if not (3, 7) <= sys.version_info[:2] < (4, 0):
+if not (3, 8) <= sys.version_info[:2] < (4, 0):
     raise Exception(
         f"Sorry, PyGreSQL {version} does not support this Python version")
 
@@ -66,7 +66,7 @@ def pg_version():
     match = re.search(r'(\d+)\.(\d+)', pg_config('version'))
     if match:
         return tuple(map(int, match.groups()))
-    return 10, 0
+    return 12, 0
 
 
 pg_version = pg_version()
@@ -105,7 +105,7 @@ class build_pg_ext(build_ext):  # noqa: N801
         build_ext.initialize_options(self)
         self.strict = False
         self.memory_size = None
-        supported = pg_version >= (10, 0)
+        supported = pg_version >= (12, 0)
         if not supported:
             warnings.warn(
                 "PyGreSQL does not support the installed PostgreSQL version.",
@@ -159,24 +159,23 @@ setup(
     classifiers=[
         'Development Status :: 6 - Mature',
         'Intended Audience :: Developers',
-        'License :: OSI Approved :: PostgreSQL License',
         'Operating System :: OS Independent',
         'Programming Language :: C',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: 3.13',
+        'Programming Language :: Python :: 3.14',
         'Programming Language :: SQL',
         'Topic :: Database',
         'Topic :: Database :: Front-Ends',
         'Topic :: Software Development :: Libraries :: Python Modules'],
     license='PostgreSQL',
-    test_suite='tests.discover',
+    license_files=['LICENSE.txt'],
     zip_safe=False,
     packages=["pg", "pgdb"],
     package_data={"pg": ["py.typed"], "pgdb": ["py.typed"]},
