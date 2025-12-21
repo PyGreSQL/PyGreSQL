@@ -3899,7 +3899,7 @@ class TestDBClass(unittest.TestCase):
 
     def test_timetz(self):
         query = self.db.query
-        timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
+        timezones = {'GMT': 0, 'Etc/GMT-1': 1, 'Etc/GMT-5': -5, 'UTC': 0}
         for timezone in sorted(timezones):
             tz = f'{timezones[timezone]:+03d}00'
             tzinfo = datetime.strptime(tz, '%z').tzinfo
@@ -3951,7 +3951,7 @@ class TestDBClass(unittest.TestCase):
 
     def test_timestamptz(self):
         query = self.db.query
-        timezones = dict(CET=1, EET=2, EST=-5, UTC=0)
+        timezones = {'GMT': 0, 'Etc/GMT-1': 1, 'Etc/GMT-5': -5, 'UTC': 0}
         for timezone in sorted(timezones):
             tz = f'{timezones[timezone]:+03d}00'
             tzinfo = datetime.strptime(tz, '%z').tzinfo

@@ -1403,7 +1403,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 CREATE OR REPLACE FUNCTION public.bad_eq(oid, integer)
                 RETURNS boolean AS $$
                 BEGIN
-                  SET TIMEZONE TO 'CET';
+                  SET TIMEZONE TO 'Europe/Athens';
                   RETURN oideq($1, $2::oid);
                 END
                 $$ LANGUAGE plpgsql
