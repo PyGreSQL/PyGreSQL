@@ -7,7 +7,6 @@ except ImportError as e:  # noqa: F841
     libpq = 'libpq.'
     if os.name == 'nt':
         libpq += 'dll'
-        import sys
         paths = [path for path in os.environ["PATH"].split(os.pathsep)
                  if os.path.exists(os.path.join(path, libpq))]
         # see https://docs.python.org/3/whatsnew/3.8.html#ctypes

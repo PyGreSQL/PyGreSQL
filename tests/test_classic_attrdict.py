@@ -93,7 +93,7 @@ class TestAttrDict(unittest.TestCase):
         self.assertEqual(a['id'], 1)
         for method in 'clear', 'update', 'pop', 'setdefault', 'popitem':
             method = getattr(a, method)
-            self.assertRaises(TypeError, method, a)  # type: ignore
+            self.assertRaises(TypeError, method, a)
 
 
 if __name__ == '__main__':

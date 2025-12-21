@@ -35,7 +35,7 @@ class TestModuleConstants(unittest.TestCase):
     """Test the existence of the documented module constants."""
 
     def test_large_object_int_constants(self):
-        names = 'INV_READ INV_WRITE SEEK_SET SEEK_CUR SEEK_END'.split()
+        names = ['INV_READ', 'INV_WRITE', 'SEEK_SET', 'SEEK_CUR', 'SEEK_END']
         for name in names:
             try:
                 value = getattr(pg, name)

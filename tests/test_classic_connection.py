@@ -121,24 +121,26 @@ class TestConnectObject(unittest.TestCase):
         self.assertTrue(r.startswith('<pg.Connection object'), r)
 
     def test_all_connect_attributes(self):
-        attributes = '''backend_pid db error host options port
-            protocol_version server_version socket
-            ssl_attributes ssl_in_use status user'''.split()
+        attributes = [
+            'backend_pid', 'db', 'error', 'host', 'options',
+            'port', 'protocol_version', 'server_version',
+            'socket', 'ssl_attributes', 'ssl_in_use', 'status', 'user']
         connection_attributes = [
             a for a in dir(self.connection)
             if not a.startswith('__') and not self.is_method(a)]
         self.assertEqual(attributes, connection_attributes)
 
     def test_all_connect_methods(self):
-        methods = '''
-            cancel close date_format describe_prepared endcopy
-            escape_bytea escape_identifier escape_literal escape_string
-            fileno get_cast_hook get_notice_receiver getline getlo getnotify
-            inserttable is_non_blocking locreate loimport parameter poll
-            prepare putline query query_prepared reset send_query
-            set_cast_hook set_non_blocking set_notice_receiver
-            source transaction
-            '''.split()
+        methods = [
+            'cancel', 'close', 'date_format', 'describe_prepared',
+            'endcopy', 'escape_bytea', 'escape_identifier',
+            'escape_literal', 'escape_string', 'fileno', 'get_cast_hook',
+            'get_notice_receiver', 'getline', 'getlo', 'getnotify',
+            'inserttable', 'is_non_blocking', 'locreate', 'loimport',
+            'parameter', 'poll', 'prepare', 'putline',
+            'query', 'query_prepared', 'reset', 'send_query',
+            'set_cast_hook', 'set_non_blocking', 'set_notice_receiver',
+            'source', 'transaction']
         connection_methods = [
             a for a in dir(self.connection)
             if not a.startswith('__') and self.is_method(a)]
@@ -267,12 +269,12 @@ class TestConnectObject(unittest.TestCase):
 
     def test_all_query_members(self):
         query = self.connection.query("select true where false")
-        members = '''
-            dictiter dictresult fieldinfo fieldname fieldnum getresult
-            listfields memsize namediter namedresult
-            one onedict onenamed onescalar scalariter scalarresult
-            single singledict singlenamed singlescalar
-            '''.split()
+        members = [
+            'dictiter', 'dictresult', 'fieldinfo', 'fieldname', 'fieldnum',
+            'getresult', 'listfields', 'memsize', 'namediter', 'namedresult',
+            'one', 'onedict', 'onenamed', 'onescalar',
+            'scalariter', 'scalarresult',
+            'single', 'singledict', 'singlenamed', 'singlescalar']
         # noinspection PyUnresolvedReferences
         if pg.get_pqlib_version() < 120000:
             members.remove('memsize')
@@ -2150,7 +2152,7 @@ class TestDirectSocketAccess(unittest.TestCase):
     def test_putline(self):
         putline = self.c.putline
         query = self.c.query
-        data = list(enumerate("apple pear plum cherry banana".split()))
+        data = list(enumerate(["apple", "pear", "plum", "cherry", "banana"]))
         query("copy test from stdin")
         try:
             for i, v in data:
@@ -2179,7 +2181,8 @@ class TestDirectSocketAccess(unittest.TestCase):
     def test_getline(self):
         getline = self.c.getline
         query = self.c.query
-        data = list(enumerate("apple banana pear plum strawberry".split()))
+        data = list(enumerate([
+            "apple", "banana", "pear", "plum", "strawberry"]))
         n = len(data)
         self.c.inserttable('test', data)
         query("copy test to stdout")

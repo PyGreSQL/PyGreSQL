@@ -44,7 +44,7 @@ class TestClassicTutorial(unittest.TestCase):
         banana = r = db.insert('fruits', name='banana')
         self.assertIsInstance(r, dict)
         self.assertEqual(r, {'name': 'banana', 'id': 2})
-        more_fruits = 'cherimaya durian eggfruit fig grapefruit'.split()
+        more_fruits = ['cherimaya', 'durian', 'eggfruit', 'fig', 'grapefruit']
         data = list(enumerate(more_fruits, start=3))
         n = db.inserttable('fruits', data)
         self.assertEqual(n, 5)
@@ -134,7 +134,7 @@ class TestDbApi20Tutorial(unittest.TestCase):
         cursor = con.cursor()
         cursor.execute("insert into fruits (name) values ('apple')")
         cursor.execute("insert into fruits (name) values (%s)", ('banana',))
-        more_fruits = 'cherimaya durian eggfruit fig grapefruit'.split()
+        more_fruits = ['cherimaya', 'durian', 'eggfruit', 'fig', 'grapefruit']
         parameters = [(name,) for name in more_fruits]
         cursor.executemany("insert into fruits (name) values (%s)", parameters)
         con.commit()

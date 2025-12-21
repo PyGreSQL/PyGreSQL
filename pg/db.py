@@ -815,7 +815,7 @@ class DB:
                 row[qoid] = row['oid']
             del row['oid']
         t = self._escape_qualified_name(table)
-        cmd = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'  # noqa: S608s
+        cmd = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'  # noqa: S608
         self._do_debug(cmd, params)
         query = self._valid_db.query(cmd, params)
         res = query.dictresult()
@@ -998,8 +998,7 @@ class DB:
             row = {}
         if 'oid' in row:
             del row['oid']  # do not insert oid
-        if 'oid' in kw:
-            del kw['oid']  # do not update oid
+        kw.pop('oid', None)  # do not update oid
         attnames = self.get_attnames(table)
         generated = self.get_generated(table)
         qoid = oid_key(table) if 'oid' in attnames else None

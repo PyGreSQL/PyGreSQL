@@ -192,8 +192,9 @@ class DbTypes(dict):
     information on the associated database type.
     """
 
-    _num_types = frozenset('int float num money int2 int4 int8'
-                           ' float4 float8 numeric money'.split())
+    _num_types = frozenset([
+        'int', 'float', 'num', 'money', 'int2', 'int4', 'int8',
+        'float4', 'float8', 'numeric', 'money'])
 
     def __init__(self, db: DB) -> None:
         """Initialize type cache for connection."""
@@ -292,11 +293,11 @@ class DbTypes(dict):
 class Adapter:
     """Class providing methods for adapting parameters to the database."""
 
-    _bool_true_values = frozenset('t true 1 y yes on'.split())
+    _bool_true_values = frozenset(['t', 'true', '1', 'y', 'yes', 'on'])
 
-    _date_literals = frozenset(
-        'current_date current_time'
-        ' current_timestamp localtime localtimestamp'.split())
+    _date_literals = frozenset([
+        'current_date', 'current_time', 'current_timestamp',
+        'localtime', 'localtimestamp'])
 
     _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
     _re_record_quote = regex(r'[(,"\\]')
