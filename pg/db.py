@@ -451,9 +451,14 @@ class DB:
             params[param] = param_value
         local_clause = ' LOCAL' if local else ''
         for param, param_value in params.items():
-            cmd = (f'RESET{local_clause} {param}'
-                   if param_value is None else
-                   f'SET{local_clause} {param} TO {param_value}')
+            if param_value is None:
+                cmd = f'RESET{local_clause} {param}'
+            else:
+                if isinstance(param_value, str) and (
+                        not param_value.isalnum() or
+                        param_value.upper() != param_value.lower()):
+                    param_value = f"'{param_value}'"
+                cmd = f'SET{local_clause} {param} TO {param_value}'
             self._do_debug(cmd)
             self._valid_db.query(cmd)
 
