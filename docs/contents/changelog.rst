@@ -6,6 +6,7 @@ Version 6.2.0 (2025-12-21)
 - Added support for Python 3.14 and PostgreSQL 18.
 - Removed support for Python versions older than 3.8 (released October 2019)
   and PostgreSQL older than version 12 (released October 2019).
+- Fixed `set_parameter()` for values containing special characters.
 
 Version 6.1.0 (2024-12-05)
 --------------------------
