@@ -708,17 +708,21 @@ conn_is_non_blocking(connObject *self, PyObject *noargs)
 static char conn_inserttable__doc__[] =
     "inserttable(table, data, [columns]) -- insert iterable into table\n\n"
     "The fields in the iterable must be in the same order as in the table\n"
-    "or in the list or tuple of columns if one is specified.\n";
+    "or in the list or tuple of columns if one is specified.\n\n"
+    "If the optional argument 'freeze' is set to True, the inserted rows\n"
+    "will be immediately frozen (can be useful for initial bulk loads).\n";
 
 static PyObject *
-conn_inserttable(connObject *self, PyObject *args)
+conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 {
     PGresult *result;
     char *table, *buffer, *bufpt, *bufmax, *s, *t;
-    int encoding, ret;
+    int freeze = 0, encoding, ret;
     size_t bufsiz;
     PyObject *rows, *iter_row, *item, *columns = NULL;
     Py_ssize_t i, j, m, n;
+
+    static char *kwlist[] = {"table", "data", "columns", "freeze", NULL};
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -726,10 +730,12 @@ conn_inserttable(connObject *self, PyObject *args)
     }
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "sO|O", &table, &rows, &columns)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "sO|O$p", kwlist, &table,
+                                     &rows, &columns, &freeze)) {
         PyErr_SetString(
             PyExc_TypeError,
-            "Method inserttable() expects a string and a list as arguments");
+            "Method inserttable() expects a string, an iterable, an optional "
+            "list/tuple and an optional boolean 'freeze' as arguments");
         return NULL;
     }
 
@@ -834,7 +840,11 @@ conn_inserttable(connObject *self, PyObject *args)
         }
     }
     if (bufpt < bufmax)
-        snprintf(bufpt, (size_t)(bufmax - bufpt), " from stdin");
+        bufpt += snprintf(bufpt, (size_t)(bufmax - bufpt), " from stdin");
+    if (freeze && bufpt < bufmax) {
+        bufpt += snprintf(bufpt, (size_t)(bufmax - bufpt), " freeze");
+    }
+
     if (bufpt >= bufmax) {
         PyMem_Free(buffer);
         Py_DECREF(iter_row);
@@ -1753,8 +1763,8 @@ static struct PyMethodDef conn_methods[] = {
      conn_set_notice_receiver__doc__},
     {"getnotify", (PyCFunction)conn_get_notify, METH_NOARGS,
      conn_get_notify__doc__},
-    {"inserttable", (PyCFunction)conn_inserttable, METH_VARARGS,
-     conn_inserttable__doc__},
+    {"inserttable", (PyCFunction)conn_inserttable,
+     METH_VARARGS | METH_KEYWORDS, conn_inserttable__doc__},
     {"transaction", (PyCFunction)conn_transaction, METH_NOARGS,
      conn_transaction__doc__},
     {"parameter", (PyCFunction)conn_parameter, METH_VARARGS,

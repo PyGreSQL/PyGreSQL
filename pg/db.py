@@ -1403,11 +1403,13 @@ class DB:
         return self._valid_db.getnotify()
 
     def inserttable(self, table: str, values: Sequence[list|tuple],
-                    columns: list[str] | tuple[str, ...] | None = None) -> int:
+                    columns: list[str] | tuple[str, ...] | None = None,
+                    freeze: bool=False) -> int:
         """Insert a Python iterable into a database table."""
         if columns is None:
-            return self._valid_db.inserttable(table, values)
-        return self._valid_db.inserttable(table, values, columns)
+            return self._valid_db.inserttable(table, values, freeze=freeze)
+        return self._valid_db.inserttable(
+            table, values, columns, freeze=freeze)
 
     def transaction(self) -> int:
         """Get the current in-transaction status of the server.

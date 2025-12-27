@@ -3,8 +3,9 @@ ChangeLog
 
 Version 6.2.1 (2025-12-27)
 --------------------------
-- Setup is now cleaner and works with a wider range of setuptools versions.
-
+- Made setup cleaner and work with a wider range of setuptools versions (#90).
+- The `inserttable()` method in the `pg` module now supports an optional
+  `freeze` parameter to optimize initial bulk loading (#81).
 
 Version 6.2.0 (2025-12-21)
 --------------------------

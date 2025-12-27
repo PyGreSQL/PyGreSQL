@@ -478,13 +478,14 @@ first, otherwise :meth:`Connection.getnotify` will always return ``None``.
 inserttable -- insert an iterable into a table
 ----------------------------------------------
 
-.. method:: Connection.inserttable(table, values, [columns])
+.. method:: Connection.inserttable(table, values, [columns], *, freeze=False)
 
     Insert a Python iterable into a database table
 
     :param str table: the table name
     :param list values: iterable of row values, which must be lists or tuples
     :param list columns: list or tuple of column names
+    :param bool freeze: if True, immediately freeze the inserted rows
     :rtype: int
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises MemoryError: insert buffer could not be allocated

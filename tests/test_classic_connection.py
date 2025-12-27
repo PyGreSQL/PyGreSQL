@@ -2118,7 +2118,28 @@ class TestInserttable(unittest.TestCase):
             self.assertIn(
                 'value "33000" is out of range for type smallint', str(e))
         else:
-            self.assertFalse('expected an error')
+            self.assertFalse('expected an error since value is out of range')
+
+    def test_insert_table_with_freeze_false(self):
+        data = self.data
+        self.c.inserttable('test', data, freeze=False)
+        self.assertEqual(self.get_back(), data)
+
+    def test_insert_table_with_freeze_true_without_truncate(self):
+        try:
+            self.c.inserttable('test', self.data, freeze=True)
+        except ValueError as e:
+            self.assertIn('cannot perform COPY FREEZE', str(e))
+        else:
+            self.assertFalse('expected an error since table was not truncated')
+
+    def test_insert_table_with_freeze_true_with_truncate(self):
+        data = self.data
+        self.c.query("begin")
+        self.c.query('truncate table test')
+        self.c.inserttable('test', data, freeze=True)
+        self.c.query('commit')
+        self.assertEqual(self.get_back(), data)
 
 
 class TestDirectSocketAccess(unittest.TestCase):

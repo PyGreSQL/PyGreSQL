@@ -4233,6 +4233,24 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual([row[0] for row in data_from], [1, 2, 3])
         self.assertEqual(data_from, data_to)
 
+    def test_inserttable_with_freeze(self):
+        # use inserttable() with freeze and table created in same transaction
+        query = self.db.query
+        values = [(i,) for i in range(1, 4)]
+        self.db.begin()
+        self.create_table('test_table_freeze', 'n integer')
+        self.db.inserttable('test_table_freeze', values, freeze=True)
+        self.db.commit()
+        r = query("select * from test_table_freeze").getresult()
+        self.assertEqual(r, values)
+
+    def test_inserttable_with_freeze_no_transaction(self):
+        # use inserttable() with freeze and table created before transaction
+        values = [(i,) for i in range(1, 4)]
+        self.create_table('test_table_freeze', 'n integer')
+        self.assertRaises(ValueError, self.db.inserttable,
+                          'test_table_freeze', values, freeze=True)
+
 
 class TestDBClassNonStdOpts(TestDBClass):
     """Test the methods of the DB class with non-standard global options."""
