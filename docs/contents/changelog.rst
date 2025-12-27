@@ -1,6 +1,11 @@
 ChangeLog
 =========
 
+Version 6.2.1 (2025-12-27)
+--------------------------
+- Setup is now cleaner and works with a wider range of setuptools versions.
+
+
 Version 6.2.0 (2025-12-21)
 --------------------------
 - Added support for Python 3.14 and PostgreSQL 18.

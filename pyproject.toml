@@ -1,6 +1,6 @@
 [project]
 name = "PyGreSQL"
-version = "6.2.0"
+version = "6.2.1"
 requires-python = ">=3.8"
 authors = [
   {name = "D'Arcy J. M. Cain", email = "darcy@pygresql.org"},
