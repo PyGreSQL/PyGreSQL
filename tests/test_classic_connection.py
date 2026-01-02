@@ -1967,9 +1967,9 @@ class TestInserttable(unittest.TestCase):
         cols = ['very_long_column_name'] * 2000
         # Should raise a value error because the column does not exist
         self.assertRaises(ValueError, self.c.inserttable, 'test', data, cols)
-        # double the size, should catch buffer overflow and raise memory error
+        # double the size, should not overflow buffer nor raise memory error
         cols *= 2
-        self.assertRaises(MemoryError, self.c.inserttable, 'test', data, cols)
+        self.assertRaises(ValueError, self.c.inserttable, 'test', data, cols)
 
     def test_inserttable_with_out_of_range_data(self):
         # try inserting data out of range for the column type
@@ -2095,16 +2095,12 @@ class TestInserttable(unittest.TestCase):
             self.c.query('select t from test').getresult(), [(s,)] * 3)
 
     def test_insert_table_big_row_size(self):
-        # inserting rows with a size of up to 64k bytes should work
-        t = '*' * 50000
+        # inserting rows with a size exceeding 64k bytes should work
+        t = '*' * 75000
         data = [(t,)]
         self.c.inserttable('test', data, ['t'])
         self.assertEqual(
             self.c.query('select t from test').getresult(), data)
-        # double the size, should catch buffer overflow and raise memory error
-        t *= 2
-        data = [(t,)]
-        self.assertRaises(MemoryError, self.c.inserttable, 'test', data, ['t'])
 
     def test_insert_table_small_int_overflow(self):
         rest_row = self.data[2][1:]

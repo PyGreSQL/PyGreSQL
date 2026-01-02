@@ -1493,3 +1493,51 @@ notice_receiver(void *arg, const PGresult *res)
     }
     PyGILState_Release(gstate);
 }
+
+/* Extend char buffer with given string */
+static void
+ext_char_buffer_s(struct CharBuffer *buf, const char *s)
+{
+    size_t len = strlen(s);
+    size_t need = buf->len + len + 1;
+
+    if (!len || buf->error)
+        return;
+
+    if (need >= buf->max_len) {
+        void *tmp;
+
+        // Allocate powers of two unless it's large
+        if (2 * buf->max_len >= need && buf->max_len < 1024 * 1024)
+            need = 2 * buf->max_len;
+
+        tmp = PyMem_Realloc(buf->data, need);
+        if (!tmp) {
+            buf->error = 1;
+            return;
+        }
+
+        buf->data = tmp;
+        buf->max_len = need;
+    }
+
+    memcpy(buf->data + buf->len, s, len + 1);
+    buf->len += len;
+}
+
+/* Extend char buffer with given character */
+static void
+ext_char_buffer_c(struct CharBuffer *buf, char c)
+{
+    if (buf->len > buf->max_len - 2) {
+        // slow path dealing with reallocation
+        char tmp[2] = {c, '\0'};
+        ext_char_buffer_s(buf, tmp);
+    }
+    else {
+        if (buf->error)
+            return;
+        buf->data[buf->len++] = c;
+        buf->data[buf->len] = '\0';
+    }
+}

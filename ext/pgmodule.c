@@ -53,8 +53,7 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #define QUERY_MOVENEXT 3
 #define QUERY_MOVEPREV 4
 
-#define MAX_BUFFER_SIZE 65536 /* maximum transaction size */
-#define MAX_ARRAY_DEPTH 16    /* maximum allowed depth of an array */
+#define MAX_ARRAY_DEPTH 16 /* maximum allowed depth of an array */
 
 /* MODULE GLOBAL VARIABLES */
 
@@ -157,6 +156,18 @@ typedef struct {
     int lo_fd;                       /* large object fd */
 } largeObject;
 #define is_largeObject(v) (PyType(v) == &largeType)
+
+/*
+   A buffer for character data with routines to handle resizing.
+   This is inspired by libpq's PQExpBufferData.
+   The buffer can be extended with the extend_char_buffer_s/x() functions.
+*/
+struct CharBuffer {
+    char *data;     /* actual string data */
+    size_t len;     /* strlen() of data */
+    size_t max_len; /* allocated size */
+    int error;      /* error flag (invalid string)*/
+};
 
 /* Internal functions */
 #include "pginternal.c"
