@@ -179,11 +179,8 @@ _get_async_result(queryObject *self, int keep)
         self->max_row = PQntuples(self->result);
         self->num_fields = PQnfields(self->result);
         self->col_types = get_col_types(self->result, self->num_fields);
-        if (!self->col_types) {
-            Py_DECREF(self);
-            Py_DECREF(self);
+        if (!self->col_types)
             return NULL;
-        }
     }
     else if (self->async == 2 && !self->max_row && !self->num_fields &&
              !self->col_types) {

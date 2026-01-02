@@ -532,6 +532,12 @@ conn_describe_prepared(connObject *self, PyObject *args)
         query_obj->max_row = PQntuples(result);
         query_obj->num_fields = PQnfields(result);
         query_obj->col_types = get_col_types(result, query_obj->num_fields);
+        if (!query_obj->col_types) {
+            PQclear(result);
+            Py_DECREF(query_obj);
+            Py_DECREF(self);
+            return NULL;
+        }
         return (PyObject *)query_obj;
     }
     set_error(ProgrammingError, "Cannot describe prepared statement",
