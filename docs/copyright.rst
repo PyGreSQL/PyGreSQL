@@ -10,7 +10,7 @@ Copyright (c) 1995, Pascal Andre
 Further modifications copyright (c) 1997-2008 by D'Arcy J.M. Cain
 (darcy@PyGreSQL.org)
 
-Further modifications copyright (c) 2009-2025 by the PyGreSQL team.
+Further modifications copyright (c) 2009-2026 by the PyGreSQL team.
 
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose, without fee, and without a written agreement

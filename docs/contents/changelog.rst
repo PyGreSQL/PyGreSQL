@@ -1,6 +1,12 @@
 ChangeLog
 =========
 
+Version 6.2.2 (2026-01-03)
+--------------------------
+- The `inserttable()` method in the `pg` module can now handle rows of 
+  arbitrary size (this was previously limited to 64 KB) (#79, thanks
+  to Justin Pryzby for this contribution).
+
 Version 6.2.1 (2025-12-27)
 --------------------------
 - Made setup cleaner and work with a wider range of setuptools versions (#90).

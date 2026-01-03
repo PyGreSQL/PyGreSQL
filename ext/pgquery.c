@@ -3,7 +3,7 @@
  *
  * The query object - this file is part a of the C extension module.
  *
- * Copyright (c) 2025 by the PyGreSQL Development Team
+ * Copyright (c) 2026 by the PyGreSQL Development Team
  *
  * Please see the LICENSE.TXT file for specific restrictions.
  */
