@@ -783,16 +783,14 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 
     encoding = PQclientEncoding(self->cnx);
 
-    /* starts query */
-    ext_char_buffer_s(&buffer, "copy ");
-
-    /* return early if there is no buffer */
-    if (buffer.error) {
-        if (buffer.data)
-            PyMem_Free(buffer.data);
+    /* pre-allocate some memory for the query buffer */
+    if (!init_char_buffer(&buffer, 4096)) {
         Py_DECREF(iter_row);
         return PyErr_NoMemory();
     }
+
+    /* starts query */
+    ext_char_buffer_s(&buffer, "copy ");
 
     s = table;
     do {
@@ -838,13 +836,14 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
             col = PQescapeIdentifier(self->cnx, col, (size_t)slen);
             Py_DECREF(obj);
             ext_char_buffer_s(&buffer, col);
-            ext_char_buffer_c(&buffer, j == n - 1 ? ')' : ',');
             PQfreemem(col);
+            ext_char_buffer_c(&buffer, j == n - 1 ? ')' : ',');
         }
     }
     ext_char_buffer_s(&buffer, " from stdin");
     if (freeze)
         ext_char_buffer_s(&buffer, " freeze");
+    ext_char_buffer_c(&buffer, '\0');
 
     if (buffer.error) {
         PyMem_Free(buffer.data);
@@ -874,7 +873,6 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
             PQputCopyEnd(self->cnx, "Invalid arguments");
             PyMem_Free(buffer.data);
             Py_DECREF(columns);
-            Py_DECREF(columns);
             Py_DECREF(iter_row);
             PyErr_SetString(
                 PyExc_TypeError,
@@ -897,10 +895,10 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
             return NULL;
         }
 
-        /* reset buffer to empty */
-        buffer.len = 0;
+        /* empty buffer while keeping allocated memory */
+        buffer.size = 0;
 
-        /* builds insert line */
+        /* build insert line */
 
         for (j = 0; j < n; ++j) {
             if (j)
@@ -1015,22 +1013,21 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
                 }
                 Py_DECREF(s);
             }
-
-            if (buffer.error) {
-                PQputCopyEnd(self->cnx, "Memory error");
-                PyMem_Free(buffer.data);
-                Py_DECREF(columns);
-                Py_DECREF(iter_row);
-                return PyErr_NoMemory();
-            }
         }
 
         Py_DECREF(columns);
 
+        /* terminate line */
         ext_char_buffer_c(&buffer, '\n');
+        if (buffer.error) {
+            PQputCopyEnd(self->cnx, "Memory error");
+            PyMem_Free(buffer.data);
+            Py_DECREF(iter_row);
+            return PyErr_NoMemory();
+        }
 
-        /* sends data */
-        ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.len);
+        /* send data */
+        ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
         if (ret != 1) {
             char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
                                        : "Data cannot be queued";

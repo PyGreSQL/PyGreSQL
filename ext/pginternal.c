@@ -1494,22 +1494,42 @@ notice_receiver(void *arg, const PGresult *res)
     PyGILState_Release(gstate);
 }
 
-/* Extend char buffer with given string */
+/* Pre-allocate some memory for a char buffer and return success status. */
+static int
+init_char_buffer(struct CharBuffer *buf, size_t initial_size)
+{
+    buf->size = 0;
+    buf->data = PyMem_Malloc(initial_size);
+    if (buf->data) {
+        buf->max_size = initial_size;
+        buf->error = 0;
+    }
+    else {
+        buf->max_size = 0;
+        buf->error = 1;
+    }
+    return !buf->error;
+}
+
+/* Extend char buffer with given string.
+   Note: We do not assume or guarantee that the buffer is zero-terminated. */
 static void
 ext_char_buffer_s(struct CharBuffer *buf, const char *s)
 {
-    size_t len = strlen(s);
-    size_t need = buf->len + len + 1;
+    size_t len = strlen(s), need;
 
     if (!len || buf->error)
         return;
 
-    if (need >= buf->max_len) {
+    if ((need = buf->size + len) >= buf->max_size) {
         void *tmp;
 
-        // Allocate powers of two unless it's large
-        if (2 * buf->max_len >= need && buf->max_len < 1024 * 1024)
-            need = 2 * buf->max_len;
+        if (buf->max_size < 1024 * 1024) {
+            /* allocate powers of two unless it's large */
+            size_t double_size = 2 * buf->max_size;
+            if (double_size >= need) /* overflow check */
+                need = double_size;
+        }
 
         tmp = PyMem_Realloc(buf->data, need);
         if (!tmp) {
@@ -1518,26 +1538,27 @@ ext_char_buffer_s(struct CharBuffer *buf, const char *s)
         }
 
         buf->data = tmp;
-        buf->max_len = need;
+        buf->max_size = need;
     }
 
-    memcpy(buf->data + buf->len, s, len + 1);
-    buf->len += len;
+    memcpy(buf->data + buf->size, s, len);
+    buf->size += len;
 }
 
 /* Extend char buffer with given character */
 static void
 ext_char_buffer_c(struct CharBuffer *buf, char c)
 {
-    if (buf->len > buf->max_len - 2) {
-        // slow path dealing with reallocation
-        char tmp[2] = {c, '\0'};
+    if (buf->error)
+        return;
+
+    if (buf->size >= buf->max_size) { /* buffer is full? */
+        /* slow path dealing with reallocation */
+        char tmp[2] = {c ? c : '\n', '\0'}; /* allow adding a zero-byte */
         ext_char_buffer_s(buf, tmp);
+        if (!c)
+            buf->data[buf->size - 1] = '\0'; /* fix zero-byte */
     }
-    else {
-        if (buf->error)
-            return;
-        buf->data[buf->len++] = c;
-        buf->data[buf->len] = '\0';
-    }
+    else
+        buf->data[buf->size++] = c;
 }

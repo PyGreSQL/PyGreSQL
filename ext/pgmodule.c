@@ -163,10 +163,10 @@ typedef struct {
    The buffer can be extended with the extend_char_buffer_s/x() functions.
 */
 struct CharBuffer {
-    char *data;     /* actual string data */
-    size_t len;     /* strlen() of data */
-    size_t max_len; /* allocated size */
-    int error;      /* error flag (invalid string)*/
+    char *data;      /* actual string data */
+    size_t size;     /* current size of data */
+    size_t max_size; /* allocated size */
+    int error;       /* error flag (invalid data) */
 };
 
 /* Internal functions */
