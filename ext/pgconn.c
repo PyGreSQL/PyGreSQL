@@ -862,6 +862,8 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     Py_END_ALLOW_THREADS
 
     if (!result || PQresultStatus(result) != PGRES_COPY_IN) {
+        if (result)
+            PQclear(result);
         PyMem_Free(buffer.data);
         Py_DECREF(iter_row);
         PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
@@ -869,6 +871,9 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     }
 
     PQclear(result);
+
+    /* empty buffer while keeping allocated memory */
+    buffer.size = 0;
 
     /* feed table */
     for (i = 0; m < 0 || i < m; ++i) {
@@ -900,9 +905,6 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
                 "The second arg must contain sequences of the same size");
             return NULL;
         }
-
-        /* empty buffer while keeping allocated memory */
-        buffer.size = 0;
 
         /* build insert line */
 
@@ -1032,22 +1034,39 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
             return PyErr_NoMemory();
         }
 
-        /* send data */
-        ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
-        if (ret != 1) {
-            char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
-                                       : "Data cannot be queued";
-            PyErr_SetString(PyExc_IOError, errormsg);
-            PQputCopyEnd(self->cnx, errormsg);
-            PyMem_Free(buffer.data);
-            Py_DECREF(iter_row);
-            return NULL;
+        if (buffer.size > 128 * 1024) {
+            /* send buffered data */
+            ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
+            buffer.size = 0;
+            if (ret != 1) {
+                char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
+                                           : "Data cannot be queued";
+                PyErr_SetString(PyExc_IOError, errormsg);
+                PQputCopyEnd(self->cnx, errormsg);
+                PyMem_Free(buffer.data);
+                Py_DECREF(iter_row);
+                return NULL;
+            }
         }
     }
 
+    /* flush any remaining data */
+    // XXX: if buffer.size
+    ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
+    if (ret != 1) {
+        char *errormsg =
+            ret == -1 ? PQerrorMessage(self->cnx) : "Data cannot be queued";
+        PyErr_SetString(PyExc_IOError, errormsg);
+        PQputCopyEnd(self->cnx, errormsg);
+        PyMem_Free(buffer.data);
+        Py_DECREF(iter_row);
+        return NULL;
+    }
+
+    PyMem_Free(buffer.data);
+
     Py_DECREF(iter_row);
     if (PyErr_Occurred()) {
-        PyMem_Free(buffer.data);
         return NULL; /* pass the iteration error */
     }
 
@@ -1055,11 +1074,8 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     if (ret != 1) {
         PyErr_SetString(PyExc_IOError, ret == -1 ? PQerrorMessage(self->cnx)
                                                  : "Data cannot be queued");
-        PyMem_Free(buffer.data);
         return NULL;
     }
-
-    PyMem_Free(buffer.data);
 
     Py_BEGIN_ALLOW_THREADS
     result = PQgetResult(self->cnx);
