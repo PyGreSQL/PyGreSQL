@@ -32,45 +32,6 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #define Py_InitModule4 Py_InitModule4_64
 #endif
 
-/* Default values */
-#undef PG_ARRAYSIZE
-#define PG_ARRAYSIZE 1
-
-/* Flags for object validity checks */
-#undef CHECK_OPEN
-#undef CHECK_CLOSE
-#undef CHECK_CNX
-#undef CHECK_RESULT
-#undef CHECK_DQL
-#define CHECK_OPEN 1
-#define CHECK_CLOSE 2
-#define CHECK_CNX 4
-#define CHECK_RESULT 8
-#define CHECK_DQL 16
-
-/* Query result types */
-#undef RESULT_EMPTY
-#undef RESULT_DML
-#undef RESULT_DDL
-#undef RESULT_DQL
-#define RESULT_EMPTY 1
-#define RESULT_DML 2
-#define RESULT_DDL 3
-#define RESULT_DQL 4
-
-/* Flags for move methods */
-#undef QUERY_MOVEFIRST
-#undef QUERY_MOVELAST
-#undef QUERY_MOVENEXT
-#undef QUERY_MOVEPREV
-#define QUERY_MOVEFIRST 1
-#define QUERY_MOVELAST 2
-#define QUERY_MOVENEXT 3
-#define QUERY_MOVEPREV 4
-
-#undef MAX_ARRAY_DEPTH
-#define MAX_ARRAY_DEPTH 16 /* maximum allowed depth of an array */
-
 /* MODULE GLOBAL VARIABLES */
 
 PyObject *pg_default_host;   /* default database host */
