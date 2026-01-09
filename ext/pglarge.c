@@ -8,6 +8,10 @@
  * Please see the LICENSE.TXT file for specific restrictions.
  */
 
+/* Shared headers */
+#include "pginternal.h"
+#include "pgmodule.h"
+
 /* Deallocate large object. */
 static void
 large_dealloc(largeObject *self)
@@ -423,7 +427,7 @@ static struct PyMethodDef large_methods[] = {
 static char large__doc__[] = "PostgreSQL large object";
 
 /* Large object type definition */
-static PyTypeObject largeType = {
+PyTypeObject largeType = {
     PyVarObject_HEAD_INIT(NULL, 0) "pg.LargeObject", /* tp_name */
     sizeof(largeObject),                             /* tp_basicsize */
     0,                                               /* tp_itemsize */

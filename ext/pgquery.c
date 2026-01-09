@@ -8,6 +8,10 @@
  * Please see the LICENSE.TXT file for specific restrictions.
  */
 
+/* Shared headers */
+#include "pginternal.h"
+#include "pgmodule.h"
+
 /* Deallocate the query object. */
 static void
 query_dealloc(queryObject *self)
@@ -969,7 +973,7 @@ static struct PyMethodDef query_methods[] = {
 static char query__doc__[] = "PyGreSQL query object";
 
 /* Query type definition */
-static PyTypeObject queryType = {
+PyTypeObject queryType = {
     PyVarObject_HEAD_INIT(NULL, 0) "pg.Query", /* tp_name */
     sizeof(queryObject),                       /* tp_basicsize */
     0,                                         /* tp_itemsize */

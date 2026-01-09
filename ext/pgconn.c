@@ -8,6 +8,10 @@
  * Please see the LICENSE.TXT file for specific restrictions.
  */
 
+/* Shared headers */
+#include "pginternal.h"
+#include "pgmodule.h"
+
 /* Deallocate connection object. */
 static void
 conn_dealloc(connObject *self)
@@ -113,7 +117,7 @@ conn_getattr(connObject *self, PyObject *nameobj)
 }
 
 /* Check connection validity. */
-static int
+int
 _check_cnx_obj(connObject *self)
 {
     if (!self || !self->valid || !self->cnx) {
@@ -154,7 +158,7 @@ conn_source(connObject *self, PyObject *noargs)
 
 /* For a non-query result, set the appropriate error status,
    return the appropriate value, and free the result set. */
-static PyObject *
+PyObject *
 _conn_non_query_result(int status, PGresult *result, PGconn *cnx)
 {
     switch (status) {
@@ -1775,7 +1779,7 @@ static struct PyMethodDef conn_methods[] = {
 static char conn__doc__[] = "PostgreSQL connection object";
 
 /* Connection type definition */
-static PyTypeObject connType = {
+PyTypeObject connType = {
     PyVarObject_HEAD_INIT(NULL, 0) "pg.Connection", /* tp_name */
     sizeof(connObject),                             /* tp_basicsize */
     0,                                              /* tp_itemsize */

@@ -8,6 +8,9 @@
  * Please see the LICENSE.TXT file for specific restrictions.
  */
 
+/* Shared headers */
+#include "pginternal.h"
+
 /* PyGreSQL internal types */
 
 /* Simple types */
@@ -27,7 +30,7 @@
 
 /* Shared functions for encoding and decoding strings */
 
-static PyObject *
+PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding)
 {
     if (encoding == pg_encoding_utf8)
@@ -41,7 +44,7 @@ get_decoded_string(const char *str, Py_ssize_t size, int encoding)
                             "strict");
 }
 
-static PyObject *
+PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding)
 {
     if (encoding == pg_encoding_utf8)
@@ -176,7 +179,7 @@ get_type(Oid pgtype)
 }
 
 /* Get PyGreSQL column types for all result columns. */
-static int *
+int *
 get_col_types(PGresult *result, int nfields)
 {
     int *types, *t, j;
@@ -194,7 +197,7 @@ get_col_types(PGresult *result, int nfields)
 
 /* Cast a bytea encoded text based type to a Python object.
    This assumes the text is null-terminated character string. */
-static PyObject *
+PyObject *
 cast_bytea_text(char *s)
 {
     PyObject *obj;
@@ -212,7 +215,7 @@ cast_bytea_text(char *s)
 
 /* Cast a text based type to a Python object.
    This needs the character string, size and encoding. */
-static PyObject *
+PyObject *
 cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
 {
     PyObject *obj, *tmp_obj;
@@ -264,7 +267,7 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
 /* Cast an arbitrary type to a Python object using a callback function.
    This needs the character string, size, encoding, the Postgres type
    and the external typecast function to be called. */
-static PyObject *
+PyObject *
 cast_other(char *s, Py_ssize_t size, int encoding, Oid pgtype,
            PyObject *cast_hook)
 {
@@ -282,7 +285,7 @@ cast_other(char *s, Py_ssize_t size, int encoding, Oid pgtype,
 
 /* Cast a simple type to a Python object.
    This needs a character string representation with a given size. */
-static PyObject *
+PyObject *
 cast_sized_simple(char *s, Py_ssize_t size, int type)
 {
     PyObject *obj, *tmp_obj;
@@ -375,7 +378,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
 
 /* Cast a simple type to a Python object.
    This needs a null-terminated character string representation. */
-static PyObject *
+PyObject *
 cast_unsized_simple(char *s, int type)
 {
     PyObject *obj, *tmp_obj;
@@ -454,7 +457,7 @@ cast_unsized_simple(char *s, int type)
    Use internal type or cast function to cast elements.
    The parameter delim specifies the delimiter for the elements,
    since some types do not use the default delimiter of a comma. */
-static PyObject *
+PyObject *
 cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
            char delim)
 {
@@ -721,7 +724,7 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
    functions to cast elements. The parameter len is the record size.
    The parameter delim can specify a delimiter for the elements,
    although composite types always use a comma as delimiter. */
-static PyObject *
+PyObject *
 cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
             Py_ssize_t len, char delim)
 {
@@ -905,7 +908,7 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
 
 /* Cast string s with size and encoding to a Python dictionary.
    using the input and output syntax for hstore values. */
-static PyObject *
+PyObject *
 cast_hstore(char *s, Py_ssize_t size, int encoding)
 {
     PyObject *result;
@@ -1198,14 +1201,14 @@ set_error_msg_and_state(PyObject *type, const char *msg, int encoding,
 }
 
 /* Set given database error message. */
-static void
+void
 set_error_msg(PyObject *type, const char *msg)
 {
     set_error_msg_and_state(type, msg, pg_encoding_ascii, NULL);
 }
 
 /* Set database error from connection and/or result. */
-static void
+void
 set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result)
 {
     char *sqlstate = NULL;
@@ -1228,7 +1231,7 @@ set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result)
 }
 
 /* Get SSL attributes and values as a dictionary. */
-static PyObject *
+PyObject *
 get_ssl_attributes(PGconn *cnx)
 {
     PyObject *attr_dict = NULL;
@@ -1260,7 +1263,7 @@ get_ssl_attributes(PGconn *cnx)
    PQprint() is not used because handing over a stream from Python to
    PostgreSQL can be problematic if they use different libs for streams
    and because using PQprint() and tp_print is not recommended any more. */
-static PyObject *
+PyObject *
 format_result(const PGresult *res)
 {
     const int n = PQnfields(res);
@@ -1402,7 +1405,7 @@ format_result(const PGresult *res)
 }
 
 /* Internal function converting a Postgres datestyles to date formats. */
-static const char *
+const char *
 date_style_to_format(const char *s)
 {
     static const char *formats[] = {
@@ -1435,7 +1438,7 @@ date_style_to_format(const char *s)
 }
 
 /* Internal function converting a date format to a Postgres datestyle. */
-static const char *
+const char *
 date_format_to_style(const char *s)
 {
     static const char *datestyle[] = {
@@ -1470,7 +1473,7 @@ date_format_to_style(const char *s)
 }
 
 /* Internal wrapper for the notice receiver callback. */
-static void
+void
 notice_receiver(void *arg, const PGresult *res)
 {
     PyGILState_STATE gstate = PyGILState_Ensure();
@@ -1495,7 +1498,7 @@ notice_receiver(void *arg, const PGresult *res)
 }
 
 /* Pre-allocate some memory for a char buffer and return success status. */
-static int
+int
 init_char_buffer(struct CharBuffer *buf, size_t initial_size)
 {
     buf->size = 0;
@@ -1512,8 +1515,8 @@ init_char_buffer(struct CharBuffer *buf, size_t initial_size)
 }
 
 /* Extend char buffer with given string.
-   Note: We do not assume or guarantee that the buffer is zero-terminated. */
-static void
+    Note: We do not assume or guarantee that the buffer is zero-terminated. */
+void
 ext_char_buffer_s(struct CharBuffer *buf, const char *s)
 {
     size_t len = strlen(s), need;
@@ -1546,7 +1549,7 @@ ext_char_buffer_s(struct CharBuffer *buf, const char *s)
 }
 
 /* Extend char buffer with given character */
-static void
+void
 ext_char_buffer_c(struct CharBuffer *buf, char c)
 {
     if (buf->error)

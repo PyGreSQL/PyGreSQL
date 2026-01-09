@@ -8,6 +8,10 @@
  * Please see the LICENSE.TXT file for specific restrictions.
  */
 
+/* Shared headers */
+#include "pginternal.h"
+#include "pgmodule.h"
+
 /* Deallocate source object. */
 static void
 source_dealloc(sourceObject *self)
@@ -796,7 +800,7 @@ static PyMethodDef source_methods[] = {
 static char source__doc__[] = "PyGreSQL source object";
 
 /* Source type definition */
-static PyTypeObject sourceType = {
+PyTypeObject sourceType = {
     PyVarObject_HEAD_INIT(NULL, 0) "pgdb.Source", /* tp_name */
     sizeof(sourceObject),                         /* tp_basicsize */
     0,                                            /* tp_itemsize */

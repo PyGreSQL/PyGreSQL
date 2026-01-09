@@ -15,12 +15,13 @@
 #include <libpq-fe.h>
 #include <libpq/libpq-fs.h>
 
-/* The type definitions from <server/catalog/pg_type.h> */
-#include "pgtypes.h"
+/* Shared headers */
+#include "pginternal.h"
+#include "pgmodule.h"
 
-static PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
-    *InternalError, *OperationalError, *ProgrammingError, *IntegrityError,
-    *DataError, *NotSupportedError, *InvalidResultError, *NoResultError,
+PyObject *Error, *Warning, *InterfaceError, *DatabaseError, *InternalError,
+    *OperationalError, *ProgrammingError, *IntegrityError, *DataError,
+    *NotSupportedError, *InvalidResultError, *NoResultError,
     *MultipleResultsError, *Connection, *Query, *LargeObject;
 
 #define _TOSTRING(x) #x
@@ -32,9 +33,15 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #endif
 
 /* Default values */
+#undef PG_ARRAYSIZE
 #define PG_ARRAYSIZE 1
 
 /* Flags for object validity checks */
+#undef CHECK_OPEN
+#undef CHECK_CLOSE
+#undef CHECK_CNX
+#undef CHECK_RESULT
+#undef CHECK_DQL
 #define CHECK_OPEN 1
 #define CHECK_CLOSE 2
 #define CHECK_CNX 4
@@ -42,44 +49,52 @@ static const char *PyPgVersion = TOSTRING(PYGRESQL_VERSION);
 #define CHECK_DQL 16
 
 /* Query result types */
+#undef RESULT_EMPTY
+#undef RESULT_DML
+#undef RESULT_DDL
+#undef RESULT_DQL
 #define RESULT_EMPTY 1
 #define RESULT_DML 2
 #define RESULT_DDL 3
 #define RESULT_DQL 4
 
 /* Flags for move methods */
+#undef QUERY_MOVEFIRST
+#undef QUERY_MOVELAST
+#undef QUERY_MOVENEXT
+#undef QUERY_MOVEPREV
 #define QUERY_MOVEFIRST 1
 #define QUERY_MOVELAST 2
 #define QUERY_MOVENEXT 3
 #define QUERY_MOVEPREV 4
 
+#undef MAX_ARRAY_DEPTH
 #define MAX_ARRAY_DEPTH 16 /* maximum allowed depth of an array */
 
 /* MODULE GLOBAL VARIABLES */
 
-static PyObject *pg_default_host;   /* default database host */
-static PyObject *pg_default_base;   /* default database name */
-static PyObject *pg_default_opt;    /* default connection options */
-static PyObject *pg_default_port;   /* default connection port */
-static PyObject *pg_default_user;   /* default username */
-static PyObject *pg_default_passwd; /* default password */
+PyObject *pg_default_host;   /* default database host */
+PyObject *pg_default_base;   /* default database name */
+PyObject *pg_default_opt;    /* default connection options */
+PyObject *pg_default_port;   /* default connection port */
+PyObject *pg_default_user;   /* default username */
+PyObject *pg_default_passwd; /* default password */
 
-static PyObject *decimal = NULL,    /* decimal type */
-    *dictiter = NULL,               /* function for getting dict results */
-        *namediter = NULL,          /* function for getting named results */
-            *namednext = NULL,      /* function for getting one named result */
-                *scalariter = NULL, /* function for getting scalar results */
-                    *jsondecode =
-                        NULL;          /* function for decoding json strings */
-static const char *date_format = NULL; /* date format that is always assumed */
-static char decimal_point = '.';       /* decimal point used in money values */
-static int bool_as_text = 0;  /* whether bool shall be returned as text */
-static int array_as_text = 0; /* whether arrays shall be returned as text */
-static int bytea_escaped = 0; /* whether bytea shall be returned escaped */
+PyObject *decimal = NULL;       /* decimal type */
+PyObject *dictiter = NULL;      /* function for getting dict results */
+PyObject *namediter = NULL;     /* function for getting named results */
+PyObject *namednext = NULL;     /* function for getting one named result */
+PyObject *scalariter = NULL;    /* function for getting scalar results */
+PyObject *jsondecode = NULL;    /* function for decoding json strings */
+const char *date_format = NULL; /* date format that is always assumed */
+char decimal_point = '.';       /* decimal point used in money values */
+int bool_as_text = 0;           /* whether bool shall be returned as text */
+int array_as_text = 0;          /* whether arrays shall be returned as text */
+int bytea_escaped = 0;          /* whether bytea shall be returned escaped */
 
-static int pg_encoding_utf8 = 0;
-static int pg_encoding_latin1 = 0;
-static int pg_encoding_ascii = 0;
+int pg_encoding_utf8 = 0;
+int pg_encoding_latin1 = 0;
+int pg_encoding_ascii = 0;
 
 /*
 OBJECTS
@@ -101,91 +116,11 @@ OBJECTS
    - source: Source object returned by pg.conn.source().
 */
 
-/* Forward declarations for types */
-static PyTypeObject connType, sourceType, queryType, noticeType, largeType;
+/* Type objects are defined in their respective .c files */
 
-/* Forward static declarations */
-static void
-notice_receiver(void *, const PGresult *);
+/* Object declarations are provided by shared headers */
 
-/* Object declarations */
-
-typedef struct {
-    PyObject_HEAD int valid;   /* validity flag */
-    PGconn *cnx;               /* Postgres connection handle */
-    const char *date_format;   /* date format derived from datestyle */
-    PyObject *cast_hook;       /* external typecast method */
-    PyObject *notice_receiver; /* current notice receiver */
-} connObject;
-#define is_connObject(v) (PyType(v) == &connType)
-
-typedef struct {
-    PyObject_HEAD int valid; /* validity flag */
-    connObject *pgcnx;       /* parent connection object */
-    PGresult *result;        /* result content */
-    int encoding;            /* client encoding */
-    int result_type;         /* result type (DDL/DML/DQL) */
-    long arraysize;          /* array size for fetch method */
-    int current_row;         /* currently selected row */
-    int max_row;             /* number of rows in the result */
-    int num_fields;          /* number of fields in each row */
-} sourceObject;
-#define is_sourceObject(v) (PyType(v) == &sourceType)
-
-typedef struct {
-    PyObject_HEAD connObject *pgcnx; /* parent connection object */
-    PGresult const *res;             /* an error or warning */
-} noticeObject;
-#define is_noticeObject(v) (PyType(v) == &noticeType)
-
-typedef struct {
-    PyObject_HEAD connObject *pgcnx; /* parent connection object */
-    PGresult *result;                /* result content */
-    int async;                       /* flag for asynchronous queries */
-    int encoding;                    /* client encoding */
-    int current_row;                 /* currently selected row */
-    int max_row;                     /* number of rows in the result */
-    int num_fields;                  /* number of fields in each row */
-    int *col_types;                  /* PyGreSQL column types */
-} queryObject;
-#define is_queryObject(v) (PyType(v) == &queryType)
-
-typedef struct {
-    PyObject_HEAD connObject *pgcnx; /* parent connection object */
-    Oid lo_oid;                      /* large object oid */
-    int lo_fd;                       /* large object fd */
-} largeObject;
-#define is_largeObject(v) (PyType(v) == &largeType)
-
-/*
-   A buffer for character data with routines to handle resizing.
-   This is inspired by libpq's PQExpBufferData.
-   The buffer can be extended with the extend_char_buffer_s/x() functions.
-*/
-struct CharBuffer {
-    char *data;      /* actual string data */
-    size_t size;     /* current size of data */
-    size_t max_size; /* allocated size */
-    int error;       /* error flag (invalid data) */
-};
-
-/* Internal functions */
-#include "pginternal.c"
-
-/* Connection object */
-#include "pgconn.c"
-
-/* Query object */
-#include "pgquery.c"
-
-/* Source object */
-#include "pgsource.c"
-
-/* Notice object */
-#include "pgnotice.c"
-
-/* Large objects */
-#include "pglarge.c"
+/* Object implementation files are compiled separately now */
 
 /* MODULE FUNCTIONS */
 

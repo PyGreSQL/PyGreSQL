@@ -224,7 +224,15 @@ setup(
     packages=["pg", "pgdb"],
     package_data={"pg": ["py.typed"], "pgdb": ["py.typed"]},
     ext_modules=[Extension(
-        'pg._pg', ["ext/pgmodule.c"],
+        'pg._pg', [
+            "ext/pgmodule.c",
+            "ext/pginternal.c",
+            "ext/pgconn.c",
+            "ext/pgquery.c",
+            "ext/pgsource.c",
+            "ext/pgnotice.c",
+            "ext/pglarge.c",
+        ],
         include_dirs=include_dirs, library_dirs=library_dirs,
         define_macros=define_macros, undef_macros=undef_macros,
         libraries=libraries, extra_compile_args=extra_compile_args)],
