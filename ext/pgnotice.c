@@ -20,6 +20,9 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
     const char *name = PyUnicode_AsUTF8(nameobj);
     int fieldcode;
 
+    if (!name)
+        return NULL;
+
     if (!res) {
         PyErr_SetString(PyExc_TypeError, "Cannot get current notice");
         return NULL;

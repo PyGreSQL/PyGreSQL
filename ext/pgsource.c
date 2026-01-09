@@ -70,6 +70,8 @@ static PyObject *
 source_getattr(sourceObject *self, PyObject *nameobj)
 {
     const char *name = PyUnicode_AsUTF8(nameobj);
+    if (!name)
+        return NULL;
 
     /* pg connection object */
     if (!strcmp(name, "pgcnx")) {

@@ -31,6 +31,8 @@ static PyObject *
 conn_getattr(connObject *self, PyObject *nameobj)
 {
     const char *name = PyUnicode_AsUTF8(nameobj);
+    if (!name)
+        return NULL;
 
     /*
      * Although we could check individually, there are only a few

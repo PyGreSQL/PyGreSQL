@@ -73,6 +73,8 @@ static PyObject *
 large_getattr(largeObject *self, PyObject *nameobj)
 {
     const char *name = PyUnicode_AsUTF8(nameobj);
+    if (!name)
+        return NULL;
 
     /* list postgreSQL large object fields */
 
