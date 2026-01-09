@@ -32,10 +32,10 @@ static PyObject *
 large_str(largeObject *self)
 {
     char str[80];
-    sprintf(str,
-            self->lo_fd >= 0 ? "Opened large object, oid %ld"
-                             : "Closed large object, oid %ld",
-            (long)self->lo_oid);
+    snprintf(str, sizeof(str),
+             self->lo_fd >= 0 ? "Opened large object, oid %ld"
+                              : "Closed large object, oid %ld",
+             (long)self->lo_oid);
     return PyUnicode_FromString(str);
 }
 

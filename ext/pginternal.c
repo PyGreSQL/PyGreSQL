@@ -1343,8 +1343,10 @@ format_result(const PGresult *res)
                     const size_t k = sizes[j];
                     const size_t h = (k - (size_t)strlen(s)) / 2;
 
-                    sprintf(p, "%*s", (int)h, "");
-                    sprintf(p + h, "%-*s", (int)(k - h), s);
+                    snprintf(p, size - (size_t)(p - buffer), "%*s", (int)h,
+                             "");
+                    snprintf(p + h, size - (size_t)(p + h - buffer), "%-*s",
+                             (int)(k - h), s);
                     p += k;
                     if (j + 1 < n)
                         *p++ = '|';
@@ -1365,12 +1367,14 @@ format_result(const PGresult *res)
                         const size_t k = sizes[j];
 
                         if (align) {
-                            sprintf(p, align == 'r' ? "%*s" : "%-*s", (int)k,
-                                    PQgetvalue(res, i, j));
+                            snprintf(p, size - (size_t)(p - buffer),
+                                     align == 'r' ? "%*s" : "%-*s", (int)k,
+                                     PQgetvalue(res, i, j));
                         }
                         else {
-                            sprintf(p, "%-*s", (int)k,
-                                    PQgetisnull(res, i, j) ? "" : "<binary>");
+                            snprintf(p, size - (size_t)(p - buffer), "%-*s",
+                                     (int)k,
+                                     PQgetisnull(res, i, j) ? "" : "<binary>");
                         }
                         p += k;
                         if (j + 1 < n)
@@ -1382,7 +1386,8 @@ format_result(const PGresult *res)
                 PyMem_Free(aligns);
                 PyMem_Free(sizes);
                 /* create the footer */
-                sprintf(p, "(%d row%s)", m, m == 1 ? "" : "s");
+                snprintf(p, size - (size_t)(p - buffer), "(%d row%s)", m,
+                         m == 1 ? "" : "s");
                 /* return the result */
                 result = PyUnicode_FromString(buffer);
                 PyMem_Free(buffer);

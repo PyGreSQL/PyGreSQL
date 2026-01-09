@@ -210,7 +210,7 @@ pg_connect(PyObject *self, PyObject *args, PyObject *dict)
     }
     if (pgport != -1) {
         memset(port_buffer, 0, sizeof(port_buffer));
-        sprintf(port_buffer, "%d", pgport);
+        snprintf(port_buffer, sizeof(port_buffer), "%d", pgport);
 
         keywords[nkw] = "port";
         values[nkw++] = port_buffer;
