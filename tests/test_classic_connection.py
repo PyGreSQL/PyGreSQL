@@ -11,6 +11,7 @@ These tests need a database to test against.
 
 from __future__ import annotations
 
+import datetime as dt
 import os
 import threading
 import time
@@ -1896,6 +1897,12 @@ class TestInserttable(unittest.TestCase):
         data = [()] * 10
         self.c.inserttable('test', data, [])
         self.assertEqual(self.get_back(), [])
+
+    def test_inserttable_datetime_adapt(self):
+        data = [(dt.date(1999,1,2), dt.time(11,12,13))]
+        self.c.inserttable('test', data, ['dt', 'ti'])
+        self.assertEqual([i[4:6] for i in self.get_back()],
+                         [tuple(str(j) for j in i) for i in data])
 
     def test_inserttable_only_one_column(self):
         data: list[tuple] = [(42,)] * 50
