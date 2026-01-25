@@ -792,6 +792,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 
     encoding = PQclientEncoding(self->cnx);
 
+    /* import datetime C API (this is not compatible with subinterpreters) */
     PyDateTime_IMPORT;
     if (PyErr_Occurred()) {
         return NULL; /* pass the error */
@@ -993,15 +994,9 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
                     Py_DECREF(s);
                 }
             }
-            else if (PyLong_Check(item)) {
-                PyObject *s = PyObject_Str(item);
-                const char *t = PyUnicode_AsUTF8(s);
-
-                ext_char_buffer_s(&buffer, t);
-                Py_DECREF(s);
-            }
-            else if (PyDate_Check(item) || PyDateTime_Check(item) ||
-                     PyTime_Check(item) || PyDelta_Check(item)) {
+            else if (PyLong_Check(item) || PyDate_Check(item) ||
+                     PyDateTime_Check(item) || PyTime_Check(item) ||
+                     PyDelta_Check(item)) {
                 PyObject *s = PyObject_Str(item);
                 const char *t = PyUnicode_AsUTF8(s);
 

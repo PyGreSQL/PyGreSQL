@@ -495,7 +495,8 @@ This method allows to *quickly* insert large blocks of data in a table.
 Internally, it uses the COPY command of the PostgreSQL database.
 The method takes an iterable of row values which must be tuples or lists
 of the same size, containing the values for each inserted row.
-These may contain string, integer, long or double (real) values.
+These may contain string, integer, long or double (real) values as well as
+date, time, datetime or timedelta objects.
 ``columns`` is an optional tuple or list of column names to be passed on
 to the COPY command.
 The number of rows affected is returned.
