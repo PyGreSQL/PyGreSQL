@@ -1035,7 +1035,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         }
 
         if (buffer.size > 128 * 1024) {
-            /* send buffered data */
+            /* send buffered data after reaching 128KB */
             ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
             buffer.size = 0;
             if (ret != 1) {
@@ -1051,16 +1051,18 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     }
 
     /* flush any remaining data */
-    // XXX: if buffer.size
-    ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
-    if (ret != 1) {
-        char *errormsg =
-            ret == -1 ? PQerrorMessage(self->cnx) : "Data cannot be queued";
-        PyErr_SetString(PyExc_IOError, errormsg);
-        PQputCopyEnd(self->cnx, errormsg);
-        PyMem_Free(buffer.data);
-        Py_DECREF(iter_row);
-        return NULL;
+    if (buffer.size) {
+        ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
+        buffer.size = 0;
+        if (ret != 1) {
+            char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
+                                       : "Data cannot be queued";
+            PyErr_SetString(PyExc_IOError, errormsg);
+            PQputCopyEnd(self->cnx, errormsg);
+            PyMem_Free(buffer.data);
+            Py_DECREF(iter_row);
+            return NULL;
+        }
     }
 
     PyMem_Free(buffer.data);
