@@ -12,6 +12,9 @@
 #include "pginternal.h"
 #include "pgmodule.h"
 
+/* Needs to be after Python.h */
+#include "datetime.h"
+
 /* Deallocate connection object. */
 static void
 conn_dealloc(connObject *self)
@@ -789,6 +792,11 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 
     encoding = PQclientEncoding(self->cnx);
 
+    PyDateTime_IMPORT;
+    if (PyErr_Occurred()) {
+        return NULL; /* pass the error */
+    }
+
     /* pre-allocate some memory for the query buffer */
     if (!init_char_buffer(&buffer, 4096)) {
         Py_DECREF(iter_row);
@@ -986,6 +994,14 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
                 }
             }
             else if (PyLong_Check(item)) {
+                PyObject *s = PyObject_Str(item);
+                const char *t = PyUnicode_AsUTF8(s);
+
+                ext_char_buffer_s(&buffer, t);
+                Py_DECREF(s);
+            }
+            else if (PyDate_Check(item) || PyDateTime_Check(item) ||
+                     PyTime_Check(item) || PyDelta_Check(item)) {
                 PyObject *s = PyObject_Str(item);
                 const char *t = PyUnicode_AsUTF8(s);
 
