@@ -11,7 +11,7 @@ These tests need a database to test against.
 
 from __future__ import annotations
 
-import datetime as dt
+import datetime
 import os
 import threading
 import time
@@ -1712,7 +1712,7 @@ class TestInserttable(unittest.TestCase):
         c.query("drop table if exists test cascade")
         c.query("create table test ("
                 "i2 smallint, i4 integer, i8 bigint,"
-                "b boolean, dt date, ti time,"
+                "b boolean, dt date, ti time, ts timestamp, td interval,"
                 "d numeric, f4 real, f8 double precision, m money,"
                 "c char(1), v4 varchar(4), c4 char(4), t text)")
         # Check whether the test database uses SQL_ASCII - this means
@@ -1746,13 +1746,17 @@ class TestInserttable(unittest.TestCase):
         self.c.close()
 
     data: Sequence[tuple] = [
-        (-1, -1, -1, True, '1492-10-12', '08:30:00',
+        (-1, -1, -1, True,
+         '1492-10-12', '08:30:00', '1492-10-12 08:30:00', '-3 days',
          -1.2345, -1.75, -1.875, '-1.25', '-', 'r?', '!u', 'xyz'),
-        (0, 0, 0, False, '1607-04-14', '09:00:00',
+        (0, 0, 0, False,
+         '1607-04-14', '09:00:00', '1607-04-14 09:00:00', '7 days',
          0.0, 0.0, 0.0, '0.0', ' ', '0123', '4567', '890'),
-        (1, 1, 1, True, '1801-03-04', '03:45:00',
+        (1, 1, 1, True,
+         '1801-03-04', '03:45:00', '1801-03-04 03:45:00', '3 mons',
          1.23456, 1.75, 1.875, '1.25', 'x', 'bc', 'cdef', 'g'),
-        (2, 2, 2, False, '1903-12-17', '11:22:00',
+        (2, 2, 2, False,
+         '1903-12-17', '11:22:00', '1903-12-17 11:22:00', '1 year',
          2.345678, 2.25, 2.125, '2.75', 'y', 'q', 'ijk', 'mnop\nstux!')]
 
     @classmethod
@@ -1784,29 +1788,37 @@ class TestInserttable(unittest.TestCase):
             if row[5] is not None:  # time
                 self.assertIsInstance(row[5], str)
                 self.assertTrue(row[5].replace(':', '').isdigit())
-            if row[6] is not None:  # numeric
-                self.assertIsInstance(row[6], Decimal)
-                row[6] = float(row[6])
-            if row[7] is not None:  # real
-                self.assertIsInstance(row[7], float)
-            if row[8] is not None:  # double precision
-                self.assertIsInstance(row[8], float)
+            if row[6] is not None:  # timestamp
+                self.assertIsInstance(row[6], str)
+                parts = row[6].split(' ')
+                self.assertEqual(len(parts), 2)
+                self.assertTrue(parts[0].replace('-', '').isdigit())
+                self.assertTrue(parts[1].replace(':', '').isdigit())
+            if row[7] is not None:  # interval
+                self.assertIsInstance(row[7], str)
+            if row[8] is not None:  # numeric
+                self.assertIsInstance(row[8], Decimal)
                 row[8] = float(row[8])
-            if row[9] is not None:  # money
-                self.assertIsInstance(row[9], Decimal)
-                row[9] = str(float(row[9]))
-            if row[10] is not None:  # char(1)
-                self.assertIsInstance(row[10], str)
-                self.assertEqual(self.db_len(row[10], encoding), 1)
-            if row[11] is not None:  # varchar(4)
-                self.assertIsInstance(row[11], str)
-                self.assertLessEqual(self.db_len(row[11], encoding), 4)
-            if row[12] is not None:  # char(4)
+            if row[9] is not None:  # real
+                self.assertIsInstance(row[9], float)
+            if row[10] is not None:  # double precision
+                self.assertIsInstance(row[10], float)
+                row[10] = float(row[10])
+            if row[11] is not None:  # money
+                self.assertIsInstance(row[11], Decimal)
+                row[11] = str(float(row[11]))
+            if row[12] is not None:  # char(1)
                 self.assertIsInstance(row[12], str)
-                self.assertEqual(self.db_len(row[12], encoding), 4)
-                row[12] = row[12].rstrip()
-            if row[13] is not None:  # text
+                self.assertEqual(self.db_len(row[12], encoding), 1)
+            if row[13] is not None:  # varchar(4)
                 self.assertIsInstance(row[13], str)
+                self.assertLessEqual(self.db_len(row[13], encoding), 4)
+            if row[14] is not None:  # char(4)
+                self.assertIsInstance(row[14], str)
+                self.assertEqual(self.db_len(row[14], encoding), 4)
+                row[14] = row[14].rstrip()
+            if row[15] is not None:  # text
+                self.assertIsInstance(row[15], str)
             row = tuple(row)
             data.append(row)
         return data
@@ -1889,7 +1901,7 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(r, num_rows)
 
     def test_inserttable_null_values(self):
-        data = [(None,) * 14] * 100
+        data = [(None,) * 16] * 100
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
 
@@ -1899,22 +1911,25 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.get_back(), [])
 
     def test_inserttable_datetime_adapt(self):
-        data = [(dt.date(1999,1,2), dt.time(11,12,13))]
-        self.c.inserttable('test', data, ['dt', 'ti'])
-        self.assertEqual([i[4:6] for i in self.get_back()],
-                         [tuple(str(j) for j in i) for i in data])
+        data = [(datetime.date(1999, 1, 2), datetime.time(11, 12, 13),
+                 datetime.datetime(1999, 1, 2, 11, 12, 13),
+                 datetime.timedelta(days=123))]
+        self.c.inserttable('test', data, ['dt', 'ti', 'ts', 'td'])
+        back = [row[4:8] for row in self.get_back()]
+        self.assertEqual(back, [(
+            '1999-01-02', '11:12:13', '1999-01-02 11:12:13', '123 days')])
 
     def test_inserttable_only_one_column(self):
         data: list[tuple] = [(42,)] * 50
         self.c.inserttable('test', data, ['i4'])
-        data = [tuple([42 if i == 1 else None for i in range(14)])] * 50
+        data = [tuple([42 if i == 1 else None for i in range(16)])] * 50
         self.assertEqual(self.get_back(), data)
 
     def test_inserttable_only_two_columns(self):
         data: list[tuple] = [(bool(i % 2), i * .5) for i in range(20)]
         self.c.inserttable('test', data, ('b', 'f4'))
         # noinspection PyTypeChecker
-        data = [(None,) * 3 + (bool(i % 2),) + (None,) * 3 + (i * .5,)
+        data = [(None,) * 3 + (bool(i % 2),) + (None,) * 5 + (i * .5,)
                 + (None,) * 6 for i in range(20)]
         self.assertEqual(self.get_back(), data)
 
@@ -1985,9 +2000,9 @@ class TestInserttable(unittest.TestCase):
             ValueError, self.c.inserttable, 'test', [[33000]], ['i2'])
 
     def test_inserttable_max_values(self):
-        data = [(2 ** 15 - 1, 2 ** 31 - 1, 2 ** 31 - 1,
-                 True, '2999-12-31', '11:59:59', 1e99,
-                 1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
+        data = [(2 ** 15 - 1, 2 ** 31 - 1, 2 ** 31 - 1, True,
+                 '2999-12-31', '11:59:59', '2999-12-31 23:59:59', '9999 years',
+                 1e99, 1.0 + 1.0 / 32, 1.0 + 1.0 / 32, None,
                  "1", "1234", "1234", "1234" * 100)]
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), data)
@@ -2000,7 +2015,8 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = '€' if self.has_encoding else '$'
         row_unicode = (
-            0, 0, 0, False, '1970-01-01', '00:00:00',
+            0, 0, 0, False,
+            '1970-01-01', '00:00:00', '1970-01-01 00:00:00', '00:00:00',
             0.0, 0.0, 0.0, '0.0',
             c, 'bäd', 'bäd', "käse сыр pont-l'évêque")
         row_bytes = tuple(
@@ -2019,7 +2035,8 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = '€' if self.has_encoding else '$'
         row_unicode = (
-            0, 0, 0, False, '1970-01-01', '00:00:00',
+            0, 0, 0, False,
+            '1970-01-01', '00:00:00', '1970-01-01 00:00:00', '00:00:00',
             0.0, 0.0, 0.0, '0.0',
             c, 'bäd', 'bäd', "käse сыр pont-l'évêque")
         data = [row_unicode] * 2
@@ -2035,7 +2052,8 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = '€' if self.has_encoding else '$'
         row_unicode: tuple = (
-            0, 0, 0, False, '1970-01-01', '00:00:00',
+            0, 0, 0, False,
+            '1970-01-01', '00:00:00', '1970-01-01 00:00:00', '00:00:00',
             0.0, 0.0, 0.0, '0.0',
             c, 'bäd', 'bäd', "for käse and pont-l'évêque pay in €")
         data = [row_unicode]
@@ -2058,7 +2076,8 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = '€' if self.has_encoding else '$'
         row_unicode = (
-            0, 0, 0, False, '1970-01-01', '00:00:00',
+            0, 0, 0, False,
+            '1970-01-01', '00:00:00', '1970-01-01 00:00:00', '00:00:00',
             0.0, 0.0, 0.0, '0.0',
             c, 'bäd', 'bäd', "for käse and pont-l'évêque pay in €")
         data = [row_unicode] * 2
@@ -2070,7 +2089,8 @@ class TestInserttable(unittest.TestCase):
         # non-ascii chars do not fit in char(1) when there is no encoding
         c = '€' if self.has_encoding else '$'
         row_unicode = (
-            0, 0, 0, False, '1970-01-01', '00:00:00',
+            0, 0, 0, False,
+            '1970-01-01', '00:00:00', '1970-01-01 00:00:00', '00:00:00',
             0.0, 0.0, 0.0, '0.0',
             c, 'bäd', 'bäd', "for käse and pont-l'évêque pay in €")
         data = [row_unicode]
@@ -2080,12 +2100,12 @@ class TestInserttable(unittest.TestCase):
     def test_inserttable_from_query(self):
         data = self.c.query(
             "select 2::int2 as i2, 4::int4 as i4, 8::int8 as i8, true as b,"
-            "null as dt, null as ti, null as d,"
+            "null as dt, null as ti, null as ts, null as td, null as d,"
             "4.5::float as float4, 8.5::float8 as f8,"
             "null as m, 'c' as c, 'v4' as v4, null as c4, 'text' as text")
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), [
-            (2, 4, 8, True, None, None, None, 4.5, 8.5,
+            (2, 4, 8, True, None, None, None, None, None, 4.5, 8.5,
              None, 'c', 'v4', None, 'text')])
 
     def test_inserttable_special_chars(self):
