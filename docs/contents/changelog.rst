@@ -1,6 +1,15 @@
 ChangeLog
 =========
 
+Version 6.2.3 (2026-01-25)
+--------------------------
+- Minor improvements and fixes (thanks to Justin Pryzby):
+
+  - The `inserttable()` method in the `pg` module can now directly import
+    date, time, datetime and timedelta objects from Python (#93) and was
+    slightly improved to avoid memory exhaustion and memory leaks (#92).
+  - The C extension has no been properly modularized into separate units (#25).
+
 Version 6.2.2 (2026-01-03)
 --------------------------
 - The `inserttable()` method in the `pg` module can now handle rows of 
