@@ -4329,8 +4329,9 @@ class TestDBClassAdapter(unittest.TestCase):
     def test_guess_simple_type(self):
         f = self.adapter.guess_simple_type
         self.assertEqual(f(pg.Bytea(b'test')), 'bytea')
+        self.assertEqual(f(b'test'), 'bytea')
         self.assertEqual(f('string'), 'text')
-        self.assertEqual(f(b'string'), 'text')
+        self.assertEqual(f(b'string'), 'bytea')
         self.assertEqual(f(True), 'bool')
         self.assertEqual(f(3), 'int')
         self.assertEqual(f(2.75), 'float')
