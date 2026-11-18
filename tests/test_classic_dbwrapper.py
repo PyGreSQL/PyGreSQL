@@ -593,6 +593,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['DateStyle'], 'ISO, YMD')
         self.assertEqual(r['bytea_output'], 'hex')
 
+    @unittest.skip("requires non-standard string literals"
+                   " (removed in PostgreSQL 19)")
     def test_set_parameter(self):
         f = self.db.set_parameter
         g = self.db.get_parameter
@@ -637,6 +639,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(g('standard_conforming_strings'), 'on')
         self.assertEqual(g('datestyle'), 'ISO, YMD')
 
+    @unittest.skip("requires non-standard string literals"
+                   " (removed in PostgreSQL 19)")
     def test_reset_parameter(self):
         db = DB()
         f = db.set_parameter
@@ -678,6 +682,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(g('standard_conforming_strings'), scs)
         db.close()
 
+    @unittest.skip("requires non-standard string literals"
+                   " (removed in PostgreSQL 19)")
     def test_reset_parameter_all(self):
         db = DB()
         f = db.set_parameter
@@ -699,6 +705,8 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(g('standard_conforming_strings'), scs)
         db.close()
 
+    @unittest.skip("requires non-standard string literals"
+                   " (removed in PostgreSQL 19)")
     def test_set_parameter_local(self):
         f = self.db.set_parameter
         g = self.db.get_parameter
@@ -709,6 +717,8 @@ class TestDBClass(unittest.TestCase):
         self.db.end()
         self.assertEqual(g('standard_conforming_strings'), 'on')
 
+    @unittest.skip("requires non-standard string literals"
+                   " (removed in PostgreSQL 19)")
     def test_set_parameter_session(self):
         f = self.db.set_parameter
         g = self.db.get_parameter

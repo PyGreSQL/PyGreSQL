@@ -2707,6 +2707,8 @@ class TestConfigFunctions(unittest.TestCase):
                              0 if maxsize is not None and maxsize < 2 else 4)
 
 
+@unittest.skip("requires non-standard string literals"
+               " (removed in PostgreSQL 19)")
 class TestStandaloneEscapeFunctions(unittest.TestCase):
     """Test pg escape functions.
 
