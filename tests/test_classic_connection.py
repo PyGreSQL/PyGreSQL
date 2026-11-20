@@ -386,6 +386,40 @@ class TestConnectObject(unittest.TestCase):
         r = parameter('server_encoding')
         self.assertEqual(r, s)
 
+    def test_get_cast_hook(self):
+        self.assertIsNone(self.connection.get_cast_hook())
+
+    def test_set_cast_hook(self):
+        f = self.connection.set_cast_hook
+        self.assertRaises(TypeError, f, 42)
+        self.assertRaises(TypeError, f, 'invalid')
+        self.assertIsNone(f(lambda value, oid: value))
+        self.assertIsNone(f(None))
+
+    def test_set_and_get_cast_hook(self):
+        h = lambda value, oid: value  # noqa: E731
+        self.assertIsNone(self.connection.set_cast_hook(h))
+        for _i in range(10):
+            self.assertIs(self.connection.get_cast_hook(), h)
+        self.assertIsNone(self.connection.set_cast_hook(None))
+        self.assertIsNone(self.connection.get_cast_hook())
+
+    def test_cast_hook(self):
+        calls = []
+
+        def cast_hook(value, oid):
+            calls.append((value, oid))
+            return f'cast {value}'
+
+        self.connection.set_cast_hook(cast_hook)
+        del cast_hook  # the connection must keep its own reference
+        for _i in range(10):
+            self.assertTrue(callable(self.connection.get_cast_hook()))
+        query = self.connection.query
+        r = query("select '(1,2)'::point, 42").getresult()
+        self.assertEqual(r, [('cast (1,2)', 42)])
+        self.assertEqual(calls, [('(1,2)', 600)])  # 600 is the point type
+
 
 class TestSimpleQueries(unittest.TestCase):
     """Test simple queries via a basic pg connection."""
@@ -2325,6 +2359,23 @@ class TestNotificatons(unittest.TestCase):
         self.assertIs(self.c.get_notice_receiver(), r)
         self.assertIsNone(self.c.set_notice_receiver(None))
         self.assertIsNone(self.c.get_notice_receiver())
+
+    def test_get_notice_receiver_repeatedly(self):
+        r = lambda notice: None  # noqa: E731
+        self.c.set_notice_receiver(r)
+        for _i in range(10):
+            self.assertIs(self.c.get_notice_receiver(), r)
+
+    def test_notice_receiver_is_kept(self):
+        received = []
+        # notices can only be accessed inside the receiver
+        self.c.set_notice_receiver(
+            lambda notice: received.append(notice.primary))
+        # the connection must keep its own reference to the receiver
+        for _i in range(10):
+            self.assertTrue(callable(self.c.get_notice_receiver()))
+        self.c.query("do $$ begin raise warning 'Bilbo was here!'; end $$")
+        self.assertEqual(received, ['Bilbo was here!'])
 
     def test_notice_receiver(self):
         self.addCleanup(self.c.query, 'drop function bilbo_notice();')
