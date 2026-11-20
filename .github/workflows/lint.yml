@@ -17,10 +17,10 @@ jobs:
         uses: actions/checkout@v6
       - name: Install tox
         run: pip install tox
-      - name: Setup Python
+      - name: Setup Python 3.15
         uses: actions/setup-python@v6
         with:
-          python-version: 3.14
+          python-version: 3.15
       - name: Run quality checks
         run: tox -e ruff,mypy,cformat,docs
         timeout-minutes: 5
