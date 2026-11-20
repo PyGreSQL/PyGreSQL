@@ -4,23 +4,23 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   checks:
     name: Quality checks run
     runs-on: ubuntu-24.04
 
-    strategy:
-      fail-fast: false
-
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+      - name: Setup Python 3.15
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
       - name: Install tox
         run: pip install tox
-      - name: Setup Python 3.15
-        uses: actions/setup-python@v6
-        with:
-          python-version: 3.15
       - name: Run quality checks
         run: tox -e ruff,mypy,cformat,docs
         timeout-minutes: 5
