@@ -8,7 +8,6 @@ You can build the PyGreSQL distribution like this:
     python -m build -C strict -C memory-size
 """
 
-import contextlib
 import os
 import platform
 import re
@@ -19,7 +18,7 @@ import warnings
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
-min_py_version = 3, 8  # supported: Python >= 3.8
+min_py_version = 3, 10  # supported: Python >= 3.10
 max_py_version = 4, 0  # and < 4.0
 min_pg_version = 12, 0  # supported: PostgreSQL >= 12.0
 
@@ -34,54 +33,11 @@ def project_version():
     raise Exception("Cannot determine PyGreSQL version")
 
 
-def project_readme():
-    """Get the content of the README file."""
-    with open('README.rst') as f:
-        return f.read()
-
-
 version = project_version()
 
 if not min_py_version <= sys.version_info[:2] < max_py_version:
     raise Exception(
         f"Sorry, PyGreSQL {version} does not support this Python version")
-
-
-def patch_pyproject_toml():
-    """Patch pyproject.toml to make it work with old setuptools versions.
-    
-    This allows building PyGreSQL with Python < 3.9 which only supports
-    setuptools up to version 75, since our pyproject.toml requires version 77.
-    """
-    from setuptools import __version__ as version
-
-    try:
-        version = int(version.split('.', 1)[0])
-    except (IndexError, TypeError, ValueError):
-        return
-    if not 61 <= version < 77:  # only needed for setuptools 61 to 76
-        return
-
-    try:
-        from setuptools.config import pyprojecttoml
-    except ImportError:
-        return
-
-    load_file = pyprojecttoml.load_file
-
-    def load_file_patched(filepath):
-        d = load_file(filepath)
-        with contextlib.suppress(KeyError):
-            p = d['project']
-            t = p['license']
-            f = p.pop('license-files')
-            p['license'] = {'text': t, 'files': f[0]}
-        return d
-
-    pyprojecttoml.load_file = load_file_patched
-
-
-patch_pyproject_toml()  # needed for Python < 3.9
 
 
 # For historical reasons, PyGreSQL does not install itself as a single
@@ -178,51 +134,14 @@ class BuildPgExt(build_ext):
                 if platform.architecture()[0] == '64bit':  # needs MinGW-w64
                     define_macros.append(('MS_WIN64', None))
             elif compiler_type == 'msvc':  # Microsoft Visual C++
-                extra_compile_args[1:] = [
-                    '-J', '-W3', '-WX', '-wd4391',
-                    '-Dinline=__inline']  # needed for MSVC 9
+                extra_compile_args[1:] = ['-J', '-W3', '-WX', '-wd4391']
         super().build_extensions()
 
 
+# All project metadata is defined in pyproject.toml.
+# We only need to specify the C extension module and how to build it here.
+
 setup(
-    name='PyGreSQL',
-    version=version,
-    description='Python PostgreSQL Interfaces',
-    long_description=project_readme(),
-    long_description_content_type='text/x-rst',
-    keywords='pygresql postgresql database api dbapi',
-    author="D'Arcy J. M. Cain",
-    author_email="darcy@PyGreSQL.org",
-    url='https://pygresql.github.io/',
-    download_url='https://pygresql.github.io/download/',
-    project_urls={
-        'Documentation': 'https://pygresql.github.io/contents/',
-        'Issue Tracker': 'https://github.com/PyGreSQL/PyGreSQL/issues/',
-        'Mailing List': 'https://mail.vex.net/mailman/listinfo/pygresql',
-        'Source Code': 'https://github.com/PyGreSQL/PyGreSQL'},
-    classifiers=[
-        'Development Status :: 6 - Mature',
-        'Intended Audience :: Developers',
-        'Operating System :: OS Independent',
-        'Programming Language :: C',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
-        'Programming Language :: Python :: 3.12',
-        'Programming Language :: Python :: 3.13',
-        'Programming Language :: Python :: 3.14',
-        'Programming Language :: SQL',
-        'Topic :: Database',
-        'Topic :: Database :: Front-Ends',
-        'Topic :: Software Development :: Libraries :: Python Modules'],
-    license='PostgreSQL',
-    license_files=['LICENSE.txt'],
-    zip_safe=False,
-    packages=["pg", "pgdb"],
-    package_data={"pg": ["py.typed"], "pgdb": ["py.typed"]},
     ext_modules=[Extension(
         'pg._pg', [
             "ext/pgmodule.c",

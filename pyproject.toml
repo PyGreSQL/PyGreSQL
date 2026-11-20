@@ -1,7 +1,7 @@
 [project]
 name = "PyGreSQL"
 version = "6.2.3"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
   {name = "D'Arcy J. M. Cain", email = "darcy@pygresql.org"},
   {name = "Christoph Zwerschke", email = "cito@online.de"},
@@ -18,13 +18,12 @@ classifiers = [
     "Programming Language :: C",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: SQL",
     "Topic :: Database",
     "Topic :: Database :: Front-Ends",
@@ -41,7 +40,7 @@ Download = "https://pygresql.github.io/download/"
 "Mailing List" = "https://mail.vex.net/mailman/listinfo/pygresql"
 
 [tool.ruff]
-target-version = "py37"
+target-version = "py310"
 line-length = 79
 exclude = [
     "__pycache__",
@@ -77,7 +76,7 @@ ignore = ["D203", "D213"]
 "tests/*.py" = ["D100", "D101", "D102", "D103", "D105", "D107", "S"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.10"
 check_untyped_defs = true
 no_implicit_optional = true
 strict_optional = true
@@ -95,9 +94,9 @@ disallow_untyped_defs = false
 packages = ["pg", "pgdb"]
 
 [tool.setuptools.package-data]
-pg = ["pg.typed"]
-pgdb = ["pg.typed"]
+pg = ["py.typed", "_pg.pyi"]
+pgdb = ["py.typed"]
 
 [build-system]
-requires = ["setuptools>=75", "wheel>=0.45"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
