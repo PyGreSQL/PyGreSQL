@@ -11,6 +11,7 @@ services:
 
     command: sleep infinity
 
+  # all supported PostgreSQL versions
   pg12:
     image: postgres:12
     restart: unless-stopped
@@ -81,6 +82,16 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_PASSWORD: postgres
 
+  pg19:
+    image: postgres:19
+    restart: unless-stopped
+    volumes:
+      - postgres-data-19:/var/lib/postgresql
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+
 volumes:
   postgres-data-12:
   postgres-data-13:
@@ -89,3 +100,4 @@ volumes:
   postgres-data-16:
   postgres-data-17:
   postgres-data-18:
+  postgres-data-19:

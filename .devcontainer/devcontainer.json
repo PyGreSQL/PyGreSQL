@@ -20,7 +20,7 @@
 						"name": "Container database",
 						"driver": "PostgreSQL",
 						"previewLimit": 50,
-						"server": "pg15",
+						"server": "pg19",
 						"port": 5432,
 						"database": "test",
 						"username": "test",

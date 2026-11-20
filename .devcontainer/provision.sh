@@ -11,48 +11,40 @@ apt-get -y upgrade
 
 ln -fs /usr/share/zoneinfo/UTC /etc/localtime
 apt-get install -y apt-utils software-properties-common
-ap-get install -y tzdata
+apt-get install -y tzdata
 dpkg-reconfigure --frontend noninteractive tzdata
 
 apt-get install -y rpm wget zip
 
 # install all supported Python versions
+# (Python 3.12 is the system Python, the others come from deadsnakes)
 
 add-apt-repository -y ppa:deadsnakes/ppa
 apt-get update
 
-apt-get install -y python3.8 python3.8-dev python3.8-distutils
-apt-get install -y python3.9 python3.9-dev python3.9-distutils
-apt-get install -y python3.10 python3.10-dev python3.10-distutils
-apt-get install -y python3.11 python3.11-dev python3.11-distutils 
-apt-get install -y python3.12 python3.12-dev python3.12-venv
-apt-get install -y python3.13 python3.13-dev python3.13-venv
-apt-get install -y python3.14 python3.14-dev python3.14-venv
+for v in 3.10 3.11 3.12 3.13 3.14 3.15
+do
+    apt-get install -y python$v python$v-dev python$v-venv
+done
 
-# install build and testing tool
+# install build and testing tools
+# (tox creates its own virtual environments for each Python version)
 
-python3.12 -m ensurepip --upgrade --default-pip
-python3.13 -m ensurepip --upgrade --default-pip
-python3.14 -m ensurepip --upgrade --default-pip
+apt-get install -y pipx clang-format
 
-python3.8 -m pip install -U pip setuptools wheel build
-python3.9 -m pip install -U pip setuptools wheel build
-python3.10 -m pip install -U pip setuptools wheel build
-python3.11 -m pip install -U pip setuptools wheel build
-python3.12 -m pip install -U pip setuptools wheel build
-python3.13 -m pip install -U pip setuptools wheel build
-python3.14 -m pip install -U pip setuptools wheel build
+export PIPX_HOME=/opt/pipx
+export PIPX_BIN_DIR=/usr/local/bin
 
-pip install ruff
+pipx install tox
+pipx install ruff
 
-apt-get install -y tox clang-format
-pip install -U tox
+# install the latest PostgreSQL client tools and libpq from PGDG
 
-# install PostgreSQL client tools
+apt-get install -y postgresql-common
+/usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+apt-get install -y postgresql-client libpq-dev
 
-apt-get install -y postgresql libpq-dev
-
-for pghost in pg12 pg13 pg14 pg15 pg16 pg17 pg18
+for pghost in pg12 pg13 pg14 pg15 pg16 pg17 pg18 pg19
 do
     export PGHOST=$pghost
     export PGDATABASE=postgres
