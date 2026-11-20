@@ -124,7 +124,8 @@ class BuildPgExt(build_ext):
         """
         super().finalize_options()
         if self.pedantic:
-            extra_compile_args.extend(['-Wextra', '-pedantic'])
+            extra_compile_args.extend([
+                '-Wextra', '-pedantic', '-Wshadow', '-Wmissing-prototypes'])
         if self.strict:
             extra_compile_args.append('-Werror')
         wanted = self.memory_size

@@ -916,7 +916,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
     while (s != end) {
         char *key, *val;
         PyObject *key_obj, *val_obj;
-        Py_ssize_t key_esc = 0, val_esc = 0, size;
+        Py_ssize_t key_esc = 0, val_esc = 0, item_size;
         int quoted;
 
         while (s != end && *s == ' ') ++s;
@@ -959,10 +959,10 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                 return NULL;
             }
         }
-        size = s - key - key_esc;
+        item_size = s - key - key_esc;
         if (key_esc) {
             char *r = key, *t;
-            key = (char *)PyMem_Malloc((size_t)size);
+            key = (char *)PyMem_Malloc((size_t)item_size);
             if (!key) {
                 Py_DECREF(result);
                 return PyErr_NoMemory();
@@ -977,7 +977,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                 *t++ = *r++;
             }
         }
-        key_obj = cast_sized_text(key, size, encoding, PYGRES_TEXT);
+        key_obj = cast_sized_text(key, item_size, encoding, PYGRES_TEXT);
         if (key_esc)
             PyMem_Free(key);
         if (!key_obj) {
@@ -1035,10 +1035,10 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                 val = NULL;
         }
         if (val) {
-            size = s - val - val_esc;
+            item_size = s - val - val_esc;
             if (val_esc) {
                 char *r = val, *t;
-                val = (char *)PyMem_Malloc((size_t)size);
+                val = (char *)PyMem_Malloc((size_t)item_size);
                 if (!val) {
                     Py_DECREF(key_obj);
                     Py_DECREF(result);
@@ -1054,7 +1054,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                     *t++ = *r++;
                 }
             }
-            val_obj = cast_sized_text(val, size, encoding, PYGRES_TEXT);
+            val_obj = cast_sized_text(val, item_size, encoding, PYGRES_TEXT);
             if (val_esc)
                 PyMem_Free(val);
             if (!val_obj) {

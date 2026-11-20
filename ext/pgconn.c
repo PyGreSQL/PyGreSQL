@@ -53,7 +53,7 @@ conn_getattr(connObject *self, PyObject *nameobj)
 
     /* postmaster host */
     if (!strcmp(name, "host")) {
-        char *r = PQhost(self->cnx);
+        const char *r = PQhost(self->cnx);
         if (!r || r[0] == '/') /* this can return a Unix socket path */
             r = "localhost";
         return PyUnicode_FromString(r);
@@ -721,7 +721,7 @@ static PyObject *
 conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 {
     PGresult *result;
-    char *table, *s, *t;
+    char *table, *part, *dot;
     struct CharBuffer buffer = {0};
     int freeze = 0, encoding, ret;
     PyObject *rows, *iter_row, *item, *columns = NULL;
@@ -795,18 +795,18 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     /* starts query */
     ext_char_buffer_s(&buffer, "copy ");
 
-    s = table;
+    part = table;
     do {
-        t = strchr(s, '.');
-        if (!t)
-            t = s + strlen(s);
-        table = PQescapeIdentifier(self->cnx, s, (size_t)(t - s));
+        dot = strchr(part, '.');
+        if (!dot)
+            dot = part + strlen(part);
+        table = PQescapeIdentifier(self->cnx, part, (size_t)(dot - part));
         ext_char_buffer_s(&buffer, table);
         PQfreemem(table);
-        s = t;
-        if (*s)
-            ext_char_buffer_c(&buffer, *s++);
-    } while (*s);
+        part = dot;
+        if (*part)
+            ext_char_buffer_c(&buffer, *part++);
+    } while (*part);
 
     if (columns) {
         /* adds a string like f" ({','.join(columns)})" */
@@ -1038,8 +1038,8 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
             ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
             buffer.size = 0;
             if (ret != 1) {
-                char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
-                                           : "Data cannot be queued";
+                const char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
+                                                 : "Data cannot be queued";
                 PyErr_SetString(PyExc_IOError, errormsg);
                 PQputCopyEnd(self->cnx, errormsg);
                 PyMem_Free(buffer.data);
@@ -1054,8 +1054,8 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
         buffer.size = 0;
         if (ret != 1) {
-            char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
-                                       : "Data cannot be queued";
+            const char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
+                                             : "Data cannot be queued";
             PyErr_SetString(PyExc_IOError, errormsg);
             PQputCopyEnd(self->cnx, errormsg);
             PyMem_Free(buffer.data);
