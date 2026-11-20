@@ -455,9 +455,8 @@ after the operation has completed.
 
 .. note::
 
-    The method uses the PostgreSQL "upsert" feature which is only available
-    since PostgreSQL 9.5. With older PostgreSQL versions, you will get a
-    ProgrammingError if you use this method.
+    The method uses the PostgreSQL "upsert" feature
+    (``INSERT ... ON CONFLICT``).
 
 .. versionadded:: 5.0
 

@@ -981,8 +981,8 @@ class DB:
         The dictionary is modified in any case to reflect the values in
         the database after the operation has completed.
 
-        Note: The method uses the PostgreSQL "upsert" feature which is
-        only available since PostgreSQL 9.5.
+        Note: The method uses the PostgreSQL "upsert" feature
+        (INSERT ... ON CONFLICT).
         """
         if table.endswith('*'):  # hint for descendant tables can be ignored
             table = table[:-1].rstrip()
