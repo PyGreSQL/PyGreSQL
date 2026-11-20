@@ -407,7 +407,7 @@ static PyObject *
 pg_set_decimal_point(PyObject *Py_UNUSED(self), PyObject *args)
 {
     PyObject *ret = NULL;
-    char *s = NULL;
+    const char *s = NULL;
 
     /* gets arguments */
     if (PyArg_ParseTuple(args, "z", &s)) {
@@ -867,7 +867,7 @@ pg_set_defport(PyObject *Py_UNUSED(self), PyObject *args)
 static char pg_cast_array__doc__[] =
     "cast_array(string, cast=None, delim=',') -- cast a string as an array";
 
-PyObject *
+static PyObject *
 pg_cast_array(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] = {"string", "cast", "delim", NULL};
@@ -921,7 +921,7 @@ pg_cast_array(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 static char pg_cast_record__doc__[] =
     "cast_record(string, cast=None, delim=',') -- cast a string as a record";
 
-PyObject *
+static PyObject *
 pg_cast_record(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] = {"string", "cast", "delim", NULL};
@@ -985,7 +985,7 @@ pg_cast_record(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 static char pg_cast_hstore__doc__[] =
     "cast_hstore(string) -- cast a string as an hstore";
 
-PyObject *
+static PyObject *
 pg_cast_hstore(PyObject *Py_UNUSED(self), PyObject *string)
 {
     PyObject *tmp_obj = NULL, *ret;

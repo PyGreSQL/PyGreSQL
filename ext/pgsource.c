@@ -334,14 +334,14 @@ source_fetch(sourceObject *self, PyObject *args)
             }
             else {
                 char *s = PQgetvalue(self->result, k, j);
-                Py_ssize_t size = PQgetlength(self->result, k, j);
+                Py_ssize_t length = PQgetlength(self->result, k, j);
                 if (PQfformat(self->result, j) == 0) { /* textual format */
-                    str = get_decoded_string(s, size, encoding);
+                    str = get_decoded_string(s, length, encoding);
                     if (!str) /* cannot decode */
-                        str = PyBytes_FromStringAndSize(s, size);
+                        str = PyBytes_FromStringAndSize(s, length);
                 }
                 else {
-                    str = PyBytes_FromStringAndSize(s, size);
+                    str = PyBytes_FromStringAndSize(s, length);
                 }
             }
             PyTuple_SET_ITEM(rowtuple, j, str);
