@@ -11,4 +11,8 @@ ENV PYTHONUNBUFFERED=1
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 #    && apt-get -y install --no-install-recommends <your-package-list-here>
 
+# Create the Claude Code data directory, so that the claude-data volume
+# mounted there is owned by the vscode user and survives container rebuilds
+RUN mkdir -p /home/vscode/.claude && chown vscode:vscode /home/vscode/.claude
+
 CMD ["sleep", "infinity"]
