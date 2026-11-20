@@ -2347,12 +2347,16 @@ class TestCopyData(unittest.TestCase):
         for _i in range(10):
             func()  # warm-up
         n = 100
-        before = mallinfo2().uordblks
-        for _i in range(n):
-            func()
-        leaked = mallinfo2().uordblks - before
+        leaked = []
+        # use the minimum of several runs, since a leak shows up in every
+        # run, while unrelated one-time allocations would not
+        for _run in range(3):
+            before = mallinfo2().uordblks
+            for _i in range(n):
+                func()
+            leaked.append(mallinfo2().uordblks - before)
         # libpq results have more than 100 bytes
-        self.assertLess(leaked, 100 * n, f'{leaked} bytes leaked')
+        self.assertLess(min(leaked), 100 * n, f'{leaked} bytes leaked')
 
     def copy_from(self):
         source = self.source
