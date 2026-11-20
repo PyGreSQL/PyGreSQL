@@ -6,6 +6,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: Unit tests run
@@ -54,10 +57,11 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install latest libpq from PGDG
         if: matrix.libpq == 'pgdg'
         run: |
+          sudo apt-get update
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y libpq-dev
@@ -70,12 +74,12 @@ jobs:
             libpq5/noble-updates libpq-dev/noble-updates
       - name: Show libpq version
         run: pg_config --version
-      - name: Install tox
-        run: pip install tox
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
+      - name: Install tox
+        run: pip install tox
       - name: Run tests
         env:
           MATRIX_PYTHON: ${{ matrix.python }}
