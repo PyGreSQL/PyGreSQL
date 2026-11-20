@@ -22,7 +22,7 @@
 PyObject *Error, *Warning, *InterfaceError, *DatabaseError, *InternalError,
     *OperationalError, *ProgrammingError, *IntegrityError, *DataError,
     *NotSupportedError, *InvalidResultError, *NoResultError,
-    *MultipleResultsError, *Connection, *Query, *LargeObject;
+    *MultipleResultsError;
 
 #define _TOSTRING(x) #x
 #define TOSTRING(x) _TOSTRING(x)
@@ -1085,6 +1085,50 @@ static struct PyModuleDef moduleDef = {
     .m_size = -1,          .m_methods = pg_methods,
 };
 
+/* Create an exception type and add it to the module.
+   The name must be fully qualified, the module gets the last part.
+   Returns a new reference, or NULL with an exception set on failure. */
+static PyObject *
+add_exception(PyObject *mod, const char *name, PyObject *base)
+{
+    PyObject *exc = PyErr_NewException(name, base, NULL);
+
+    if (exc && PyModule_AddObjectRef(mod, strrchr(name, '.') + 1, exc) < 0)
+        Py_CLEAR(exc);
+    return exc;
+}
+
+/* Integer constants exported by the module */
+static const struct {
+    const char *name;
+    long value;
+} int_constants[] = {
+    /* Result types for queries */
+    {"RESULT_EMPTY", RESULT_EMPTY},
+    {"RESULT_DML", RESULT_DML},
+    {"RESULT_DDL", RESULT_DDL},
+    {"RESULT_DQL", RESULT_DQL},
+    /* Transaction states */
+    {"TRANS_IDLE", PQTRANS_IDLE},
+    {"TRANS_ACTIVE", PQTRANS_ACTIVE},
+    {"TRANS_INTRANS", PQTRANS_INTRANS},
+    {"TRANS_INERROR", PQTRANS_INERROR},
+    {"TRANS_UNKNOWN", PQTRANS_UNKNOWN},
+    /* Polling results */
+    {"POLLING_OK", PGRES_POLLING_OK},
+    {"POLLING_FAILED", PGRES_POLLING_FAILED},
+    {"POLLING_READING", PGRES_POLLING_READING},
+    {"POLLING_WRITING", PGRES_POLLING_WRITING},
+    /* Create mode for large objects */
+    {"INV_READ", INV_READ},
+    {"INV_WRITE", INV_WRITE},
+    /* Position flags for lo_lseek */
+    {"SEEK_SET", SEEK_SET},
+    {"SEEK_CUR", SEEK_CUR},
+    {"SEEK_END", SEEK_END},
+    {NULL, 0} /* sentinel */
+};
+
 /* Initialization function for the module */
 PyMODINIT_FUNC
 PyInit__pg(void);
@@ -1092,122 +1136,59 @@ PyInit__pg(void);
 PyMODINIT_FUNC
 PyInit__pg(void)
 {
-    PyObject *mod, *dict, *s;
+    PyObject *mod;
+    int i;
 
     /* Create the module and add the functions */
-
     mod = PyModule_Create(&moduleDef);
-
-    /* Initialize here because some Windows platforms get confused otherwise */
-    connType.tp_base = noticeType.tp_base = queryType.tp_base =
-        sourceType.tp_base = &PyBaseObject_Type;
-    largeType.tp_base = &PyBaseObject_Type;
-
-    if (PyType_Ready(&connType) || PyType_Ready(&noticeType) ||
-        PyType_Ready(&queryType) || PyType_Ready(&sourceType) ||
-        PyType_Ready(&largeType)) {
+    if (!mod)
         return NULL;
-    }
-
-    dict = PyModule_GetDict(mod);
 
     /* Exceptions as defined by DB-API 2.0 */
-    Error = PyErr_NewException("pg.Error", PyExc_Exception, NULL);
-    PyDict_SetItemString(dict, "Error", Error);
+    if (!(Error = add_exception(mod, "pg.Error", PyExc_Exception)) ||
+        !(Warning = add_exception(mod, "pg.Warning", PyExc_Exception)) ||
+        !(InterfaceError = add_exception(mod, "pg.InterfaceError", Error)) ||
+        !(DatabaseError = add_exception(mod, "pg.DatabaseError", Error)) ||
+        !(InternalError =
+              add_exception(mod, "pg.InternalError", DatabaseError)) ||
+        !(OperationalError =
+              add_exception(mod, "pg.OperationalError", DatabaseError)) ||
+        !(ProgrammingError =
+              add_exception(mod, "pg.ProgrammingError", DatabaseError)) ||
+        !(IntegrityError =
+              add_exception(mod, "pg.IntegrityError", DatabaseError)) ||
+        !(DataError = add_exception(mod, "pg.DataError", DatabaseError)) ||
+        !(NotSupportedError =
+              add_exception(mod, "pg.NotSupportedError", DatabaseError)) ||
+        !(InvalidResultError =
+              add_exception(mod, "pg.InvalidResultError", DataError)) ||
+        !(NoResultError =
+              add_exception(mod, "pg.NoResultError", InvalidResultError)) ||
+        !(MultipleResultsError = add_exception(mod, "pg.MultipleResultsError",
+                                               InvalidResultError))) {
+        goto error;
+    }
 
-    Warning = PyErr_NewException("pg.Warning", PyExc_Exception, NULL);
-    PyDict_SetItemString(dict, "Warning", Warning);
-
-    InterfaceError = PyErr_NewException("pg.InterfaceError", Error, NULL);
-    PyDict_SetItemString(dict, "InterfaceError", InterfaceError);
-
-    DatabaseError = PyErr_NewException("pg.DatabaseError", Error, NULL);
-    PyDict_SetItemString(dict, "DatabaseError", DatabaseError);
-
-    InternalError =
-        PyErr_NewException("pg.InternalError", DatabaseError, NULL);
-    PyDict_SetItemString(dict, "InternalError", InternalError);
-
-    OperationalError =
-        PyErr_NewException("pg.OperationalError", DatabaseError, NULL);
-    PyDict_SetItemString(dict, "OperationalError", OperationalError);
-
-    ProgrammingError =
-        PyErr_NewException("pg.ProgrammingError", DatabaseError, NULL);
-    PyDict_SetItemString(dict, "ProgrammingError", ProgrammingError);
-
-    IntegrityError =
-        PyErr_NewException("pg.IntegrityError", DatabaseError, NULL);
-    PyDict_SetItemString(dict, "IntegrityError", IntegrityError);
-
-    DataError = PyErr_NewException("pg.DataError", DatabaseError, NULL);
-    PyDict_SetItemString(dict, "DataError", DataError);
-
-    NotSupportedError =
-        PyErr_NewException("pg.NotSupportedError", DatabaseError, NULL);
-    PyDict_SetItemString(dict, "NotSupportedError", NotSupportedError);
-
-    InvalidResultError =
-        PyErr_NewException("pg.InvalidResultError", DataError, NULL);
-    PyDict_SetItemString(dict, "InvalidResultError", InvalidResultError);
-
-    NoResultError =
-        PyErr_NewException("pg.NoResultError", InvalidResultError, NULL);
-    PyDict_SetItemString(dict, "NoResultError", NoResultError);
-
-    MultipleResultsError = PyErr_NewException("pg.MultipleResultsError",
-                                              InvalidResultError, NULL);
-    PyDict_SetItemString(dict, "MultipleResultsError", MultipleResultsError);
-
-    /* Types */
-    Connection = (PyObject *)&connType;
-    PyDict_SetItemString(dict, "Connection", Connection);
-    Query = (PyObject *)&queryType;
-    PyDict_SetItemString(dict, "Query", Query);
-    LargeObject = (PyObject *)&largeType;
-    PyDict_SetItemString(dict, "LargeObject", LargeObject);
+    /* Types (only some of them are exposed in the module) */
+    if (PyModule_AddType(mod, &connType) < 0 ||
+        PyModule_AddType(mod, &queryType) < 0 ||
+        PyModule_AddType(mod, &largeType) < 0 ||
+        PyType_Ready(&noticeType) < 0 || PyType_Ready(&sourceType) < 0) {
+        goto error;
+    }
 
     /* Make the version available */
-    s = PyUnicode_FromString(PyPgVersion);
-    PyDict_SetItemString(dict, "version", s);
-    PyDict_SetItemString(dict, "__version__", s);
-    Py_DECREF(s);
+    if (PyModule_AddStringConstant(mod, "version", PyPgVersion) < 0 ||
+        PyModule_AddStringConstant(mod, "__version__", PyPgVersion) < 0) {
+        goto error;
+    }
 
-    /* Result types for queries */
-    PyDict_SetItemString(dict, "RESULT_EMPTY", PyLong_FromLong(RESULT_EMPTY));
-    PyDict_SetItemString(dict, "RESULT_DML", PyLong_FromLong(RESULT_DML));
-    PyDict_SetItemString(dict, "RESULT_DDL", PyLong_FromLong(RESULT_DDL));
-    PyDict_SetItemString(dict, "RESULT_DQL", PyLong_FromLong(RESULT_DQL));
-
-    /* Transaction states */
-    PyDict_SetItemString(dict, "TRANS_IDLE", PyLong_FromLong(PQTRANS_IDLE));
-    PyDict_SetItemString(dict, "TRANS_ACTIVE",
-                         PyLong_FromLong(PQTRANS_ACTIVE));
-    PyDict_SetItemString(dict, "TRANS_INTRANS",
-                         PyLong_FromLong(PQTRANS_INTRANS));
-    PyDict_SetItemString(dict, "TRANS_INERROR",
-                         PyLong_FromLong(PQTRANS_INERROR));
-    PyDict_SetItemString(dict, "TRANS_UNKNOWN",
-                         PyLong_FromLong(PQTRANS_UNKNOWN));
-
-    /* Polling results */
-    PyDict_SetItemString(dict, "POLLING_OK",
-                         PyLong_FromLong(PGRES_POLLING_OK));
-    PyDict_SetItemString(dict, "POLLING_FAILED",
-                         PyLong_FromLong(PGRES_POLLING_FAILED));
-    PyDict_SetItemString(dict, "POLLING_READING",
-                         PyLong_FromLong(PGRES_POLLING_READING));
-    PyDict_SetItemString(dict, "POLLING_WRITING",
-                         PyLong_FromLong(PGRES_POLLING_WRITING));
-
-    /* Create mode for large objects */
-    PyDict_SetItemString(dict, "INV_READ", PyLong_FromLong(INV_READ));
-    PyDict_SetItemString(dict, "INV_WRITE", PyLong_FromLong(INV_WRITE));
-
-    /* Position flags for lo_lseek */
-    PyDict_SetItemString(dict, "SEEK_SET", PyLong_FromLong(SEEK_SET));
-    PyDict_SetItemString(dict, "SEEK_CUR", PyLong_FromLong(SEEK_CUR));
-    PyDict_SetItemString(dict, "SEEK_END", PyLong_FromLong(SEEK_END));
+    /* Integer constants */
+    for (i = 0; int_constants[i].name; ++i) {
+        if (PyModule_AddIntConstant(mod, int_constants[i].name,
+                                    int_constants[i].value) < 0)
+            goto error;
+    }
 
     /* Prepare default values */
     pg_default_host = Py_NewRef(Py_None);
@@ -1218,15 +1199,13 @@ PyInit__pg(void)
     pg_default_passwd = Py_NewRef(Py_None);
 
     /* Store common pg encoding ids */
-
     pg_encoding_utf8 = pg_char_to_encoding("UTF8");
     pg_encoding_latin1 = pg_char_to_encoding("LATIN1");
     pg_encoding_ascii = pg_char_to_encoding("SQL_ASCII");
 
-    /* Check for errors */
-    if (PyErr_Occurred()) {
-        return NULL;
-    }
-
     return mod;
+
+error:
+    Py_DECREF(mod);
+    return NULL;
 }
