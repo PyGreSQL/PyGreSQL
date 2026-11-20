@@ -33,3 +33,9 @@ Thumbs.db
 .idea/
 .vs/
 .vscode/
+
+/AGENTS.md
+/CLAUDE.md
+/CLAUDE.local.md
+/.mcp.json
+.claude/
