@@ -28,6 +28,9 @@ Version 6.3.0 (unreleased)
     report). `putdata()` also read freed memory when an exception was passed
     to abort the COPY, garbling the error message, and crashed when the
     exception could not be converted to a string.
+  - After a COPY with `putdata()` or `getdata()`, the connection is now idle
+    again, so that `send_query()` can be used without running another query
+    first. It previously failed with "another command is already in progress".
 
 - Modernization and build:
 

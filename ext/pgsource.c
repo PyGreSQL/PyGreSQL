@@ -428,6 +428,52 @@ source_moveprev(sourceObject *self, PyObject *Py_UNUSED(noargs))
     return _source_move(self, QUERY_MOVEPREV);
 }
 
+/* Get the final result of a copy operation (internal use only).
+   Returns the number of rows or NULL with an IOError, using errormsg
+   as the error message if it is not NULL. */
+static PyObject *
+_source_end_copy(sourceObject *self, const char *errormsg)
+{
+    PGconn *cnx = self->pgcnx->cnx;
+    PGresult *result;
+    PyObject *ret;
+
+    Py_BEGIN_ALLOW_THREADS;
+    result = PQgetResult(cnx);
+    Py_END_ALLOW_THREADS;
+
+    if (PQresultStatus(result) == PGRES_COMMAND_OK) {
+        const char *tmp = PQcmdTuples(result);
+
+        ret = PyLong_FromLong(tmp[0] ? atol(tmp) : -1);
+    }
+    else {
+        PyErr_SetString(PyExc_IOError,
+                        errormsg ? errormsg : PQerrorMessage(cnx));
+        ret = NULL;
+    }
+    PQclear(result);
+
+    /* consume the remaining results, so that the connection becomes idle
+       and can be used with PQsendQuery() again */
+    Py_BEGIN_ALLOW_THREADS;
+    while ((result = PQgetResult(cnx))) {
+        ExecStatusType status = PQresultStatus(result);
+
+        PQclear(result);
+        if (status == PGRES_COPY_IN || status == PGRES_COPY_OUT ||
+            status == PGRES_COPY_BOTH)
+            break; /* still copying, the same result would be returned */
+    }
+    Py_END_ALLOW_THREADS;
+
+    PQclear(self->result);
+    self->result = NULL;
+    self->result_type = RESULT_EMPTY;
+
+    return ret;
+}
+
 /* Put copy data. */
 static char source_putdata__doc__[] =
     "putdata(buffer) -- send data to server during copy from stdin";
@@ -508,32 +554,8 @@ source_putdata(sourceObject *self, PyObject *buffer)
     else if (buf) { /* buffer has been sent */
         ret = Py_NewRef(Py_None);
     }
-    else {                /* copy is done */
-        PGresult *result; /* final result of the operation */
-
-        Py_BEGIN_ALLOW_THREADS;
-        result = PQgetResult(self->pgcnx->cnx);
-        Py_END_ALLOW_THREADS;
-
-        if (PQresultStatus(result) == PGRES_COMMAND_OK) {
-            char *tmp;
-            long num_rows;
-
-            tmp = PQcmdTuples(result);
-            num_rows = tmp[0] ? atol(tmp) : -1;
-            ret = PyLong_FromLong(num_rows);
-        }
-        else {
-            if (!errormsg)
-                errormsg = PQerrorMessage(self->pgcnx->cnx);
-            PyErr_SetString(PyExc_IOError, errormsg);
-            ret = NULL;
-        }
-
-        PQclear(result);
-        PQclear(self->result);
-        self->result = NULL;
-        self->result_type = RESULT_EMPTY;
+    else { /* copy is done */
+        ret = _source_end_copy(self, errormsg);
     }
 
     Py_XDECREF(tmp_obj); /* only now, since errormsg may point into it */
@@ -577,30 +599,8 @@ source_getdata(sourceObject *self, PyObject *args)
         return NULL;
     }
 
-    if (nbytes == -1) {   /* copy is done */
-        PGresult *result; /* final result of the operation */
-
-        Py_BEGIN_ALLOW_THREADS;
-        result = PQgetResult(self->pgcnx->cnx);
-        Py_END_ALLOW_THREADS;
-
-        if (PQresultStatus(result) == PGRES_COMMAND_OK) {
-            char *tmp;
-            long num_rows;
-
-            tmp = PQcmdTuples(result);
-            num_rows = tmp[0] ? atol(tmp) : -1;
-            ret = PyLong_FromLong(num_rows);
-        }
-        else {
-            PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
-            ret = NULL;
-        }
-
-        PQclear(result);
-        PQclear(self->result);
-        self->result = NULL;
-        self->result_type = RESULT_EMPTY;
+    if (nbytes == -1) { /* copy is done */
+        ret = _source_end_copy(self, NULL);
     }
     else { /* a row has been returned */
         ret = decode ? get_decoded_string(buffer, nbytes,

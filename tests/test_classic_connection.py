@@ -2417,6 +2417,14 @@ class TestCopyData(unittest.TestCase):
         self.source.execute("select 1")
         self.assertRaises(OSError, self.source.getdata)
 
+    def test_connection_is_idle_after_copy(self):
+        for copy in self.copy_from, self.copy_from_aborted, self.copy_to:
+            copy()
+            self.assertEqual(self.c.transaction(), pg.TRANS_IDLE)
+            query = self.c.send_query("select 1")
+            self.assertEqual(query.getresult(), [(1,)])
+            self.assertIsNone(query.getresult())
+
     def test_putdata_memory_leak(self):
         self.assert_no_memory_leak(self.copy_from)
 
