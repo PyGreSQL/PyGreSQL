@@ -92,6 +92,7 @@ class MultipleResultsError(InvalidResultError):
 class Source:
     """Source object."""
 
+    pgcnx: Connection
     arraysize: int
     resulttype: int
     ntuples: int
