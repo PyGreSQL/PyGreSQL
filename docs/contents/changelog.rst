@@ -3,25 +3,32 @@ ChangeLog
 
 Version 6.3.0 (unreleased)
 --------------------------
-- Added support for Python 3.15 and PostgreSQL 19.
-- Removed support for Python versions older than 3.10 (released October 2021).
-  PostgreSQL 12 or newer is still supported.
-- Modernized the code base using the features of Python 3.10, such as
-  structural pattern matching and the newer type annotation syntax.
-- Python types passed to `format_query()` can now also be builtin generic
-  types like `list[int]`, not only generic types like `List[int]`.
-- The `set_parameter()` and `truncate()` methods of the `pg.DB` object now
-  raise a `ValueError` if they get lists of different lengths. Previously,
-  the extra items were silently ignored.
-- The items of `Cursor.description` and the fields of composite types
-  returned by `TypeCache.get_fields()` in `pgdb` are now typed named tuples.
-- The C extension has been modernized using the Python 3.10 C API. It now
-  checks for all errors during initialization and compiles without warnings
-  even with extra warnings enabled (new build option `--pedantic`).
-  Added tests for the reference counting in the C extension.
-- All project metadata is now defined in `pyproject.toml`, and building
-  PyGreSQL requires setuptools 77 or newer. The installation instructions
-  have been updated accordingly.
+- Supported versions:
+
+  - Added support for Python 3.15 and PostgreSQL 19 (thanks to
+    Christoph Berg for pointing out an issue with PostgreSQL 19 in #97).
+  - Removed support for Python 3.8 and 3.9. PostgreSQL 12 or newer
+    is still supported.
+
+- Changes in the `pg` module:
+
+  - `format_query()` now also accepts builtin generic types like `list[int]`.
+  - `DB.set_parameter()` and `DB.truncate()` now raise a `ValueError` for
+    lists of different lengths instead of silently ignoring extra items.
+
+- Changes in the `pgdb` module:
+
+  - The items of `Cursor.description` and the results of
+    `TypeCache.get_fields()` are now typed named tuples.
+
+- Modernization and build:
+
+  - Modernized the code using Python 3.10 features and the Python 3.10 C API.
+    The C extension now checks all errors during initialization.
+  - All project metadata is now defined in `pyproject.toml`. Building requires
+    setuptools 77 or newer. New build option ``--pedantic`` for extra compiler
+    warnings. The installation instructions have been updated.
+
 - This version was developed with the help of Claude Code.
 
 Version 6.2.3 (2026-01-25)
