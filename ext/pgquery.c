@@ -55,8 +55,7 @@ _query_value_in_column(queryObject *self, int column)
     int type;
 
     if (PQgetisnull(self->result, self->current_row, column)) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     /* get the string representation of the value */
@@ -149,8 +148,7 @@ _get_async_result(queryObject *self, int keep)
             self->max_row = 0;
             self->num_fields = 0;
             self->col_types = NULL;
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
 
         if ((status = PQresultStatus(self->result)) != PGRES_TUPLES_OK) {
@@ -188,8 +186,7 @@ _get_async_result(queryObject *self, int keep)
     }
     else if (self->async == 2 && !self->max_row && !self->num_fields &&
              !self->col_types) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     /* return the query object itself as sentinel for a normal query result */
@@ -231,8 +228,7 @@ query_iter(queryObject *self)
         return res;
 
     self->current_row = 0;
-    Py_INCREF(self);
-    return (PyObject *)self;
+    return Py_NewRef(self);
 }
 
 /* __next__() method of the queryObject:
@@ -434,8 +430,7 @@ query_one(queryObject *self, PyObject *Py_UNUSED(noargs))
 
     if ((row_tuple = _get_async_result(self, 0)) == (PyObject *)self) {
         if (self->current_row >= self->max_row) {
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
 
         row_tuple = _query_row_as_tuple(self);
@@ -567,8 +562,7 @@ query_onedict(queryObject *self, PyObject *Py_UNUSED(noargs))
 
     if ((row_dict = _get_async_result(self, 0)) == (PyObject *)self) {
         if (self->current_row >= self->max_row) {
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
 
         row_dict = _query_row_as_dict(self);
@@ -685,8 +679,7 @@ query_onenamed(queryObject *self, PyObject *noargs)
         return res;
 
     if (self->current_row >= self->max_row) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     return PyObject_CallFunction(namednext, "(O)", self);
@@ -867,8 +860,7 @@ query_onescalar(queryObject *self, PyObject *Py_UNUSED(noargs))
         }
 
         if (self->current_row >= self->max_row) {
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
 
         value = _query_value_in_column(self, 0);
