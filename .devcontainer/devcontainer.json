@@ -1,14 +1,11 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+// Dev container for PyGreSQL, see https://containers.dev/implementors/json_reference/
 {
 	"name": "PyGreSQL",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "dev",
 	"workspaceFolder": "/workspace",
 	"customizations": {
 		"vscode": {
-			// Set *default* container specific settings.json values on container create.
 			"settings": {
 				"terminal.integrated.profiles.linux": {
 					"bash": {
@@ -27,19 +24,24 @@
 						"password": "test"
 					}
 				],
-				"python.pythonPath": "/usr/local/bin/python",
+				// The tox env has the C extension built in place (run tox first)
+				"python.defaultInterpreterPath": "/workspace/.tox/py315/bin/python",
 				"python.analysis.typeCheckingMode": "basic",
 				"python.testing.unittestEnabled": true,
 				"editor.formatOnSave": true,
+				// The code is linted with ruff, but not formatted with it
+				"[python]": {
+					"editor.formatOnSave": false
+				},
 				"editor.renderWhitespace": "all",
 				"editor.rulers": [
 					79
 				]
 			},
-			// Add the IDs of extensions you want installed when the container is created.
 			"extensions": [
 				"ms-azuretools.vscode-docker",
 				"ms-python.python",
+				"ms-python.mypy-type-checker",
 				"ms-vscode.cpptools",
 				"mtxr.sqltools",
 				"njpwerner.autodocstring",
@@ -51,14 +53,8 @@
 			]
 		}
 	},
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	// Use 'postCreateCommand' to run commands after the container is created.
+	"features": {
+		"ghcr.io/devcontainers/features/github-cli:1": {}
+	},
 	"postCreateCommand": "sudo bash /workspace/.devcontainer/provision.sh"
-	// Configure tool-specific properties.
-	// "customizations": {},
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
 }

@@ -9,6 +9,7 @@ services:
     volumes:
       - ..:/workspace:cached
       - claude-data:/home/vscode/.claude
+      - gh-config:/home/vscode/.config/gh
 
     command: sleep infinity
 
@@ -95,6 +96,7 @@ services:
 
 volumes:
   claude-data:
+  gh-config:
   postgres-data-12:
   postgres-data-13:
   postgres-data-14:

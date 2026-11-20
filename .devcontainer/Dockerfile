@@ -15,4 +15,9 @@ ENV PYTHONUNBUFFERED=1
 # mounted there is owned by the vscode user and survives container rebuilds
 RUN mkdir -p /home/vscode/.claude && chown vscode:vscode /home/vscode/.claude
 
+# Create the GitHub CLI config directory for the gh-config volume,
+# so that the gh login survives container rebuilds
+RUN mkdir -p /home/vscode/.config/gh \
+    && chown -R vscode:vscode /home/vscode/.config
+
 CMD ["sleep", "infinity"]
