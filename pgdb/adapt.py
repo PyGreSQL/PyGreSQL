@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta, tzinfo
 from json import dumps as jsonencode
 from re import compile as regex
 from time import localtime
-from typing import Any, Callable, Iterable
+from typing import Any
 from uuid import UUID as Uuid  # noqa: N811
 
 from .typecode import TypeCode

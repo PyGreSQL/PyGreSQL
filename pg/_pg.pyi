@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Sequence, TypeVar
+from collections.abc import Callable, Iterable, Sequence
+from typing import Any, TypeAlias, TypeVar
 
-try:
-    AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
-except TypeError:  # Python < 3.10
-    AnyStr = Any  # type: ignore
-SomeNamedTuple = Any  # alias for accessing arbitrary named tuples
+AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
+SomeNamedTuple: TypeAlias = Any  # alias for accessing arbitrary named tuples
 
 version: str
 __version__: str

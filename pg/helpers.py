@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from collections.abc import Callable, Iterator, Sequence
 from decimal import Decimal
 from functools import lru_cache
 from json import loads as jsondecode
-from typing import Any, Callable, Generator, NamedTuple, Sequence
+from typing import Any, NamedTuple, TypeAlias
 
 from .core import Query, set_decimal, set_jsondecode, set_query_helpers
 
-SomeNamedTuple = Any  # alias for accessing arbitrary named tuples
+SomeNamedTuple: TypeAlias = Any  # alias for accessing arbitrary named tuples
 
 __all__ = [
     'QuoteDict',
@@ -90,14 +91,14 @@ class RowCache:
 
 # Helper functions used by the query object
 
-def dictiter(q: Query) -> Generator[dict[str, Any], None, None]:
+def dictiter(q: Query) -> Iterator[dict[str, Any]]:
     """Get query result as an iterator of dictionaries."""
     fields: tuple[str, ...] = q.listfields()
     for r in q:
         yield dict(zip(fields, r))
 
 
-def namediter(q: Query) -> Generator[SomeNamedTuple, None, None]:
+def namediter(q: Query) -> Iterator[SomeNamedTuple]:
     """Get query result as an iterator of named tuples."""
     row = RowCache.row_factory(q.listfields())
     for r in q:
@@ -109,7 +110,7 @@ def namednext(q: Query) -> SomeNamedTuple:
     return RowCache.row_factory(q.listfields())(next(q))
 
 
-def scalariter(q: Query) -> Generator[Any, None, None]:
+def scalariter(q: Query) -> Iterator[Any]:
     """Get query result as an iterator of scalar values."""
     for r in q:
         yield r[0]

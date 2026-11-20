@@ -17,13 +17,14 @@ import os
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from io import StringIO
 from operator import itemgetter
 from time import strftime
-from typing import Any, Callable, ClassVar
+from typing import Any, ClassVar, List  # noqa: UP035
 from uuid import UUID
 
 import pg  # the module under test
@@ -4370,6 +4371,25 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query('select %s', values, types)
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(0,-3.25,"",f,{0},"{\\"\\"}")'])
+
+    def test_adapt_query_typed_list_with_python_types(self):
+        format_query = self.adapter.format_query
+        values: tuple = (3, 7.5, 'hello', True)
+        types: list = [int, float, str, bool]
+        sql, params = format_query("select %s,%s,%s,%s", values, types)
+        self.assertEqual(sql, 'select $1,$2,$3,$4')
+        self.assertEqual(params, [3, 7.5, 'hello', 't'])
+        values = ([1, 2, 3], ['a', 'b', 'c'], [True, False])
+        # builtin generic types
+        types = [list[int], list[str], list[bool]]
+        sql, params = format_query("select %s,%s,%s", values, types)
+        self.assertEqual(sql, 'select $1,$2,$3')
+        self.assertEqual(params, ['{1,2,3}', '{a,b,c}', '{t,f}'])
+        # legacy generic types from the typing module
+        types = [List[int], List[str], List[bool]]  # noqa: UP006
+        sql, params = format_query("select %s,%s,%s", values, types)
+        self.assertEqual(sql, 'select $1,$2,$3')
+        self.assertEqual(params, ['{1,2,3}', '{a,b,c}', '{t,f}'])
 
     def test_adapt_query_typed_list_with_types_as_string(self):
         format_query = self.adapter.format_query

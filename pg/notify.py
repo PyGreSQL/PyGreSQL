@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import select
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from .core import Query
 from .error import db_error

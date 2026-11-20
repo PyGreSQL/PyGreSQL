@@ -14,9 +14,10 @@ from __future__ import annotations
 import json
 import re
 import unittest
+from collections.abc import Sequence
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, Sequence
+from typing import Any
 
 import pg  # the module under test
 

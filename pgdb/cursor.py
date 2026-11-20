@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from collections.abc import Iterable
+from collections.abc import (
+    Callable,
+    Generator,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from math import isinf, isnan
-from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 from uuid import UUID as Uuid  # noqa: N811
 
 from pg.core import (
@@ -309,8 +316,10 @@ class Cursor:
             cast_row = self.type_cache.get_row_caster(coltypes)
             return [row_factory(cast_row(row)) for row in result]
         cast_value = self.type_cache.typecast
-        return [row_factory([cast_value(value, typ)
-                for typ, value in zip(coltypes, row)]) for row in result]
+        return [row_factory([
+            cast_value(value, typ)
+            for typ, value in zip(coltypes, row)])
+            for row in result]
 
     def callproc(self, procname: str, parameters: Sequence | None = None
                  ) -> Sequence | None:
@@ -378,12 +387,12 @@ class Cursor:
                         if not stream.endswith(b'\n'):
                             stream += b'\n'
 
-                def chunks() -> Generator:
+                def chunks() -> Iterator[str | bytes]:
                     yield stream
 
             elif isinstance(stream, Iterable):
 
-                def chunks() -> Generator:
+                def chunks() -> Iterator[str | bytes]:
                     for chunk in stream:
                         if not isinstance(chunk, input_type):
                             raise ValueError(
@@ -405,7 +414,7 @@ class Cursor:
                 raise TypeError("The size option must be an integer")
             if size > 0:
 
-                def chunks() -> Generator:
+                def chunks() -> Iterator[str | bytes]:
                     while True:
                         buffer = read(size)
                         yield buffer
@@ -414,7 +423,7 @@ class Cursor:
 
             else:
 
-                def chunks() -> Generator:
+                def chunks() -> Iterator[str | bytes]:
                     yield read()
 
         if not table or not isinstance(table, str):
@@ -478,7 +487,8 @@ class Cursor:
     def copy_to(self, stream: Any, table: str,
                 format: str | None = None, sep: str | None = None,
                 null: str | None = None, decode: bool | None = None,
-                columns: Sequence[str] | None = None) -> Cursor | Generator:
+                columns: Sequence[str] | None = None
+                ) -> Cursor | Generator[str | bytes, None, None]:
         """Copy data from the specified table to an output stream.
 
         The output stream can be a file-like object with a write() method or
@@ -559,7 +569,7 @@ class Cursor:
         getdata = self._src.getdata
         self.execute(operation, parameters)
 
-        def copy() -> Generator:
+        def copy() -> Generator[str | bytes, None, None]:
             self.rowcount = 0
             while True:
                 row = getdata(decode)

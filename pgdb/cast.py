@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from collections.abc import Callable, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal as _Decimal
 from functools import partial
 from inspect import signature
 from json import loads as jsondecode
 from re import compile as regex
-from typing import Any, Callable, ClassVar, Sequence
+from typing import Any, ClassVar
 from uuid import UUID as Uuid  # noqa: N811
 
 from pg.core import Connection as Cnx
