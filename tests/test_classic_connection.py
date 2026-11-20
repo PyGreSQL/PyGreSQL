@@ -2718,13 +2718,17 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
     """
 
     cls_set_up = False
+    std_strings = False
 
     @classmethod
     def setUpClass(cls):
         db = connect()
         query = db.query
         query('set client_encoding=sql_ascii')
-        query('set standard_conforming_strings=off')
+        # PostgreSQL 19 does not support non-standard strings any more
+        cls.std_strings = db.server_version >= 190000
+        scs = 'on' if cls.std_strings else 'off'
+        query(f'set standard_conforming_strings={scs}')
         query('set bytea_output=escape')
         db.close()
         cls.cls_set_up = True
@@ -2745,7 +2749,10 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         self.assertIsInstance(s, str)
         self.assertEqual(s, "that''s cheesy")
         s = f(r"It's bad to have a \ inside.")
-        self.assertEqual(s, r"It''s bad to have a \\ inside.")
+        if self.std_strings:
+            self.assertEqual(s, r"It''s bad to have a \ inside.")
+        else:
+            self.assertEqual(s, r"It''s bad to have a \\ inside.")
 
     def test_escape_bytea(self):
         self.assertTrue(self.cls_set_up)
@@ -2758,12 +2765,18 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
         self.assertEqual(s, 'plain')
         b = f("das is' käse".encode())
         self.assertIsInstance(b, bytes)
-        self.assertEqual(b, b"das is'' k\\\\303\\\\244se")
+        if self.std_strings:
+            self.assertEqual(b, b"das is'' k\\303\\244se")
+        else:
+            self.assertEqual(b, b"das is'' k\\\\303\\\\244se")
         s = f("that's cheesy")
         self.assertIsInstance(s, str)
         self.assertEqual(s, "that''s cheesy")
         b = f(b'O\x00ps\xff!')
-        self.assertEqual(b, b'O\\\\000ps\\\\377!')
+        if self.std_strings:
+            self.assertEqual(b, b'O\\000ps\\377!')
+        else:
+            self.assertEqual(b, b'O\\\\000ps\\\\377!')
 
 
 if __name__ == '__main__':

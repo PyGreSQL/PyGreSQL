@@ -25,7 +25,6 @@ def open_db():
     db.query("SET TIME ZONE 'EST5EDT'")
     db.query("SET DEFAULT_WITH_OIDS=FALSE")
     db.query("SET CLIENT_MIN_MESSAGES=WARNING")
-    db.query("SET STANDARD_CONFORMING_STRINGS=FALSE")
     return db
 
 
