@@ -59,7 +59,8 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-  "E",   # pycodestyle
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
   "F",   # pyflakes
   "I",   # isort
   "N",   # pep8-naming
@@ -68,6 +69,7 @@ select = [
   "B",   # bugbear
   "S",   # bandit
   "SIM", # simplify
+  "PGH", # pygrep-hooks
   "RUF", # ruff
 ]
 ignore = ["D203", "D213"]
@@ -82,6 +84,7 @@ no_implicit_optional = true
 strict_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+enable_error_code = ["ignore-without-code"]
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]

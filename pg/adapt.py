@@ -115,8 +115,8 @@ class _SimpleTypes(dict):
                 elif not isinstance(key, tuple):
                     # support builtin and legacy typing generics
                     array = f'{typ}[]'
-                    self[list[key]] = array  # type: ignore
-                    self[List[key]] = array  # type: ignore  # noqa: UP006
+                    self[list[key]] = array  # type: ignore[valid-type]
+                    self[List[key]] = array  # type: ignore[valid-type]  # noqa: UP006
 
     @staticmethod
     def __missing__(key: str) -> str:
@@ -173,7 +173,7 @@ class DbType(str):
     oid: int
     pgtype: str
     regtype: str
-    simple: str 
+    simple: str
     typlen: int
     typtype: str
     category: str
@@ -206,7 +206,7 @@ class DbTypes(dict):
         self._db = weakref.proxy(db)
         self._regtypes = False
         self._typecasts = Typecasts()
-        self._typecasts.get_attnames = self.get_attnames  # type: ignore
+        self._typecasts.get_attnames = self.get_attnames  # type: ignore[assignment, method-assign]
         self._typecasts.connection = self._db.db
         self._query_pg_type = (
             "SELECT oid, typname, oid::pg_catalog.regtype,"
@@ -231,7 +231,7 @@ class DbTypes(dict):
         typ.category = category
         typ.delim = delim
         typ.relid = relid
-        typ._get_attnames = self.get_attnames  # type: ignore
+        typ._get_attnames = self.get_attnames  # type: ignore[assignment]
         return typ
 
     def __missing__(self, key: int | str) -> DbType:
@@ -248,7 +248,7 @@ class DbTypes(dict):
         self[typ.oid] = self[typ.pgtype] = typ
         return typ
 
-    def get(self, key: int | str,  # type: ignore
+    def get(self, key: int | str,  # type: ignore[override]
             default: DbType | None = None) -> DbType | None:
         """Get the type even if it is not cached."""
         try:
@@ -670,7 +670,7 @@ class Adapter:
                 try:
                     command % map_literals
                 except KeyError:
-                    used_values[key] = values[key]  # pyright: ignore
+                    used_values[key] = values[key]
                 map_literals[key] = ''
             if inline:
                 adapt = self.adapt_inline

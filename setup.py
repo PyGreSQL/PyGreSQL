@@ -118,7 +118,7 @@ class BuildPgExt(build_ext):
 
     def finalize_options(self):
         """Set values for all build_pg options.
-        
+
         Some values are set in build_extensions() since they depend
         on the compiler version which is not yet known at this point.
         """

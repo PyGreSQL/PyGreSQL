@@ -69,10 +69,10 @@ class RowCache:
     def row_factory(names: Sequence[str]) -> Callable[[Sequence], NamedTuple]:
         """Get a namedtuple factory for row results with the given names."""
         try:
-            return namedtuple('Row', names, rename=True)._make  # type: ignore
+            return namedtuple('Row', names, rename=True)._make  # type: ignore[attr-defined]
         except ValueError:  # there is still a problem with the field names
             names = [f'column_{n}' for n in range(len(names))]
-            return namedtuple('Row', names)._make  # type: ignore
+            return namedtuple('Row', names)._make  # type: ignore[attr-defined]
 
     @classmethod
     def clear(cls) -> None:
@@ -86,7 +86,7 @@ class RowCache:
         If maxsize is set to None, the cache can grow without bound.
         """
         row_factory = cls.row_factory.__wrapped__
-        cls.row_factory = lru_cache(maxsize)(row_factory)  # type: ignore
+        cls.row_factory = lru_cache(maxsize)(row_factory)  # type: ignore[method-assign]
 
 
 # Helper functions used by the query object

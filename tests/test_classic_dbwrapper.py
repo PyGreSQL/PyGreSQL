@@ -319,7 +319,7 @@ class TestDBClassBasic(unittest.TestCase):
                 self._cnx.close()
 
         db2 = FakeDbApi2Connection(self.db.db)
-        db = pg.DB(db2)  # type: ignore
+        db = pg.DB(db2)  # type: ignore[call-overload]
         self.assertEqual(self.db.db, db.db)
         db.close()
         self.assertIsNone(db.db)
@@ -4836,11 +4836,11 @@ class TestSchemas(unittest.TestCase):
 
 class TestDebug(unittest.TestCase):
     """Test the debug attribute of the DB class."""
- 
+
     def setUp(self):
         self.db = DB()
         self.query = self.db.query
-        self.debug = self.db.debug  # type: ignore
+        self.debug = self.db.debug  # type: ignore[method-assign]
         self.output = StringIO()
         self.stdout, sys.stdout = sys.stdout, self.output
 

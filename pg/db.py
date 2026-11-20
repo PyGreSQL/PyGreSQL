@@ -11,6 +11,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     TypeVar,
+    cast,
     overload,
 )
 
@@ -72,7 +73,7 @@ class DB:
     def __init__(self, db: Connection | DB | DbApi2Connection) -> None:
         ...  # create a connection wrapper based on an existing connection
 
-    def __init__(self, *args: Any, **kw: Any) -> None: 
+    def __init__(self, *args: Any, **kw: Any) -> None:
         """Create a new connection.
 
         You can pass either the connection parameters or an existing
@@ -610,7 +611,7 @@ class DB:
 
         Same as pkey() with 'composite' set to True.
         """
-        return self.pkey(table, True)  # type: ignore
+        return self.pkey(table, True)  # type: ignore[return-value]
 
     def get_databases(self) -> list[str]:
         """Get list of databases in the system."""
@@ -1112,7 +1113,7 @@ class DB:
         cmd = f'DELETE FROM {t} WHERE {where}'  # noqa: S608
         self._do_debug(cmd, params)
         res = self._valid_db.query(cmd, params)
-        return int(res)  # type: ignore
+        return int(res)  # type: ignore[call-overload]
 
     def truncate(self, table: str | list[str] | tuple[str, ...] |
                  set[str] | frozenset[str], restart: bool = False,
@@ -1246,7 +1247,7 @@ class DB:
 
     def get_as_dict(
             self, table: str,
-            keyname: str | list[str] | tuple[str, ...] | None = None, 
+            keyname: str | list[str] | tuple[str, ...] | None = None,
             what: str | list[str] | tuple[str, ...] | None = None,
             where: str | list[str] | tuple[str, ...] | None = None,
             order: str | list[str] | tuple[str, ...] | bool | None = None,
@@ -1326,23 +1327,24 @@ class DB:
             row_is_tuple = False
         else:
             row_is_tuple = len(row_index) > 1
+        get_row: Callable[[tuple], tuple]
         if scalar or row_is_tuple:
-            get_row: Callable[[tuple], tuple] = itemgetter(  # pyright: ignore
-                *row_index)
+            get_row = cast(Callable[[tuple], tuple], itemgetter(*row_index))
         else:
             frst_index = row_index[0]
 
-            def get_row(row : tuple) -> tuple:
+            def get_first(row: tuple) -> tuple:
                 return row[frst_index],  # tuple with one item
 
+            get_row = get_first
             row_is_tuple = True
         rows = map(get_row, res)
         if key_tuple or row_is_tuple:
             if key_tuple:
-                keys = namediter(_MemoryQuery(keys, keynames))  # type: ignore
+                keys = namediter(_MemoryQuery(keys, keynames))  # type: ignore[arg-type, assignment]
             if row_is_tuple:
                 fields = tuple(f for f in fields if f not in keyset)
-                rows = namediter(_MemoryQuery(rows, fields))  # type: ignore
+                rows = namediter(_MemoryQuery(rows, fields))  # type: ignore[arg-type, assignment]
         # noinspection PyArgumentList
         return dict(zip(keys, rows, strict=True))
 

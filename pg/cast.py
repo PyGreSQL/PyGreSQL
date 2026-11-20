@@ -296,7 +296,7 @@ class Typecasts(dict):
         'time': cast_time, 'timetz': cast_timetz,
         'timestamp': cast_timestamp, 'timestamptz': cast_timestamptz,
         'int2vector': cast_int2vector, 'uuid': UUID,
-        'anyarray': cast_array, 'record': cast_record}  # pyright: ignore
+        'anyarray': cast_array, 'record': cast_record}
 
     connection: Connection | None = None  # set in connection specific instance
 
@@ -341,7 +341,7 @@ class Typecasts(dict):
             return cast
         return partial(cast, connection=self.connection)
 
-    def get(self, typ: str, default: Callable | None = None # type: ignore
+    def get(self, typ: str, default: Callable | None = None # type: ignore[override]
             ) -> Callable | None:
         """Get the typecast function for the given database type."""
         return self[typ] or default
@@ -425,7 +425,7 @@ class Typecasts(dict):
                            casts: list[Callable]) -> Callable:
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
-        record = namedtuple(name, fields)  # type: ignore
+        record = namedtuple(name, fields)  # type: ignore[misc]
 
         def cast(v: Any) -> record:
             # noinspection PyArgumentList

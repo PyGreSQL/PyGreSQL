@@ -350,7 +350,7 @@ class Typecasts(dict):
             return cast
         return partial(cast, cnx=self.cnx)
 
-    def get(self, typ: str, default: Callable | None = None  # type: ignore
+    def get(self, typ: str, default: Callable | None = None  # type: ignore[override]
             ) -> Callable | None:
         """Get the typecast function for the given database type."""
         return self[typ] or default
@@ -408,7 +408,7 @@ class Typecasts(dict):
                            casts: Sequence[str]) -> Callable:
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
-        record = namedtuple(name, fields)  # type: ignore
+        record = namedtuple(name, fields)  # type: ignore[misc]
 
         def cast(v: Any) -> record:
             # noinspection PyArgumentList
@@ -503,7 +503,7 @@ class TypeCache(dict):
         self._escape_string = cnx.escape_string
         self._src = cnx.source()
         self._typecasts = LocalTypecasts()
-        self._typecasts.get_fields = self.get_fields  # type: ignore
+        self._typecasts.get_fields = self.get_fields  # type: ignore[assignment, method-assign]
         self._typecasts.cnx = cnx
         self._query_pg_type = (
             "SELECT oid, typname,"
@@ -534,7 +534,7 @@ class TypeCache(dict):
         self[type_code.oid] = self[str(type_code)] = type_code
         return type_code
 
-    def get(self, key: int | str,  # type: ignore
+    def get(self, key: int | str,  # type: ignore[override]
             default: TypeCode | None = None) -> TypeCode | None:
         """Get the type even if it is not cached."""
         try:

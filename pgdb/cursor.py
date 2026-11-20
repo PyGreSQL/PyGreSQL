@@ -53,9 +53,9 @@ class Cursor:
         self._description: list[CursorDescription] | bool | None = None
         if self.row_factory is Cursor.row_factory:
             # the row factory needs to be determined dynamically
-            self.row_factory = None  # type: ignore
+            self.row_factory = None  # type: ignore[assignment, method-assign]
         else:
-            self.build_row_factory = None  # type: ignore
+            self.build_row_factory = None  # type: ignore[assignment, method-assign]
         self.rowcount: int | None = -1
         self.arraysize: int = 1
         self.lastrowid: int | None = None
@@ -265,8 +265,8 @@ class Cursor:
             self.rowcount = self._src.ntuples
             self.lastrowid = None
             build_row_factory = self.build_row_factory
-            if build_row_factory:  # type: ignore
-                self.row_factory = build_row_factory()  # type: ignore
+            if build_row_factory:  # type: ignore[truthy-function]
+                self.row_factory = build_row_factory()  # type: ignore[assignment, method-assign]
         else:
             self.rowcount = rowcount
             self.lastrowid = self._src.oidstatus()

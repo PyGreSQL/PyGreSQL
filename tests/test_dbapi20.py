@@ -572,13 +572,13 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 inval = -inf
             elif inval in ('nan', 'NaN'):
                 inval = nan
-            if isinf(inval):  # type: ignore
+            if isinf(inval):  # type: ignore[arg-type]
                 self.assertTrue(isinf(outval))
-                if inval < 0:  # type: ignore
+                if inval < 0:  # type: ignore[operator]
                     self.assertLess(outval, 0)
                 else:
                     self.assertGreater(outval, 0)
-            elif isnan(inval):  # type: ignore
+            elif isnan(inval):  # type: ignore[arg-type]
                 self.assertTrue(isnan(outval))
             else:
                 self.assertEqual(inval, outval)
@@ -599,7 +599,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             # input as objects
             values,
             # input as text
-            [v.isoformat() for v in values],  # type: ignore
+            [v.isoformat() for v in values],  # type: ignore[attr-defined]
             # # input using type helpers
             [pgdb.Date(*da), pgdb.Time(*ti),
              pgdb.Timestamp(*(da + ti)), pgdb.Time(*(ti + tz)),
@@ -833,7 +833,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
 
     def test_custom_type(self):
         values = [3, 5, 65]
-        values = list(map(PgBitString, values))  # type: ignore
+        values = list(map(PgBitString, values))  # type: ignore[arg-type]
         table = self.table_prefix + 'booze'
         con = self._connect()
         try:

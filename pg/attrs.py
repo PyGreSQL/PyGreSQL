@@ -14,8 +14,8 @@ class AttrDict(dict):
         super().__init__(*args, **kw)
         self._read_only = True
         error = self._read_only_error
-        self.clear = self.update = error  # type: ignore
-        self.pop = self.setdefault = self.popitem = error  # type: ignore
+        self.clear = self.update = error  # type: ignore[method-assign]
+        self.pop = self.setdefault = self.popitem = error  # type: ignore[method-assign]
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set a value."""
