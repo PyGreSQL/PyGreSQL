@@ -18,8 +18,8 @@ The following Python versions are supported:
 * PyGreSQL 5.x: Python 2 and Python 3
 * PyGreSQL 6.x and newer: Python 3 only
 
-The current version of PyGreSQL supports Python versions 3.8 to 3.14
-and PostgreSQL versions 12 to 18 on the server.
+The current version of PyGreSQL supports Python versions 3.10 to 3.15
+and PostgreSQL versions 12 to 19 on the server.
 
 Installation
 ------------
