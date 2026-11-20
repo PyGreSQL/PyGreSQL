@@ -63,16 +63,14 @@ class DbType(frozenset):
     def __eq__(self, other: Any) -> bool:
         """Check whether types are considered equal."""
         if isinstance(other, str):
-            if other.startswith('_'):
-                other = other[1:]
+            other = other.removeprefix('_')
             return other in self
         return super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:
         """Check whether types are not considered equal."""
         if isinstance(other, str):
-            if other.startswith('_'):
-                other = other[1:]
+            other = other.removeprefix('_')
             return other not in self
         return super().__ne__(other)
 
