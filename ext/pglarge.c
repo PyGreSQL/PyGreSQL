@@ -81,12 +81,10 @@ large_getattr(largeObject *self, PyObject *nameobj)
     /* associated pg connection object */
     if (!strcmp(name, "pgcnx")) {
         if (_check_lo_obj(self, 0)) {
-            Py_INCREF(self->pgcnx);
-            return (PyObject *)(self->pgcnx);
+            return Py_NewRef(self->pgcnx);
         }
         PyErr_Clear();
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     /* large object oid */
@@ -94,8 +92,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
         if (_check_lo_obj(self, 0))
             return PyLong_FromLong((long)self->lo_oid);
         PyErr_Clear();
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     /* error (status) message */
@@ -148,8 +145,7 @@ large_open(largeObject *self, PyObject *args)
     self->lo_fd = fd;
 
     /* no error : returns Py_None */
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Close large object. */
@@ -172,8 +168,7 @@ large_close(largeObject *self, PyObject *Py_UNUSED(noargs))
     self->lo_fd = -1;
 
     /* no error : returns Py_None */
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Read from large object. */
@@ -253,8 +248,7 @@ large_write(largeObject *self, PyObject *args)
     }
 
     /* no error : returns Py_None */
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Go to position in large object. */
@@ -384,8 +378,7 @@ large_export(largeObject *self, PyObject *args)
         return NULL;
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Delete a large object. */
@@ -408,8 +401,7 @@ large_unlink(largeObject *self, PyObject *Py_UNUSED(noargs))
     }
     self->lo_oid = 0;
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Large object methods */

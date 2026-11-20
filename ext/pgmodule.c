@@ -359,8 +359,7 @@ pg_set_datestyle(PyObject *Py_UNUSED(self), PyObject *args)
 
     date_format = datestyle ? date_style_to_format(datestyle) : NULL;
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Get fixed datestyle. */
@@ -374,8 +373,7 @@ pg_get_datestyle(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
         return PyUnicode_FromString(date_format_to_style(date_format));
     }
     else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -395,8 +393,7 @@ pg_get_decimal_point(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
         ret = PyUnicode_FromString(s);
     }
     else {
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
 
     return ret;
@@ -422,8 +419,7 @@ pg_set_decimal_point(PyObject *Py_UNUSED(self), PyObject *args)
 
     if (s) {
         decimal_point = *s;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(PyExc_TypeError,
@@ -440,12 +436,7 @@ static char pg_get_decimal__doc__[] =
 static PyObject *
 pg_get_decimal(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    PyObject *ret;
-
-    ret = decimal ? decimal : Py_None;
-    Py_INCREF(ret);
-
-    return ret;
+    return Py_NewRef(decimal ? decimal : Py_None);
 }
 
 /* Set decimal type. */
@@ -460,15 +451,13 @@ pg_set_decimal(PyObject *Py_UNUSED(self), PyObject *cls)
     if (cls == Py_None) {
         Py_XDECREF(decimal);
         decimal = NULL;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else if (PyCallable_Check(cls)) {
         Py_XINCREF(cls);
         Py_XDECREF(decimal);
         decimal = cls;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(PyExc_TypeError,
@@ -486,12 +475,7 @@ static char pg_get_bool__doc__[] =
 static PyObject *
 pg_get_bool(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    PyObject *ret;
-
-    ret = bool_as_text ? Py_False : Py_True;
-    Py_INCREF(ret);
-
-    return ret;
+    return PyBool_FromLong(!bool_as_text);
 }
 
 /* Set usage of bool values. */
@@ -507,8 +491,7 @@ pg_set_bool(PyObject *Py_UNUSED(self), PyObject *args)
     /* gets arguments */
     if (PyArg_ParseTuple(args, "i", &i)) {
         bool_as_text = i ? 0 : 1;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(
@@ -526,12 +509,7 @@ static char pg_get_array__doc__[] =
 static PyObject *
 pg_get_array(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    PyObject *ret;
-
-    ret = array_as_text ? Py_False : Py_True;
-    Py_INCREF(ret);
-
-    return ret;
+    return PyBool_FromLong(!array_as_text);
 }
 
 /* Set conversion of arrays to lists. */
@@ -547,8 +525,7 @@ pg_set_array(PyObject *Py_UNUSED(self), PyObject *args)
     /* gets arguments */
     if (PyArg_ParseTuple(args, "i", &i)) {
         array_as_text = i ? 0 : 1;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(
@@ -566,12 +543,7 @@ static char pg_get_bytea_escaped__doc__[] =
 static PyObject *
 pg_get_bytea_escaped(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    PyObject *ret;
-
-    ret = bytea_escaped ? Py_True : Py_False;
-    Py_INCREF(ret);
-
-    return ret;
+    return PyBool_FromLong(bytea_escaped);
 }
 
 /* Set usage of bool values. */
@@ -587,8 +559,7 @@ pg_set_bytea_escaped(PyObject *Py_UNUSED(self), PyObject *args)
     /* gets arguments */
     if (PyArg_ParseTuple(args, "i", &i)) {
         bytea_escaped = i ? 1 : 0;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(PyExc_TypeError,
@@ -614,8 +585,7 @@ pg_set_query_helpers(PyObject *Py_UNUSED(self), PyObject *args)
         return NULL;
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Get json decode function. */
@@ -625,14 +595,7 @@ static char pg_get_jsondecode__doc__[] =
 static PyObject *
 pg_get_jsondecode(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    PyObject *ret;
-
-    ret = jsondecode;
-    if (!ret)
-        ret = Py_None;
-    Py_INCREF(ret);
-
-    return ret;
+    return Py_NewRef(jsondecode ? jsondecode : Py_None);
 }
 
 /* Set json decode function. */
@@ -648,15 +611,13 @@ pg_set_jsondecode(PyObject *Py_UNUSED(self), PyObject *func)
     if (func == Py_None) {
         Py_XDECREF(jsondecode);
         jsondecode = NULL;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else if (PyCallable_Check(func)) {
         Py_XINCREF(func);
         Py_XDECREF(jsondecode);
         jsondecode = func;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(PyExc_TypeError,
@@ -674,8 +635,7 @@ static char pg_get_defhost__doc__[] =
 static PyObject *
 pg_get_defhost(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    Py_XINCREF(pg_default_host);
-    return pg_default_host;
+    return Py_XNewRef(pg_default_host);
 }
 
 /* Set default host. */
@@ -704,8 +664,7 @@ pg_set_defhost(PyObject *Py_UNUSED(self), PyObject *args)
         pg_default_host = PyUnicode_FromString(tmp);
     }
     else {
-        Py_INCREF(Py_None);
-        pg_default_host = Py_None;
+        pg_default_host = Py_NewRef(Py_None);
     }
 
     return old;
@@ -718,8 +677,7 @@ static char pg_get_defbase__doc__[] =
 static PyObject *
 pg_get_defbase(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    Py_XINCREF(pg_default_base);
-    return pg_default_base;
+    return Py_XNewRef(pg_default_base);
 }
 
 /* Set default database. */
@@ -748,8 +706,7 @@ pg_set_defbase(PyObject *Py_UNUSED(self), PyObject *args)
         pg_default_base = PyUnicode_FromString(tmp);
     }
     else {
-        Py_INCREF(Py_None);
-        pg_default_base = Py_None;
+        pg_default_base = Py_NewRef(Py_None);
     }
 
     return old;
@@ -762,8 +719,7 @@ static char pg_get_defopt__doc__[] =
 static PyObject *
 pg_get_defopt(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    Py_XINCREF(pg_default_opt);
-    return pg_default_opt;
+    return Py_XNewRef(pg_default_opt);
 }
 
 /* Set default options. */
@@ -791,8 +747,7 @@ pg_setdefopt(PyObject *Py_UNUSED(self), PyObject *args)
         pg_default_opt = PyUnicode_FromString(tmp);
     }
     else {
-        Py_INCREF(Py_None);
-        pg_default_opt = Py_None;
+        pg_default_opt = Py_NewRef(Py_None);
     }
 
     return old;
@@ -805,8 +760,7 @@ static char pg_get_defuser__doc__[] =
 static PyObject *
 pg_get_defuser(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    Py_XINCREF(pg_default_user);
-    return pg_default_user;
+    return Py_XNewRef(pg_default_user);
 }
 
 /* Set default username. */
@@ -835,8 +789,7 @@ pg_set_defuser(PyObject *Py_UNUSED(self), PyObject *args)
         pg_default_user = PyUnicode_FromString(tmp);
     }
     else {
-        Py_INCREF(Py_None);
-        pg_default_user = Py_None;
+        pg_default_user = Py_NewRef(Py_None);
     }
 
     return old;
@@ -863,12 +816,10 @@ pg_set_defpasswd(PyObject *Py_UNUSED(self), PyObject *args)
         pg_default_passwd = PyUnicode_FromString(tmp);
     }
     else {
-        Py_INCREF(Py_None);
-        pg_default_passwd = Py_None;
+        pg_default_passwd = Py_NewRef(Py_None);
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Get default port. */
@@ -878,8 +829,7 @@ static char pg_get_defport__doc__[] =
 static PyObject *
 pg_get_defport(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    Py_XINCREF(pg_default_port);
-    return pg_default_port;
+    return Py_XNewRef(pg_default_port);
 }
 
 /* Set default port. */
@@ -907,8 +857,7 @@ pg_set_defport(PyObject *Py_UNUSED(self), PyObject *args)
         pg_default_port = PyLong_FromLong(port);
     }
     else {
-        Py_INCREF(Py_None);
-        pg_default_port = Py_None;
+        pg_default_port = Py_NewRef(Py_None);
     }
 
     return old;
@@ -1261,18 +1210,12 @@ PyInit__pg(void)
     PyDict_SetItemString(dict, "SEEK_END", PyLong_FromLong(SEEK_END));
 
     /* Prepare default values */
-    Py_INCREF(Py_None);
-    pg_default_host = Py_None;
-    Py_INCREF(Py_None);
-    pg_default_base = Py_None;
-    Py_INCREF(Py_None);
-    pg_default_opt = Py_None;
-    Py_INCREF(Py_None);
-    pg_default_port = Py_None;
-    Py_INCREF(Py_None);
-    pg_default_user = Py_None;
-    Py_INCREF(Py_None);
-    pg_default_passwd = Py_None;
+    pg_default_host = Py_NewRef(Py_None);
+    pg_default_base = Py_NewRef(Py_None);
+    pg_default_opt = Py_NewRef(Py_None);
+    pg_default_port = Py_NewRef(Py_None);
+    pg_default_user = Py_NewRef(Py_None);
+    pg_default_passwd = Py_NewRef(Py_None);
 
     /* Store common pg encoding ids */
 

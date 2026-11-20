@@ -76,11 +76,9 @@ source_getattr(sourceObject *self, PyObject *nameobj)
     /* pg connection object */
     if (!strcmp(name, "pgcnx")) {
         if (_check_source_obj(self, 0)) {
-            Py_INCREF(self->pgcnx);
-            return (PyObject *)(self->pgcnx);
+            return Py_NewRef(self->pgcnx);
         }
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     /* arraysize */
@@ -142,8 +140,7 @@ source_close(sourceObject *self, PyObject *Py_UNUSED(noargs))
     self->valid = 0;
 
     /* return None */
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Database query. */
@@ -217,8 +214,7 @@ source_execute(sourceObject *self, PyObject *sql)
             self->result_type = RESULT_DQL;
             self->max_row = PQntuples(self->result);
             self->num_fields = PQnfields(self->result);
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         case PGRES_COMMAND_OK: /* other requests */
         case PGRES_COPY_OUT:
         case PGRES_COPY_IN: {
@@ -275,8 +271,7 @@ source_oidstatus(sourceObject *self, PyObject *Py_UNUSED(noargs))
 
     /* retrieves oid status */
     if ((oid = PQoidValue(self->result)) == InvalidOid) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     return PyLong_FromLong((long)oid);
@@ -335,8 +330,7 @@ source_fetch(sourceObject *self, PyObject *args)
             PyObject *str;
 
             if (PQgetisnull(self->result, k, j)) {
-                Py_INCREF(Py_None);
-                str = Py_None;
+                str = Py_NewRef(Py_None);
             }
             else {
                 char *s = PQgetvalue(self->result, k, j);
@@ -392,8 +386,7 @@ _source_move(sourceObject *self, int move)
             break;
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Move to first result row. */
@@ -521,8 +514,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
 
     if (buf) { /* buffer has been sent */
-        ret = Py_None;
-        Py_INCREF(ret);
+        ret = Py_NewRef(Py_None);
     }
     else {                /* copy is done */
         PGresult *result; /* final result of the operation */

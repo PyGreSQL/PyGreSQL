@@ -31,12 +31,10 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
     /* pg connection object */
     if (!strcmp(name, "pgcnx")) {
         if (self->pgcnx && _check_cnx_obj(self->pgcnx)) {
-            Py_INCREF(self->pgcnx);
-            return (PyObject *)self->pgcnx;
+            return Py_NewRef(self->pgcnx);
         }
         else {
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
     }
 
@@ -61,8 +59,7 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
             return PyUnicode_FromString(s);
         }
         else {
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
     }
 

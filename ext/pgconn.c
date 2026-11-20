@@ -104,12 +104,10 @@ conn_getattr(connObject *self, PyObject *nameobj)
     /* whether the connection uses SSL */
     if (!strcmp(name, "ssl_in_use")) {
         if (PQsslInUse(self->cnx)) {
-            Py_INCREF(Py_True);
-            return Py_True;
+            Py_RETURN_TRUE;
         }
         else {
-            Py_INCREF(Py_False);
-            return Py_False;
+            Py_RETURN_FALSE;
         }
     }
 
@@ -187,8 +185,7 @@ _conn_non_query_result(int status, PGresult *result, PGconn *cnx)
                     return obj;
                 }
                 PQclear(result);
-                Py_INCREF(Py_None);
-                return Py_None;
+                Py_RETURN_NONE;
             }
             /* for a single insert, return the oid */
             PQclear(result);
@@ -197,8 +194,7 @@ _conn_non_query_result(int status, PGresult *result, PGconn *cnx)
         case PGRES_COPY_OUT: /* no data will be received */
         case PGRES_COPY_IN:
             PQclear(result);
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         default:
             set_error_msg(InternalError, "Unknown result status");
     }
@@ -491,8 +487,7 @@ conn_prepare(connObject *self, PyObject *args)
     Py_END_ALLOW_THREADS
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
         PQclear(result);
-        Py_INCREF(Py_None);
-        return Py_None; /* success */
+        Py_RETURN_NONE; /* success */
     }
     set_error(ProgrammingError, "Cannot create prepared statement", self->cnx,
               result);
@@ -589,8 +584,7 @@ conn_putline(connObject *self, PyObject *args)
                 : "Line cannot be queued, wait for write-ready and try again");
         return NULL;
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Direct access function: getline. */
@@ -618,8 +612,7 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
             PQfreemem(line);
         if (ret == -1) {
             PQgetResult(self->cnx);
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
         PyErr_SetString(
             PyExc_MemoryError,
@@ -629,8 +622,7 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
         return NULL;
     }
     if (line == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     /* for backward compatibility, convert terminating newline to zero byte */
     if (*line)
@@ -663,8 +655,7 @@ conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
                                     " wait for write-ready and try again");
         return NULL;
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Direct access function: set blocking status. */
@@ -692,8 +683,7 @@ conn_set_non_blocking(connObject *self, PyObject *args)
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
         return NULL;
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Direct access function: get blocking status. */
@@ -765,8 +755,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     if (!m) {
         /* no rows specified, nothing to do */
         Py_DECREF(iter_row);
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     /* checks columns type */
@@ -782,8 +771,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         if (!n) {
             /* no columns specified, nothing to do */
             Py_DECREF(iter_row);
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
     }
     else {
@@ -1147,8 +1135,7 @@ conn_parameter(connObject *self, PyObject *args)
         return PyUnicode_FromString(name);
 
     /* unknown parameter, return None */
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Get current date format. */
@@ -1493,8 +1480,7 @@ conn_reset(connObject *self, PyObject *Py_UNUSED(noargs))
 
     /* resets the connection */
     PQreset(self->cnx);
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Cancel current command. */
@@ -1540,15 +1526,13 @@ conn_set_cast_hook(connObject *self, PyObject *func)
     if (func == Py_None) {
         Py_XDECREF(self->cast_hook);
         self->cast_hook = NULL;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else if (PyCallable_Check(func)) {
         Py_XINCREF(func);
         Py_XDECREF(self->cast_hook);
         self->cast_hook = func;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(PyExc_TypeError,
@@ -1567,13 +1551,8 @@ static PyObject *
 conn_get_cast_hook(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret = self->cast_hook;
-    ;
 
-    if (!ret)
-        ret = Py_None;
-    Py_INCREF(ret);
-
-    return ret;
+    return Py_NewRef(ret ? ret : Py_None);
 }
 
 /* Get asynchronous connection state. */
@@ -1614,16 +1593,14 @@ conn_set_notice_receiver(connObject *self, PyObject *func)
     if (func == Py_None) {
         Py_XDECREF(self->notice_receiver);
         self->notice_receiver = NULL;
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else if (PyCallable_Check(func)) {
         Py_XINCREF(func);
         Py_XDECREF(self->notice_receiver);
         self->notice_receiver = func;
         PQsetNoticeReceiver(self->cnx, notice_receiver, self);
-        Py_INCREF(Py_None);
-        ret = Py_None;
+        ret = Py_NewRef(Py_None);
     }
     else {
         PyErr_SetString(PyExc_TypeError,
@@ -1643,11 +1620,7 @@ conn_get_notice_receiver(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret = self->notice_receiver;
 
-    if (!ret)
-        ret = Py_None;
-    Py_INCREF(ret);
-
-    return ret;
+    return Py_NewRef(ret ? ret : Py_None);
 }
 
 /* Close without deleting. */
@@ -1670,8 +1643,7 @@ conn_close(connObject *self, PyObject *Py_UNUSED(noargs))
     Py_END_ALLOW_THREADS
 
     self->cnx = NULL;
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /* Get asynchronous notify. */
@@ -1692,8 +1664,7 @@ conn_get_notify(connObject *self, PyObject *Py_UNUSED(noargs))
     PQconsumeInput(self->cnx);
 
     if (!(notify = PQnotifies(self->cnx))) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     else {
         PyObject *notify_result, *tmp;

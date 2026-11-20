@@ -363,8 +363,7 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
                 obj = PyUnicode_FromString(*s == 't' ? "t" : "f");
             }
             else {
-                obj = *s == 't' ? Py_True : Py_False;
-                Py_INCREF(obj);
+                obj = PyBool_FromLong(*s == 't');
             }
             break;
 
@@ -433,8 +432,7 @@ cast_unsized_simple(char *s, int type)
                 obj = PyUnicode_FromString(*s == 't' ? "t" : "f");
             }
             else {
-                obj = *s == 't' ? Py_True : Py_False;
-                Py_INCREF(obj);
+                obj = PyBool_FromLong(*s == 't');
             }
             break;
 
@@ -668,8 +666,7 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
                 }
             }
             else {
-                Py_INCREF(Py_None);
-                element = Py_None;
+                element = Py_NewRef(Py_None);
             }
             if (PyList_Append(result, element)) {
                 Py_DECREF(element);
@@ -756,8 +753,7 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
         PyObject *element;
 
         if (*s == ')' || *s == delim) {
-            Py_INCREF(Py_None);
-            element = Py_None;
+            element = Py_NewRef(Py_None);
         }
         else {
             char *estr;
@@ -1068,8 +1064,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             }
         }
         else {
-            Py_INCREF(Py_None);
-            val_obj = Py_None;
+            val_obj = Py_NewRef(Py_None);
         }
         if (quoted)
             ++s;
@@ -1183,8 +1178,7 @@ set_error_msg_and_state(PyObject *type, const char *msg, int encoding,
         sql_obj = PyUnicode_FromStringAndSize(sqlstate, 5);
     }
     else {
-        Py_INCREF(Py_None);
-        sql_obj = Py_None;
+        sql_obj = Py_NewRef(Py_None);
     }
 
     err_obj = PyObject_CallFunctionObjArgs(type, msg_obj, NULL);
