@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import namedtuple
 from collections.abc import (
     Callable,
     Generator,
@@ -14,7 +13,7 @@ from collections.abc import (
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from math import isinf, isnan
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID as Uuid  # noqa: N811
 
 from pg.core import (
@@ -651,6 +650,13 @@ class Cursor:
         return RowCache.row_factory(tuple(names)) if names else None
 
 
-CursorDescription = namedtuple('CursorDescription', (
-    'name', 'type_code', 'display_size', 'internal_size',
-    'precision', 'scale', 'null_ok'))
+class CursorDescription(NamedTuple):
+    """Description of a result column as specified by the DB-API 2."""
+
+    name: str
+    type_code: TypeCode
+    display_size: int | None
+    internal_size: int
+    precision: int | None
+    scale: int | None
+    null_ok: bool | None

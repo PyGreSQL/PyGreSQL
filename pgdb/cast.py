@@ -10,7 +10,7 @@ from functools import partial
 from inspect import signature
 from json import loads as jsondecode
 from re import compile as regex
-from typing import Any, ClassVar
+from typing import Any, ClassVar, NamedTuple
 from uuid import UUID as Uuid  # noqa: N811
 
 from pg.core import Connection as Cnx
@@ -483,7 +483,11 @@ class LocalTypecasts(Typecasts):
         return []
 
 
-FieldInfo = namedtuple('FieldInfo', ('name', 'type'))
+class FieldInfo(NamedTuple):
+    """Name and type of a field of a composite type."""
+
+    name: str
+    type: TypeCode | None
 
 
 class TypeCache(dict):
