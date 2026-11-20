@@ -121,15 +121,10 @@ class DB:
             " WHERE a.attrelid OPERATOR(pg_catalog.=)"
             " {}::pg_catalog.regclass"
             " AND {} AND NOT a.attisdropped ORDER BY a.attnum")
-        if db.server_version < 120000:
-            self._query_generated = (
-                "a.attidentity OPERATOR(pg_catalog.=) 'a'"
-            )
-        else:
-            self._query_generated = (
-                "(a.attidentity OPERATOR(pg_catalog.=) 'a' OR"
-                " a.attgenerated OPERATOR(pg_catalog.!=) '')"
-            )
+        self._query_generated = (
+            "(a.attidentity OPERATOR(pg_catalog.=) 'a' OR"
+            " a.attgenerated OPERATOR(pg_catalog.!=) '')"
+        )
         db.set_cast_hook(self.dbtypes.typecast)
         # For debugging scripts, self.debug can be set
         # * to a string format specification (e.g. in CGI set to "%s<BR>"),
