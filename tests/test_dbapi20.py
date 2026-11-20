@@ -165,7 +165,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 description = self.description
                 assert isinstance(description, list)
                 return {f'column {desc[0]}': value
-                        for desc, value in zip(description, row)}
+                        for desc, value in zip(description, row, strict=True)}
 
         con = self._connect()
         con.cursor_type = TestCursor
@@ -195,7 +195,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 assert isinstance(description, list)
                 keys = [desc[0] for desc in description]
                 return lambda row: {
-                    key: value for key, value in zip(keys, row)}
+                    key: value for key, value in zip(keys, row, strict=True)}
 
         con = self._connect()
         con.cursor_type = TestCursor
@@ -565,7 +565,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             con.close()
         self.assertEqual(len(rows), len(values))
         rows = [row[0] for row in rows]
-        for inval, outval in zip(values, rows):
+        for inval, outval in zip(values, rows, strict=True):
             if inval in ('inf', 'Infinity'):
                 inval = inf
             elif inval in ('-inf', '-Infinity'):

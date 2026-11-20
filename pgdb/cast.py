@@ -590,6 +590,6 @@ class TypeCache(dict):
 
         def row_caster(row: Sequence) -> Sequence:
             return [value if cast is None or value is None else cast(value)
-                    for cast, value in zip(casts, row)]
+                    for cast, value in zip(casts, row, strict=True)]
 
         return row_caster

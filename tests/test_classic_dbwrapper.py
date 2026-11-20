@@ -2839,7 +2839,7 @@ class TestDBClass(unittest.TestCase):
         r = get_as_list(table)
         self.assertIsInstance(r, list)
         self.assertEqual(r, names)
-        for t, n in zip(r, names):
+        for t, n in zip(r, names, strict=True):
             self.assertIsInstance(t, tuple)
             self.assertEqual(t, n)
             if named:
