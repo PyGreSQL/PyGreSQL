@@ -5,7 +5,19 @@
 You can build the PyGreSQL distribution like this:
 
     pip install build
-    python -m build -C strict -C memory-size
+    python -m build
+
+For development, you can build the C extension in place like this:
+
+    python setup.py build_ext --inplace --strict --pedantic
+
+The custom build_ext options are --strict (treat compiler warnings as
+errors), --pedantic (enable extra compiler warnings) and --memory-size
+or --no-memory-size (enabled by default if supported). Note that build
+frontends do not pass these options through as simple config settings.
+You need to pass them as build options instead, like this:
+
+    python -m build -C--build-option=build_ext -C--build-option=--strict
 """
 
 import os
@@ -82,11 +94,12 @@ class BuildPgExt(build_ext):
 
     user_options = [*build_ext.user_options,  # noqa: RUF012
         ('strict', None, "count all compiler warnings as errors"),
+        ('pedantic', None, "enable extra compiler warnings"),
         ('memory-size', None, "enable memory size function"),
         ('no-memory-size', None, "disable memory size function")]
 
     boolean_options = [*build_ext.boolean_options,  # noqa: RUF012
-        'strict', 'memory-size']
+        'strict', 'pedantic', 'memory-size']
 
     negative_opt = {  # noqa: RUF012
         'no-memory-size': 'memory-size'}
@@ -95,6 +108,7 @@ class BuildPgExt(build_ext):
         """Initialize the supported options with default values."""
         super().initialize_options()
         self.strict = False
+        self.pedantic = False
         self.memory_size = None
         supported = pg_version >= min_pg_version
         if not supported:
@@ -109,6 +123,8 @@ class BuildPgExt(build_ext):
         on the compiler version which is not yet known at this point.
         """
         super().finalize_options()
+        if self.pedantic:
+            extra_compile_args.extend(['-Wextra', '-pedantic'])
         if self.strict:
             extra_compile_args.append('-Werror')
         wanted = self.memory_size
