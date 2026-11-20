@@ -31,6 +31,8 @@ Version 6.3.0 (unreleased)
   - After a COPY with `putdata()` or `getdata()`, the connection is now idle
     again, so that `send_query()` can be used without running another query
     first. It previously failed with "another command is already in progress".
+    If the query has more statements after the COPY, an error in these is now
+    reported, and a further COPY can be run with `putdata()` or `getdata()`.
 
 - Modernization and build:
 

@@ -2429,6 +2429,38 @@ class TestCopyData(unittest.TestCase):
             self.assertEqual(query.getresult(), [(1,)])
             self.assertIsNone(query.getresult())
 
+    def test_putdata_with_failing_statement_after_copy(self):
+        source = self.source
+        source.execute("copy test_copy from stdin; select 1/0")
+        self.assertIsNone(source.putdata(b'1\n'))
+        with self.assertRaises(OSError) as cm:
+            source.putdata(None)
+        self.assertIn('division by zero', str(cm.exception))
+        # the failing statement has also rolled back the copy
+        self.assertEqual(self.get_table(), [])
+
+    def test_getdata_with_failing_statement_after_copy(self):
+        source = self.source
+        source.execute("copy (select 1) to stdout; select 1/0")
+        self.assertEqual(source.getdata(), b'1\n')
+        with self.assertRaises(OSError) as cm:
+            source.getdata()
+        self.assertIn('division by zero', str(cm.exception))
+
+    def test_multiple_copy_operations(self):
+        source = self.source
+        source.execute("copy test_copy from stdin;"
+                       " copy test_copy to stdout; copy test_copy from stdin")
+        self.assertIsNone(source.putdata(b'1\n'))
+        self.assertEqual(source.putdata(None), 1)
+        self.assertEqual(source.getdata(), b'1\n')
+        self.assertEqual(source.getdata(), 1)
+        self.assertIsNone(source.putdata(b'2\n'))
+        self.assertEqual(source.putdata(None), 1)
+        self.assertRaises(OSError, source.putdata, None)
+        self.assertEqual(self.c.transaction(), pg.TRANS_IDLE)
+        self.assertEqual(self.get_table(), [(1,), (2,)])
+
     def test_putdata_memory_leak(self):
         self.assert_no_memory_leak(self.copy_from)
 

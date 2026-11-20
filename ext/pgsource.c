@@ -430,12 +430,18 @@ source_moveprev(sourceObject *self, PyObject *Py_UNUSED(noargs))
 
 /* Get the final result of a copy operation (internal use only).
    Returns the number of rows or NULL with an IOError, using errormsg
-   as the error message if it is not NULL. */
+   as the error message if it is not NULL. Also consumes the results of
+   the remaining statements of the query, so that the connection becomes
+   idle again. If the query continues with another copy operation, this
+   becomes the current result, so that it can be run with putdata() or
+   getdata() as well. */
 static PyObject *
 _source_end_copy(sourceObject *self, const char *errormsg)
 {
     PGconn *cnx = self->pgcnx->cnx;
     PGresult *result;
+    PGresult *error = NULL;     /* first error of a remaining statement */
+    PGresult *next_copy = NULL; /* the next copy operation, if any */
     PyObject *ret;
 
     Py_BEGIN_ALLOW_THREADS;
@@ -454,22 +460,37 @@ _source_end_copy(sourceObject *self, const char *errormsg)
     }
     PQclear(result);
 
-    /* consume the remaining results, so that the connection becomes idle
-       and can be used with PQsendQuery() again */
+    /* consume the results of the remaining statements, up to the next
+       copy operation, since PQgetResult() would return this repeatedly */
     Py_BEGIN_ALLOW_THREADS;
-    while ((result = PQgetResult(cnx))) {
+    while (!next_copy && (result = PQgetResult(cnx))) {
         ExecStatusType status = PQresultStatus(result);
 
-        PQclear(result);
         if (status == PGRES_COPY_IN || status == PGRES_COPY_OUT ||
             status == PGRES_COPY_BOTH)
-            break; /* still copying, the same result would be returned */
+            next_copy = result;
+        else if (!error &&
+                 (status == PGRES_FATAL_ERROR || status == PGRES_BAD_RESPONSE))
+            error = result;
+        else
+            PQclear(result);
     }
     Py_END_ALLOW_THREADS;
 
+    if (error) {
+        /* a remaining statement failed, which usually also rolled back
+           the copy, so report the error instead of the row count */
+        if (ret) {
+            Py_DECREF(ret);
+            PyErr_SetString(PyExc_IOError, PQresultErrorMessage(error));
+            ret = NULL;
+        }
+        PQclear(error);
+    }
+
     PQclear(self->result);
-    self->result = NULL;
-    self->result_type = RESULT_EMPTY;
+    self->result = next_copy;
+    self->result_type = next_copy ? RESULT_DDL : RESULT_EMPTY;
 
     return ret;
 }
