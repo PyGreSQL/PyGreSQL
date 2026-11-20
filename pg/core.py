@@ -10,7 +10,7 @@ except ImportError as e:  # noqa: F841
         paths = [path for path in os.environ["PATH"].split(os.pathsep)
                  if os.path.exists(os.path.join(path, libpq))]
         # see https://docs.python.org/3/whatsnew/3.8.html#ctypes
-        add_dll_dir = os.add_dll_directory  # type: ignore
+        add_dll_dir = os.add_dll_directory  # type: ignore[attr-defined]
         for path in paths:
             with add_dll_dir(os.path.abspath(path)):
                 try:
@@ -19,7 +19,7 @@ except ImportError as e:  # noqa: F841
                     pass
                 else:
                     del version
-                    e = None  # type: ignore
+                    e = None  # type: ignore[assignment]
                     break
         if paths:
             libpq = 'compatible ' + libpq

@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from contextlib import suppress
 from os import environ
 
 # We need a database to test against.
@@ -23,9 +24,7 @@ dbuser = get('PYGRESQL_USER', get('PGUSER'))
 dbpasswd = get('PYGRESQL_PASSWD', get('PGPASSWORD'))
 
 try:
-    from .LOCAL_PyGreSQL import *  # type: ignore  # noqa
+    from .LOCAL_PyGreSQL import *  # type: ignore[import-not-found]  # noqa: F403
 except (ImportError, ValueError):
-    try:  # noqa
-        from LOCAL_PyGreSQL import *  # type: ignore  # noqa
-    except ImportError:
-        pass
+    with suppress(ImportError):
+        from LOCAL_PyGreSQL import *  # type: ignore[import-not-found]  # noqa: F403

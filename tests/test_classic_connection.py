@@ -573,7 +573,7 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertEqual(v._fields, ('snake_case_alias', 'CamelCaseAlias'))
 
     def test_namedresult_with_bad_fieldnames(self):
-        t = namedtuple('Bad', ['?'] * 6, rename=True)  # type: ignore
+        t = namedtuple('Bad', ['?'] * 6, rename=True)  # type: ignore[misc]
         # noinspection PyUnresolvedReferences
         fields = t._fields
         q = ('select 3 as "0alias", 4 as _alias, 5 as "alias$", 6 as "alias?",'
