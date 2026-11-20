@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from collections.abc import Callable, Sequence
 from datetime import date, datetime, timedelta
 from functools import partial
 from inspect import signature
 from re import compile as regex
-from typing import Any, Callable, ClassVar, Sequence
+from typing import Any, ClassVar
 from uuid import UUID
 
 from .attrs import AttrDict

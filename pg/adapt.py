@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import weakref
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from json import dumps as jsonencode
 from math import isinf, isnan
 from re import compile as regex
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Callable, List, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, List  # noqa: UP035
 from uuid import UUID
 
 from .attrs import AttrDict
@@ -112,7 +113,10 @@ class _SimpleTypes(dict):
                 if isinstance(key, str):
                     self[f'_{key}'] = f'{typ}[]'
                 elif not isinstance(key, tuple):
-                    self[List[key]] = f'{typ}[]'  # type: ignore
+                    # support builtin and legacy typing generics
+                    array = f'{typ}[]'
+                    self[list[key]] = array  # type: ignore
+                    self[List[key]] = array  # type: ignore  # noqa: UP006
 
     @staticmethod
     def __missing__(key: str) -> str:
@@ -650,8 +654,9 @@ class Adapter:
                     if (not isinstance(types, (list, tuple))
                             or len(types) != len(values)):
                         raise TypeError('The values and types do not match')
-                    seq_literals = [add(value, typ)
-                                    for value, typ in zip(values, types)]
+                    seq_literals = [
+                        add(value, typ)
+                        for value, typ in zip(values, types)]
                 else:
                     seq_literals = [add(value) for value in values]
             command %= tuple(seq_literals)

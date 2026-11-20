@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from contextlib import suppress
-from typing import Any, Sequence
+from typing import Any
 
 from pg.core import Connection as Cnx
 from pg.core import (

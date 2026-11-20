@@ -17,10 +17,10 @@ import threading
 import time
 import unittest
 from collections import namedtuple
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from contextlib import suppress
 from decimal import Decimal
-from typing import Any, Sequence
+from typing import Any
 
 import pg  # the module under test
 

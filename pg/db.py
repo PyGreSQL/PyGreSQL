@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import suppress
 from json import dumps as jsonencode
 from json import loads as jsondecode
@@ -9,9 +10,6 @@ from operator import itemgetter
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Iterator,
-    Sequence,
     TypeVar,
     overload,
 )
@@ -35,10 +33,7 @@ from .notify import NotificationHandler
 if TYPE_CHECKING:
     from pgdb.connection import Connection as DbApi2Connection
 
-try:
-    AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
-except TypeError:  # Python < 3.10
-    AnyStr = Any  # type: ignore
+AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
 
 __all__ = ['DB']
 
