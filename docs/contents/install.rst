@@ -14,7 +14,7 @@ On Windows, you also need to make sure that the directory that contains
 ``libpq.dll`` is part of your ``PATH`` environment variable.
 
 The current version of PyGreSQL has been tested with Python versions
-3.8 to 3.14, and PostgreSQL versions 12 to 18.
+3.10 to 3.15, and PostgreSQL versions 12 to 19.
 
 PyGreSQL will be installed as two packages named ``pg`` (for the classic
 interface) and ``pgdb`` (for the DB API 2 compliant interface). The former
@@ -74,33 +74,34 @@ If you are using a precompiled PostgreSQL, you will also need the pg_config
 tool. This is usually also part of the "devel" package on Unix, and will be
 installed as part of the database server feature on Windows systems.
 
-Building and installing with Distutils
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can build and install PyGreSQL using
-`Distutils <http://docs.python.org/install/>`_.
+Building and installing with pip
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Download and unpack the PyGreSQL source tarball if you haven't already done so.
+Then run the following command in the directory containing the sources in
+order to build and install PyGreSQL::
 
-Type the following commands to build and install PyGreSQL::
-
-    python setup.py install
+    pip install .
 
 Now you should be ready to use PyGreSQL.
 
-You can also run the build step separately if you want to create a distribution
-to be installed on a different system or explicitly enable or disable certain
-features. For instance, in order to build PyGreSQL without support for the
-memory size functions, run::
+You can also build a wheel first if you want to install it on a different
+system. The wheel will be created in the ``dist`` directory::
 
-    python setup.py build_ext --no-memory-size
+    pip install build
+    python -m build --wheel
 
 By default, PyGreSQL is compiled with support for all features available in the
 installed PostgreSQL version, and you will get warnings for the features that
-are not supported in this version. You can also explicitly require a feature in
-order to get an error if it is not available, for instance:
+are not supported in this version. You can also explicitly enable or disable
+certain features by passing options to the ``build_ext`` command. For instance,
+in order to build PyGreSQL without support for the memory size functions, run::
 
-    python setup.py build_ext --memory-size
+    pip install . -C--build-option=build_ext -C--build-option=--no-memory-size
+
+The same options can be passed to ``python -m build``. Note that pip may reuse
+a wheel that it has built and cached before. Add the ``--no-cache-dir`` option
+to make sure that the build options are applied.
 
 You can find out all possible build options with::
 
@@ -117,98 +118,43 @@ which will prevent Python from loading it.
 Compiling Manually
 ~~~~~~~~~~~~~~~~~~
 
-The source file for compiling the C extension module is pgmodule.c.
-You have two options. You can compile PyGreSQL as a stand-alone module
-or you can build it into the Python interpreter.
+The source files for the C extension module are in the ``ext`` directory.
+If you cannot or do not want to use pip, you can also compile the C extension
+manually. In the directory containing the PyGreSQL sources, run something
+like the following command::
 
-Stand-Alone
-^^^^^^^^^^^
+    cc -fpic -shared -o pg/_pg$EXT_SUFFIX -DPYGRESQL_VERSION=$VERSION \
+        -I$PYINC -I$PGINC ext/*.c -L$PGLIB -lpq
 
-* In the directory containing ``pgmodule.c``, run the following command::
+where you have to set::
 
-    cc -fpic -shared -o _pg.so -I$PYINC -I$PGINC -I$PSINC -L$PGLIB -lpq pgmodule.c
-
-  where you have to set::
-
+    EXT_SUFFIX = file name suffix for Python extension modules
+                 (something like .cpython-313-x86_64-linux-gnu.so)
+    VERSION = the version of PyGreSQL (something like 6.3.0)
     PYINC = path to the Python include files
-            (usually something like /usr/include/python)
     PGINC = path to the PostgreSQL client include files
-            (something like /usr/include/pgsql or /usr/include/postgresql)
-    PSINC = path to the PostgreSQL server include files
-            (like /usr/include/pgsql/server or /usr/include/postgresql/server)
-    PGLIB = path to the PostgreSQL object code libraries (usually /usr/lib)
+    PGLIB = path to the PostgreSQL client library
 
-  If you are not sure about the above paths, try something like::
+You can get these values for your system like this::
 
-    PYINC=`find /usr -name Python.h`
-    PGINC=`find /usr -name libpq-fe.h`
-    PSINC=`find /usr -name postgres.h`
-    PGLIB=`find /usr -name libpq.so`
-
-  If you have the ``pg_config`` tool installed, you can set::
-
+    EXT_SUFFIX=`python -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))"`
+    PYINC=`python -c "import sysconfig; print(sysconfig.get_path('include'))"`
     PGINC=`pg_config --includedir`
-    PSINC=`pg_config --includedir-server`
     PGLIB=`pg_config --libdir`
 
-  Some options may be added to this line::
+Some options may be added to the command::
 
-    -DMEMORY_SIZE = support memory size function (PostgreSQL 12 or newer)
+    -DMEMORY_SIZE = support memory size function
 
-  On some systems you may need to include ``-lcrypt`` in the list of libraries
-  to make it compile.
-
-* Test the new module. Something like the following should work::
+Now test the new module. Something like the following should work::
 
     $ python
 
-    >>> import _pg
-    >>> db = _pg.connect('thilo','localhost')
-    >>> db.query("INSERT INTO test VALUES ('ping','pong')")
-    18304
-    >>> db.query("SELECT * FROM test")
-    eins|zwei
-    ----+----
-    ping|pong
-    (1 row)
+    >>> import pg
+    >>> db = pg.DB('testdb', 'localhost')
+    >>> db.query("SELECT 'pong' AS ping").getresult()
+    [('pong',)]
 
-* Finally, move the ``_pg.so``, ``pg.py``, and ``pgdb.py`` to a directory in
-  your ``PYTHONPATH``. A good place would be ``/usr/lib/python/site-packages``
-  if your Python modules are in ``/usr/lib/python``.
-
-Built-in to Python interpreter
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Find the directory where your ``Setup`` file lives (usually in the ``Modules``
-  subdirectory) in the Python source hierarchy and copy or symlink the
-  ``pgmodule.c`` file there.
-
-* Add the following line to your 'Setup' file::
-
-    _pg  pgmodule.c -I$PGINC -I$PSINC -L$PGLIB -lpq
-
-  where::
-
-    PGINC = path to the PostgreSQL client include files (see above)
-    PSINC = path to the PostgreSQL server include files (see above)
-    PGLIB = path to the PostgreSQL object code libraries (see above)
-
-  Some options may be added to this line::
-
-    -DMEMORY_SIZE = support memory size function (PostgreSQL 12 or newer)
-
-  On some systems you may need to include ``-lcrypt`` in the list of libraries
-  to make it compile.
-
-* If you want a shared module, make sure that the ``shared`` keyword is
-  uncommented and add the above line below it. You used to need to install
-  your shared modules with ``make sharedinstall`` but this no longer seems
-  to be true.
-
-* Copy ``pg.py`` to the lib directory where the rest of your modules are.
-  For example, that's ``/usr/local/lib/Python`` on my system.
-
-* Rebuild Python from the root directory of the Python source hierarchy by
-  running ``make -f Makefile.pre.in boot`` and ``make && make install``.
-
-* For more details read the documentation at the top of ``Makefile.pre.in``.
+Finally, copy the ``pg`` and ``pgdb`` directories to a directory in your
+``PYTHONPATH``, for instance to the ``site-packages`` directory of your
+Python installation.

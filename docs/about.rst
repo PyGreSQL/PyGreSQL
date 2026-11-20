@@ -39,6 +39,7 @@ on the PyGres95 code written by Pascal Andre (andre@chimay.via.ecp.fr).
 D'Arcy (darcy@druid.net) renamed it to PyGreSQL starting with
 version 2.0 and serves as the "BDFL" of PyGreSQL.
 
-The current version PyGreSQL |version| needs PostgreSQL 12 to 18, and Python
-3.8 to 3.14. If you need to support older PostgreSQL or Python versions,
-you can resort to the PyGreSQL 5.x versions that still support them.
+The current version PyGreSQL |version| needs PostgreSQL 12 to 19, and Python
+3.10 to 3.15. If you need to support Python 3.8 or 3.9, you can resort to
+PyGreSQL 6.2.x. For older PostgreSQL or Python versions, you can resort to
+the PyGreSQL 5.x versions that still support them.
