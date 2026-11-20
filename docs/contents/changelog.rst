@@ -1,6 +1,29 @@
 ChangeLog
 =========
 
+Version 6.3.0 (unreleased)
+--------------------------
+- Added support for Python 3.15 and PostgreSQL 19.
+- Removed support for Python versions older than 3.10 (released October 2021).
+  PostgreSQL 12 or newer is still supported.
+- Modernized the code base using the features of Python 3.10, such as
+  structural pattern matching and the newer type annotation syntax.
+- Python types passed to `format_query()` can now also be builtin generic
+  types like `list[int]`, not only generic types like `List[int]`.
+- The `set_parameter()` and `truncate()` methods of the `pg.DB` object now
+  raise a `ValueError` if they get lists of different lengths. Previously,
+  the extra items were silently ignored.
+- The items of `Cursor.description` and the fields of composite types
+  returned by `TypeCache.get_fields()` in `pgdb` are now typed named tuples.
+- The C extension has been modernized using the Python 3.10 C API. It now
+  checks for all errors during initialization and compiles without warnings
+  even with extra warnings enabled (new build option `--pedantic`).
+  Added tests for the reference counting in the C extension.
+- All project metadata is now defined in `pyproject.toml`, and building
+  PyGreSQL requires setuptools 77 or newer. The installation instructions
+  have been updated accordingly.
+- This version was developed with the help of Claude Code.
+
 Version 6.2.3 (2026-01-25)
 --------------------------
 - Minor improvements and fixes (thanks to Justin Pryzby):
