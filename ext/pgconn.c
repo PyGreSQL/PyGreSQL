@@ -137,7 +137,7 @@ static char conn_source__doc__[] =
     "source() -- create a new source object for this connection";
 
 static PyObject *
-conn_source(connObject *self, PyObject *noargs)
+conn_source(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     sourceObject *source_obj;
 
@@ -598,7 +598,7 @@ static char conn_getline__doc__[] =
     "getline() -- get a line directly from the backend";
 
 static PyObject *
-conn_getline(connObject *self, PyObject *noargs)
+conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     char *line = NULL;
     PyObject *str = NULL;
@@ -645,7 +645,7 @@ static char conn_endcopy__doc__[] =
     "endcopy() -- synchronize client and server";
 
 static PyObject *
-conn_endcopy(connObject *self, PyObject *noargs)
+conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     int ret;
 
@@ -701,7 +701,7 @@ static char conn_is_non_blocking__doc__[] =
     "is_non_blocking() -- report the blocking status of the connection";
 
 static PyObject *
-conn_is_non_blocking(connObject *self, PyObject *noargs)
+conn_is_non_blocking(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     int rc;
 
@@ -1110,7 +1110,7 @@ static char conn_transaction__doc__[] =
     "transaction() -- return the current transaction status";
 
 static PyObject *
-conn_transaction(connObject *self, PyObject *noargs)
+conn_transaction(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1156,7 +1156,7 @@ static char conn_date_format__doc__[] =
     "date_format() -- return the current date format";
 
 static PyObject *
-conn_date_format(connObject *self, PyObject *noargs)
+conn_date_format(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     const char *fmt;
 
@@ -1484,7 +1484,7 @@ static char conn_reset__doc__[] =
     "will not be usable after this call.\n";
 
 static PyObject *
-conn_reset(connObject *self, PyObject *noargs)
+conn_reset(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1502,7 +1502,7 @@ static char conn_cancel__doc__[] =
     "cancel() -- abandon processing of the current command";
 
 static PyObject *
-conn_cancel(connObject *self, PyObject *noargs)
+conn_cancel(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1518,7 +1518,7 @@ static char conn_fileno__doc__[] =
     "fileno() -- return database connection socket file handle";
 
 static PyObject *
-conn_fileno(connObject *self, PyObject *noargs)
+conn_fileno(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1564,7 +1564,7 @@ static char conn_get_cast_hook__doc__[] =
     "get_cast_hook() -- get the fallback typecast function";
 
 static PyObject *
-conn_get_cast_hook(connObject *self, PyObject *noargs)
+conn_get_cast_hook(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret = self->cast_hook;
     ;
@@ -1581,7 +1581,7 @@ static char conn_poll__doc__[] =
     "poll() -- Completes an asynchronous connection";
 
 static PyObject *
-conn_poll(connObject *self, PyObject *noargs)
+conn_poll(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     int rc;
 
@@ -1639,7 +1639,7 @@ static char conn_get_notice_receiver__doc__[] =
     "get_notice_receiver() -- get the current notice receiver";
 
 static PyObject *
-conn_get_notice_receiver(connObject *self, PyObject *noargs)
+conn_get_notice_receiver(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret = self->notice_receiver;
 
@@ -1657,7 +1657,7 @@ static char conn_close__doc__[] =
     "(queries and large objects) can no longer be used after this call.\n";
 
 static PyObject *
-conn_close(connObject *self, PyObject *noargs)
+conn_close(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     /* connection object cannot already be closed */
     if (!self->cnx) {
@@ -1679,7 +1679,7 @@ static char conn_get_notify__doc__[] =
     "getnotify() -- get database notify for this connection";
 
 static PyObject *
-conn_get_notify(connObject *self, PyObject *noargs)
+conn_get_notify(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     PGnotify *notify;
 
@@ -1731,7 +1731,7 @@ conn_get_notify(connObject *self, PyObject *noargs)
 
 /* Get the list of connection attributes. */
 static PyObject *
-conn_dir(connObject *self, PyObject *noargs)
+conn_dir(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *attrs;
 
@@ -1772,7 +1772,7 @@ static struct PyMethodDef conn_methods[] = {
      conn_set_notice_receiver__doc__},
     {"getnotify", (PyCFunction)conn_get_notify, METH_NOARGS,
      conn_get_notify__doc__},
-    {"inserttable", (PyCFunction)conn_inserttable,
+    {"inserttable", (PyCFunction)(void (*)(void))conn_inserttable,
      METH_VARARGS | METH_KEYWORDS, conn_inserttable__doc__},
     {"transaction", (PyCFunction)conn_transaction, METH_NOARGS,
      conn_transaction__doc__},
@@ -1804,38 +1804,19 @@ static struct PyMethodDef conn_methods[] = {
     {"loimport", (PyCFunction)conn_loimport, METH_VARARGS,
      conn_loimport__doc__},
 
-    {NULL, NULL} /* sentinel */
+    {NULL, NULL, 0, NULL} /* sentinel */
 };
 
 static char conn__doc__[] = "PostgreSQL connection object";
 
 /* Connection type definition */
 PyTypeObject connType = {
-    PyVarObject_HEAD_INIT(NULL, 0) "pg.Connection", /* tp_name */
-    sizeof(connObject),                             /* tp_basicsize */
-    0,                                              /* tp_itemsize */
-    (destructor)conn_dealloc,                       /* tp_dealloc */
-    0,                                              /* tp_print */
-    0,                                              /* tp_getattr */
-    0,                                              /* tp_setattr */
-    0,                                              /* tp_reserved */
-    0,                                              /* tp_repr */
-    0,                                              /* tp_as_number */
-    0,                                              /* tp_as_sequence */
-    0,                                              /* tp_as_mapping */
-    0,                                              /* tp_hash */
-    0,                                              /* tp_call */
-    0,                                              /* tp_str */
-    (getattrofunc)conn_getattr,                     /* tp_getattro */
-    0,                                              /* tp_setattro */
-    0,                                              /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,                             /* tp_flags */
-    conn__doc__,                                    /* tp_doc */
-    0,                                              /* tp_traverse */
-    0,                                              /* tp_clear */
-    0,                                              /* tp_richcompare */
-    0,                                              /* tp_weaklistoffset */
-    0,                                              /* tp_iter */
-    0,                                              /* tp_iternext */
-    conn_methods,                                   /* tp_methods */
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "pg.Connection",
+    .tp_basicsize = sizeof(connObject),
+    .tp_dealloc = (destructor)conn_dealloc,
+    .tp_getattro = (getattrofunc)conn_getattr,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = conn__doc__,
+    .tp_methods = conn_methods,
 };

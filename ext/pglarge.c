@@ -108,7 +108,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
 
 /* Get the list of large object attributes. */
 static PyObject *
-large_dir(largeObject *self, PyObject *noargs)
+large_dir(largeObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *attrs;
 
@@ -157,7 +157,7 @@ static char large_close__doc__[] =
     "close() -- close access to large object data";
 
 static PyObject *
-large_close(largeObject *self, PyObject *noargs)
+large_close(largeObject *self, PyObject *Py_UNUSED(noargs))
 {
     /* checks validity */
     if (!_check_lo_obj(self, CHECK_OPEN)) {
@@ -298,7 +298,7 @@ static char large_size__doc__[] =
     "The object must be opened before calling this method.\n";
 
 static PyObject *
-large_size(largeObject *self, PyObject *noargs)
+large_size(largeObject *self, PyObject *Py_UNUSED(noargs))
 {
     int start, end;
 
@@ -337,7 +337,7 @@ static char large_tell__doc__[] =
     "The object must be opened before calling this method.\n";
 
 static PyObject *
-large_tell(largeObject *self, PyObject *noargs)
+large_tell(largeObject *self, PyObject *Py_UNUSED(noargs))
 {
     int start;
 
@@ -394,7 +394,7 @@ static char large_unlink__doc__[] =
     "The object must be closed when calling this method.\n";
 
 static PyObject *
-large_unlink(largeObject *self, PyObject *noargs)
+large_unlink(largeObject *self, PyObject *Py_UNUSED(noargs))
 {
     /* checks validity */
     if (!_check_lo_obj(self, CHECK_CLOSE)) {
@@ -424,39 +424,19 @@ static struct PyMethodDef large_methods[] = {
     {"tell", (PyCFunction)large_tell, METH_NOARGS, large_tell__doc__},
     {"export", (PyCFunction)large_export, METH_VARARGS, large_export__doc__},
     {"unlink", (PyCFunction)large_unlink, METH_NOARGS, large_unlink__doc__},
-    {NULL, NULL}};
+    {NULL, NULL, 0, NULL}};
 
 static char large__doc__[] = "PostgreSQL large object";
 
 /* Large object type definition */
 PyTypeObject largeType = {
-    PyVarObject_HEAD_INIT(NULL, 0) "pg.LargeObject", /* tp_name */
-    sizeof(largeObject),                             /* tp_basicsize */
-    0,                                               /* tp_itemsize */
-
-    /* methods */
-    (destructor)large_dealloc,   /* tp_dealloc */
-    0,                           /* tp_print */
-    0,                           /* tp_getattr */
-    0,                           /* tp_setattr */
-    0,                           /* tp_compare */
-    0,                           /* tp_repr */
-    0,                           /* tp_as_number */
-    0,                           /* tp_as_sequence */
-    0,                           /* tp_as_mapping */
-    0,                           /* tp_hash */
-    0,                           /* tp_call */
-    (reprfunc)large_str,         /* tp_str */
-    (getattrofunc)large_getattr, /* tp_getattro */
-    0,                           /* tp_setattro */
-    0,                           /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,          /* tp_flags */
-    large__doc__,                /* tp_doc */
-    0,                           /* tp_traverse */
-    0,                           /* tp_clear */
-    0,                           /* tp_richcompare */
-    0,                           /* tp_weaklistoffset */
-    0,                           /* tp_iter */
-    0,                           /* tp_iternext */
-    large_methods,               /* tp_methods */
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "pg.LargeObject",
+    .tp_basicsize = sizeof(largeObject),
+    .tp_dealloc = (destructor)large_dealloc,
+    .tp_str = (reprfunc)large_str,
+    .tp_getattro = (getattrofunc)large_getattr,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = large__doc__,
+    .tp_methods = large_methods,
 };

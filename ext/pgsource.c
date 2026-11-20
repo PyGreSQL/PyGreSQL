@@ -130,7 +130,7 @@ static char source_close__doc__[] =
     "call.\n";
 
 static PyObject *
-source_close(sourceObject *self, PyObject *noargs)
+source_close(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     /* frees result if necessary and invalidates object */
     if (self->result) {
@@ -264,7 +264,7 @@ static char source_oidstatus__doc__[] =
     "oidstatus() -- return oid of last inserted row (if available)";
 
 static PyObject *
-source_oidstatus(sourceObject *self, PyObject *noargs)
+source_oidstatus(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     Oid oid;
 
@@ -401,7 +401,7 @@ static char source_movefirst__doc__[] =
     "movefirst() -- move to first result row";
 
 static PyObject *
-source_movefirst(sourceObject *self, PyObject *noargs)
+source_movefirst(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     return _source_move(self, QUERY_MOVEFIRST);
 }
@@ -411,7 +411,7 @@ static char source_movelast__doc__[] =
     "movelast() -- move to last valid result row";
 
 static PyObject *
-source_movelast(sourceObject *self, PyObject *noargs)
+source_movelast(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     return _source_move(self, QUERY_MOVELAST);
 }
@@ -420,7 +420,7 @@ source_movelast(sourceObject *self, PyObject *noargs)
 static char source_movenext__doc__[] = "movenext() -- move to next result row";
 
 static PyObject *
-source_movenext(sourceObject *self, PyObject *noargs)
+source_movenext(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     return _source_move(self, QUERY_MOVENEXT);
 }
@@ -430,7 +430,7 @@ static char source_moveprev__doc__[] =
     "moveprev() -- move to previous result row";
 
 static PyObject *
-source_moveprev(sourceObject *self, PyObject *noargs)
+source_moveprev(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     return _source_move(self, QUERY_MOVEPREV);
 }
@@ -690,7 +690,7 @@ static char source_listinfo__doc__[] =
     " (position, name, type oid, size, type modifier)";
 
 static PyObject *
-source_listInfo(sourceObject *self, PyObject *noargs)
+source_listInfo(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *result, *info;
     int i;
@@ -761,7 +761,7 @@ source_field(sourceObject *self, PyObject *desc)
 
 /* Get the list of source object attributes. */
 static PyObject *
-source_dir(connObject *self, PyObject *noargs)
+source_dir(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *attrs;
 
@@ -797,38 +797,20 @@ static PyMethodDef source_methods[] = {
      source_fieldinfo__doc__},
     {"listinfo", (PyCFunction)source_listInfo, METH_NOARGS,
      source_listinfo__doc__},
-    {NULL, NULL}};
+    {NULL, NULL, 0, NULL}};
 
 static char source__doc__[] = "PyGreSQL source object";
 
 /* Source type definition */
 PyTypeObject sourceType = {
-    PyVarObject_HEAD_INIT(NULL, 0) "pgdb.Source", /* tp_name */
-    sizeof(sourceObject),                         /* tp_basicsize */
-    0,                                            /* tp_itemsize */
-    /* methods */
-    (destructor)source_dealloc,   /* tp_dealloc */
-    0,                            /* tp_print */
-    0,                            /* tp_getattr */
-    (setattrfunc)source_setattr,  /* tp_setattr */
-    0,                            /* tp_compare */
-    0,                            /* tp_repr */
-    0,                            /* tp_as_number */
-    0,                            /* tp_as_sequence */
-    0,                            /* tp_as_mapping */
-    0,                            /* tp_hash */
-    0,                            /* tp_call */
-    (reprfunc)source_str,         /* tp_str */
-    (getattrofunc)source_getattr, /* tp_getattro */
-    0,                            /* tp_setattro */
-    0,                            /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,           /* tp_flags */
-    source__doc__,                /* tp_doc */
-    0,                            /* tp_traverse */
-    0,                            /* tp_clear */
-    0,                            /* tp_richcompare */
-    0,                            /* tp_weaklistoffset */
-    0,                            /* tp_iter */
-    0,                            /* tp_iternext */
-    source_methods,               /* tp_methods */
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "pgdb.Source",
+    .tp_basicsize = sizeof(sourceObject),
+    .tp_dealloc = (destructor)source_dealloc,
+    .tp_setattr = (setattrfunc)source_setattr,
+    .tp_str = (reprfunc)source_str,
+    .tp_getattro = (getattrofunc)source_getattr,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = source__doc__,
+    .tp_methods = source_methods,
 };

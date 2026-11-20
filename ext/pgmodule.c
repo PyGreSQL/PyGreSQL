@@ -93,7 +93,7 @@ static char pg_connect__doc__[] =
     "aware).\n";
 
 static PyObject *
-pg_connect(PyObject *self, PyObject *args, PyObject *dict)
+pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] = {"dbname", "host",   "port",   "opt",
                                    "user",   "passwd", "nowait", NULL};
@@ -197,7 +197,7 @@ static char pg_get_pqlib_version__doc__[] =
     "get_pqlib_version() -- get the version of libpq that is being used";
 
 static PyObject *
-pg_get_pqlib_version(PyObject *self, PyObject *noargs)
+pg_get_pqlib_version(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     return PyLong_FromLong(PQlibVersion());
 }
@@ -207,7 +207,7 @@ static char pg_escape_string__doc__[] =
     "escape_string(string) -- escape a string for use within SQL";
 
 static PyObject *
-pg_escape_string(PyObject *self, PyObject *string)
+pg_escape_string(PyObject *Py_UNUSED(self), PyObject *string)
 {
     PyObject *tmp_obj = NULL, /* auxiliary string object */
         *to_obj;              /* string object to return */
@@ -257,7 +257,7 @@ static char pg_escape_bytea__doc__[] =
     "bytea";
 
 static PyObject *
-pg_escape_bytea(PyObject *self, PyObject *data)
+pg_escape_bytea(PyObject *Py_UNUSED(self), PyObject *data)
 {
     PyObject *tmp_obj = NULL, /* auxiliary string object */
         *to_obj;              /* string object to return */
@@ -302,7 +302,7 @@ static char pg_unescape_bytea__doc__[] =
     "unescape_bytea(string) -- unescape bytea data retrieved as text";
 
 static PyObject *
-pg_unescape_bytea(PyObject *self, PyObject *data)
+pg_unescape_bytea(PyObject *Py_UNUSED(self), PyObject *data)
 {
     PyObject *tmp_obj = NULL, /* auxiliary string object */
         *to_obj;              /* string object to return */
@@ -345,7 +345,7 @@ static char pg_set_datestyle__doc__[] =
     "set_datestyle(style) -- set which style is assumed";
 
 static PyObject *
-pg_set_datestyle(PyObject *self, PyObject *args)
+pg_set_datestyle(PyObject *Py_UNUSED(self), PyObject *args)
 {
     const char *datestyle = NULL;
 
@@ -368,7 +368,7 @@ static char pg_get_datestyle__doc__[] =
     "get_datestyle() -- get which date style is assumed";
 
 static PyObject *
-pg_get_datestyle(PyObject *self, PyObject *noargs)
+pg_get_datestyle(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     if (date_format) {
         return PyUnicode_FromString(date_format_to_style(date_format));
@@ -384,7 +384,7 @@ static char pg_get_decimal_point__doc__[] =
     "get_decimal_point() -- get decimal point to be used for money values";
 
 static PyObject *
-pg_get_decimal_point(PyObject *self, PyObject *noargs)
+pg_get_decimal_point(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret;
     char s[2];
@@ -407,7 +407,7 @@ static char pg_set_decimal_point__doc__[] =
     "set_decimal_point(char) -- set decimal point to be used for money values";
 
 static PyObject *
-pg_set_decimal_point(PyObject *self, PyObject *args)
+pg_set_decimal_point(PyObject *Py_UNUSED(self), PyObject *args)
 {
     PyObject *ret = NULL;
     char *s = NULL;
@@ -438,7 +438,7 @@ static char pg_get_decimal__doc__[] =
     "get_decimal() -- get the decimal type to be used for numeric values";
 
 static PyObject *
-pg_get_decimal(PyObject *self, PyObject *noargs)
+pg_get_decimal(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret;
 
@@ -453,7 +453,7 @@ static char pg_set_decimal__doc__[] =
     "set_decimal(cls) -- set a decimal type to be used for numeric values";
 
 static PyObject *
-pg_set_decimal(PyObject *self, PyObject *cls)
+pg_set_decimal(PyObject *Py_UNUSED(self), PyObject *cls)
 {
     PyObject *ret = NULL;
 
@@ -484,7 +484,7 @@ static char pg_get_bool__doc__[] =
     "get_bool() -- check whether boolean values are converted to bool";
 
 static PyObject *
-pg_get_bool(PyObject *self, PyObject *noargs)
+pg_get_bool(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret;
 
@@ -499,7 +499,7 @@ static char pg_set_bool__doc__[] =
     "set_bool(on) -- set whether boolean values should be converted to bool";
 
 static PyObject *
-pg_set_bool(PyObject *self, PyObject *args)
+pg_set_bool(PyObject *Py_UNUSED(self), PyObject *args)
 {
     PyObject *ret = NULL;
     int i;
@@ -524,7 +524,7 @@ static char pg_get_array__doc__[] =
     "get_array() -- check whether arrays are converted as lists";
 
 static PyObject *
-pg_get_array(PyObject *self, PyObject *noargs)
+pg_get_array(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret;
 
@@ -539,7 +539,7 @@ static char pg_set_array__doc__[] =
     "set_array(on) -- set whether arrays should be converted to lists";
 
 static PyObject *
-pg_set_array(PyObject *self, PyObject *args)
+pg_set_array(PyObject *Py_UNUSED(self), PyObject *args)
 {
     PyObject *ret = NULL;
     int i;
@@ -564,7 +564,7 @@ static char pg_get_bytea_escaped__doc__[] =
     "get_bytea_escaped() -- check whether bytea will be returned escaped";
 
 static PyObject *
-pg_get_bytea_escaped(PyObject *self, PyObject *noargs)
+pg_get_bytea_escaped(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret;
 
@@ -579,7 +579,7 @@ static char pg_set_bytea_escaped__doc__[] =
     "set_bytea_escaped(on) -- set whether bytea will be returned escaped";
 
 static PyObject *
-pg_set_bytea_escaped(PyObject *self, PyObject *args)
+pg_set_bytea_escaped(PyObject *Py_UNUSED(self), PyObject *args)
 {
     PyObject *ret = NULL;
     int i;
@@ -605,7 +605,7 @@ static char pg_set_query_helpers__doc__[] =
     "set_query_helpers(*helpers) -- set internal query helper functions";
 
 static PyObject *
-pg_set_query_helpers(PyObject *self, PyObject *args)
+pg_set_query_helpers(PyObject *Py_UNUSED(self), PyObject *args)
 {
     /* gets arguments */
     if (!PyArg_ParseTuple(args, "O!O!O!O!", &PyFunction_Type, &dictiter,
@@ -623,7 +623,7 @@ static char pg_get_jsondecode__doc__[] =
     "get_jsondecode() -- get the function used for decoding json results";
 
 static PyObject *
-pg_get_jsondecode(PyObject *self, PyObject *noargs)
+pg_get_jsondecode(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     PyObject *ret;
 
@@ -641,7 +641,7 @@ static char pg_set_jsondecode__doc__[] =
     "results";
 
 static PyObject *
-pg_set_jsondecode(PyObject *self, PyObject *func)
+pg_set_jsondecode(PyObject *Py_UNUSED(self), PyObject *func)
 {
     PyObject *ret = NULL;
 
@@ -672,7 +672,7 @@ static char pg_get_defhost__doc__[] =
     "get_defhost() -- return default database host";
 
 static PyObject *
-pg_get_defhost(PyObject *self, PyObject *noargs)
+pg_get_defhost(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     Py_XINCREF(pg_default_host);
     return pg_default_host;
@@ -684,7 +684,7 @@ static char pg_set_defhost__doc__[] =
     "value";
 
 static PyObject *
-pg_set_defhost(PyObject *self, PyObject *args)
+pg_set_defhost(PyObject *Py_UNUSED(self), PyObject *args)
 {
     char *tmp = NULL;
     PyObject *old;
@@ -716,7 +716,7 @@ static char pg_get_defbase__doc__[] =
     "get_defbase() -- return default database name";
 
 static PyObject *
-pg_get_defbase(PyObject *self, PyObject *noargs)
+pg_get_defbase(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     Py_XINCREF(pg_default_base);
     return pg_default_base;
@@ -728,7 +728,7 @@ static char pg_set_defbase__doc__[] =
     "value";
 
 static PyObject *
-pg_set_defbase(PyObject *self, PyObject *args)
+pg_set_defbase(PyObject *Py_UNUSED(self), PyObject *args)
 {
     char *tmp = NULL;
     PyObject *old;
@@ -760,7 +760,7 @@ static char pg_get_defopt__doc__[] =
     "get_defopt() -- return default database options";
 
 static PyObject *
-pg_get_defopt(PyObject *self, PyObject *noargs)
+pg_get_defopt(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     Py_XINCREF(pg_default_opt);
     return pg_default_opt;
@@ -771,7 +771,7 @@ static char pg_set_defopt__doc__[] =
     "set_defopt(string) -- set default options and return previous value";
 
 static PyObject *
-pg_setdefopt(PyObject *self, PyObject *args)
+pg_setdefopt(PyObject *Py_UNUSED(self), PyObject *args)
 {
     char *tmp = NULL;
     PyObject *old;
@@ -803,7 +803,7 @@ static char pg_get_defuser__doc__[] =
     "get_defuser() -- return default database username";
 
 static PyObject *
-pg_get_defuser(PyObject *self, PyObject *noargs)
+pg_get_defuser(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     Py_XINCREF(pg_default_user);
     return pg_default_user;
@@ -815,7 +815,7 @@ static char pg_set_defuser__doc__[] =
     "set_defuser(name) -- set default username and return previous value";
 
 static PyObject *
-pg_set_defuser(PyObject *self, PyObject *args)
+pg_set_defuser(PyObject *Py_UNUSED(self), PyObject *args)
 {
     char *tmp = NULL;
     PyObject *old;
@@ -847,7 +847,7 @@ static char pg_set_defpasswd__doc__[] =
     "set_defpasswd(password) -- set default database password";
 
 static PyObject *
-pg_set_defpasswd(PyObject *self, PyObject *args)
+pg_set_defpasswd(PyObject *Py_UNUSED(self), PyObject *args)
 {
     char *tmp = NULL;
 
@@ -876,7 +876,7 @@ static char pg_get_defport__doc__[] =
     "get_defport() -- return default database port";
 
 static PyObject *
-pg_get_defport(PyObject *self, PyObject *noargs)
+pg_get_defport(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
     Py_XINCREF(pg_default_port);
     return pg_default_port;
@@ -887,7 +887,7 @@ static char pg_set_defport__doc__[] =
     "set_defport(port) -- set default port and return previous value";
 
 static PyObject *
-pg_set_defport(PyObject *self, PyObject *args)
+pg_set_defport(PyObject *Py_UNUSED(self), PyObject *args)
 {
     long int port = -2;
     PyObject *old;
@@ -919,7 +919,7 @@ static char pg_cast_array__doc__[] =
     "cast_array(string, cast=None, delim=',') -- cast a string as an array";
 
 PyObject *
-pg_cast_array(PyObject *self, PyObject *args, PyObject *dict)
+pg_cast_array(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] = {"string", "cast", "delim", NULL};
     PyObject *string_obj, *cast_obj = NULL, *ret;
@@ -973,7 +973,7 @@ static char pg_cast_record__doc__[] =
     "cast_record(string, cast=None, delim=',') -- cast a string as a record";
 
 PyObject *
-pg_cast_record(PyObject *self, PyObject *args, PyObject *dict)
+pg_cast_record(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 {
     static const char *kwlist[] = {"string", "cast", "delim", NULL};
     PyObject *string_obj, *cast_obj = NULL, *ret;
@@ -1037,7 +1037,7 @@ static char pg_cast_hstore__doc__[] =
     "cast_hstore(string) -- cast a string as an hstore";
 
 PyObject *
-pg_cast_hstore(PyObject *self, PyObject *string)
+pg_cast_hstore(PyObject *Py_UNUSED(self), PyObject *string)
 {
     PyObject *tmp_obj = NULL, *ret;
     char *s;
@@ -1072,8 +1072,8 @@ pg_cast_hstore(PyObject *self, PyObject *string)
 /* The list of functions defined in the module */
 
 static struct PyMethodDef pg_methods[] = {
-    {"connect", (PyCFunction)pg_connect, METH_VARARGS | METH_KEYWORDS,
-     pg_connect__doc__},
+    {"connect", (PyCFunction)(void (*)(void))pg_connect,
+     METH_VARARGS | METH_KEYWORDS, pg_connect__doc__},
     {"escape_string", (PyCFunction)pg_escape_string, METH_O,
      pg_escape_string__doc__},
     {"escape_bytea", (PyCFunction)pg_escape_bytea, METH_O,
@@ -1107,10 +1107,10 @@ static struct PyMethodDef pg_methods[] = {
      pg_get_jsondecode__doc__},
     {"set_jsondecode", (PyCFunction)pg_set_jsondecode, METH_O,
      pg_set_jsondecode__doc__},
-    {"cast_array", (PyCFunction)pg_cast_array, METH_VARARGS | METH_KEYWORDS,
-     pg_cast_array__doc__},
-    {"cast_record", (PyCFunction)pg_cast_record, METH_VARARGS | METH_KEYWORDS,
-     pg_cast_record__doc__},
+    {"cast_array", (PyCFunction)(void (*)(void))pg_cast_array,
+     METH_VARARGS | METH_KEYWORDS, pg_cast_array__doc__},
+    {"cast_record", (PyCFunction)(void (*)(void))pg_cast_record,
+     METH_VARARGS | METH_KEYWORDS, pg_cast_record__doc__},
     {"cast_hstore", (PyCFunction)pg_cast_hstore, METH_O,
      pg_cast_hstore__doc__},
     {"get_defhost", pg_get_defhost, METH_NOARGS, pg_get_defhost__doc__},
@@ -1126,16 +1126,14 @@ static struct PyMethodDef pg_methods[] = {
     {"set_defpasswd", pg_set_defpasswd, METH_VARARGS, pg_set_defpasswd__doc__},
     {"get_pqlib_version", (PyCFunction)pg_get_pqlib_version, METH_NOARGS,
      pg_get_pqlib_version__doc__},
-    {NULL, NULL} /* sentinel */
+    {NULL, NULL, 0, NULL} /* sentinel */
 };
 
 static char pg__doc__[] = "Python interface to PostgreSQL DB";
 
 static struct PyModuleDef moduleDef = {
-    PyModuleDef_HEAD_INIT, "_pg", /* m_name */
-    pg__doc__,                    /* m_doc */
-    -1,                           /* m_size */
-    pg_methods                    /* m_methods */
+    PyModuleDef_HEAD_INIT, .m_name = "_pg",         .m_doc = pg__doc__,
+    .m_size = -1,          .m_methods = pg_methods,
 };
 
 /* Initialization function for the module */
