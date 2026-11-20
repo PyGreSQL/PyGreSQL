@@ -76,59 +76,60 @@ class Cursor:
 
     def _quote(self, value: Any) -> Any:
         """Quote value depending on its type."""
-        if value is None:
-            return 'NULL'
-        if isinstance(value, (Hstore, Json)):
-            value = str(value)
-        if isinstance(value, (bytes, str)):
-            cnx = self._cnx
-            if isinstance(value, Binary):
-                value = cnx.escape_bytea(value).decode('ascii')
-            else:
-                value = cnx.escape_string(value)
-            return f"'{value}'"
-        if isinstance(value, float):
-            if isinf(value):
-                return "'-Infinity'" if value < 0 else "'Infinity'"
-            if isnan(value):
-                return "'NaN'"
-            return value
-        if isinstance(value, (int, Decimal, Literal)):
-            return value
-        if isinstance(value, datetime):
-            if value.tzinfo:
+        match value:
+            case None:
+                return 'NULL'
+            case Binary():  # must come before bytes
+                return f"'{self._cnx.escape_bytea(value).decode('ascii')}'"
+            case bytes() | str():
+                value = self._cnx.escape_string(value)
+                return f"'{value}'"
+            case Hstore() | Json():
+                return f"'{self._cnx.escape_string(str(value))}'"
+            case float():
+                if isinf(value):
+                    return "'-Infinity'" if value < 0 else "'Infinity'"
+                if isnan(value):
+                    return "'NaN'"
+                return value
+            case int() | Decimal() | Literal():
+                return value
+            case datetime(tzinfo=None):  # must come before date
+                return f"'{value}'::timestamp"
+            case datetime():
                 return f"'{value}'::timestamptz"
-            return f"'{value}'::timestamp"
-        if isinstance(value, date):
-            return f"'{value}'::date"
-        if isinstance(value, time):
-            if value.tzinfo:
+            case date():
+                return f"'{value}'::date"
+            case time(tzinfo=None):
+                return f"'{value}'::time"
+            case time():
                 return f"'{value}'::timetz"
-            return f"'{value}'::time"
-        if isinstance(value, timedelta):
-            return f"'{value}'::interval"
-        if isinstance(value, Uuid):
-            return f"'{value}'::uuid"
-        if isinstance(value, list):
-            # Quote value as an ARRAY constructor. This is better than using
-            # an array literal because it carries the information that this is
-            # an array and not a string.  One issue with this syntax is that
-            # you need to add an explicit typecast when passing empty arrays.
-            # The ARRAY keyword is actually only necessary at the top level.
-            if not value:  # exception for empty array
-                return "'{}'"
-            q = self._quote
-            v = ','.join(str(q(v)) for v in value)
-            return f'ARRAY[{v}]'
-        if isinstance(value, tuple):
-            # Quote as a ROW constructor.  This is better than using a record
-            # literal because it carries the information that this is a record
-            # and not a string.  We don't use the keyword ROW in order to make
-            # this usable with the IN syntax as well.  It is only necessary
-            # when the records has a single column which is not really useful.
-            q = self._quote
-            v = ','.join(str(q(v)) for v in value)
-            return f'({v})'
+            case timedelta():
+                return f"'{value}'::interval"
+            case Uuid():
+                return f"'{value}'::uuid"
+            case list():
+                # Quote value as an ARRAY constructor. This is better than
+                # using an array literal because it carries the information
+                # that this is an array and not a string.  One issue with this
+                # syntax is that you need to add an explicit typecast when
+                # passing empty arrays. The ARRAY keyword is actually only
+                # necessary at the top level.
+                if not value:  # exception for empty array
+                    return "'{}'"
+                q = self._quote
+                v = ','.join(str(q(v)) for v in value)
+                return f'ARRAY[{v}]'
+            case tuple():
+                # Quote as a ROW constructor.  This is better than using a
+                # record literal because it carries the information that this
+                # is a record and not a string.  We don't use the keyword ROW
+                # in order to make this usable with the IN syntax as well.
+                # It is only necessary when the records has a single column
+                # which is not really useful.
+                q = self._quote
+                v = ','.join(str(q(v)) for v in value)
+                return f'({v})'
         try:  # noinspection PyUnresolvedReferences
             value = value.__pg_repr__()
         except AttributeError as e:

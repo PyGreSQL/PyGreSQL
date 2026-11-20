@@ -333,18 +333,19 @@ class DB:
         of all existing configuration parameters.
         """
         values: Any
-        if isinstance(parameter, str):
-            parameter = [parameter]
-            values = None
-        elif isinstance(parameter, (list, tuple)):
-            values = []
-        elif isinstance(parameter, (set, frozenset)):
-            values = {}
-        elif isinstance(parameter, dict):
-            values = parameter
-        else:
-            raise TypeError(
-                'The parameter must be a string, list, set or dict')
+        match parameter:
+            case str():
+                parameter = [parameter]
+                values = None
+            case list() | tuple():
+                values = []
+            case set() | frozenset():
+                values = {}
+            case dict():
+                values = parameter
+            case _:
+                raise TypeError(
+                    'The parameter must be a string, list, set or dict')
         if not parameter:
             raise TypeError('No parameter has been specified')
         query = self._valid_db.query
@@ -404,31 +405,32 @@ class DB:
         have no effect if it is executed outside a transaction, since the
         transaction will end immediately.
         """
-        if isinstance(parameter, str):
-            parameter = {parameter: value}
-        elif isinstance(parameter, (list, tuple)):
-            if isinstance(value, (list, tuple)):
-                parameter = dict(zip(parameter, value, strict=True))
-            else:
+        match parameter:
+            case str():
+                parameter = {parameter: value}
+            case list() | tuple():
+                if isinstance(value, (list, tuple)):
+                    parameter = dict(zip(parameter, value, strict=True))
+                else:
+                    parameter = dict.fromkeys(parameter, value)
+            case set() | frozenset():
+                if isinstance(value, (list, tuple, set, frozenset)):
+                    value = set(value)
+                    if len(value) == 1:
+                        value = next(iter(value))
+                if not (value is None or isinstance(value, str)):
+                    raise ValueError(
+                        'A single value must be specified'
+                        ' when parameter is a set')
                 parameter = dict.fromkeys(parameter, value)
-        elif isinstance(parameter, (set, frozenset)):
-            if isinstance(value, (list, tuple, set, frozenset)):
-                value = set(value)
-                if len(value) == 1:
-                    value = next(iter(value))
-            if not (value is None or isinstance(value, str)):
-                raise ValueError(
-                    'A single value must be specified'
-                    ' when parameter is a set')
-            parameter = dict.fromkeys(parameter, value)
-        elif isinstance(parameter, dict):
-            if value is not None:
-                raise ValueError(
-                    'A value must not be specified'
-                    ' when parameter is a dictionary')
-        else:
-            raise TypeError(
-                'The parameter must be a string, list, set or dict')
+            case dict():
+                if value is not None:
+                    raise ValueError(
+                        'A value must not be specified'
+                        ' when parameter is a dictionary')
+            case _:
+                raise TypeError(
+                    'The parameter must be a string, list, set or dict')
         if not parameter:
             raise TypeError('No parameter has been specified')
         params: dict[str, str | None] = {}
@@ -1136,18 +1138,19 @@ class DB:
         can be specified after the table name to explicitly indicate that
         descendant tables are included.
         """
-        if isinstance(table, str):
-            table_only = {table: only}
-            table = [table]
-        elif isinstance(table, (list, tuple)):
-            if isinstance(only, (list, tuple)):
-                table_only = dict(zip(table, only, strict=True))
-            else:
+        match table:
+            case str():
+                table_only = {table: only}
+                table = [table]
+            case list() | tuple():
+                if isinstance(only, (list, tuple)):
+                    table_only = dict(zip(table, only, strict=True))
+                else:
+                    table_only = dict.fromkeys(table, only)
+            case set() | frozenset():
                 table_only = dict.fromkeys(table, only)
-        elif isinstance(table, (set, frozenset)):
-            table_only = dict.fromkeys(table, only)
-        else:
-            raise TypeError('The table must be a string, list or set')
+            case _:
+                raise TypeError('The table must be a string, list or set')
         if not (restart is None or isinstance(restart, (bool, int))):
             raise TypeError('Invalid type for the restart option')
         if not (cascade is None or isinstance(cascade, (bool, int))):
