@@ -238,7 +238,7 @@ query_iter(queryObject *self)
 /* __next__() method of the queryObject:
   Returns the current row as a tuple and moves to the next one. */
 static PyObject *
-query_next(queryObject *self, PyObject *noargs)
+query_next(queryObject *self)
 {
     PyObject *row_tuple = NULL;
 
@@ -257,7 +257,7 @@ query_next(queryObject *self, PyObject *noargs)
 static char query_memsize__doc__[] =
     "memsize() -- return number of bytes allocated by query result";
 static PyObject *
-query_memsize(queryObject *self, PyObject *noargs)
+query_memsize(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
 #ifdef MEMORY_SIZE
     return PyLong_FromSize_t(PQresultMemorySize(self->result));
@@ -272,7 +272,7 @@ static char query_listfields__doc__[] =
     "listfields() -- List field names from result";
 
 static PyObject *
-query_listfields(queryObject *self, PyObject *noargs)
+query_listfields(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     int i;
     char *name;
@@ -428,7 +428,7 @@ static char query_one__doc__[] =
     "It returns None if the result does not contain one more row.\n";
 
 static PyObject *
-query_one(queryObject *self, PyObject *noargs)
+query_one(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *row_tuple;
 
@@ -457,7 +457,7 @@ static char query_single__doc__[] =
     "specifically.\n";
 
 static PyObject *
-query_single(queryObject *self, PyObject *noargs)
+query_single(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *row_tuple;
 
@@ -486,7 +486,7 @@ static char query_getresult__doc__[] =
     "in the order returned by the server.\n";
 
 static PyObject *
-query_getresult(queryObject *self, PyObject *noargs)
+query_getresult(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *result_list;
     int i;
@@ -497,7 +497,7 @@ query_getresult(queryObject *self, PyObject *noargs)
         }
 
         for (i = self->current_row = 0; i < self->max_row; ++i) {
-            PyObject *row_tuple = query_next(self, noargs);
+            PyObject *row_tuple = query_next(self);
 
             if (!row_tuple) {
                 Py_DECREF(result_list);
@@ -537,7 +537,7 @@ _query_row_as_dict(queryObject *self)
 
 /* Return the current row as a dict and move to the next one. */
 static PyObject *
-query_next_dict(queryObject *self, PyObject *noargs)
+query_next_dict(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *row_dict = NULL;
 
@@ -561,7 +561,7 @@ static char query_onedict__doc__[] =
     "It returns None if the result does not contain one more row.\n";
 
 static PyObject *
-query_onedict(queryObject *self, PyObject *noargs)
+query_onedict(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *row_dict;
 
@@ -591,7 +591,7 @@ static char query_singledict__doc__[] =
     "specifically.\n";
 
 static PyObject *
-query_singledict(queryObject *self, PyObject *noargs)
+query_singledict(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *row_dict;
 
@@ -763,7 +763,7 @@ static char query_namediter__doc__[] =
     "of fields in the order returned by the server.\n";
 
 static PyObject *
-query_namediter(queryObject *self, PyObject *noargs)
+query_namediter(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *res, *res_iter;
 
@@ -791,7 +791,7 @@ static char query_scalarresult__doc__[] =
     "are the first fields of the rows in the order returned by the server.\n";
 
 static PyObject *
-query_scalarresult(queryObject *self, PyObject *noargs)
+query_scalarresult(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *result_list;
 
@@ -856,7 +856,7 @@ static char query_onescalar__doc__[] =
     "It returns None if the result does not contain one more row.\n";
 
 static PyObject *
-query_onescalar(queryObject *self, PyObject *noargs)
+query_onescalar(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *value;
 
@@ -891,7 +891,7 @@ static char query_singlescalar__doc__[] =
     "specifically.\n";
 
 static PyObject *
-query_singlescalar(queryObject *self, PyObject *noargs)
+query_singlescalar(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *value;
 
@@ -920,14 +920,8 @@ query_singlescalar(queryObject *self, PyObject *noargs)
 
 /* Query sequence protocol methods */
 static PySequenceMethods query_sequence_methods = {
-    (lenfunc)query_len,          /* sq_length */
-    0,                           /* sq_concat */
-    0,                           /* sq_repeat */
-    (ssizeargfunc)query_getitem, /* sq_item */
-    0,                           /* sq_ass_item */
-    0,                           /* sq_contains */
-    0,                           /* sq_inplace_concat */
-    0,                           /* sq_inplace_repeat */
+    .sq_length = (lenfunc)query_len,
+    .sq_item = (ssizeargfunc)query_getitem,
 };
 
 /* Query object methods */
@@ -968,38 +962,22 @@ static struct PyMethodDef query_methods[] = {
     {"fieldinfo", (PyCFunction)query_fieldinfo, METH_VARARGS,
      query_fieldinfo__doc__},
     {"memsize", (PyCFunction)query_memsize, METH_NOARGS, query_memsize__doc__},
-    {NULL, NULL}};
+    {NULL, NULL, 0, NULL}};
 
 static char query__doc__[] = "PyGreSQL query object";
 
 /* Query type definition */
 PyTypeObject queryType = {
-    PyVarObject_HEAD_INIT(NULL, 0) "pg.Query", /* tp_name */
-    sizeof(queryObject),                       /* tp_basicsize */
-    0,                                         /* tp_itemsize */
-    /* methods */
-    (destructor)query_dealloc, /* tp_dealloc */
-    0,                         /* tp_print */
-    0,                         /* tp_getattr */
-    0,                         /* tp_setattr */
-    0,                         /* tp_compare */
-    0,                         /* tp_repr */
-    0,                         /* tp_as_number */
-    &query_sequence_methods,   /* tp_as_sequence */
-    0,                         /* tp_as_mapping */
-    0,                         /* tp_hash */
-    0,                         /* tp_call */
-    (reprfunc)query_str,       /* tp_str */
-    PyObject_GenericGetAttr,   /* tp_getattro */
-    0,                         /* tp_setattro */
-    0,                         /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,        /* tp_flags */
-    query__doc__,              /* tp_doc */
-    0,                         /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    (getiterfunc)query_iter,   /* tp_iter */
-    (iternextfunc)query_next,  /* tp_iternext */
-    query_methods,             /* tp_methods */
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "pg.Query",
+    .tp_basicsize = sizeof(queryObject),
+    .tp_dealloc = (destructor)query_dealloc,
+    .tp_as_sequence = &query_sequence_methods,
+    .tp_str = (reprfunc)query_str,
+    .tp_getattro = PyObject_GenericGetAttr,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = query__doc__,
+    .tp_iter = (getiterfunc)query_iter,
+    .tp_iternext = (iternextfunc)query_next,
+    .tp_methods = query_methods,
 };

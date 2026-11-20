@@ -71,7 +71,7 @@ notice_getattr(noticeObject *self, PyObject *nameobj)
 
 /* Get the list of notice attributes. */
 static PyObject *
-notice_dir(noticeObject *self, PyObject *noargs)
+notice_dir(noticeObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *attrs;
 
@@ -91,38 +91,20 @@ notice_str(noticeObject *self)
 
 /* Notice object methods */
 static struct PyMethodDef notice_methods[] = {
-    {"__dir__", (PyCFunction)notice_dir, METH_NOARGS, NULL}, {NULL, NULL}};
+    {"__dir__", (PyCFunction)notice_dir, METH_NOARGS, NULL},
+    {NULL, NULL, 0, NULL}};
 
 static char notice__doc__[] = "PostgreSQL notice object";
 
 /* Notice type definition */
 PyTypeObject noticeType = {
-    PyVarObject_HEAD_INIT(NULL, 0) "pg.Notice", /* tp_name */
-    sizeof(noticeObject),                       /* tp_basicsize */
-    0,                                          /* tp_itemsize */
-    /* methods */
-    0,                            /* tp_dealloc */
-    0,                            /* tp_print */
-    0,                            /* tp_getattr */
-    0,                            /* tp_setattr */
-    0,                            /* tp_compare */
-    0,                            /* tp_repr */
-    0,                            /* tp_as_number */
-    0,                            /* tp_as_sequence */
-    0,                            /* tp_as_mapping */
-    0,                            /* tp_hash */
-    0,                            /* tp_call */
-    (reprfunc)notice_str,         /* tp_str */
-    (getattrofunc)notice_getattr, /* tp_getattro */
-    PyObject_GenericSetAttr,      /* tp_setattro */
-    0,                            /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,           /* tp_flags */
-    notice__doc__,                /* tp_doc */
-    0,                            /* tp_traverse */
-    0,                            /* tp_clear */
-    0,                            /* tp_richcompare */
-    0,                            /* tp_weaklistoffset */
-    0,                            /* tp_iter */
-    0,                            /* tp_iternext */
-    notice_methods,               /* tp_methods */
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "pg.Notice",
+    .tp_basicsize = sizeof(noticeObject),
+    .tp_str = (reprfunc)notice_str,
+    .tp_getattro = (getattrofunc)notice_getattr,
+    .tp_setattro = PyObject_GenericSetAttr,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = notice__doc__,
+    .tp_methods = notice_methods,
 };
