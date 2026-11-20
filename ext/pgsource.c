@@ -447,11 +447,6 @@ source_putdata(sourceObject *self, PyObject *buffer)
         return NULL;
     }
 
-    /* make sure that the connection object is valid */
-    if (!self->pgcnx->cnx) {
-        return NULL;
-    }
-
     if (buffer == Py_None) {
         /* pass None for terminating the operation */
         buf = errormsg = NULL;
@@ -470,16 +465,16 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
     else if (PyErr_GivenExceptionMatches(buffer, PyExc_BaseException)) {
         /* or pass a Python exception for sending an error message */
-        tmp_obj = PyObject_Str(buffer);
-        if (PyUnicode_Check(tmp_obj)) {
-            PyObject *obj = tmp_obj;
+        PyObject *str_obj = PyObject_Str(buffer);
 
-            tmp_obj =
-                get_encoded_string(obj, PQclientEncoding(self->pgcnx->cnx));
-            Py_DECREF(obj);
-            if (!tmp_obj)
-                return NULL; /* pass the UnicodeEncodeError */
-        }
+        if (!str_obj)
+            return NULL; /* pass the error raised by __str__() */
+        tmp_obj =
+            get_encoded_string(str_obj, PQclientEncoding(self->pgcnx->cnx));
+        Py_DECREF(str_obj);
+        if (!tmp_obj)
+            return NULL; /* pass the UnicodeEncodeError */
+        /* errormsg points into tmp_obj, which must be kept until the end */
         errormsg = PyBytes_AsString(tmp_obj);
         buf = NULL;
     }
@@ -506,14 +501,11 @@ source_putdata(sourceObject *self, PyObject *buffer)
         res = PQputCopyEnd(self->pgcnx->cnx, errormsg);
     }
 
-    Py_XDECREF(tmp_obj);
-
     if (res != 1) {
         PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
-        return NULL;
+        ret = NULL;
     }
-
-    if (buf) { /* buffer has been sent */
+    else if (buf) { /* buffer has been sent */
         ret = Py_NewRef(Py_None);
     }
     else {                /* copy is done */
@@ -538,10 +530,13 @@ source_putdata(sourceObject *self, PyObject *buffer)
             ret = NULL;
         }
 
+        PQclear(result);
         PQclear(self->result);
         self->result = NULL;
         self->result_type = RESULT_EMPTY;
     }
+
+    Py_XDECREF(tmp_obj); /* only now, since errormsg may point into it */
 
     return ret; /* None or number of rows */
 }
@@ -553,18 +548,13 @@ static char source_getdata__doc__[] =
 static PyObject *
 source_getdata(sourceObject *self, PyObject *args)
 {
-    int *decode = 0;   /* decode flag */
+    int decode = 0;    /* decode flag */
     char *buffer;      /* the copied buffer as encoded byte string */
     Py_ssize_t nbytes; /* length of the byte string */
     PyObject *ret;     /* return value */
 
     /* checks validity */
     if (!_check_source_obj(self, CHECK_CNX)) {
-        return NULL;
-    }
-
-    /* make sure that the connection object is valid */
-    if (!self->pgcnx->cnx) {
         return NULL;
     }
 
@@ -607,6 +597,7 @@ source_getdata(sourceObject *self, PyObject *args)
             ret = NULL;
         }
 
+        PQclear(result);
         PQclear(self->result);
         self->result = NULL;
         self->result_type = RESULT_EMPTY;

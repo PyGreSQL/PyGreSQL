@@ -255,7 +255,11 @@ class TestCopyFrom(TestCopy):
         self.check_rowcount()
 
     def test_input_iterable_invalid(self):
-        self.assertRaises(IOError, self.copy_from, [None])
+        with self.assertRaises(IOError) as cm:
+            self.copy_from([None])
+        # the error message must be passed through unchanged
+        self.assertEqual(
+            str(cm.exception), 'Input stream must consist of strings')
 
     def test_input_iterable_with_newlines(self):
         self.copy_from(f'{row}\n' for row in self.data_text.splitlines())

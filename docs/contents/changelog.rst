@@ -21,6 +21,14 @@ Version 6.3.0 (unreleased)
   - The items of `Cursor.description` and the results of
     `TypeCache.get_fields()` are now typed named tuples.
 
+- Fixes in the C extension:
+
+  - The `putdata()` and `getdata()` methods of the source object leaked the
+    final result of every COPY operation (#95, thanks to FairyFar for the
+    report). `putdata()` also read freed memory when an exception was passed
+    to abort the COPY, garbling the error message, and crashed when the
+    exception could not be converted to a string.
+
 - Modernization and build:
 
   - Modernized the code using Python 3.10 features and the Python 3.10 C API.

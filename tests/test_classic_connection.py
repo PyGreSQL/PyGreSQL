@@ -11,13 +11,14 @@ These tests need a database to test against.
 
 from __future__ import annotations
 
+import ctypes
 import datetime
 import os
 import threading
 import time
 import unittest
 from collections import namedtuple
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from decimal import Decimal
 from typing import Any
@@ -41,6 +42,28 @@ def connect():
                             user=dbuser, passwd=dbpasswd)
     connection.query("set client_min_messages=warning")
     return connection
+
+
+class MallInfo2(ctypes.Structure):
+    """Memory allocation information as returned by glibc."""
+
+    _fields_ = [(name, ctypes.c_size_t) for name in (
+        'arena', 'ordblks', 'smblks', 'hblks', 'hblkhd', 'usmblks',
+        'fsmblks', 'uordblks', 'fordblks', 'keepcost')]
+
+
+def get_mallinfo2() -> Callable[[], MallInfo2] | None:
+    """Get the mallinfo2() function of glibc if available."""
+    try:
+        func = ctypes.CDLL(None).mallinfo2
+    except (AttributeError, OSError, TypeError):  # not glibc 2.33 or newer
+        return None
+    func.argtypes = []
+    func.restype = MallInfo2
+    return func
+
+
+mallinfo2 = get_mallinfo2()
 
 
 def connect_nowait():
@@ -2302,6 +2325,106 @@ class TestDirectSocketAccess(unittest.TestCase):
         self.assertRaises(TypeError, self.c.putline)
         self.assertRaises(TypeError, self.c.getline, 'invalid')
         self.assertRaises(TypeError, self.c.endcopy, 'invalid')
+
+
+class TestCopyData(unittest.TestCase):
+    """Test copy command with the putdata() and getdata() methods."""
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query("create temporary table test_copy (n int)")
+        self.source = self.c.source()
+
+    def tearDown(self):
+        self.c.close()
+
+    def get_table(self):
+        return self.c.query("select n from test_copy order by n").getresult()
+
+    def assert_no_memory_leak(self, func):
+        if mallinfo2 is None:
+            self.skipTest('needs glibc 2.33 or newer')
+        for _i in range(10):
+            func()  # warm-up
+        n = 100
+        before = mallinfo2().uordblks
+        for _i in range(n):
+            func()
+        leaked = mallinfo2().uordblks - before
+        # libpq results have more than 100 bytes
+        self.assertLess(leaked, 100 * n, f'{leaked} bytes leaked')
+
+    def copy_from(self):
+        source = self.source
+        source.execute("copy test_copy from stdin")
+        self.assertIsNone(source.putdata(b'1\n'))
+        self.assertIsNone(source.putdata('2\n'))
+        self.assertEqual(source.putdata(None), 2)
+
+    def copy_from_aborted(self):
+        source = self.source
+        source.execute("copy test_copy from stdin")
+        self.assertIsNone(source.putdata(b'1\n'))
+        with self.assertRaises(OSError) as cm:
+            source.putdata(ValueError('Copy aborted by the client'))
+        self.assertEqual(str(cm.exception), 'Copy aborted by the client')
+
+    def copy_to(self):
+        source = self.source
+        source.execute("copy (select generate_series(1, 2)) to stdout")
+        self.assertEqual(source.getdata(), b'1\n')
+        self.assertEqual(source.getdata(True), '2\n')
+        self.assertEqual(source.getdata(), 2)
+
+    def test_putdata(self):
+        self.copy_from()
+        self.assertEqual(self.get_table(), [(1,), (2,)])
+
+    def test_putdata_with_exception(self):
+        self.copy_from_aborted()
+        self.assertEqual(self.get_table(), [])
+
+    def test_putdata_with_exception_that_cannot_be_converted(self):
+        class BadError(Exception):
+            def __str__(self):
+                raise RuntimeError('Cannot convert to string')
+
+        source = self.source
+        source.execute("copy test_copy from stdin")
+        self.assertRaises(RuntimeError, source.putdata, BadError())
+        # the copy operation is still in progress
+        self.assertEqual(source.putdata(None), 0)
+
+    def test_putdata_with_invalid_argument(self):
+        source = self.source
+        source.execute("copy test_copy from stdin")
+        self.assertRaises(TypeError, source.putdata, 42)
+        self.assertEqual(source.putdata(None), 0)
+
+    def test_putdata_without_copy(self):
+        self.assertRaises(OSError, self.source.putdata, b'1\n')
+        self.source.execute("select 1")
+        self.assertRaises(OSError, self.source.putdata, None)
+
+    def test_getdata(self):
+        self.copy_to()
+
+    def test_getdata_with_invalid_argument(self):
+        self.assertRaises(TypeError, self.source.getdata, 'invalid')
+
+    def test_getdata_without_copy(self):
+        self.assertRaises(OSError, self.source.getdata)
+        self.source.execute("select 1")
+        self.assertRaises(OSError, self.source.getdata)
+
+    def test_putdata_memory_leak(self):
+        self.assert_no_memory_leak(self.copy_from)
+
+    def test_putdata_with_exception_memory_leak(self):
+        self.assert_no_memory_leak(self.copy_from_aborted)
+
+    def test_getdata_memory_leak(self):
+        self.assert_no_memory_leak(self.copy_to)
 
 
 class TestNotificatons(unittest.TestCase):

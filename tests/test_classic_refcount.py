@@ -160,6 +160,22 @@ class TestConnectionRefCounts(RefCountTestCase):
 
         self.assert_refcount_unchanged(fetch_null, None)
 
+    def test_source_putdata(self):
+        self.c.query('create temporary table test_copy (n int)')
+        source = self.c.source()
+        data, text = b'1\n', '2\n'
+        error = ValueError('Copy aborted')
+
+        def copy_from():
+            source.execute('copy test_copy from stdin')
+            self.assertIsNone(source.putdata(data))
+            self.assertIsNone(source.putdata(text))
+            with self.assertRaises(OSError):
+                source.putdata(error)
+
+        for obj in data, text, error, None:
+            self.assert_refcount_unchanged(copy_from, obj)
+
     def test_large_object_pgcnx(self):
         self.c.query('begin')
         try:
