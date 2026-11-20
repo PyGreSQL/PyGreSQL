@@ -95,7 +95,7 @@ def dictiter(q: Query) -> Iterator[dict[str, Any]]:
     """Get query result as an iterator of dictionaries."""
     fields: tuple[str, ...] = q.listfields()
     for r in q:
-        yield dict(zip(fields, r))
+        yield dict(zip(fields, r, strict=True))
 
 
 def namediter(q: Query) -> Iterator[SomeNamedTuple]:

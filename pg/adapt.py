@@ -447,7 +447,7 @@ class Adapter:
             raise TypeError(f'Record parameter {v} has wrong size')
         adapt = self.adapt
         value = []
-        for v, t in zip(v, typ):  # noqa: B020
+        for v, t in zip(v, typ, strict=True):  # noqa: B020
             v = adapt(v, t)
             if v is None:
                 v = ''
@@ -656,7 +656,7 @@ class Adapter:
                         raise TypeError('The values and types do not match')
                     seq_literals = [
                         add(value, typ)
-                        for value, typ in zip(values, types)]
+                        for value, typ in zip(values, types, strict=True)]
                 else:
                     seq_literals = [add(value) for value in values]
             command %= tuple(seq_literals)

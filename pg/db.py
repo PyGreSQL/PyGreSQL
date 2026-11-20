@@ -408,7 +408,7 @@ class DB:
             parameter = {parameter: value}
         elif isinstance(parameter, (list, tuple)):
             if isinstance(value, (list, tuple)):
-                parameter = dict(zip(parameter, value))
+                parameter = dict(zip(parameter, value, strict=True))
             else:
                 parameter = dict.fromkeys(parameter, value)
         elif isinstance(parameter, (set, frozenset)):
@@ -797,7 +797,7 @@ class DB:
             if len(keyname) != len(row):
                 raise KeyError(
                     'Differing number of items in keyname and row')
-            row = dict(zip(keyname, row))
+            row = dict(zip(keyname, row, strict=True))
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
@@ -1141,7 +1141,7 @@ class DB:
             table = [table]
         elif isinstance(table, (list, tuple)):
             if isinstance(only, (list, tuple)):
-                table_only = dict(zip(table, only))
+                table_only = dict(zip(table, only, strict=True))
             else:
                 table_only = dict.fromkeys(table, only)
         elif isinstance(table, (set, frozenset)):
@@ -1346,7 +1346,7 @@ class DB:
                 fields = tuple(f for f in fields if f not in keyset)
                 rows = namediter(_MemoryQuery(rows, fields))  # type: ignore
         # noinspection PyArgumentList
-        return dict(zip(keys, rows))
+        return dict(zip(keys, rows, strict=True))
 
     def notification_handler(self, event: str, callback: Callable,
                              arg_dict: dict | None = None,

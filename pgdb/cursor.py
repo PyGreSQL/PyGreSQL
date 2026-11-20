@@ -318,7 +318,7 @@ class Cursor:
         cast_value = self.type_cache.typecast
         return [row_factory([
             cast_value(value, typ)
-            for typ, value in zip(coltypes, row)])
+            for typ, value in zip(coltypes, row, strict=True)])
             for row in result]
 
     def callproc(self, procname: str, parameters: Sequence | None = None
