@@ -122,6 +122,12 @@ than one location, you can and should use named specifications, like this::
 
 PyGreSQL does not only adapt the basic types like ``int``, ``float``,
 ``bool`` and ``str``, but also tries to make sense of Python lists and tuples.
+Byte strings (``bytes``) are adapted as binary data of the PostgreSQL type
+``bytea``, the same as values created with :func:`Binary`.
+
+.. versionchanged:: 6.3
+    Byte strings were not properly adapted in earlier versions, unless they
+    had been wrapped with :func:`Binary`.
 
 Lists are adapted as PostgreSQL arrays::
 

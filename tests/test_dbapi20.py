@@ -498,6 +498,38 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_insert_bytes(self):
+        values = [b'', b'Hello, World!', b'{a,b,c}', b'"Hi!"',
+                  b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"]
+        table = self.table_prefix + 'booze'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute(f"create table {table} (n smallint, b bytea)")
+            # plain bytes are passed as bytea, like pgdb.Binary
+            cur.executemany(f"insert into {table} values (%d, %s)",
+                            enumerate(values))
+            cur.execute(f"select b from {table} order by n")
+            rows = [row[0] for row in cur.fetchall()]
+            cur.execute(f"select n from {table} where b = %s",
+                        (values[-1],))
+            n = cur.fetchone()[0]
+        finally:
+            con.close()
+        self.assertEqual(rows, values)
+        self.assertEqual(n, len(values) - 1)
+
+    def test_select_bytea_array(self):
+        values = ([b'a', b'', None, b'\x00\xff\\'],)
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select %s::bytea[]", values)
+            row = cur.fetchone()
+        finally:
+            con.close()
+        self.assertEqual(row, values)
+
     def test_integrity_error(self):
         table = self.table_prefix + 'booze'
         con = self._connect()

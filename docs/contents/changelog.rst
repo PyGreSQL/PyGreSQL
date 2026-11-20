@@ -30,6 +30,8 @@ Version 6.3.0 (unreleased)
 
   - The items of `Cursor.description` and the results of
     `TypeCache.get_fields()` are now typed named tuples.
+  - Plain `bytes` parameters are now adapted as `bytea`, like values wrapped
+    with `Binary()`. Before, they were not properly quoted.
 
 - Fixes in the C extension:
 

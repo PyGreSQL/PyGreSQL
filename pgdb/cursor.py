@@ -27,7 +27,7 @@ from pg.core import Connection as Cnx
 from pg.error import db_error, if_error, op_error
 from pg.helpers import QuoteDict, RowCache
 
-from .adapt import Binary, Hstore, Json, Literal
+from .adapt import Hstore, Json, Literal
 from .cast import TypeCache
 from .typecode import TypeCode
 
@@ -78,9 +78,9 @@ class Cursor:
         match value:
             case None:
                 return 'NULL'
-            case Binary():  # must come before bytes
+            case bytes():
                 return f"'{self._cnx.escape_bytea(value).decode('ascii')}'"
-            case bytes() | str():
+            case str():
                 value = self._cnx.escape_string(value)
                 return f"'{value}'"
             case Hstore() | Json():
