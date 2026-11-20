@@ -4018,7 +4018,7 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r[1], list)
         self.assertEqual(r[1][0], dt[1])
 
-    def test_hstore(self):
+    def require_hstore(self):
         try:
             self.db.query("select 'k=>v'::hstore")
         except pg.DatabaseError:
@@ -4026,6 +4026,9 @@ class TestDBClass(unittest.TestCase):
                 self.db.query("create extension hstore")
             except pg.DatabaseError:
                 self.skipTest("hstore extension not enabled")
+
+    def test_hstore(self):
+        self.require_hstore()
         d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
              '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
              '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
@@ -4034,6 +4037,23 @@ class TestDBClass(unittest.TestCase):
         r = self.db.query(q, (pg.Hstore(d),)).getresult()[0][0]
         self.assertIsInstance(r, dict)
         self.assertEqual(r, d)
+
+    def test_insert_get_empty_hstore(self):
+        self.require_hstore()
+        self.create_table(
+            'hstore_test', "n smallint primary key,"
+            " data hstore not null default ''")
+        for n, data in enumerate(({}, pg.Hstore(), '')):
+            r = self.db.insert('hstore_test', n=n, data=data)
+            self.assertEqual(r['data'], {})
+            r = self.db.get('hstore_test', n)
+            self.assertEqual(r['data'], {})
+        r = self.db.update('hstore_test', n=0, data={'k': 'v'})
+        self.assertEqual(r['data'], {'k': 'v'})
+        r = self.db.update('hstore_test', n=0, data={})
+        self.assertEqual(r['data'], {})
+        self.assertRaises(
+            pg.IntegrityError, self.db.insert, 'hstore_test', n=3, data=None)
 
     def test_uuid(self):
         d = UUID('{12345678-1234-5678-1234-567812345678}')
@@ -4450,6 +4470,14 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query("select %s", [value], [pg.Hstore])
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
+
+    def test_adapt_query_typed_with_empty_hstore(self):
+        format_query = self.adapter.format_query
+        values: Any = [None, {}, pg.Hstore(), '']
+        types = ('hstore',) * 4
+        sql, params = format_query("select %s,%s,%s,%s", values, types)
+        self.assertEqual(sql, 'select $1,$2,$3,$4')
+        self.assertEqual(params, [None, '', '', ''])
 
     def test_adapt_query_typed_with_uuid(self):
         format_query = self.adapter.format_query

@@ -15,6 +15,9 @@ Version 6.3.0 (unreleased)
   - `format_query()` now also accepts builtin generic types like `list[int]`.
   - `DB.set_parameter()` and `DB.truncate()` now raise a `ValueError` for
     lists of different lengths instead of silently ignoring extra items.
+  - Empty hstore values (e.g. an empty dict) passed as parameters for hstore
+    columns are no longer adapted as NULL (#96, thanks to D'Arcy Cain for
+    the report).
 
 - Changes in the `pgdb` module:
 
@@ -41,8 +44,6 @@ Version 6.3.0 (unreleased)
   - All project metadata is now defined in `pyproject.toml`. Building requires
     setuptools 77 or newer. New build option ``--pedantic`` for extra compiler
     warnings. The installation instructions have been updated.
-
-- This version was developed with the help of Claude Code.
 
 Version 6.2.3 (2026-01-25)
 --------------------------

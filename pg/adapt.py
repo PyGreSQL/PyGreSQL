@@ -354,7 +354,7 @@ class Adapter:
 
     def _adapt_hstore(self, v: Any) -> str | None:
         """Adapt a hstore parameter."""
-        if not v:
+        if v is None:
             return None
         if isinstance(v, str):
             return v
