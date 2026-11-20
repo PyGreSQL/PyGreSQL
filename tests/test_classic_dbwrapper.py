@@ -3193,6 +3193,36 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, s)
 
+    def test_query_formatted_bytea(self):
+        query_formatted = self.db.query_formatted
+        unescape = pg.unescape_bytea if pg.get_bytea_escaped() else None
+        self.create_table(
+            'bytea_test', 'n smallint primary key, data bytea')
+        s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
+        for n, inline in enumerate((False, True)):
+            query_formatted('insert into bytea_test values (%s, %s)',
+                            (n, s), inline=inline)
+            r = query_formatted(
+                'select data from bytea_test where data = %s',
+                (s,), inline=inline).getresult()
+            self.assertEqual(len(r), n + 1)
+            r = r[n][0]
+            if unescape:
+                r = unescape(r)
+            self.assertIsInstance(r, bytes)
+            self.assertEqual(r, s)
+
+    def test_query_formatted_bytea_array(self):
+        if not pg.get_array() or pg.get_bytea_escaped():
+            self.skipTest('array or bytea conversion is disabled')
+        query_formatted = self.db.query_formatted
+        data = [b'Hello, World!', b'', None, b'{a,b,c}', b'"Hi!"',
+                b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"]
+        for inline in (False, True):
+            r = query_formatted(
+                'select %s::bytea[]', (data,), inline=inline).getresult()
+            self.assertEqual(r, [(data,)])
+
     def test_insert_update_get_bytea(self):
         query = self.db.query
         unescape = pg.unescape_bytea if pg.get_bytea_escaped() else None
@@ -4331,7 +4361,8 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(f(pg.Bytea(b'test')), 'bytea')
         self.assertEqual(f(b'test'), 'bytea')
         self.assertEqual(f('string'), 'text')
-        self.assertEqual(f(b'string'), 'bytea')
+        self.assertEqual(f([b'a', b'b']), 'bytea[]')
+        self.assertEqual(f([[[b'abc']]]), 'bytea[]')
         self.assertEqual(f(True), 'bool')
         self.assertEqual(f(3), 'int')
         self.assertEqual(f(2.75), 'float')
@@ -4343,10 +4374,17 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(f([[['abc']]]), 'text[]')
         self.assertEqual(f([False, True]), 'bool[]')
         self.assertEqual(f([[[False]]]), 'bool[]')
-        r = f(('string', True, 3, 2.75, [1], [False]))
+        r = f(('string', True, 3, 2.75, [1], [False], b'bytes'))
         self.assertEqual(r, 'record')
         self.assertEqual(list(r.attnames.values()), [
-            'text', 'bool', 'int', 'float', 'int[]', 'bool[]'])
+            'text', 'bool', 'int', 'float', 'int[]', 'bool[]', 'bytea'])
+
+    def test_guess_simple_type_of_bytes_subclass(self):
+        class MyBytes(bytes):
+            pass
+
+        f = self.adapter.guess_simple_type
+        self.assertEqual(f(MyBytes(b'test')), 'bytea')
 
     def test_adapt_query_typed_list(self):
         format_query = self.adapter.format_query
@@ -4587,6 +4625,14 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
+    def test_adapt_query_untyped_with_bytes(self):
+        format_query = self.adapter.format_query
+        value = b"it's \\ \x00\xff"
+        sql, params = format_query("select %s, %s", (value, [b'a', b'']))
+        self.assertEqual(sql, "select $1, $2")
+        self.assertEqual(params, [
+            b'\\x69742773205c2000ff', b'{\\\\x61,\\\\x}'])
+
     def test_adapt_query_untyped_dict(self):
         format_query = self.adapter.format_query
         values: dict = dict(i=3, f=7.5, t='hello', b=True)
@@ -4665,6 +4711,15 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query("select %s", (value,), inline=True)
         self.assertEqual(
             sql, "select 'one=>\"it''s fine\",two=>2'::hstore")
+        self.assertEqual(params, [])
+
+    def test_adapt_query_inline_list_with_bytes(self):
+        format_query = self.adapter.format_query
+        value = b"it's \\ \x00\xff"
+        sql, params = format_query(
+            "select %s, %s", (value, [b'a', b'']), inline=True)
+        self.assertEqual(
+            sql, "select '\\x69742773205c2000ff', ARRAY['\\x61','\\x']")
         self.assertEqual(params, [])
 
     def test_adapt_query_inline_dict(self):

@@ -18,6 +18,13 @@ Version 6.3.0 (unreleased)
   - Empty hstore values (e.g. an empty dict) passed as parameters for hstore
     columns are no longer adapted as NULL (#96, thanks to D'Arcy Cain for
     the report).
+  - Plain `bytes` parameters are now adapted as `bytea`, so they do not need
+    to be wrapped with `Bytea()` any more (#94, thanks to Justin Pryzby).
+    Before, they were adapted as text, which truncated binary data at NUL
+    bytes and failed for bytes that were not valid in the client encoding.
+    This also applies to inline parameters, which were not properly quoted
+    before. Note that bytes passed for text columns are now stored as an
+    escaped bytea string like ``\x616263``; pass `str` values for text.
 
 - Changes in the `pgdb` module:
 

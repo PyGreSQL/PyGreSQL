@@ -162,6 +162,14 @@ In real world examples you will rarely have to cast your parameters like that,
 since in an INSERT statement or a WHERE clause comparing the parameter to a
 table column, the data type will be clear from the context.
 
+Byte strings (``bytes``) are adapted as binary data of the PostgreSQL type
+``bytea``, while ``str`` values are adapted as text.  If you have text that
+is already encoded as bytes, decode it to ``str`` before passing it.
+
+.. versionchanged:: 6.3
+    Byte strings were adapted as text in earlier versions, unless they had
+    been wrapped with :func:`Bytea`.
+
 When binding the parameters to a query, PyGreSQL not only adapts the basic
 types like ``int``, ``float``, ``bool`` and ``str``, but also tries to make
 sense of Python lists and tuples.

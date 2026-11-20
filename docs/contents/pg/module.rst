@@ -706,6 +706,10 @@ type of the parameters, if it cannot be derived from the context.
 
 .. versionadded:: 5.0
 
+.. versionchanged:: 6.3
+    Plain ``bytes`` values are now also adapted as ``bytea``, so this
+    wrapper is no longer needed for them.
+
 .. function:: HStore(dict)
 
     A wrapper for holding an hstore dictionary

@@ -520,8 +520,10 @@ class Adapter:
             return _simple_type_dict[type(value)]
         except KeyError:
             pass
-        if isinstance(value, (bytes, str)):
+        if isinstance(value, str):
             return 'text'
+        if isinstance(value, bytes):
+            return 'bytea'
         if isinstance(value, bool):
             return 'bool'
         if isinstance(value, int):
@@ -532,8 +534,6 @@ class Adapter:
             return 'num'
         if isinstance(value, (date, time, datetime, timedelta)):
             return 'date'
-        if isinstance(value, Bytea):
-            return 'bytea'
         if isinstance(value, Json):
             return 'json'
         if isinstance(value, Hstore):
@@ -574,11 +574,11 @@ class Adapter:
             return 'NULL'
         if isinstance(value, Literal):
             return value
-        if isinstance(value, Bytea):
+        if isinstance(value, bytes):
             value = self.db.escape_bytea(value).decode('ascii')
         elif isinstance(value, (datetime, date, time, timedelta)):
             value = str(value)
-        if isinstance(value, (bytes, str)):
+        if isinstance(value, str):
             value = self.db.escape_string(value)
             return f"'{value}'"
         if isinstance(value, bool):
