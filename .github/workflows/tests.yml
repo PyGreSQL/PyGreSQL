@@ -9,28 +9,27 @@ on:
 jobs:
   tests:
     name: Unit tests run
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
       matrix:
+        # libpq "pgdg" means the latest libpq from apt.postgresql.org,
+        # "distro" means the older libpq shipped with the Ubuntu runner.
         include:
-          - { python: "3.8", postgres: "12" }
-          - { python: "3.9", postgres: "13" }
-          - { python: "3.10", postgres: "14" }
-          - { python: "3.11", postgres: "15" }
-          - { python: "3.12", postgres: "16" }
-          - { python: "3.13", postgres: "17" }
-          - { python: "3.14", postgres: "18" }
+          # Diagonal through the supported Py/PG range
+          - { python: "3.10", postgres: "12", libpq: "pgdg" }
+          - { python: "3.11", postgres: "14", libpq: "pgdg" }
+          - { python: "3.12", postgres: "15", libpq: "pgdg" }
+          - { python: "3.13", postgres: "16", libpq: "pgdg" }
+          - { python: "3.14", postgres: "17", libpq: "pgdg" }
+          - { python: "3.15", postgres: "19", libpq: "pgdg" }
 
-          # Opposite extremes of the supported Py/PG range, other architecture
-          - { python: "3.8", postgres: "18", architecture: "x86" }
-          - { python: "3.9", postgres: "17", architecture: "x86" }
-          - { python: "3.10", postgres: "16", architecture: "x86" }
-          - { python: "3.11", postgres: "15", architecture: "x86" }
-          - { python: "3.12", postgres: "14", architecture: "x86" }
-          - { python: "3.13", postgres: "13", architecture: "x86" }
-          - { python: "3.14", postgres: "12", architecture: "x86" }
+          # Opposite extremes and remaining versions, older libpq
+          - { python: "3.10", postgres: "19", libpq: "distro" }
+          - { python: "3.12", postgres: "13", libpq: "distro" }
+          - { python: "3.13", postgres: "18", libpq: "distro" }
+          - { python: "3.15", postgres: "12", libpq: "distro" }
 
     env:
       PYGRESQL_DB: test
@@ -56,6 +55,21 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+      - name: Install latest libpq from PGDG
+        if: matrix.libpq == 'pgdg'
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y libpq-dev
+      - name: Install libpq from Ubuntu
+        if: matrix.libpq == 'distro'
+        # the runner image may already use PGDG, so pin the Ubuntu archive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --allow-downgrades \
+            libpq5/noble-updates libpq-dev/noble-updates
+      - name: Show libpq version
+        run: pg_config --version
       - name: Install tox
         run: pip install tox
       - name: Setup Python
