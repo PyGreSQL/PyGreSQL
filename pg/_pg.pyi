@@ -431,7 +431,7 @@ class Query:
         """Get field name from its number."""
         ...
 
-    def fieldnum(self, name: str) -> int:
+    def fieldnum(self, name: str | bytes) -> int:
         """Get field number from its name."""
         ...
 
@@ -439,7 +439,8 @@ class Query:
         """List field names of query result."""
         ...
 
-    def fieldinfo(self, column: int | str | None) -> tuple[str, int, int, int]:
+    def fieldinfo(self, column: int | str | bytes | None
+                  ) -> tuple[str, int, int, int]:
         """Get information on one or all fields of the query.
 
         The four-tuples contain the following information:

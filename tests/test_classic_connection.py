@@ -756,6 +756,12 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).fieldname(3)
         self.assertEqual(r, 'y')
 
+    def test_fieldname_out_of_range(self):
+        q = self.c.query("select 0 as x")
+        self.assertRaises(ValueError, q.fieldname, 1)
+        # negative numbers crashed before
+        self.assertRaises(ValueError, q.fieldname, -1)
+
     def test_fieldnum(self):
         q = "select 1 as x"
         self.assertRaises(ValueError, self.c.query(q).fieldnum, 'y')
@@ -770,6 +776,13 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).fieldnum('y')
         self.assertIsInstance(r, int)
         self.assertEqual(r, 3)
+        r = self.c.query(q).fieldnum(b'y')
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 3)
+        self.assertRaises(TypeError, self.c.query(q).fieldnum, 3)
+        # names were truncated at NUL characters
+        self.assertRaises(ValueError, self.c.query(q).fieldnum, 'y\0z')
+        self.assertRaises(ValueError, self.c.query(q).fieldinfo, b'y\0z')
 
     def test_field_info_name(self):
         q = ('select true as FooBar, 42::smallint as "FooBar",'
@@ -1043,6 +1056,26 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
+    def test_field_names_latin1(self):
+        try:
+            self.c.query('set client_encoding=latin1')
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support latin1")
+        # field names were decoded as UTF-8 (and namedresult crashed)
+        q = self.c.query('select 1 as "größe", \'wär\'::text as "ä"')
+        self.assertEqual(q.listfields(), ('größe', 'ä'))
+        self.assertEqual(q.fieldname(0), 'größe')
+        self.assertEqual(q.fieldnum('größe'), 0)
+        self.assertEqual(q.fieldnum('"ä"'), 1)
+        self.assertEqual(q.fieldnum('größe'.encode('latin1')), 0)
+        self.assertEqual(q.fieldinfo('größe'), ('größe', 23, 4, -1))
+        self.assertEqual(q.fieldinfo()[1], ('ä', 25, -1, -1))
+        self.assertEqual(q.dictresult(), [{'größe': 1, 'ä': 'wär'}])
+        self.assertEqual(q.namedresult()[0]._fields, ('größe', 'ä'))
+        # the query was also decoded as UTF-8 when printing it
+        self.assertEqual(str(q).splitlines()[0], 'größe| ä ')
+        self.assertEqual(str(q).splitlines()[2], '    1|wär')
+
 
 class TestUndecodableText(unittest.TestCase):
     """Test text that cannot be decoded with the client encoding."""
@@ -1054,7 +1087,7 @@ class TestUndecodableText(unittest.TestCase):
         # chr(228) is non-ASCII in all server encodings
         self.raw = self.c.query("select chr(228)").singlescalar()
         self.assertIsInstance(self.raw, bytes)
-        # messages are decoded as UTF-8 with escapes instead
+        # names and messages are decoded as UTF-8 with escapes instead
         self.text = self.raw.decode('utf-8', 'backslashreplace')
 
     def tearDown(self):
@@ -1118,12 +1151,84 @@ class TestUndecodableText(unittest.TestCase):
         self.assertIn(f'w{self.text}r', error.args[0])
         self.assertEqual(error.sqlstate, 'P0001')
 
+    def test_field_names(self):
+        raw, text = self.raw, self.text
+        q = self.c.query(b'select 1 as "w' + raw + b'r", 2 as b')
+        # this raised SystemError before
+        self.assertEqual(q.listfields(), (f'w{text}r', 'b'))
+        self.assertEqual(q.fieldname(0), f'w{text}r')
+        self.assertEqual(q.fieldnum(b'"w' + raw + b'r"'), 0)
+        self.assertEqual(q.fieldinfo(0), (f'w{text}r', 23, 4, -1))
+        self.assertEqual(q.fieldinfo()[0], (f'w{text}r', 23, 4, -1))
+        self.assertEqual(q.dictresult(), [{f'w{text}r': 1, 'b': 2}])
+        self.assertEqual(q.namedresult(), [(1, 2)])
+        # names are looked up like they are decoded, i.e. with UTF-8
+        # instead of SQL_ASCII, so the names from listfields() can be used
+        # if they were valid UTF-8 (otherwise they contain escapes)
+        if self.c.parameter('server_encoding') == 'UTF8':
+            self.assertEqual(q.fieldnum(f'"w{text}r"'), 0)
+            self.assertEqual(q.fieldinfo(f'"w{text}r"')[0], f'w{text}r')
+        else:
+            self.assertRaises(ValueError, q.fieldnum, f'"w{text}r"')
+        self.assertRaises(ValueError, q.fieldnum, '"wör"')
+
+    def test_str(self):
+        q = self.c.query("select 'w' || chr(228) || 'r' as a")
+        self.assertEqual(str(q).splitlines()[2], f'w{self.text}r')
+
     def test_source(self):
-        raw = self.raw
+        raw, text = self.raw, self.text
         s = self.c.source()
-        s.execute("select 'w' || chr(228) || 'r' as a")
+        s.execute(b"select 'w' || chr(228) || 'r' as \"" + raw + b'"')
+        self.assertEqual(s.listinfo(), ((0, text, 25, -1, -1),))
+        self.assertEqual(s.fieldinfo(b'"' + raw + b'"'),
+                         (0, text, 25, -1, -1))
         # this raised SystemError before
         self.assertEqual(s.fetch(1), [(b'w' + raw + b'r',)])
+
+
+class TestSourceFields(unittest.TestCase):
+    """Test the field methods of source objects."""
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query('set client_encoding=utf8')
+        self.s = self.c.source()
+
+    def tearDown(self):
+        self.s.close()
+        self.c.close()
+
+    def test_listinfo(self):
+        self.s.execute("select 1 as a, 'b'::text as \"MixedCase\"")
+        self.assertEqual(self.s.listinfo(), (
+            (0, 'a', 23, 4, -1), (1, 'MixedCase', 25, -1, -1)))
+
+    def test_fieldinfo(self):
+        self.s.execute("select 1 as a, 'b'::text as \"MixedCase\"")
+        fieldinfo = self.s.fieldinfo
+        self.assertEqual(fieldinfo(0), (0, 'a', 23, 4, -1))
+        self.assertEqual(fieldinfo(1), (1, 'MixedCase', 25, -1, -1))
+        # looking up fields by name did not work before
+        self.assertEqual(fieldinfo('a'), (0, 'a', 23, 4, -1))
+        self.assertEqual(fieldinfo('"MixedCase"'),
+                         (1, 'MixedCase', 25, -1, -1))
+        self.assertEqual(fieldinfo(b'a'), (0, 'a', 23, 4, -1))
+        self.assertRaises(ValueError, fieldinfo, 'b')
+        self.assertRaises(ValueError, fieldinfo, 'a\0b')
+        self.assertRaises(ValueError, fieldinfo, 2)
+        self.assertRaises(TypeError, fieldinfo, 1.0)
+
+    def test_field(self):
+        self.s.execute("select 1 as a, 'b'::text as \"MixedCase\"")
+        self.assertEqual(self.s.fetch(1), [('1', 'b')])
+        self.s.movefirst()
+        field = self.s.field
+        self.assertEqual(field(0), '1')
+        self.assertEqual(field('a'), '1')
+        self.assertEqual(field('"MixedCase"'), 'b')
+        self.assertEqual(field(b'a'), '1')
+        self.assertRaises(ValueError, field, 'c')
 
 
 class TestParamQueries(unittest.TestCase):

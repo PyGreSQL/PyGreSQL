@@ -31,7 +31,7 @@ query_dealloc(queryObject *self)
 static PyObject *
 query_str(queryObject *self)
 {
-    return format_result(self->result);
+    return format_result(self->result, self->encoding);
 }
 
 /* Return length of a query object. */
@@ -271,15 +271,17 @@ static PyObject *
 query_listfields(queryObject *self, PyObject *Py_UNUSED(noargs))
 {
     int i;
-    char *name;
     PyObject *fieldstuple, *str;
 
     /* builds tuple */
     fieldstuple = PyTuple_New(self->num_fields);
     if (fieldstuple) {
         for (i = 0; i < self->num_fields; ++i) {
-            name = PQfname(self->result, i);
-            str = PyUnicode_FromString(name);
+            str = get_decoded_text(PQfname(self->result, i), self->encoding);
+            if (!str) {
+                Py_DECREF(fieldstuple);
+                return NULL;
+            }
             PyTuple_SET_ITEM(fieldstuple, i, str);
         }
     }
@@ -294,7 +296,6 @@ static PyObject *
 query_fieldname(queryObject *self, PyObject *args)
 {
     int i;
-    char *name;
 
     /* gets args */
     if (!PyArg_ParseTuple(args, "i", &i)) {
@@ -304,14 +305,13 @@ query_fieldname(queryObject *self, PyObject *args)
     }
 
     /* checks number validity */
-    if (i >= self->num_fields) {
+    if (i < 0 || i >= self->num_fields) {
         PyErr_SetString(PyExc_ValueError, "Invalid field number");
         return NULL;
     }
 
     /* gets fields name and builds object */
-    name = PQfname(self->result, i);
-    return PyUnicode_FromString(name);
+    return get_decoded_text(PQfname(self->result, i), self->encoding);
 }
 
 /* Get field number from name in last result. */
@@ -322,17 +322,22 @@ static PyObject *
 query_fieldnum(queryObject *self, PyObject *args)
 {
     int num;
-    char *name;
+    PyObject *name_obj;
 
     /* gets args */
-    if (!PyArg_ParseTuple(args, "s", &name)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "Method fieldnum() takes a string as argument");
+    if (!PyArg_ParseTuple(args, "O", &name_obj)) {
+        return NULL;
+    }
+    if (!(name_obj = get_encoded_name(
+              name_obj, self->encoding,
+              "Method fieldnum() takes a string as argument"))) {
         return NULL;
     }
 
     /* gets field number */
-    if ((num = PQfnumber(self->result, name)) == -1) {
+    num = PQfnumber(self->result, PyBytes_AS_STRING(name_obj));
+    Py_DECREF(name_obj);
+    if (num == -1) {
         PyErr_SetString(PyExc_ValueError, "Unknown field");
         return NULL;
     }
@@ -342,13 +347,18 @@ query_fieldnum(queryObject *self, PyObject *args)
 
 /* Build a tuple with info for query field with given number. */
 static PyObject *
-_query_build_field_info(PGresult *res, int col_num)
+_query_build_field_info(PGresult *res, int col_num, int encoding)
 {
-    PyObject *info;
+    PyObject *info, *name;
 
+    if (!(name = get_decoded_text(PQfname(res, col_num), encoding)))
+        return NULL;
     info = PyTuple_New(4);
-    if (info) {
-        PyTuple_SET_ITEM(info, 0, PyUnicode_FromString(PQfname(res, col_num)));
+    if (!info) {
+        Py_DECREF(name);
+    }
+    else {
+        PyTuple_SET_ITEM(info, 0, name);
         PyTuple_SET_ITEM(info, 1,
                          PyLong_FromLong((long)PQftype(res, col_num)));
         PyTuple_SET_ITEM(info, 2, PyLong_FromLong(PQfsize(res, col_num)));
@@ -377,36 +387,31 @@ query_fieldinfo(queryObject *self, PyObject *args)
     /* check optional field arg */
     if (field) {
         /* gets field number */
-        if (PyBytes_Check(field)) {
-            num = PQfnumber(self->result, PyBytes_AsString(field));
-        }
-        else if (PyUnicode_Check(field)) {
-            PyObject *tmp = get_encoded_string(field, self->encoding);
-            if (!tmp)
-                return NULL;
-            num = PQfnumber(self->result, PyBytes_AsString(tmp));
-            Py_DECREF(tmp);
-        }
-        else if (PyLong_Check(field)) {
+        if (PyLong_Check(field)) {
             num = (int)PyLong_AsLong(field);
         }
         else {
-            PyErr_SetString(PyExc_TypeError,
-                            "Field should be given as column number or name");
-            return NULL;
+            PyObject *name = get_encoded_name(
+                field, self->encoding,
+                "Field should be given as column number or name");
+            if (!name)
+                return NULL;
+            num = PQfnumber(self->result, PyBytes_AS_STRING(name));
+            Py_DECREF(name);
         }
         if (num < 0 || num >= self->num_fields) {
             PyErr_SetString(PyExc_IndexError, "Unknown field");
             return NULL;
         }
-        return _query_build_field_info(self->result, num);
+        return _query_build_field_info(self->result, num, self->encoding);
     }
 
     if (!(result = PyTuple_New(self->num_fields))) {
         return NULL;
     }
     for (num = 0; num < self->num_fields; ++num) {
-        PyObject *info = _query_build_field_info(self->result, num);
+        PyObject *info =
+            _query_build_field_info(self->result, num, self->encoding);
         if (!info) {
             Py_DECREF(result);
             return NULL;
@@ -517,14 +522,26 @@ _query_row_as_dict(queryObject *self)
     }
 
     for (j = 0; j < self->num_fields; ++j) {
-        PyObject *val = _query_value_in_column(self, j);
+        PyObject *key, *val;
+        int ret;
 
-        if (!val) {
+        if (!(val = _query_value_in_column(self, j))) {
             Py_DECREF(row_dict);
             return NULL;
         }
-        PyDict_SetItemString(row_dict, PQfname(self->result, j), val);
+        if (!(key = get_decoded_text(PQfname(self->result, j),
+                                     self->encoding))) {
+            Py_DECREF(val);
+            Py_DECREF(row_dict);
+            return NULL;
+        }
+        ret = PyDict_SetItem(row_dict, key, val);
+        Py_DECREF(key);
         Py_DECREF(val);
+        if (ret) {
+            Py_DECREF(row_dict);
+            return NULL;
+        }
     }
 
     return row_dict;

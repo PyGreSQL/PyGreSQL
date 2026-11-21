@@ -363,7 +363,8 @@ result values.
 
     Get field number from its name
 
-    :param str name: field name
+    :param name: field name
+    :type name: str or bytes
     :returns: field number
     :rtype: int
     :raises TypeError: invalid connection, bad parameter type, or too many parameters
@@ -372,7 +373,12 @@ result values.
 This method returns a field number given its name. It can be used to
 build a function that converts result list strings to their correct
 type, using a hardcoded table definition. The number returned is the
-field rank in the query result.
+field rank in the query result. The name is encoded with the client
+encoding, it can also be passed as bytes, which are not encoded.
+
+.. versionchanged:: 6.3
+    The name is encoded with the client encoding instead of UTF-8,
+    and it can also be passed as bytes.
 
 fieldinfo -- detailed info about query result fields
 ----------------------------------------------------
@@ -382,7 +388,7 @@ fieldinfo -- detailed info about query result fields
     Get information on one or all fields of the query
 
     :param field: a column number or name (optional)
-    :type field: int or str
+    :type field: int, str or bytes
     :returns: field info tuple(s) for all fields or given field
     :rtype: tuple
     :raises IndexError: field does not exist

@@ -29,7 +29,7 @@ source_str(sourceObject *self)
 {
     switch (self->result_type) {
         case RESULT_DQL:
-            return format_result(self->result);
+            return format_result(self->result, self->encoding);
         case RESULT_DDL:
         case RESULT_DML:
             return PyUnicode_FromString(PQcmdStatus(self->result));
@@ -647,15 +647,16 @@ _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
         return -1;
 
     /* gets field number */
-    if (PyUnicode_Check(param)) {
-        num = PQfnumber(self->result, PyBytes_AsString(param));
-    }
-    else if (PyLong_Check(param)) {
+    if (PyLong_Check(param)) {
         num = (int)PyLong_AsLong(param);
     }
     else {
-        PyErr_SetString(PyExc_TypeError, usage);
-        return -1;
+        PyObject *name = get_encoded_name(param, self->encoding, usage);
+
+        if (!name)
+            return -1;
+        num = PQfnumber(self->result, PyBytes_AS_STRING(name));
+        Py_DECREF(name);
     }
 
     /* checks field validity */
@@ -671,18 +672,23 @@ _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
 static PyObject *
 _source_buildinfo(sourceObject *self, int num)
 {
-    PyObject *result;
+    PyObject *result, *name;
+
+    if (!(name =
+              get_decoded_text(PQfname(self->result, num), self->encoding))) {
+        return NULL;
+    }
 
     /* allocates tuple */
     result = PyTuple_New(5);
     if (!result) {
+        Py_DECREF(name);
         return NULL;
     }
 
     /* affects field information */
     PyTuple_SET_ITEM(result, 0, PyLong_FromLong(num));
-    PyTuple_SET_ITEM(result, 1,
-                     PyUnicode_FromString(PQfname(self->result, num)));
+    PyTuple_SET_ITEM(result, 1, name);
     PyTuple_SET_ITEM(result, 2,
                      PyLong_FromLong((long)PQftype(self->result, num)));
     PyTuple_SET_ITEM(result, 3, PyLong_FromLong(PQfsize(self->result, num)));

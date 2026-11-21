@@ -86,6 +86,41 @@ get_decoded_text(const char *str, int encoding)
     return obj;
 }
 
+/* Get a name for a lookup given as str or as bytes as a new reference to a
+   bytes object. Like get_decoded_text(), names that cannot be encoded with
+   the given encoding are encoded as UTF-8. Return NULL and set a TypeError
+   with the given message if the name is neither str nor bytes, or a
+   ValueError if it contains NUL characters. */
+PyObject *
+get_encoded_name(PyObject *name, int encoding, const char *usage)
+{
+    PyObject *bytes;
+
+    if (PyBytes_Check(name)) {
+        bytes = Py_NewRef(name);
+    }
+    else if (PyUnicode_Check(name)) {
+        /* encode like names are decoded, since this is only a lookup */
+        if (!(bytes = get_encoded_string(name, encoding))) {
+            if (!_is_codec_error())
+                return NULL;
+            PyErr_Clear();
+            if (!(bytes = PyUnicode_AsUTF8String(name)))
+                return NULL;
+        }
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, usage);
+        return NULL;
+    }
+    if (strlen(PyBytes_AS_STRING(bytes)) != (size_t)PyBytes_GET_SIZE(bytes)) {
+        Py_DECREF(bytes);
+        PyErr_SetString(PyExc_ValueError, "embedded null character");
+        return NULL;
+    }
+    return bytes;
+}
+
 PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding)
 {
@@ -1284,7 +1319,7 @@ get_ssl_attributes(PGconn *cnx)
    PostgreSQL can be problematic if they use different libs for streams
    and because using PQprint() and tp_print is not recommended any more. */
 PyObject *
-format_result(const PGresult *res)
+format_result(const PGresult *res, int encoding)
 {
     const int n = PQnfields(res);
 
@@ -1409,7 +1444,7 @@ format_result(const PGresult *res)
                 snprintf(p, size - (size_t)(p - buffer), "(%d row%s)", m,
                          m == 1 ? "" : "s");
                 /* return the result */
-                result = PyUnicode_FromString(buffer);
+                result = get_decoded_text(buffer, encoding);
                 PyMem_Free(buffer);
                 return result;
             }

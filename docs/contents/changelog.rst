@@ -91,6 +91,18 @@ Version 6.3.0 (unreleased)
     `json.loads()` decodes as UTF-8. Error messages that cannot be decoded
     also raised a `SystemError`, they are now decoded as UTF-8 with backslash
     escapes, like notices.
+  - Field names were always decoded as UTF-8 instead of the client encoding,
+    which caused errors or crashes with non-ASCII field names, as did
+    `str()` of a query or source object. Field names that cannot be decoded
+    with the client encoding are now decoded as UTF-8 with backslash escapes.
+    `Query.fieldnum()` now encodes the name with the client encoding instead
+    of UTF-8, falling back to UTF-8 like the decoding of field names, so
+    that the names returned by `Query.listfields()` can be used. It also
+    accepts bytes. Names containing NUL characters now raise a `ValueError`
+    instead of being truncated. `Query.fieldname()` crashed with a negative
+    field number.
+  - The `fieldinfo()` and `field()` methods of the source object can now
+    look up fields by name (passed as str or bytes), which always failed.
   - Casting records with a sequence of cast functions leaked references to
     these functions.
 

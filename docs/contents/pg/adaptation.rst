@@ -69,14 +69,16 @@ Strings are encoded and decoded with the client encoding of the connection
   returned as ``bytes`` instead. This also applies to the elements of arrays,
   records and hstore values. JSON values are then passed to the JSON decoder
   as ``bytes``, which :func:`json.loads` decodes as UTF-8.
-- Error messages and notices are always ``str``. If they cannot be decoded
-  with the client encoding, they are decoded as UTF-8 with backslash escapes
-  for invalid bytes (e.g. the byte 0xE4 becomes the four characters
-  ``\xe4``).
+- Field names, error messages and notices are always ``str``. If they cannot
+  be decoded with the client encoding, they are decoded as UTF-8 with
+  backslash escapes for invalid bytes (e.g. the byte 0xE4 becomes the four
+  characters ``\xe4``). Field names passed
+  to :meth:`Query.fieldnum` or :meth:`Query.fieldinfo` are encoded the same
+  way, so the names returned by :meth:`Query.listfields` can be used there.
 
 .. versionchanged:: 6.3
     Undecodable text values are returned as ``bytes`` again, also as elements
-    of arrays and records.
+    of arrays and records. Field names are decoded with the client encoding.
 
 
 Adaptation of parameters
