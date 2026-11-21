@@ -1527,6 +1527,15 @@ notice_receiver(void *arg, const PGresult *res)
     if (func) {
         noticeObject *notice;
         PyObject *ret = NULL;
+        /* libpq may call the receiver while an exception is pending (e.g.
+           when inserttable() sends remaining data after an iteration
+           error), so it must be saved and restored afterwards */
+#if PY_VERSION_HEX >= 0x030C0000
+        PyObject *exc = PyErr_GetRaisedException();
+#else
+        PyObject *exc_type, *exc_value, *exc_tb;
+        PyErr_Fetch(&exc_type, &exc_value, &exc_tb);
+#endif
 
         /* the receiver may replace itself while it is running */
         Py_INCREF(func);
@@ -1543,6 +1552,11 @@ notice_receiver(void *arg, const PGresult *res)
         else /* we cannot raise exceptions from here */
             PyErr_WriteUnraisable(func);
         Py_DECREF(func);
+#if PY_VERSION_HEX >= 0x030C0000
+        PyErr_SetRaisedException(exc);
+#else
+        PyErr_Restore(exc_type, exc_value, exc_tb);
+#endif
     }
     PyGILState_Release(gstate);
 }

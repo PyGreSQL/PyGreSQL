@@ -14,6 +14,7 @@ from __future__ import annotations
 import ctypes
 import datetime
 import os
+import socket
 import sys
 import threading
 import time
@@ -2645,6 +2646,57 @@ class TestNotificatons(unittest.TestCase):
         self.assertEqual(
             received, ['Bilbo was here!', 'other: Frodo was here!'])
         self.assertIs(self.c.get_notice_receiver(), other_receiver)
+
+    def test_notice_receiver_with_pending_exception(self):
+        # libpq can call the notice receiver while an exception is pending,
+        # e.g. when inserttable() sends the remaining data after the
+        # iterable has raised an error; this exception must not get lost
+        query = self.c.query
+        query("create temporary table test_notice_pending (t text)")
+        # use notices, since warnings would also go to the server log
+        query("""create function pg_temp.test_notice_pending()
+            returns trigger language plpgsql as $$ begin
+            raise notice '%', repeat('x', 1000); return new; end $$""")
+        query("""create trigger test_notice_pending
+            before insert on test_notice_pending for each row
+            execute function pg_temp.test_notice_pending()""")
+        query("set client_min_messages to notice")
+        # libpq only reads the notices while it is blocked sending data,
+        # and passes them to the receiver when it sends the next data, so
+        # make the send buffer small to ensure that this happens
+        with socket.socket(fileno=os.dup(self.c.fileno())) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+        raised = False  # set when the iterable raises the error
+        received_after_error = 0
+
+        def receiver(notice):
+            nonlocal received_after_error
+            if raised:
+                received_after_error += 1
+
+        self.c.set_notice_receiver(receiver)
+        row = ('y' * 1000,)
+
+        def rows():
+            nonlocal raised
+            # inserttable() sends the data in chunks of 128 kB
+            for _i in range(300):
+                yield row
+            raised = True
+            raise RuntimeError('Bilbo is gone!')
+
+        for _i in range(5):
+            raised = False
+            with self.assertRaises(RuntimeError) as cm:
+                self.c.inserttable('test_notice_pending', rows())
+            self.assertEqual(str(cm.exception), 'Bilbo is gone!')
+            raised = False
+            # the COPY must not have been completed
+            self.assertEqual(query(
+                "select count(*) from test_notice_pending").getresult(),
+                [(0,)])
+        # make sure that the test really covered the situation
+        self.assertGreater(received_after_error, 0)
 
     def test_notice_receiver_with_undecodable_message(self):
         encoding = self.c.parameter('server_encoding')
