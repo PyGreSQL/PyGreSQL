@@ -858,6 +858,7 @@ when storing data using :meth:`DB.insert` and similar.
     :param str string: the string that is to be escaped
     :returns: the escaped string
     :rtype: str
+    :raises DataError: a bytes string with invalid multibyte characters
 
 This method escapes a string for use within an SQL command. This is useful
 when inserting data values as literal constants in SQL commands. Certain
@@ -873,6 +874,7 @@ from being interpreted specially by the SQL parser.
     :param str string: the string that is to be escaped
     :returns: the escaped string
     :rtype: str
+    :raises DataError: a bytes string with invalid multibyte characters
 
 This method escapes a string for use as an SQL identifier, such as a table,
 column, or function name. This is useful when a user-supplied identifier

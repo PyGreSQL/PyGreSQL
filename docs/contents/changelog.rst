@@ -59,6 +59,11 @@ Version 6.3.0 (unreleased)
     freed when their notice receiver or cast hook refers back to them, e.g.
     as a bound method of an object holding the connection. Closing the
     connection also releases the notice receiver.
+  - The `escape_literal()` and `escape_identifier()` methods crashed for
+    bytes containing invalid multibyte characters, they now raise a
+    `DataError`. The escape methods of a connection that had been closed
+    after the method was looked up now raise a `TypeError` instead of
+    crashing or returning an empty string.
 
 - Modernization and build:
 

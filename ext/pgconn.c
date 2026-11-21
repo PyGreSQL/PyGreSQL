@@ -1200,6 +1200,11 @@ conn_escape_literal(connObject *self, PyObject *string)
     size_t to_length;         /* length of result */
     int encoding = -1;        /* client encoding */
 
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
+
     if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
@@ -1218,16 +1223,20 @@ conn_escape_literal(connObject *self, PyObject *string)
     }
 
     to = PQescapeLiteral(self->cnx, from, (size_t)from_length);
-    to_length = strlen(to);
 
     Py_XDECREF(tmp_obj);
+
+    if (!to) {
+        set_error(DataError, "Cannot escape literal", self->cnx, NULL);
+        return NULL;
+    }
+    to_length = strlen(to);
 
     if (encoding == -1)
         to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t)to_length);
     else
         to_obj = get_decoded_string(to, (Py_ssize_t)to_length, encoding);
-    if (to)
-        PQfreemem(to);
+    PQfreemem(to);
     return to_obj;
 }
 
@@ -1245,6 +1254,11 @@ conn_escape_identifier(connObject *self, PyObject *string)
     Py_ssize_t from_length;   /* length of string */
     size_t to_length;         /* length of result */
     int encoding = -1;        /* client encoding */
+
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
 
     if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &from, &from_length);
@@ -1264,16 +1278,20 @@ conn_escape_identifier(connObject *self, PyObject *string)
     }
 
     to = PQescapeIdentifier(self->cnx, from, (size_t)from_length);
-    to_length = strlen(to);
 
     Py_XDECREF(tmp_obj);
+
+    if (!to) {
+        set_error(DataError, "Cannot escape identifier", self->cnx, NULL);
+        return NULL;
+    }
+    to_length = strlen(to);
 
     if (encoding == -1)
         to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t)to_length);
     else
         to_obj = get_decoded_string(to, (Py_ssize_t)to_length, encoding);
-    if (to)
-        PQfreemem(to);
+    PQfreemem(to);
     return to_obj;
 }
 
@@ -1291,6 +1309,11 @@ conn_escape_string(connObject *self, PyObject *string)
     Py_ssize_t from_length;   /* length of string */
     size_t to_length;         /* length of result */
     int encoding = -1;        /* client encoding */
+
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
 
     if (PyBytes_Check(string)) {
         PyBytes_AsStringAndSize(string, &from, &from_length);
@@ -1314,6 +1337,10 @@ conn_escape_string(connObject *self, PyObject *string)
         from_length = (from_length - 1) / 2;
     }
     to = (char *)PyMem_Malloc(to_length);
+    if (!to) {
+        Py_XDECREF(tmp_obj);
+        return PyErr_NoMemory();
+    }
     to_length =
         PQescapeStringConn(self->cnx, to, from, (size_t)from_length, NULL);
 
@@ -1343,6 +1370,11 @@ conn_escape_bytea(connObject *self, PyObject *data)
     size_t to_length;         /* length of result */
     int encoding = -1;        /* client encoding */
 
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
+
     if (PyBytes_Check(data)) {
         PyBytes_AsStringAndSize(data, &from, &from_length);
     }
@@ -1364,12 +1396,14 @@ conn_escape_bytea(connObject *self, PyObject *data)
 
     Py_XDECREF(tmp_obj);
 
+    if (!to)
+        return PyErr_NoMemory();
+
     if (encoding == -1)
         to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t)to_length - 1);
     else
         to_obj = get_decoded_string(to, (Py_ssize_t)to_length - 1, encoding);
-    if (to)
-        PQfreemem(to);
+    PQfreemem(to);
     return to_obj;
 }
 

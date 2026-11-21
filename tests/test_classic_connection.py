@@ -334,6 +334,28 @@ class TestConnectObject(unittest.TestCase):
             self.fail('Query should give an error for a closed connection')
         self.connection = connect()
 
+    def test_escape_methods_after_close(self):
+        connection = self.connection
+        methods = [connection.escape_literal, connection.escape_identifier,
+                   connection.escape_string, connection.escape_bytea]
+        connection.close()
+        for method in methods:
+            for arg in ('x', b'x'):
+                with self.assertRaises(TypeError) as cm:
+                    method(arg)
+                self.assertEqual(str(cm.exception), 'Connection is not valid')
+        self.connection = connect()
+
+    def test_escape_literal_and_identifier_with_invalid_bytes(self):
+        connection = self.connection
+        connection.query("set client_encoding=utf8")
+        invalid = '€'.encode()[:2]  # incomplete multibyte character
+        for method in connection.escape_literal, connection.escape_identifier:
+            with self.assertRaises(pg.DataError) as cm:
+                method(invalid)
+            self.assertIn('multibyte character', str(cm.exception))
+            self.assertEqual(method('€'.encode()), method('€').encode())
+
     def test_method_reset(self):
         query = self.connection.query
         # check that client encoding gets reset
