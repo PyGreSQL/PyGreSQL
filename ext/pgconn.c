@@ -113,6 +113,15 @@ conn_getattr(connObject *self, PyObject *nameobj)
     if (!strcmp(name, "protocol_version"))
         return PyLong_FromLong(PQprotocolVersion(self->cnx));
 
+    /* Python codec name of the client encoding */
+    if (!strcmp(name, "encoding")) {
+        int encoding = get_client_encoding(self);
+
+        if (encoding < 0)
+            return NULL;
+        return PyUnicode_FromString(get_codec_name(encoding));
+    }
+
     /* backend version */
     if (!strcmp(name, "server_version"))
         return PyLong_FromLong(PQserverVersion(self->cnx));
@@ -1834,10 +1843,10 @@ conn_dir(connObject *self, PyObject *Py_UNUSED(noargs))
     PyObject *attrs;
 
     attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-    PyObject_CallMethod(attrs, "extend", "[sssssssssssss]", "host", "port",
-                        "db", "options", "error", "status", "user",
-                        "protocol_version", "server_version", "socket",
-                        "backend_pid", "ssl_in_use", "ssl_attributes");
+    PyObject_CallMethod(
+        attrs, "extend", "[ssssssssssssss]", "host", "port", "db", "options",
+        "error", "status", "user", "protocol_version", "server_version",
+        "encoding", "socket", "backend_pid", "ssl_in_use", "ssl_attributes");
 
     return attrs;
 }

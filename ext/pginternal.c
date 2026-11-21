@@ -104,6 +104,16 @@ get_codec(int encoding)
     return codec ? codec : "ascii";
 }
 
+/* Get the Python codec name used for a PostgreSQL encoding id, including
+   the encodings that are handled directly. */
+const char *
+get_codec_name(int encoding)
+{
+    return encoding == pg_encoding_utf8     ? "utf-8"
+           : encoding == pg_encoding_latin1 ? "latin-1"
+                                            : get_codec(encoding);
+}
+
 /* Check whether a PostgreSQL encoding is supported by Python. */
 static int
 has_codec(int encoding)
@@ -282,10 +292,7 @@ get_encoded_text(PyObject *text, int encoding)
     }
     bytes = get_encoded_string(text, encoding);
     if (!bytes && _is_codec_error()) {
-        const char *codec = encoding == pg_encoding_utf8 ? "utf-8"
-                            : encoding == pg_encoding_latin1
-                                ? "latin-1"
-                                : get_codec(encoding);
+        const char *codec = get_codec_name(encoding);
 
         PyErr_Clear();
         bytes = PyUnicode_AsEncodedString(text, codec, "backslashreplace");

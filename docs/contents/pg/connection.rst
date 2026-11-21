@@ -794,6 +794,17 @@ the connection and its status. These attributes are:
 
 .. versionadded:: 4.0
 
+.. attribute:: Connection.encoding
+
+    the name of the Python codec used for the client encoding (str)
+
+This is the codec that is used to encode text sent to the server and to
+decode text received from the server, e.g. ``'utf-8'`` for the client
+encoding ``UTF8``. For ``SQL_ASCII`` and for client encodings that are not
+supported by Python, this is ``'ascii'``.
+
+.. versionadded:: 6.3
+
 .. attribute:: Connection.status
 
     the status of the connection (int: 1 = OK, 0 = bad)

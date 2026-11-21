@@ -99,7 +99,7 @@ class TestDBClassBasic(unittest.TestCase):
             'date_format', 'db', 'dbname', 'dbtypes',
             'debug', 'decode_json', 'delete',
             'delete_prepared', 'describe_prepared',
-            'encode_json', 'end', 'endcopy', 'error',
+            'encode_json', 'encoding', 'end', 'endcopy', 'error',
             'escape_bytea', 'escape_identifier',
             'escape_literal', 'escape_string',
             'fileno',

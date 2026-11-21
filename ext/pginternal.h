@@ -32,6 +32,8 @@ void
 init_codecs(void);
 int
 get_client_encoding(connObject *cnx);
+const char *
+get_codec_name(int encoding);
 PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding);
 PyObject *

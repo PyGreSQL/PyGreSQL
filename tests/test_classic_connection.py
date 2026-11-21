@@ -153,7 +153,7 @@ class TestConnectObject(unittest.TestCase):
 
     def test_all_connect_attributes(self):
         attributes = [
-            'backend_pid', 'db', 'error', 'host', 'options',
+            'backend_pid', 'db', 'encoding', 'error', 'host', 'options',
             'port', 'protocol_version', 'server_version',
             'socket', 'ssl_attributes', 'ssl_in_use', 'status', 'user']
         connection_attributes = [
@@ -209,6 +209,25 @@ class TestConnectObject(unittest.TestCase):
         self.assertIsInstance(server_version, int)
         self.assertGreaterEqual(server_version, 120000)  # >= 12.0
         self.assertLess(server_version, 200000)  # < 20.0
+
+    def test_attribute_encoding(self):
+        query = self.connection.query
+        encoding = self.connection.encoding
+        self.assertIsInstance(encoding, str)
+        client_encoding = query('show client_encoding').getresult()[0][0]
+        try:
+            for name, codec in [
+                    ('utf8', 'utf-8'), ('latin1', 'latin-1'),
+                    ('latin9', 'iso8859-15'), ('win1252', 'cp1252'),
+                    ('iso_8859_5', 'iso8859-5'), ('sql_ascii', 'ascii')]:
+                try:
+                    query(f'set client_encoding={name}')
+                except pg.DatabaseError:  # conversion not supported
+                    continue
+                self.assertEqual(self.connection.encoding, codec)
+        finally:
+            query(f'set client_encoding={client_encoding}')
+        self.assertEqual(self.connection.encoding, encoding)
 
     def test_attribute_socket(self):
         socket = self.connection.socket

@@ -195,6 +195,7 @@ class Connection:
     user : str
     protocol_version: int
     server_version: int
+    encoding: str
     socket: int
     backend_pid: int
     ssl_in_use: bool
