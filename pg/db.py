@@ -117,7 +117,8 @@ class DB:
         self._query_attnames = (
             "SELECT a.attname,"
             " t.oid, t.typname, t.oid::pg_catalog.regtype,"
-            " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid"
+            " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid,"
+            " t.typelem"
             " FROM pg_catalog.pg_attribute a"
             " JOIN pg_catalog.pg_type t"
             " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"

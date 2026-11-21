@@ -30,6 +30,20 @@ Version 6.3.0 (unreleased)
   - Keys and values of hstore parameters containing tabs, newlines or other
     whitespace besides spaces are now quoted. Before, they caused a syntax
     error, or such whitespace at the start or end was silently stripped.
+  - Arrays of hstore, uuid and composite types can now be passed as
+    parameters and inserted or updated in table columns. Before, this
+    raised an `AttributeError` or a `DataError`.
+  - Elements of json arrays wrapped with `Json()` can now be adapted.
+    Empty dicts, zero and `False` as elements of json arrays are no longer
+    adapted as NULL. Similarly, zero and `False` as elements of text arrays
+    are no longer adapted as empty strings.
+  - Type names of arrays like ``int[]`` or ``hstore[]``, as returned by
+    `DB.get_attnames()`, can now be passed as types to `format_query()`
+    and `query_formatted()`. Before, the arrays were sent as Python lists
+    converted to strings.
+  - `UUID` objects can now also be passed as inline parameters.
+  - The `DbType` objects for array types have a new attribute ``elem``
+    with the type OID of the array elements.
 
 - Changes in the `pgdb` module:
 

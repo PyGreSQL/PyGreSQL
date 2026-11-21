@@ -26,7 +26,12 @@ type that can be inspected using the following attributes:
         - *category* -- `A` = Array, `b` =Boolean, `C` = Composite etc.
         - *delim* -- delimiter for array types
         - *relid* -- corresponding table for composite types
+        - *elem* -- the type OID of the elements for array types
         - *attnames* -- attributes for composite types
+
+.. versionchanged:: 6.3
+    The *elem* attribute has been added. Arrays of composite types now
+    have the simple PyGreSQL type name ``record[]`` instead of ``text``.
 
 For details, see the PostgreSQL documentation on `pg_type
 <http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.

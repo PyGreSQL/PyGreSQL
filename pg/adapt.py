@@ -120,9 +120,20 @@ class _SimpleTypes(dict):
                     self[list[key]] = array  # type: ignore[valid-type]
                     self[List[key]] = array  # type: ignore[valid-type]  # noqa: UP006
 
-    @staticmethod
-    def __missing__(key: str) -> str:
-        """Unmapped types are interpreted as text."""
+    def __missing__(self, key: Any) -> str:
+        """Unmapped types are interpreted as text.
+
+        Array type names like "int[]" are mapped to arrays of the simple
+        type of the element, arrays of records to "record[]".
+        """
+        if isinstance(key, str) and key.endswith('[]'):
+            base = key[:-2]
+            while base.endswith('[]'):
+                base = base[:-2]
+            if base == 'record':
+                return 'record[]'
+            simple = self[base]
+            return simple if simple.endswith('[]') else f'{simple}[]'
         return 'text'
 
     def get_type_dict(self) -> dict[type, str]:
@@ -169,6 +180,7 @@ class DbType(str):
         category: A = Array, b = Boolean, C = Composite etc.
         delim: delimiter for array types
         relid: corresponding table for composite types
+        elem: the type OID of the elements for array types
         attnames: attributes for composite types
     """
 
@@ -181,6 +193,7 @@ class DbType(str):
     category: str
     delim: str
     relid: int
+    elem: int
 
     _get_attnames: Callable[[DbType], AttrDict]
 
@@ -212,17 +225,25 @@ class DbTypes(dict):
         self._typecasts.connection = self._db.db
         self._query_pg_type = (
             "SELECT oid, typname, oid::pg_catalog.regtype,"
-            " typlen, typtype, typcategory, typdelim, typrelid"
+            " typlen, typtype, typcategory, typdelim, typrelid, typelem"
             " FROM pg_catalog.pg_type"
             " WHERE oid OPERATOR(pg_catalog.=) {}::pg_catalog.regtype")
 
     def add(self, oid: int, pgtype: str, regtype: str,
-            typlen: int, typtype: str, category: str, delim: str, relid: int
-            ) -> DbType:
+            typlen: int, typtype: str, category: str, delim: str, relid: int,
+            elem: int = 0) -> DbType:
         """Create a PostgreSQL type name with additional info."""
         if oid in self:
             return self[oid]
-        simple = 'record' if relid else _simpletypes[pgtype]
+        if relid:
+            simple = 'record'
+        else:
+            simple = _simpletypes[pgtype]
+            if simple == 'text' and category == 'A' and elem:
+                # check for arrays of composite types
+                elem_type = self.get(elem)
+                if elem_type and elem_type.relid:
+                    simple = 'record[]'
         typ = DbType(regtype if self._regtypes else simple)
         typ.oid = oid
         typ.simple = simple
@@ -233,6 +254,7 @@ class DbTypes(dict):
         typ.category = category
         typ.delim = delim
         typ.relid = relid
+        typ.elem = elem
         typ._get_attnames = self.get_attnames  # type: ignore[assignment]
         return typ
 
@@ -375,6 +397,16 @@ class Adapter:
         return str(v)
 
     @classmethod
+    def _quote_array_element(cls, v: str) -> str:
+        """Quote an adapted element of an array if necessary."""
+        if not v:
+            return '""'
+        if cls._re_array_quote.search(v):
+            v = cls._re_array_escape.sub(r'\\\1', v)
+            v = f'"{v}"'
+        return v
+
+    @classmethod
     def _adapt_text_array(cls, v: Any) -> str:
         """Adapt a text type array parameter."""
         if isinstance(v, list):
@@ -382,13 +414,7 @@ class Adapter:
             return '{' + ','.join(adapt(v) for v in v) + '}'
         if v is None:
             return 'null'
-        if not v:
-            return '""'
-        v = str(v)
-        if cls._re_array_quote.search(v):
-            v = cls._re_array_escape.sub(r'\\\1', v)
-            v = f'"{v}"'
-        return v
+        return cls._quote_array_element(str(v))
 
     _adapt_date_array = _adapt_text_array
 
@@ -433,14 +459,45 @@ class Adapter:
         if isinstance(v, list):
             adapt = self._adapt_json_array
             return '{' + ','.join(adapt(v) for v in v) + '}'
-        if not v:
+        if v is None or v == '':  # empty strings are adapted as null
             return 'null'
-        if not isinstance(v, str):
-            v = self.db.encode_json(v)
-        if self._re_array_quote.search(v):
-            v = self._re_array_escape.sub(r'\\\1', v)
-            v = f'"{v}"'
-        return v
+        v = self._adapt_json(v)
+        return self._quote_array_element(v)
+
+    def _adapt_hstore_array(self, v: Any) -> str:
+        """Adapt a hstore array parameter."""
+        if isinstance(v, list):
+            adapt = self._adapt_hstore_array
+            return '{' + ','.join(adapt(v) for v in v) + '}'
+        v = self._adapt_hstore(v)
+        if v is None:
+            return 'null'
+        return self._quote_array_element(v)
+
+    def _adapt_uuid_array(self, v: Any) -> str:
+        """Adapt a UUID array parameter."""
+        if isinstance(v, list):
+            adapt = self._adapt_uuid_array
+            return '{' + ','.join(adapt(v) for v in v) + '}'
+        v = self._adapt_uuid(v)
+        if v is None:
+            return 'null'
+        return self._quote_array_element(v)
+
+    def _adapt_record_array(self, v: Any, typ: Any) -> str:
+        """Adapt a record array parameter with given type."""
+        if isinstance(v, list):
+            return '{' + ','.join(
+                self._adapt_record_array(v, typ) for v in v) + '}'
+        if v is None:
+            return 'null'
+        if isinstance(v, tuple):
+            elem = getattr(typ, 'elem', None)
+            elem_type = self.db.dbtypes.get(elem) if elem else None
+            v = self._adapt_record(v, elem_type or self.guess_simple_type(v))
+        else:
+            v = str(v)
+        return self._quote_array_element(v)
 
     def _adapt_record(self, v: Any, typ: Any) -> str:
         """Adapt a record parameter with given type."""
@@ -485,8 +542,11 @@ class Adapter:
                     value = self._adapt_record(value, typ)
             elif simple.endswith('[]'):
                 if isinstance(value, list):
-                    adapt = getattr(self, f'_adapt_{simple[:-2]}_array')
-                    value = adapt(value)
+                    if simple == 'record[]':
+                        value = self._adapt_record_array(value, typ)
+                    else:
+                        adapt = getattr(self, f'_adapt_{simple[:-2]}_array')
+                        value = adapt(value)
             else:
                 adapt = getattr(self, f'_adapt_{simple}')
                 value = adapt(value)
@@ -606,6 +666,8 @@ class Adapter:
         if isinstance(value, Hstore):
             value = self.db.escape_string(str(value))
             return f"'{value}'::hstore"
+        if isinstance(value, UUID):
+            return f"'{value}'::uuid"
         pg_repr = getattr(value, '__pg_repr__', None)
         if not pg_repr:
             raise InterfaceError(

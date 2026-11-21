@@ -4118,6 +4118,95 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, UUID)
         self.assertEqual(r, d)
 
+    def test_insert_get_hstore_array(self):
+        self.require_hstore()
+        self.create_table(
+            'hstore_array_test', 'n smallint primary key, data hstore[]')
+        query = self.db.query
+        q = 'select data::text from hstore_array_test where n=$1'
+        expected = r'{"\"k\"=>\"a b\"","\"x\"=>NULL","",NULL}'
+        data: list = [pg.Hstore({'k': 'a b'}), {'x': None}, {}, None]
+        self.db.insert('hstore_array_test', n=1, data=data)
+        self.assertEqual(query(q, (1,)).getresult()[0][0], expected)
+        r = self.db.get('hstore_array_test', 1)['data']
+        if pg.get_array():
+            self.assertEqual(r, [{'k': 'a b'}, {'x': None}, {}, None])
+        data = [pg.Hstore({'k': 'a b'}), pg.Hstore({'x': None})]
+        expected = r'{"\"k\"=>\"a b\"","\"x\"=>NULL"}'
+        for inline in (False, True):
+            r = self.db.query_formatted(
+                'select %s::hstore[]::text', (data,), inline=inline)
+            self.assertEqual(r.getresult()[0][0], expected)
+
+    def test_insert_get_json_array_with_wrappers(self):
+        self.create_table(
+            'json_array_test', 'n smallint primary key, data json[]')
+        query = self.db.query
+        q = 'select data::text from json_array_test where n=$1'
+        expected = r'{"{\"k\": \"v\"}","{}",0,false,NULL}'
+        data: list = [pg.Json({'k': 'v'}), {}, 0, False, None]
+        self.db.insert('json_array_test', n=1, data=data)
+        self.assertEqual(query(q, (1,)).getresult()[0][0], expected)
+        data = [pg.Json({'k': 'v'}), pg.Json({}), pg.Json(0)]
+        expected = r'{"{\"k\": \"v\"}","{}",0}'
+        for inline in (False, True):
+            r = self.db.query_formatted(
+                'select %s::json[]::text', (data,), inline=inline)
+            self.assertEqual(r.getresult()[0][0], expected)
+
+    def test_insert_get_uuid_array(self):
+        self.create_table(
+            'uuid_array_test', 'n smallint primary key, data uuid[]')
+        query = self.db.query
+        q = 'select data::text from uuid_array_test where n=$1'
+        u = UUID('{12345678-1234-5678-1234-567812345678}')
+        expected = '{12345678-1234-5678-1234-567812345678,NULL}'
+        self.db.insert('uuid_array_test', n=1, data=[u, None])
+        self.assertEqual(query(q, (1,)).getresult()[0][0], expected)
+        r = self.db.get('uuid_array_test', 1)['data']
+        if pg.get_array():
+            self.assertEqual(r, [u, None])
+        for inline in (False, True):
+            r = self.db.query_formatted(
+                'select %s::uuid[]::text', ([u, None],), inline=inline)
+            self.assertEqual(r.getresult()[0][0], expected)
+        r = self.db.query_formatted('select %s::text', (u,), inline=True)
+        self.assertEqual(r.getresult()[0][0], str(u))
+
+    def test_insert_get_record_array(self):
+        query = self.db.query
+        query('create type test_item_type as (n int, s text, a int[])')
+        self.addCleanup(query, 'drop type test_item_type')
+        self.create_table('record_array_test',
+                          'n smallint primary key, data test_item_type[]',
+                          temporary=False)
+        attnames = self.db.get_attnames('record_array_test')
+        typ = attnames['data']
+        self.assertEqual(
+            typ, 'test_item_type[]' if self.regtypes else 'record[]')
+        self.assertEqual(typ.simple, 'record[]')
+        self.assertEqual(typ.category, 'A')
+        self.assertEqual(typ.elem, self.db.dbtypes['test_item_type'].oid)
+        q = 'select data::text from record_array_test where n=$1'
+        expected = r'{"(1,\"a, b\",\"{2,3}\")","(4,,)",NULL}'
+        data: list = [(1, 'a, b', [2, 3]), (4, None, None), None]
+        self.db.insert('record_array_test', n=1, data=data)
+        self.assertEqual(query(q, (1,)).getresult()[0][0], expected)
+        r = self.db.get('record_array_test', 1)['data']
+        if pg.get_array():
+            self.assertEqual(len(r), 3)
+            self.assertEqual(r[0].s, 'a, b')
+            self.assertEqual(r[1].n, 4)
+            self.assertIsNone(r[2])
+        self.assertRaises(TypeError, self.db.insert, 'record_array_test',
+                          n=2, data=[(1, 'a')])
+        for inline in (False, True):
+            r = self.db.query_formatted(
+                'select %s::test_item_type[]::text', (data[:2],),
+                inline=inline)
+            self.assertEqual(
+                r.getresult()[0][0], r'{"(1,\"a, b\",\"{2,3}\")","(4,,)"}')
+
     def test_db_types_info(self):
         dbtypes = self.db.dbtypes
         self.assertIsInstance(dbtypes, dict)
@@ -4134,7 +4223,12 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(typ.category, 'N')
         self.assertEqual(typ.delim, ',')
         self.assertEqual(typ.relid, 0)
+        self.assertEqual(typ.elem, 0)
         self.assertIs(dbtypes[1700], typ)
+        typ = dbtypes['_numeric']
+        self.assertEqual(typ, 'numeric[]' if self.regtypes else 'num[]')
+        self.assertEqual(typ.category, 'A')
+        self.assertEqual(typ.elem, 1700)
         self.assertNotIn('pg_type', dbtypes)
         typ = dbtypes['pg_type']
         self.assertIn('pg_type', dbtypes)
@@ -4400,6 +4494,10 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(f([[['abc']]]), 'text[]')
         self.assertEqual(f([False, True]), 'bool[]')
         self.assertEqual(f([[[False]]]), 'bool[]')
+        self.assertEqual(f([pg.Json([1])]), 'json[]')
+        self.assertEqual(f([pg.Hstore({'k': 'v'})]), 'hstore[]')
+        self.assertEqual(f([UUID(int=1)]), 'uuid[]')
+        self.assertEqual(f([(1, 'a')]), 'record[]')
         r = f(('string', True, 3, 2.75, [1], [False], b'bytes'))
         self.assertEqual(r, 'record')
         self.assertEqual(list(r.attnames.values()), [
@@ -4559,6 +4657,44 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['12345678-1234-5678-1234-567812345678'])
 
+    def test_adapt_query_typed_with_array_type_names(self):
+        format_query = self.adapter.format_query
+        values: Any = [[[1, 2], [3, None]], ['a', 'b c'], [True, None]]
+        sql, params = format_query(
+            "select %s,%s,%s", values, ('int[]', 'text[]', 'bool[][]'))
+        self.assertEqual(sql, 'select $1,$2,$3')
+        self.assertEqual(params, ['{{1,2},{3,null}}', '{a,"b c"}', '{t,null}'])
+        sql, params = format_query(
+            "select %s", ([{'k': 'v'}],), ('hstore[]',))
+        self.assertEqual(params, ['{k=>v}'])
+        sql, params = format_query("select %s", ([(1, 'a')],), ('record[]',))
+        self.assertEqual(params, ['{"(1,a)"}'])
+
+    def test_adapt_query_typed_with_json_array(self):
+        format_query = self.adapter.format_query
+        value: Any = [pg.Json({'k': 'v'}), {}, 0, False, None, '']
+        sql, params = format_query("select %s", (value,), ('_json',))
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, [
+            '{"{\\"k\\": \\"v\\"}","{}",0,false,null,null}'])
+
+    def test_adapt_query_typed_with_hstore_array(self):
+        format_query = self.adapter.format_query
+        value: Any = [pg.Hstore({'k': 'a b'}), {'x': None}, {}, None]
+        sql, params = format_query("select %s", (value,), ('_hstore',))
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['{"k=>\\"a b\\"",x=>NULL,"",null}'])
+
+    def test_adapt_query_typed_with_uuid_array(self):
+        format_query = self.adapter.format_query
+        value: Any = [
+            UUID(int=1), None, '00000000-0000-0000-0000-000000000002']
+        sql, params = format_query("select %s", (value,), ('_uuid',))
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, [
+            '{00000000-0000-0000-0000-000000000001,null,'
+            '00000000-0000-0000-0000-000000000002}'])
+
     def test_adapt_query_typed_dict(self):
         format_query = self.adapter.format_query
         self.assertRaises(
@@ -4651,6 +4787,18 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
+    def test_adapt_query_untyped_with_arrays(self):
+        format_query = self.adapter.format_query
+        values: Any = [
+            [pg.Json({'k': 'v'}), None], [pg.Hstore({'k': 'v'}), None],
+            [UUID(int=1), None], [(1, 'a b', None), (2, '"', [3, 4])]]
+        sql, params = format_query("select %s,%s,%s,%s", values)
+        self.assertEqual(sql, 'select $1,$2,$3,$4')
+        self.assertEqual(params, [
+            '{"{\\"k\\": \\"v\\"}",null}', '{k=>v,null}',
+            '{00000000-0000-0000-0000-000000000001,null}',
+            '{"(1,a b,)","(2,\\"\\\\\\"\\",\\"{3,4}\\")"}'])
+
     def test_adapt_query_untyped_with_bytes(self):
         format_query = self.adapter.format_query
         value = b"it's \\ \x00\xff"
@@ -4737,6 +4885,15 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query("select %s", (value,), inline=True)
         self.assertEqual(
             sql, "select 'one=>\"it''s fine\",two=>2'::hstore")
+        self.assertEqual(params, [])
+
+    def test_adapt_query_inline_list_with_uuid(self):
+        format_query = self.adapter.format_query
+        value = UUID(int=1)
+        sql, params = format_query(
+            "select %s, %s, %s", (value, [value], (value, 1)), inline=True)
+        u = "'00000000-0000-0000-0000-000000000001'::uuid"
+        self.assertEqual(sql, f"select {u}, ARRAY[{u}], ({u},1)")
         self.assertEqual(params, [])
 
     def test_adapt_query_inline_list_with_bytes(self):

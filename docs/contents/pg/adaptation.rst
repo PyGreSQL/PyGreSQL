@@ -231,6 +231,10 @@ only because this simple query does not provide enough context.
 Also note that the query gives the value back as Python lists again.  This
 is achieved by the typecasting mechanism explained in the next section.
 
+The elements of the lists are adapted like single values, so they can
+also be values wrapped with :func:`Json`, UUIDs, or tuples for arrays of
+composite types.
+
 Tuples are adapted as PostgreSQL composite types.  If you use inline
 parameters, they can also be used with the ``IN`` syntax.
 
