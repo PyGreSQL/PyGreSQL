@@ -200,7 +200,7 @@ source_execute(sourceObject *self, PyObject *sql)
 
     /* checks result validity */
     if (!self->result) {
-        PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->pgcnx->cnx));
+        set_error_text(PyExc_ValueError, NULL, self->pgcnx->cnx);
         return NULL;
     }
 
@@ -458,8 +458,8 @@ _source_end_copy(sourceObject *self, const char *errormsg)
         ret = PyLong_FromLong(tmp[0] ? atol(tmp) : -1);
     }
     else {
-        PyErr_SetString(PyExc_IOError,
-                        errormsg ? errormsg : PQerrorMessage(cnx));
+        /* the error message has been encoded with the client encoding */
+        set_error_text(PyExc_IOError, errormsg, cnx);
         ret = NULL;
     }
     PQclear(result);
@@ -486,7 +486,7 @@ _source_end_copy(sourceObject *self, const char *errormsg)
            the copy, so report the error instead of the row count */
         if (ret) {
             Py_DECREF(ret);
-            PyErr_SetString(PyExc_IOError, PQresultErrorMessage(error));
+            set_error_text(PyExc_IOError, PQresultErrorMessage(error), cnx);
             ret = NULL;
         }
         PQclear(error);
@@ -578,7 +578,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
 
     if (res != 1) {
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
+        set_error_text(PyExc_IOError, NULL, self->pgcnx->cnx);
         ret = NULL;
     }
     else if (buf) { /* buffer has been sent */
@@ -625,7 +625,7 @@ source_getdata(sourceObject *self, PyObject *args)
     nbytes = PQgetCopyData(self->pgcnx->cnx, &buffer, 0);
 
     if (!nbytes || nbytes < -1) { /* an error occurred */
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->pgcnx->cnx));
+        set_error_text(PyExc_IOError, NULL, self->pgcnx->cnx);
         return NULL;
     }
 
@@ -639,8 +639,9 @@ source_getdata(sourceObject *self, PyObject *args)
     else { /* a row has been returned and shall be decoded */
         int encoding = get_client_encoding(self->pgcnx);
 
-        ret =
-            encoding < 0 ? NULL : get_decoded_string(buffer, nbytes, encoding);
+        ret = encoding < 0
+                  ? NULL
+                  : get_decoded_string_or_bytes(buffer, nbytes, encoding);
         PQfreemem(buffer);
     }
 

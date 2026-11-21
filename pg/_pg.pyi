@@ -262,7 +262,7 @@ class Connection:
         """Set a custom notice receiver."""
         ...
 
-    def getnotify(self) -> tuple[str, int, str] | None:
+    def getnotify(self) -> tuple[str, int, str | bytes] | None:
         """Get the last notify from the server."""
         ...
 
@@ -313,7 +313,7 @@ class Connection:
         """Write a line to the server socket."""
         ...
 
-    def getline(self) -> str:
+    def getline(self) -> str | bytes | None:
         """Get a line from server socket."""
         ...
 

@@ -79,24 +79,27 @@ conn_getattr(connObject *self, PyObject *nameobj)
         const char *r = PQhost(self->cnx);
         if (!r || r[0] == '/') /* this can return a Unix socket path */
             r = "localhost";
-        return PyUnicode_FromString(r);
+        return get_decoded_text(r, pg_encoding_utf8);
     }
 
     /* postmaster port */
     if (!strcmp(name, "port"))
         return PyLong_FromLong(atol(PQport(self->cnx)));
 
+    /* the connection parameters have been passed as UTF-8 by connect() */
+
     /* selected database */
     if (!strcmp(name, "db"))
-        return PyUnicode_FromString(PQdb(self->cnx));
+        return get_decoded_text(PQdb(self->cnx), pg_encoding_utf8);
 
     /* selected options */
     if (!strcmp(name, "options"))
-        return PyUnicode_FromString(PQoptions(self->cnx));
+        return get_decoded_text(PQoptions(self->cnx), pg_encoding_utf8);
 
     /* error (status) message */
     if (!strcmp(name, "error"))
-        return PyUnicode_FromString(PQerrorMessage(self->cnx));
+        return get_decoded_text(PQerrorMessage(self->cnx),
+                                PQclientEncoding(self->cnx));
 
     /* connection status : 1 - OK, 0 - BAD */
     if (!strcmp(name, "status"))
@@ -104,7 +107,7 @@ conn_getattr(connObject *self, PyObject *nameobj)
 
     /* provided user name */
     if (!strcmp(name, "user"))
-        return PyUnicode_FromString(PQuser(self->cnx));
+        return get_decoded_text(PQuser(self->cnx), pg_encoding_utf8);
 
     /* protocol version */
     if (!strcmp(name, "protocol_version"))
@@ -401,7 +404,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
 
     /* checks result validity */
     if (!status) {
-        PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
+        set_error_text(PyExc_ValueError, NULL, self->cnx);
         return NULL;
     }
 
@@ -601,11 +604,12 @@ conn_putline(connObject *self, PyObject *args)
     /* send line to backend */
     ret = PQputCopyData(self->cnx, line, (int)line_length);
     if (ret != 1) {
-        PyErr_SetString(
+        set_error_text(
             PyExc_IOError,
             ret == -1
-                ? PQerrorMessage(self->cnx)
-                : "Line cannot be queued, wait for write-ready and try again");
+                ? NULL
+                : "Line cannot be queued, wait for write-ready and try again",
+            self->cnx);
         return NULL;
     }
     Py_RETURN_NONE;
@@ -634,24 +638,25 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
     if (ret <= 0) {
         if (line != NULL)
             PQfreemem(line);
-        if (ret == -1) {
-            PQgetResult(self->cnx);
+        if (ret == -1) { /* end of copy, consume the final result */
+            PQclear(PQgetResult(self->cnx));
             Py_RETURN_NONE;
         }
-        PyErr_SetString(
+        set_error_text(
             PyExc_MemoryError,
-            ret == -2
-                ? PQerrorMessage(self->cnx)
-                : "No line available, wait for read-ready and try again");
+            ret == -2 ? NULL
+                      : "No line available, wait for read-ready and try again",
+            self->cnx);
         return NULL;
     }
     if (line == NULL) {
         Py_RETURN_NONE;
     }
-    /* for backward compatibility, convert terminating newline to zero byte */
-    if (*line)
-        line[strlen(line) - 1] = '\0';
-    str = PyUnicode_FromString(line);
+    /* for backward compatibility, strip the terminating newline */
+    if (line[ret - 1] == '\n')
+        --ret;
+    /* decode like text values, i.e. return bytes if this is not possible */
+    str = get_decoded_string_or_bytes(line, ret, PQclientEncoding(self->cnx));
     PQfreemem(line);
     return str;
 }
@@ -673,10 +678,11 @@ conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
     /* end direct copy */
     ret = PQputCopyEnd(self->cnx, NULL);
     if (ret != 1) {
-        PyErr_SetString(PyExc_IOError,
-                        ret == -1 ? PQerrorMessage(self->cnx)
-                                  : "Termination message cannot be queued,"
-                                    " wait for write-ready and try again");
+        set_error_text(PyExc_IOError,
+                       ret == -1 ? NULL
+                                 : "Termination message cannot be queued,"
+                                   " wait for write-ready and try again",
+                       self->cnx);
         return NULL;
     }
     Py_RETURN_NONE;
@@ -704,7 +710,7 @@ conn_set_non_blocking(connObject *self, PyObject *args)
     }
 
     if (PQsetnonblocking(self->cnx, non_blocking) < 0) {
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+        set_error_text(PyExc_IOError, NULL, self->cnx);
         return NULL;
     }
     Py_RETURN_NONE;
@@ -726,7 +732,7 @@ conn_is_non_blocking(connObject *self, PyObject *Py_UNUSED(noargs))
 
     rc = PQisnonblocking(self->cnx);
     if (rc < 0) {
-        PyErr_SetString(PyExc_IOError, PQerrorMessage(self->cnx));
+        set_error_text(PyExc_IOError, NULL, self->cnx);
         return NULL;
     }
 
@@ -1171,7 +1177,7 @@ conn_parameter(connObject *self, PyObject *args)
     name = PQparameterStatus(self->cnx, name);
 
     if (name)
-        return PyUnicode_FromString(name);
+        return get_decoded_text(name, PQclientEncoding(self->cnx));
 
     /* unknown parameter, return None */
     Py_RETURN_NONE;
@@ -1752,35 +1758,23 @@ conn_get_notify(connObject *self, PyObject *Py_UNUSED(noargs))
         Py_RETURN_NONE;
     }
     else {
-        PyObject *notify_result, *tmp;
+        int encoding = PQclientEncoding(self->cnx);
+        PyObject *notify_result = NULL, *channel, *pid, *payload;
 
-        if (!(tmp = PyUnicode_FromString(notify->relname))) {
-            return NULL;
-        }
-
-        if (!(notify_result = PyTuple_New(3))) {
-            return NULL;
-        }
-
-        PyTuple_SET_ITEM(notify_result, 0, tmp);
-
-        if (!(tmp = PyLong_FromLong(notify->be_pid))) {
-            Py_DECREF(notify_result);
-            return NULL;
-        }
-
-        PyTuple_SET_ITEM(notify_result, 1, tmp);
-
-        /* extra exists even in old versions that did not support it */
-        if (!(tmp = PyUnicode_FromString(notify->extra))) {
-            Py_DECREF(notify_result);
-            return NULL;
-        }
-
-        PyTuple_SET_ITEM(notify_result, 2, tmp);
-
+        /* the channel is a name, the payload is decoded like text values */
+        channel = get_decoded_text(notify->relname, encoding);
+        pid = channel ? PyLong_FromLong(notify->be_pid) : NULL;
+        payload = pid ? get_decoded_string_or_bytes(
+                            notify->extra, (Py_ssize_t)strlen(notify->extra),
+                            encoding)
+                      : NULL;
         PQfreemem(notify);
 
+        if (payload)
+            notify_result = PyTuple_Pack(3, channel, pid, payload);
+        Py_XDECREF(channel);
+        Py_XDECREF(pid);
+        Py_XDECREF(payload);
         return notify_result;
     }
 }

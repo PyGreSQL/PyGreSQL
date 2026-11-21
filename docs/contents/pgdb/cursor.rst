@@ -312,6 +312,8 @@ output stream, the method will return a generator yielding one row of output
 data on each iteration.
 
 Output will be returned as byte strings unless you set decode to true.
+Rows that cannot be decoded with the client encoding (e.g. non-ASCII text
+with the client encoding ``SQL_ASCII``) are still returned as byte strings.
 
 Note that you can also use a ``SELECT`` query instead of the table name.
 

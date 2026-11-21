@@ -1393,7 +1393,7 @@ class DB:
         """Set a custom notice receiver."""
         self._valid_db.set_notice_receiver(receiver)
 
-    def getnotify(self) -> tuple[str, int, str] | None:
+    def getnotify(self) -> tuple[str, int, str | bytes] | None:
         """Get the last notify from the server."""
         return self._valid_db.getnotify()
 
@@ -1448,7 +1448,7 @@ class DB:
         """Write a line to the server socket."""
         self._valid_db.putline(line)
 
-    def getline(self) -> str:
+    def getline(self) -> str | bytes | None:
         """Get a line from server socket."""
         return self._valid_db.getline()
 

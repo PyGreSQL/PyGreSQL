@@ -67,9 +67,13 @@ Strings are encoded and decoded with the client encoding of the connection
   client encoding ``SQL_ASCII``, PostgreSQL does not convert text and its
   actual encoding is unknown, so values that are not plain ASCII are
   returned as ``bytes`` instead. This also applies to the elements of arrays,
-  records and hstore values. JSON values are then passed to the JSON decoder
-  as ``bytes``, which :func:`json.loads` decodes as UTF-8.
-- Field names, error messages and notices are always ``str``. If they cannot
+  records and hstore values, to the payload of notifications, and to the
+  lines returned by :meth:`Connection.getline` or decoded by the ``getdata()``
+  method of the source object (used by ``Cursor.copy_to()`` in :mod:`pgdb`).
+  JSON values are then passed to the JSON decoder as ``bytes``, which
+  :func:`json.loads` decodes as UTF-8.
+- Field names, error messages, notices, notification channels and parameter
+  values (:meth:`Connection.parameter`) are always ``str``. If they cannot
   be decoded with the client encoding, they are decoded as UTF-8 with
   backslash escapes for invalid bytes (e.g. the byte 0xE4 becomes the four
   characters ``\xe4``). Field names passed
@@ -85,7 +89,8 @@ and again only after the client encoding has been changed).
 
 .. versionchanged:: 6.3
     Undecodable text values are returned as ``bytes`` again, also as elements
-    of arrays and records. Field names are decoded with the client encoding.
+    of arrays and records. Field names, error messages, notifications and
+    parameter values are decoded with the client encoding.
     PostgreSQL encodings that have different names in Python can be used.
 
 

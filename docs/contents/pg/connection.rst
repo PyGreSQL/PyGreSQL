@@ -472,8 +472,15 @@ connection that triggered the notify, and *extra* is a payload string
 that has been sent with the notification. Remember to do a listen query
 first, otherwise :meth:`Connection.getnotify` will always return ``None``.
 
+The name and the payload are decoded with the client encoding. Like text
+values, a payload that cannot be decoded (e.g. non-ASCII text with the client
+encoding ``SQL_ASCII``) is returned as ``bytes``.
+
 .. versionchanged:: 4.1
     Support for payload strings was added in version 4.1.
+
+.. versionchanged:: 6.3
+    The name and the payload are decoded with the client encoding.
 
 inserttable -- insert an iterable into a table
 ----------------------------------------------
@@ -653,13 +660,20 @@ getline -- get a line from server socket
 
     Get a line from server socket
 
-    :returns: the line read
-    :rtype: str
+    :returns: the line read, or None at the end of the copy operation
+    :rtype: str, bytes or None
     :raises TypeError: invalid connection
     :raises TypeError: too many parameters
     :raises MemoryError: buffer overflow
 
 This method allows to directly read a string from the server socket.
+The line is decoded with the client encoding. Like text values, a line that
+cannot be decoded is returned as ``bytes``. A final newline is removed, so
+this method is only suited for the text and CSV formats of COPY. Use the
+``getdata()`` method of the source object for the binary format.
+
+.. versionchanged:: 6.3
+    The line is decoded with the client encoding instead of UTF-8.
 
 endcopy -- synchronize client and server
 ----------------------------------------

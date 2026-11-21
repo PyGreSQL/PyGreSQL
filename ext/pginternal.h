@@ -75,6 +75,8 @@ void
 set_error_msg(PyObject *type, const char *msg);
 void
 set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result);
+void
+set_error_text(PyObject *type, const char *msg, PGconn *cnx);
 
 /* SSL attributes helper */
 PyObject *

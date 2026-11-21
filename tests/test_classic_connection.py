@@ -1208,6 +1208,63 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertEqual(str(q).splitlines()[2], '    1|wär')
 
 
+class TestServerStringsLatin1(unittest.TestCase):
+    """Test strings from the server with the client encoding LATIN1."""
+
+    def setUp(self):
+        self.c = connect()
+        try:
+            self.c.query('set client_encoding=latin1')
+        except (pg.DataError, pg.NotSupportedError):
+            self.c.close()
+            self.skipTest("database does not support latin1")
+
+    def tearDown(self):
+        self.c.close()
+
+    def test_error_attribute(self):
+        with self.assertRaises(pg.InternalError):
+            self.c.query("do $$ begin raise exception 'wärme'; end $$")
+        # this raised UnicodeDecodeError before
+        self.assertIn('wärme', self.c.error)
+
+    def test_parameter(self):
+        if self.c.server_version < 180000:
+            self.skipTest('search_path is reported since PostgreSQL 18')
+        self.c.query('set search_path = "schäma"')
+        # this raised UnicodeDecodeError before
+        self.assertEqual(self.c.parameter('search_path'), '"schäma"')
+
+    def test_getnotify(self):
+        query = self.c.query
+        query('listen "kanäl"')
+        query("notify \"kanäl\", 'wärme'")
+        # this raised UnicodeDecodeError before
+        self.assertEqual(self.c.getnotify(),
+                         ('kanäl', self.c.backend_pid, 'wärme'))
+
+    def test_getline(self):
+        self.c.query("copy (values ('wärme'), ('')) to stdout")
+        # this raised UnicodeDecodeError before
+        self.assertEqual(self.c.getline(), 'wärme')
+        self.assertEqual(self.c.getline(), '')
+        self.assertIsNone(self.c.getline())
+
+    def test_putdata_error_messages(self):
+        self.c.query("create temporary table test_copy (n int)")
+        source = self.c.source()
+        source.execute("copy test_copy from stdin")
+        self.assertIsNone(source.putdata('wärme\n'))
+        # these raised UnicodeDecodeError before
+        with self.assertRaises(OSError) as cm:
+            source.putdata(None)
+        self.assertIn('"wärme"', str(cm.exception))
+        source.execute("copy test_copy from stdin")
+        with self.assertRaises(OSError) as cm:
+            source.putdata(ValueError('wärme'))
+        self.assertEqual(str(cm.exception), 'wärme')
+
+
 class TestUndecodableText(unittest.TestCase):
     """Test text that cannot be decoded with the client encoding."""
 
@@ -1302,6 +1359,42 @@ class TestUndecodableText(unittest.TestCase):
         else:
             self.assertRaises(ValueError, q.fieldnum, f'"w{text}r"')
         self.assertRaises(ValueError, q.fieldnum, '"wör"')
+
+    def test_error_attribute(self):
+        q = "do $$ begin raise exception 'w%r', chr(228); end $$"
+        with self.assertRaises(pg.InternalError):
+            self.c.query(q)
+        # this raised UnicodeDecodeError before with non-UTF8 servers
+        self.assertIn(f'w{self.text}r', self.c.error)
+
+    def test_parameter(self):
+        if self.c.server_version < 180000:
+            self.skipTest('search_path is reported since PostgreSQL 18')
+        self.c.query(b'set search_path = "s' + self.raw + b'"')
+        # this raised UnicodeDecodeError before with non-UTF8 servers
+        self.assertEqual(self.c.parameter('search_path'), f'"s{self.text}"')
+
+    def test_getnotify(self):
+        query = self.c.query
+        channel = b'"k' + self.raw + b'"'
+        query(b'listen ' + channel)
+        query("select pg_notify('k' || chr(228), 'w' || chr(228))")
+        # the channel is a name, the payload is returned like text values
+        self.assertEqual(self.c.getnotify(), (
+            f'k{self.text}', self.c.backend_pid, b'w' + self.raw))
+
+    def test_getline(self):
+        self.c.query("copy (select 'w' || chr(228)) to stdout")
+        # this returned str or raised UnicodeDecodeError before
+        self.assertEqual(self.c.getline(), b'w' + self.raw)
+        self.assertIsNone(self.c.getline())
+
+    def test_getdata(self):
+        source = self.c.source()
+        source.execute("copy (select 'w' || chr(228)) to stdout")
+        # this raised UnicodeDecodeError before
+        self.assertEqual(source.getdata(True), b'w' + self.raw + b'\n')
+        self.assertEqual(source.getdata(True), 1)
 
     def test_str(self):
         q = self.c.query("select 'w' || chr(228) || 'r' as a")

@@ -123,6 +123,17 @@ Version 6.3.0 (unreleased)
     raise an `OperationalError`. Also, a query that failed because the
     connection was lost now raises an `OperationalError` instead of a
     `ProgrammingError`, also in the `pgdb` module.
+  - Other strings from the server were also decoded as UTF-8 instead of the
+    client encoding, so that non-ASCII characters in other encodings raised a
+    `UnicodeDecodeError`, also instead of the intended exception: the channel
+    and payload of notifications returned by `getnotify()`, the `error`
+    attributes of connections and large objects, the lines returned by
+    `getline()`, the values returned by `parameter()`, and the messages of
+    the exceptions raised by many other methods. Like text values, payloads
+    and lines that cannot be decoded are now returned as bytes, also by the
+    `getdata()` method of the source object, which raised a
+    `UnicodeDecodeError`. When `getnotify()` failed, it leaked memory.
+    `getline()` leaked the final result of every COPY operation.
 
 - Modernization and build:
 
