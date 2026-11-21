@@ -1471,6 +1471,51 @@ date_format_to_style(const char *s)
     }
 }
 
+/* Get a field of a notice as a decoded string or None if it is missing. */
+static PyObject *
+_notice_field(const PGresult *res, int fieldcode, int encoding)
+{
+    const char *s = fieldcode ? PQresultErrorField(res, fieldcode)
+                              : PQresultErrorMessage(res);
+    Py_ssize_t size;
+    PyObject *obj;
+
+    if (!s)
+        Py_RETURN_NONE;
+    size = (Py_ssize_t)strlen(s);
+    obj = get_decoded_string(s, size, encoding);
+    if (!obj) { /* cannot decode in the client encoding */
+        PyErr_Clear();
+        obj = PyUnicode_DecodeUTF8(s, size, "backslashreplace");
+    }
+    return obj;
+}
+
+/* Create a notice object with copies of all fields of the given result.
+   The libpq result is only valid during the callback, but the notice
+   object may be kept by the receiver, so we cannot store the result. */
+static noticeObject *
+_notice_new(connObject *cnx, const PGresult *res)
+{
+    noticeObject *notice = PyObject_New(noticeObject, &noticeType);
+    int encoding = PQclientEncoding(cnx->cnx);
+
+    if (!notice)
+        return NULL;
+    notice->pgcnx = cnx;
+    notice->message = _notice_field(res, 0, encoding);
+    notice->severity = _notice_field(res, PG_DIAG_SEVERITY, encoding);
+    notice->primary = _notice_field(res, PG_DIAG_MESSAGE_PRIMARY, encoding);
+    notice->detail = _notice_field(res, PG_DIAG_MESSAGE_DETAIL, encoding);
+    notice->hint = _notice_field(res, PG_DIAG_MESSAGE_HINT, encoding);
+    if (!notice->message || !notice->severity || !notice->primary ||
+        !notice->detail || !notice->hint) {
+        Py_DECREF(notice);
+        return NULL;
+    }
+    return notice;
+}
+
 /* Internal wrapper for the notice receiver callback. */
 void
 notice_receiver(void *arg, const PGresult *res)
@@ -1480,18 +1525,24 @@ notice_receiver(void *arg, const PGresult *res)
     PyObject *func = self->notice_receiver;
 
     if (func) {
-        noticeObject *notice = PyObject_New(noticeObject, &noticeType);
-        PyObject *ret;
+        noticeObject *notice;
+        PyObject *ret = NULL;
+
+        /* the receiver may replace itself while it is running */
+        Py_INCREF(func);
+        notice = _notice_new(self, res);
         if (notice) {
-            notice->pgcnx = arg;
-            notice->res = res;
+            ret = PyObject_CallOneArg(func, (PyObject *)notice);
+            /* the notice has no reference to the connection,
+               so it must not be accessible after the callback */
+            notice->pgcnx = NULL;
+            Py_DECREF(notice);
         }
-        else {
-            Py_INCREF(Py_None);
-            notice = (noticeObject *)(void *)Py_None;
-        }
-        ret = PyObject_CallFunction(func, "(O)", notice);
-        Py_XDECREF(ret);
+        if (ret)
+            Py_DECREF(ret);
+        else /* we cannot raise exceptions from here */
+            PyErr_WriteUnraisable(func);
+        Py_DECREF(func);
     }
     PyGILState_Release(gstate);
 }

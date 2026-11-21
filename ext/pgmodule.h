@@ -109,8 +109,12 @@ typedef struct {
 #define is_sourceObject(v) (PyType(v) == &sourceType)
 
 typedef struct {
-    PyObject_HEAD connObject *pgcnx; /* parent connection object */
-    PGresult const *res;             /* an error or warning */
+    PyObject_HEAD connObject *pgcnx; /* borrowed, only in the receiver */
+    PyObject *message;               /* full message */
+    PyObject *severity;              /* severity of the message */
+    PyObject *primary;               /* primary message text */
+    PyObject *detail;                /* optional detail */
+    PyObject *hint;                  /* optional hint */
 } noticeObject;
 
 #define is_noticeObject(v) (PyType(v) == &noticeType)

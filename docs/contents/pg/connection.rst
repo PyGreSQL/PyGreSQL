@@ -566,7 +566,7 @@ custom notice receiver has ever been set on the connection.
 
 This method allows setting a custom notice receiver callback function.
 When a notice or warning message is received from the server,
-or generated internally by libpq, and the message level is below
+or generated internally by libpq, and the message level is not below
 the one set with ``client_min_messages``, the specified notice receiver
 function will be called. This function must take one parameter,
 the :class:`Notice` object, which provides the following read-only
@@ -574,7 +574,7 @@ attributes:
 
     .. attribute:: Notice.pgcnx
 
-        the connection
+        the connection (``None`` after the receiver has returned)
 
     .. attribute:: Notice.message
 
@@ -596,7 +596,23 @@ attributes:
 
         an optional suggestion what to do about the problem
 
+``str(notice)`` returns the full message. The notice object can be kept
+and used after the receiver has returned, but its :attr:`Notice.pgcnx`
+attribute is then ``None``. Exceptions raised by the receiver cannot be
+propagated to the code that caused the notice, so they are passed to
+``sys.unraisablehook()`` instead, which by default prints them to
+``sys.stderr``.
+
+The receiver is called in the middle of a libpq operation on the
+connection, e.g. while a query is running. Therefore it must not run
+queries or other commands on the connection, and must not close it.
+It may set another notice receiver, though.
+
 .. versionadded:: 4.1
+
+.. versionchanged:: 6.3
+    The notice can be used after the receiver has returned, and exceptions
+    raised by the receiver are reported as unraisable.
 
 putline -- write a line to the server socket
 --------------------------------------------

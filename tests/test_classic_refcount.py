@@ -138,13 +138,29 @@ class TestConnectionRefCounts(RefCountTestCase):
         results: list[Any] = []
 
         def receiver(notice):
-            # notices can only be accessed inside the receiver
+            # the connection is only available inside the receiver
             results.append(notice.pgcnx is self.c)
             results.append(refcount_drift(lambda: notice.pgcnx, self.c))
 
         self.c.set_notice_receiver(receiver)
         self.c.query("do $$ begin raise warning 'Bilbo was here!'; end $$")
         self.assertEqual(results, [True, 0])
+
+    def test_notice_not_leaked(self):
+        notices: list[Any] = []
+        self.c.set_notice_receiver(notices.append)
+        self.c.query("do $$ begin raise warning 'Bilbo was here!'; end $$")
+        self.assertEqual(len(notices), 1)
+        # the list must hold the only reference to the notice
+        other = [object()]
+        self.assertEqual(
+            sys.getrefcount(notices[0]), sys.getrefcount(other[0]))
+        # the notice receiver must not leak references either
+        self.c.set_notice_receiver(hook)
+        self.assert_refcount_unchanged(
+            lambda: self.c.query(
+                "do $$ begin raise warning 'Bilbo was here!'; end $$"),
+            hook)
 
     def test_source_pgcnx(self):
         source = self.c.source()

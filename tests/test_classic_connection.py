@@ -14,6 +14,7 @@ from __future__ import annotations
 import ctypes
 import datetime
 import os
+import sys
 import threading
 import time
 import unittest
@@ -22,6 +23,7 @@ from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from decimal import Decimal
 from typing import Any
+from unittest import mock
 
 import pg  # the module under test
 
@@ -2535,7 +2537,6 @@ class TestNotificatons(unittest.TestCase):
 
     def test_notice_receiver_is_kept(self):
         received = []
-        # notices can only be accessed inside the receiver
         self.c.set_notice_receiver(
             lambda notice: received.append(notice.primary))
         # the connection must keep its own reference to the receiver
@@ -2568,6 +2569,106 @@ class TestNotificatons(unittest.TestCase):
             pgcnx=self.c, message='WARNING:  Bilbo was here!\n',
             severity='WARNING', primary='Bilbo was here!',
             detail=None, hint=None))
+
+    def test_notice_can_be_kept(self):
+        notices: list[Any] = []
+        connections: list[Any] = []
+
+        def receiver(notice):
+            notices.append(notice)
+            connections.append(notice.pgcnx)
+
+        self.c.set_notice_receiver(receiver)
+        self.c.query("""do $$ begin raise warning 'Bilbo was here!'
+            using detail = 'In the Shire.', hint = 'Look for him.'; end $$""")
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(connections, [self.c])
+        notice = notices[0]
+        self.assertEqual(
+            {attr for attr in dir(notice) if not attr.startswith('_')},
+            {'pgcnx', 'message', 'severity', 'primary', 'detail', 'hint'})
+        # the fields must still be valid after the receiver has returned
+        self.assertEqual(notice.primary, 'Bilbo was here!')
+        self.assertEqual(notice.detail, 'In the Shire.')
+        self.assertEqual(notice.hint, 'Look for him.')
+        severity = notice.severity
+        self.assertIn(severity, ('WARNING', 'WARNUNG'))
+        message = notice.message
+        self.assertTrue(message.startswith(f'{severity}:  Bilbo was here!\n'))
+        self.assertEqual(str(notice), message)
+        # but the connection is only available inside the receiver
+        self.assertIsNone(notice.pgcnx)
+        # the fields are read-only
+        with self.assertRaises(AttributeError):
+            notice.primary = 'Frodo was here!'
+
+    def test_notice_str(self):
+        received = []
+        self.c.set_notice_receiver(lambda notice: received.append(str(notice)))
+        self.c.query("do $$ begin raise warning 'Bilbo was here!'; end $$")
+        self.assertEqual(len(received), 1)
+        self.assertTrue(received[0].endswith(':  Bilbo was here!\n'))
+
+    def test_notice_receiver_raising_exception(self):
+        unraisable: list[Any] = []
+
+        def receiver(notice):
+            raise ValueError('Bilbo is gone!')
+
+        self.c.set_notice_receiver(receiver)
+        with mock.patch.object(sys, 'unraisablehook', unraisable.append):
+            r = self.c.query(
+                "do $$ begin raise warning 'Bilbo was here!'; end $$")
+        # the exception must not break the query
+        self.assertIsNone(r)
+        self.assertEqual(self.c.query('select 1').getresult(), [(1,)])
+        # but it must be reported as unraisable
+        self.assertEqual(len(unraisable), 1)
+        self.assertIs(unraisable[0].exc_type, ValueError)
+        self.assertEqual(str(unraisable[0].exc_value), 'Bilbo is gone!')
+        self.assertIs(unraisable[0].object, receiver)
+
+    def test_notice_receiver_replacing_itself(self):
+        received = []
+
+        def other_receiver(notice):
+            received.append(f'other: {notice.primary}')
+
+        def receiver(notice):
+            received.append(notice.primary)
+            notice.pgcnx.set_notice_receiver(other_receiver)
+
+        self.c.set_notice_receiver(receiver)
+        del receiver  # the connection has the only reference now
+        self.c.query("do $$ begin raise warning 'Bilbo was here!';"
+                     " raise warning 'Frodo was here!'; end $$")
+        self.assertEqual(
+            received, ['Bilbo was here!', 'other: Frodo was here!'])
+        self.assertIs(self.c.get_notice_receiver(), other_receiver)
+
+    def test_notice_receiver_with_undecodable_message(self):
+        encoding = self.c.parameter('server_encoding')
+        self.c.query("set client_encoding to sql_ascii")
+        self.addCleanup(self.c.query, "reset client_encoding")
+        received = []
+        self.c.set_notice_receiver(
+            lambda notice: received.append(notice.primary))
+        self.c.query("do $$ begin raise warning 'w%r', chr(228); end $$")
+        # the message is decoded as UTF-8 with escapes as a fallback
+        self.assertEqual(received, [
+            'wär' if encoding == 'UTF8' else 'w\\xe4r'])
+
+    def test_notice_receiver_with_client_encoding(self):
+        encoding = self.c.parameter('server_encoding')
+        if encoding not in ('UTF8', 'SQL_ASCII', 'LATIN1'):
+            self.skipTest(f'cannot convert {encoding} to LATIN1')
+        self.c.query("set client_encoding to latin1")
+        self.addCleanup(self.c.query, "reset client_encoding")
+        received = []
+        self.c.set_notice_receiver(
+            lambda notice: received.append(notice.primary))
+        self.c.query("do $$ begin raise warning 'Bilbo wär hier!'; end $$")
+        self.assertEqual(received, ['Bilbo wär hier!'])
 
 
 class TestConfigFunctions(unittest.TestCase):

@@ -12,84 +12,44 @@
 #include "pginternal.h"
 #include "pgmodule.h"
 
-/* Get notice object attributes. */
-static PyObject *
-notice_getattr(noticeObject *self, PyObject *nameobj)
+/* Needs to be after Python.h */
+#include <structmember.h>
+
+/* Deallocate notice object. */
+static void
+notice_dealloc(noticeObject *self)
 {
-    PGresult const *res = self->res;
-    const char *name = PyUnicode_AsUTF8(nameobj);
-    int fieldcode;
-
-    if (!name)
-        return NULL;
-
-    if (!res) {
-        PyErr_SetString(PyExc_TypeError, "Cannot get current notice");
-        return NULL;
-    }
-
-    /* pg connection object */
-    if (!strcmp(name, "pgcnx")) {
-        if (self->pgcnx && _check_cnx_obj(self->pgcnx)) {
-            return Py_NewRef(self->pgcnx);
-        }
-        else {
-            Py_RETURN_NONE;
-        }
-    }
-
-    /* full message */
-    if (!strcmp(name, "message")) {
-        return PyUnicode_FromString(PQresultErrorMessage(res));
-    }
-
-    /* other possible fields */
-    fieldcode = 0;
-    if (!strcmp(name, "severity"))
-        fieldcode = PG_DIAG_SEVERITY;
-    else if (!strcmp(name, "primary"))
-        fieldcode = PG_DIAG_MESSAGE_PRIMARY;
-    else if (!strcmp(name, "detail"))
-        fieldcode = PG_DIAG_MESSAGE_DETAIL;
-    else if (!strcmp(name, "hint"))
-        fieldcode = PG_DIAG_MESSAGE_HINT;
-    if (fieldcode) {
-        char *s = PQresultErrorField(res, fieldcode);
-        if (s) {
-            return PyUnicode_FromString(s);
-        }
-        else {
-            Py_RETURN_NONE;
-        }
-    }
-
-    return PyObject_GenericGetAttr((PyObject *)self, nameobj);
-}
-
-/* Get the list of notice attributes. */
-static PyObject *
-notice_dir(noticeObject *self, PyObject *Py_UNUSED(noargs))
-{
-    PyObject *attrs;
-
-    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-    PyObject_CallMethod(attrs, "extend", "[ssssss]", "pgcnx", "severity",
-                        "message", "primary", "detail", "hint");
-
-    return attrs;
+    /* the connection is a borrowed reference */
+    Py_XDECREF(self->message);
+    Py_XDECREF(self->severity);
+    Py_XDECREF(self->primary);
+    Py_XDECREF(self->detail);
+    Py_XDECREF(self->hint);
+    PyObject_Del(self);
 }
 
 /* Return notice as string in human readable form. */
 static PyObject *
 notice_str(noticeObject *self)
 {
-    return notice_getattr(self, PyBytes_FromString("message"));
+    return Py_NewRef(self->message);
 }
 
-/* Notice object methods */
-static struct PyMethodDef notice_methods[] = {
-    {"__dir__", (PyCFunction)notice_dir, METH_NOARGS, NULL},
-    {NULL, NULL, 0, NULL}};
+/* Notice object members (all read-only, NULL is returned as None) */
+static struct PyMemberDef notice_members[] = {
+    {"pgcnx", T_OBJECT, offsetof(noticeObject, pgcnx), READONLY,
+     "the connection (only available inside the notice receiver)"},
+    {"message", T_OBJECT, offsetof(noticeObject, message), READONLY,
+     "the full message with a trailing newline"},
+    {"severity", T_OBJECT, offsetof(noticeObject, severity), READONLY,
+     "the level of the message, e.g. 'NOTICE' or 'WARNING'"},
+    {"primary", T_OBJECT, offsetof(noticeObject, primary), READONLY,
+     "the primary human-readable message"},
+    {"detail", T_OBJECT, offsetof(noticeObject, detail), READONLY,
+     "an optional secondary message"},
+    {"hint", T_OBJECT, offsetof(noticeObject, hint), READONLY,
+     "an optional suggestion what to do about the problem"},
+    {NULL, 0, 0, 0, NULL}};
 
 static char notice__doc__[] = "PostgreSQL notice object";
 
@@ -98,10 +58,9 @@ PyTypeObject noticeType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "pg.Notice",
     .tp_basicsize = sizeof(noticeObject),
+    .tp_dealloc = (destructor)notice_dealloc,
     .tp_str = (reprfunc)notice_str,
-    .tp_getattro = (getattrofunc)notice_getattr,
-    .tp_setattro = PyObject_GenericSetAttr,
     .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_doc = notice__doc__,
-    .tp_methods = notice_methods,
+    .tp_members = notice_members,
 };

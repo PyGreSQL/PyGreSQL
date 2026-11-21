@@ -45,6 +45,14 @@ Version 6.3.0 (unreleased)
     first. It previously failed with "another command is already in progress".
     If the query has more statements after the COPY, an error in these is now
     reported, and a further COPY can be run with `putdata()` or `getdata()`.
+  - Fixed several problems with custom notice receivers: notice objects were
+    leaked, and reading their attributes after the receiver had returned
+    accessed freed memory. The notice fields are now copied, so notices can
+    be kept and used later, except for the `pgcnx` attribute, which is only
+    available inside the receiver. The fields are now decoded with the client
+    encoding instead of UTF-8, and `str(notice)` works again. Exceptions
+    raised in the receiver are now reported as unraisable exceptions instead
+    of causing a `SystemError` in the query that produced the notice.
 
 - Modernization and build:
 

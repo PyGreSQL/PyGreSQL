@@ -19,13 +19,14 @@
 static void
 conn_dealloc(connObject *self)
 {
+    /* do not call the notice receiver on a deallocated connection */
+    Py_CLEAR(self->notice_receiver);
     if (self->cnx) {
         Py_BEGIN_ALLOW_THREADS
         PQfinish(self->cnx);
         Py_END_ALLOW_THREADS
     }
     Py_XDECREF(self->cast_hook);
-    Py_XDECREF(self->notice_receiver);
     PyObject_Del(self);
 }
 
