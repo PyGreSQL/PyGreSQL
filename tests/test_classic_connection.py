@@ -2023,6 +2023,19 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('public.test', data)
         self.assertEqual(self.get_back(), data)
 
+    def test_inserttable_with_bytes_as_table_name(self):
+        data = self.data
+        self.c.inserttable(b'test', data[:2])
+        self.c.inserttable(b'public.test', data[2:])
+        self.assertEqual(self.get_back(), data)
+
+    def test_inserttable_with_invalid_table_name_type(self):
+        for table in 42, None, ['test']:
+            with self.assertRaises(TypeError) as cm:
+                self.c.inserttable(table, self.data)
+            self.assertIn('expects a string', str(cm.exception))
+        self.assert_ready()
+
     def test_inserttable_with_invalid_table_name(self):
         data = [(42,)]
         # check that the table name is not inserted unescaped
@@ -2198,13 +2211,187 @@ class TestInserttable(unittest.TestCase):
             def __repr__(self):
                 return s
 
+        class I(int):  # noqa: E742
+            def __str__(self):
+                return s
+
         s = '1\'2"3\b4\f5\n6\r7\t8\b9\\0'
         s1 = s.encode('ascii')
         s2 = S()
-        data = [(t,) for t in (s, s1, s2)]
+        s3 = I()
+        data = [(t,) for t in (s, s1, s2, s3)]
         self.c.inserttable('test', data, ['t'])
         self.assertEqual(
-            self.c.query('select t from test').getresult(), [(s,)] * 3)
+            self.c.query('select t from test').getresult(), [(s,)] * 4)
+
+    def assert_ready(self):
+        """Check that the connection is ready for the next command."""
+        q = self.c.send_query("select 1")
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertIsNone(q.getresult())
+
+    def assert_failed(self, error, data, columns=None, message=None):
+        """Check that inserttable() fails without inserting any rows."""
+        with self.assertRaises(error) as cm:
+            if columns is None:
+                self.c.inserttable('test', data)
+            else:
+                self.c.inserttable('test', data, columns)
+        if message:
+            self.assertIn(message, str(cm.exception))
+        self.assert_ready()
+        self.assertEqual(self.get_back(), [])
+
+    def test_inserttable_ready_after_success(self):
+        self.c.inserttable('test', self.data)
+        self.assert_ready()
+        self.assertEqual(self.get_back(), self.data)
+
+    def test_inserttable_ready_after_errors(self):
+        self.assert_failed(ValueError, [(1,), ('x',)], ['i4'],
+                           'invalid input syntax for type integer')
+        self.assert_failed(TypeError, [(1,), (2, 3)], ['i4'],
+                           'sequences of the same size')
+        self.assert_failed(TypeError, [(1,), 2], ['i4'],
+                           'must contain tuples or lists')
+
+    def test_inserttable_with_iteration_error(self):
+        def rows():
+            yield 1,
+            raise ZeroDivisionError
+
+        self.assert_failed(ZeroDivisionError, rows(), ['i4'])
+
+    def test_inserttable_with_unencodable_strings(self):
+        self.c.query("set client_encoding=sql_ascii")
+        for i in range(100):
+            # a new string that is only referenced by the row
+            row = (f'€{i}',)
+            refcount = sys.getrefcount(row[0])
+            self.assertRaises(
+                UnicodeEncodeError, self.c.inserttable, 'test', [row], ['t'])
+            self.assertEqual(sys.getrefcount(row[0]), refcount)
+        self.assert_ready()
+        self.assertEqual(self.get_back(), [])
+
+    def test_inserttable_with_failing_str_and_repr(self):
+        class I(int):  # noqa: E742
+            def __str__(self):
+                raise ZeroDivisionError
+
+        class R:
+            def __repr__(self):
+                raise ZeroDivisionError
+
+        class S:
+            def __repr__(self):
+                return '\udc80'  # lone surrogate, cannot be encoded
+
+        self.assert_failed(ZeroDivisionError, [(1,), (I(2),)], ['i4'])
+        self.assert_failed(ZeroDivisionError, [('a',), (R(),)], ['t'])
+        self.assert_failed(UnicodeEncodeError, [('a',), (S(),)], ['t'])
+
+    def test_inserttable_with_nul_characters(self):
+        message = 'must not contain NUL characters'
+        self.assert_failed(ValueError, [('a',), (b'b\0c',)], ['t'], message)
+        self.assert_failed(ValueError, [('a',), ('b\0c',)], ['t'], message)
+
+    def test_inserttable_with_nul_characters_in_names(self):
+        message = 'must not contain NUL'
+        # the column name must not be truncated to the existing column t
+        self.assert_failed(ValueError, [('a',)], [b't\0x'], message)
+        self.assert_failed(ValueError, [('a',)], ['t\0x'], message)
+        with self.assertRaises(ValueError) as cm:
+            self.c.inserttable('test\0x', [('a',)], ['t'])
+        self.assertIn(message, str(cm.exception))
+        self.assert_ready()
+
+    def test_inserttable_with_invalid_bytes_in_names(self):
+        invalid = '€'.encode()[:2]  # incomplete multibyte character
+        self.assert_failed(ValueError, [('a',)], [invalid],
+                           'multibyte character')
+
+    def test_inserttable_with_rows_changed_while_converting(self):
+        class R:
+            def __init__(self, row):
+                self.row = row
+
+            def __repr__(self):
+                self.row.clear()
+                return 'changed'
+
+        row: list = []
+        row.extend([R(row), 'x'])
+        self.c.inserttable('test', [row], ['t', 'v4'])
+        self.assertEqual(row, [])
+        self.assertEqual(
+            self.c.query("select t, v4 from test").getresult(),
+            [('changed', 'x')])
+
+    def test_inserttable_with_columns_iterating_differently(self):
+        class L(list):
+            def __iter__(self):
+                return iter(['t'])
+
+        class T(tuple):
+            __slots__ = ()
+
+            def __iter__(self):
+                return iter(['t'])
+
+        for columns in L(['t', 'v4']), T(['t', 'v4']):
+            self.c.inserttable('test', [('a', 'b')], columns)
+        self.assertEqual(
+            self.c.query("select t, v4 from test").getresult(),
+            [('a', 'b')] * 2)
+
+    def test_inserttable_with_rows_failing_to_get_length(self):
+        class L(list):
+            def __len__(self):
+                raise ZeroDivisionError
+
+        self.assertRaises(ZeroDivisionError, self.c.inserttable,
+                          'test', L([('a',)]), ['t'])
+        self.assert_ready()
+        self.assertEqual(self.get_back(), [])
+
+    def test_inserttable_with_latin1_names_and_values(self):
+        try:
+            self.c.query("set client_encoding=latin1")
+            self.c.query('create temporary table "täble"'
+                         ' ("cölumn" text, "zähler" int)')
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support latin1")
+        # table and column names and the repr of other objects
+        # must also be encoded with the client encoding
+        self.c.inserttable('täble', [('käse',), (['käse'],)], ['cölumn'])
+        self.assertEqual(
+            self.c.query('select "cölumn" from "täble"').getresult(),
+            [('käse',), ("['käse']",)])
+        # error messages must be decoded with the client encoding
+        with self.assertRaises(ValueError) as cm:
+            self.c.inserttable('täble', [('käse',)], ['spalte_ä'])
+        self.assertIn('"spalte_ä"', str(cm.exception))
+        with self.assertRaises(ValueError) as cm:
+            self.c.inserttable('täble', [('käse',)], ['zähler'])
+        self.assertIn('"käse"', str(cm.exception))
+        # names can also be passed as bytes in the server encoding
+        # when they cannot be encoded with the client encoding
+        server_encoding = self.c.parameter('server_encoding')
+        if server_encoding not in ('UTF8', 'LATIN1', 'SQL_ASCII'):
+            return
+        encoding = 'utf8' if server_encoding == 'UTF8' else 'latin1'
+        self.c.query("set client_encoding=sql_ascii")
+        self.assertRaises(UnicodeEncodeError, self.c.inserttable,
+                          'täble', [(b'k',)], ['cölumn'])
+        self.assertRaises(UnicodeEncodeError, self.c.inserttable,
+                          'täble'.encode(encoding), [(b'k',)], ['cölumn'])
+        self.c.inserttable(
+            'täble'.encode(encoding), [(b'k',)], ['cölumn'.encode(encoding)])
+        self.c.query("set client_encoding=latin1")
+        self.assertEqual(self.c.query(
+            'select "cölumn" from "täble" where "cölumn" = \'k\'').getresult(),
+            [('k',)])
 
     def test_insert_table_big_row_size(self):
         # inserting rows with a size exceeding 64k bytes should work

@@ -59,6 +59,22 @@ Version 6.3.0 (unreleased)
     freed when their notice receiver or cast hook refers back to them, e.g.
     as a bound method of an object holding the connection. Closing the
     connection also releases the notice receiver.
+  - Fixed several problems in the `inserttable()` method: values whose
+    conversion to a string failed, e.g. because of an exception in their
+    `__str__()` or `__repr__()` method, and invalid bytes in column names
+    caused crashes, as did rows that were changed while being converted.
+    Strings that could not be encoded in the client encoding released a
+    reference too much. Values containing NUL characters were silently
+    truncated and now raise a `ValueError`, as do table and column names
+    containing NUL characters. The table name and the `repr()` of other
+    objects are now encoded with the client encoding instead of UTF-8, like
+    the column names and string values. With the client encoding SQL_ASCII,
+    non-ASCII characters in these now raise a `UnicodeEncodeError`. The
+    table name can now also be passed as bytes, like the column names. Error
+    messages are now decoded with the client encoding instead of UTF-8.
+    After an error, the COPY operation is now always aborted (also when the
+    iteration raised an error), and the connection is idle again after the
+    method returns, so that `send_query()` can be used directly afterwards.
   - The `escape_literal()` and `escape_identifier()` methods crashed for
     bytes containing invalid multibyte characters, they now raise a
     `DataError`. The escape methods of a connection that had been closed

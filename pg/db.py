@@ -1397,7 +1397,8 @@ class DB:
         """Get the last notify from the server."""
         return self._valid_db.getnotify()
 
-    def inserttable(self, table: str, values: Sequence[list|tuple],
+    def inserttable(self, table: str | bytes,
+                    values: Sequence[list|tuple],
                     columns: list[str] | tuple[str, ...] | None = None,
                     freeze: bool=False) -> int:
         """Insert a Python iterable into a database table."""

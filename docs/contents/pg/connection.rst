@@ -482,14 +482,19 @@ inserttable -- insert an iterable into a table
 
     Insert a Python iterable into a database table
 
-    :param str table: the table name
+    :param table: the table name
+    :type table: str or bytes
     :param list values: iterable of row values, which must be lists or tuples
     :param list columns: list or tuple of column names
     :param bool freeze: if True, immediately freeze the inserted rows
     :rtype: int
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises MemoryError: insert buffer could not be allocated
-    :raises ValueError: unsupported values
+    :raises ValueError: unsupported values, values or names containing NUL
+        characters, or an error reported by the server
+    :raises UnicodeEncodeError: a string that cannot be encoded in the
+        client encoding
+    :raises OSError: the data could not be sent to the server
 
 This method allows to *quickly* insert large blocks of data in a table.
 Internally, it uses the COPY command of the PostgreSQL database.
@@ -497,6 +502,14 @@ The method takes an iterable of row values which must be tuples or lists
 of the same size, containing the values for each inserted row.
 These may contain string, integer, long or double (real) values as well as
 date, time, datetime or timedelta objects.
+Strings are encoded with the client encoding, bytes are passed unchanged.
+Other objects are converted to strings with ``str()`` (integers, dates
+and times) or ``repr()`` and then also encoded with the client encoding.
+The values must not contain NUL characters, which PostgreSQL does not
+support in text.
+``table`` is the table name, optionally qualified with a schema name.
+The table and column names can also be passed as bytes, which are not
+encoded, e.g. for non-ASCII names with the client encoding SQL_ASCII.
 ``columns`` is an optional tuple or list of column names to be passed on
 to the COPY command.
 The number of rows affected is returned.

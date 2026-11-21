@@ -732,6 +732,159 @@ conn_is_non_blocking(connObject *self, PyObject *Py_UNUSED(noargs))
     return PyBool_FromLong((long)rc);
 }
 
+/* Append an escaped identifier (str or bytes) to the buffer.
+   If qualified is set, the parts separated by dots are escaped separately.
+   Return 0 on success or -1 with an exception set. */
+static int
+_inserttable_append_identifier(connObject *self, struct CharBuffer *buf,
+                               PyObject *name, int encoding, int qualified)
+{
+    PyObject *bytes_obj;
+    char *s, *end, *part_end, *escaped;
+    Py_ssize_t len;
+
+    if (PyBytes_Check(name)) {
+        bytes_obj = Py_NewRef(name);
+    }
+    else if (PyUnicode_Check(name)) {
+        bytes_obj = get_encoded_string(name, encoding);
+        if (!bytes_obj)
+            return -1; /* pass the UnicodeEncodeError */
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError,
+                        "The third argument must contain only strings");
+        return -1;
+    }
+
+    if (PyBytes_AsStringAndSize(bytes_obj, &s, &len) < 0) {
+        Py_DECREF(bytes_obj);
+        return -1;
+    }
+    if (memchr(s, '\0', (size_t)len)) {
+        Py_DECREF(bytes_obj);
+        PyErr_SetString(PyExc_ValueError,
+                        "Table and column names must not contain NUL");
+        return -1;
+    }
+
+    /* the dot cannot be part of a multibyte character in any of the client
+       encodings supported by PostgreSQL, so we can split the bytes */
+    for (end = s + len;; s = part_end + 1) {
+        part_end = qualified ? memchr(s, '.', (size_t)(end - s)) : NULL;
+        if (!part_end)
+            part_end = end;
+        escaped = PQescapeIdentifier(self->cnx, s, (size_t)(part_end - s));
+        if (!escaped) {
+            Py_DECREF(bytes_obj);
+            set_error(PyExc_ValueError, "Cannot escape identifier", self->cnx,
+                      NULL);
+            return -1;
+        }
+        ext_char_buffer_s(buf, escaped);
+        PQfreemem(escaped);
+        if (part_end == end)
+            break;
+        ext_char_buffer_c(buf, '.');
+    }
+    Py_DECREF(bytes_obj);
+    return 0;
+}
+
+/* Append a value to the buffer in COPY text format.
+   Return 0 on success or -1 with an exception set. */
+static int
+_inserttable_append_value(struct CharBuffer *buf, PyObject *item, int encoding)
+{
+    PyObject *str_obj, *bytes_obj;
+    char *s, *end;
+    Py_ssize_t len;
+    int ret = 0;
+
+    if (item == Py_None) {
+        ext_char_buffer_c(buf, '\\');
+        ext_char_buffer_c(buf, 'N');
+        return 0;
+    }
+
+    if (PyBytes_Check(item)) {
+        bytes_obj = Py_NewRef(item);
+    }
+    else {
+        if (PyUnicode_Check(item))
+            str_obj = Py_NewRef(item);
+        else if (PyLong_Check(item) || PyDate_Check(item) ||
+                 PyDateTime_Check(item) || PyTime_Check(item) ||
+                 PyDelta_Check(item))
+            str_obj = PyObject_Str(item);
+        else
+            str_obj = PyObject_Repr(item);
+        if (!str_obj)
+            return -1; /* pass the error */
+        bytes_obj = get_encoded_string(str_obj, encoding);
+        Py_DECREF(str_obj);
+        if (!bytes_obj)
+            return -1; /* pass the UnicodeEncodeError */
+    }
+
+    if (PyBytes_AsStringAndSize(bytes_obj, &s, &len) < 0) {
+        Py_DECREF(bytes_obj);
+        return -1;
+    }
+    for (end = s + len; s < end; ++s) {
+        char c = *s;
+
+        if (!c) {
+            PyErr_SetString(PyExc_ValueError,
+                            "Values must not contain NUL characters");
+            ret = -1;
+            break;
+        }
+        if (c == '\\' || c == '\t' || c == '\r' || c == '\n')
+            ext_char_buffer_c(buf, '\\');
+        ext_char_buffer_c(buf, c);
+    }
+    Py_DECREF(bytes_obj);
+    return ret;
+}
+
+/* Send the buffered data to the server and empty the buffer.
+   Return 0 on success or -1 with an exception set. */
+static int
+_inserttable_put_data(connObject *self, struct CharBuffer *buf)
+{
+    int rc = PQputCopyData(self->cnx, buf->data, (int)buf->size);
+
+    buf->size = 0;
+    if (rc == 1)
+        return 0;
+    if (rc == -1)
+        set_error(PyExc_IOError, "Data cannot be sent", self->cnx, NULL);
+    else
+        PyErr_SetString(PyExc_IOError, "Data cannot be queued");
+    return -1;
+}
+
+/* Consume the remaining results after the end of a copy operation, so that
+   the connection is ready for the next command. */
+static void
+_inserttable_drain(connObject *self)
+{
+    PGresult *result;
+
+    Py_BEGIN_ALLOW_THREADS
+    while ((result = PQgetResult(self->cnx))) {
+        ExecStatusType status = PQresultStatus(result);
+
+        PQclear(result);
+        /* still in copy state (should not happen), avoid an endless loop */
+        if (status == PGRES_COPY_IN || status == PGRES_COPY_OUT ||
+            status == PGRES_COPY_BOTH)
+            break;
+    }
+    Py_END_ALLOW_THREADS
+}
+
 /* Insert table */
 static char conn_inserttable__doc__[] =
     "inserttable(table, data, [columns]) -- insert iterable into table\n\n"
@@ -744,10 +897,12 @@ static PyObject *
 conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 {
     PGresult *result;
-    char *table, *part, *dot;
     struct CharBuffer buffer = {0};
-    int freeze = 0, encoding, ret;
-    PyObject *rows, *iter_row, *item, *columns = NULL;
+    const char *errormsg = NULL; /* reason for aborting the copy */
+    int freeze = 0, encoding;
+    PyObject *table, *rows, *columns = NULL;
+    PyObject *iter_row = NULL, *cols = NULL, *row = NULL;
+    PyObject *ret = NULL;
     Py_ssize_t i, j, m, n;
 
     static char *kwlist[] = {"table", "data", "columns", "freeze", NULL};
@@ -758,8 +913,9 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     }
 
     /* gets arguments */
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "sO|O$p", kwlist, &table,
-                                     &rows, &columns, &freeze)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|O$p", kwlist, &table,
+                                     &rows, &columns, &freeze) ||
+        !(PyUnicode_Check(table) || PyBytes_Check(table))) {
         PyErr_SetString(
             PyExc_TypeError,
             "Method inserttable() expects a string, an iterable, an optional "
@@ -775,10 +931,16 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
     m = PySequence_Check(rows) ? PySequence_Size(rows) : -1;
-    if (!m) {
+    if (m < 0 && PyErr_Occurred()) {
+        /* the number of rows is not known */
+        if (!PyErr_ExceptionMatches(PyExc_TypeError))
+            goto cleanup;
+        PyErr_Clear();
+    }
+    else if (!m) {
         /* no rows specified, nothing to do */
-        Py_DECREF(iter_row);
-        Py_RETURN_NONE;
+        ret = Py_NewRef(Py_None);
+        goto cleanup;
     }
 
     /* checks columns type */
@@ -787,14 +949,20 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
             PyErr_SetString(PyExc_TypeError,
                             "Method inserttable() expects a tuple or a list"
                             " as third argument");
-            return NULL;
+            goto cleanup;
         }
 
-        n = PySequence_Fast_GET_SIZE(columns);
+        /* use a tuple that cannot be changed while we are using it
+           (do not use __iter__ here, which may be overridden) */
+        cols = PyList_Check(columns) ? PyList_AsTuple(columns)
+                                     : Py_NewRef(columns);
+        if (!cols)
+            goto cleanup;
+        n = PyTuple_GET_SIZE(cols);
         if (!n) {
             /* no columns specified, nothing to do */
-            Py_DECREF(iter_row);
-            Py_RETURN_NONE;
+            ret = Py_NewRef(Py_None);
+            goto cleanup;
         }
     }
     else {
@@ -805,66 +973,33 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 
     /* import datetime C API (this is not compatible with subinterpreters) */
     PyDateTime_IMPORT;
-    if (PyErr_Occurred()) {
-        return NULL; /* pass the error */
-    }
+    if (!PyDateTimeAPI)
+        goto cleanup; /* pass the error */
 
     /* pre-allocate some memory for the query buffer */
     if (!init_char_buffer(&buffer, 4096)) {
-        Py_DECREF(iter_row);
-        return PyErr_NoMemory();
+        PyErr_NoMemory();
+        goto cleanup;
     }
 
     /* starts query */
     ext_char_buffer_s(&buffer, "copy ");
 
-    part = table;
-    do {
-        dot = strchr(part, '.');
-        if (!dot)
-            dot = part + strlen(part);
-        table = PQescapeIdentifier(self->cnx, part, (size_t)(dot - part));
-        ext_char_buffer_s(&buffer, table);
-        PQfreemem(table);
-        part = dot;
-        if (*part)
-            ext_char_buffer_c(&buffer, *part++);
-    } while (*part);
+    /* adds the escaped (possibly qualified) table name */
+    if (_inserttable_append_identifier(self, &buffer, table, encoding, 1) < 0)
+        goto cleanup;
 
-    if (columns) {
+    if (cols) {
         /* adds a string like f" ({','.join(columns)})" */
         ext_char_buffer_s(&buffer, " (");
         for (j = 0; j < n; ++j) {
-            PyObject *obj = PySequence_Fast_GET_ITEM(columns, j);
-            Py_ssize_t slen;
-            char *col;
-
-            if (PyBytes_Check(obj)) {
-                Py_INCREF(obj);
-            }
-            else if (PyUnicode_Check(obj)) {
-                obj = get_encoded_string(obj, encoding);
-                if (!obj) {
-                    PyMem_Free(buffer.data);
-                    Py_DECREF(iter_row);
-                    return NULL; /* pass the UnicodeEncodeError */
-                }
-            }
-            else {
-                PyErr_SetString(
-                    PyExc_TypeError,
-                    "The third argument must contain only strings");
-                PyMem_Free(buffer.data);
-                Py_DECREF(iter_row);
-                return NULL;
-            }
-            PyBytes_AsStringAndSize(obj, &col, &slen);
-            col = PQescapeIdentifier(self->cnx, col, (size_t)slen);
-            Py_DECREF(obj);
-            ext_char_buffer_s(&buffer, col);
-            PQfreemem(col);
-            ext_char_buffer_c(&buffer, j == n - 1 ? ')' : ',');
+            if (j)
+                ext_char_buffer_c(&buffer, ',');
+            if (_inserttable_append_identifier(
+                    self, &buffer, PyTuple_GET_ITEM(cols, j), encoding, 0) < 0)
+                goto cleanup;
         }
+        ext_char_buffer_c(&buffer, ')');
     }
     ext_char_buffer_s(&buffer, " from stdin");
     if (freeze)
@@ -872,9 +1007,8 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     ext_char_buffer_c(&buffer, '\0');
 
     if (buffer.error) {
-        PyMem_Free(buffer.data);
-        Py_DECREF(iter_row);
-        return PyErr_NoMemory();
+        PyErr_NoMemory();
+        goto cleanup;
     }
 
     Py_BEGIN_ALLOW_THREADS
@@ -882,238 +1016,118 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     Py_END_ALLOW_THREADS
 
     if (!result || PQresultStatus(result) != PGRES_COPY_IN) {
-        if (result)
-            PQclear(result);
-        PyMem_Free(buffer.data);
-        Py_DECREF(iter_row);
-        PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
-        return NULL;
+        PQclear(result);
+        set_error(PyExc_ValueError, "Cannot copy", self->cnx, NULL);
+        goto cleanup;
     }
 
     PQclear(result);
+
+    /* from now on, errors must abort the copy operation */
+    errormsg = "Invalid arguments";
 
     /* empty buffer while keeping allocated memory */
     buffer.size = 0;
 
     /* feed table */
     for (i = 0; m < 0 || i < m; ++i) {
-        if (!(columns = PyIter_Next(iter_row)))
+        if (!(row = PyIter_Next(iter_row))) {
+            if (PyErr_Occurred()) {
+                errormsg = "Iteration error";
+                goto cleanup;
+            }
             break;
+        }
 
-        if (!(PyTuple_Check(columns) || PyList_Check(columns))) {
-            PQputCopyEnd(self->cnx, "Invalid arguments");
-            PyMem_Free(buffer.data);
-            Py_DECREF(columns);
-            Py_DECREF(iter_row);
+        if (PyList_Check(row)) {
+            /* use a copy that cannot be changed while we are using it,
+               since converting the items may run arbitrary Python code */
+            Py_SETREF(row, PyList_AsTuple(row));
+            if (!row)
+                goto cleanup;
+        }
+        else if (!PyTuple_Check(row)) {
             PyErr_SetString(
                 PyExc_TypeError,
                 "The second argument must contain tuples or lists");
-            return NULL;
+            goto cleanup;
         }
 
-        j = PySequence_Fast_GET_SIZE(columns);
+        j = PyTuple_GET_SIZE(row);
         if (n < 0) {
             n = j;
         }
         else if (j != n) {
-            PQputCopyEnd(self->cnx, "Invalid arguments");
-            PyMem_Free(buffer.data);
-            Py_DECREF(columns);
-            Py_DECREF(iter_row);
             PyErr_SetString(
                 PyExc_TypeError,
                 "The second arg must contain sequences of the same size");
-            return NULL;
+            goto cleanup;
         }
 
         /* build insert line */
-
         for (j = 0; j < n; ++j) {
             if (j)
                 ext_char_buffer_c(&buffer, '\t');
-
-            item = PySequence_Fast_GET_ITEM(columns, j);
-
-            /* convert item to string and append to buffer */
-            if (item == Py_None) {
-                ext_char_buffer_c(&buffer, '\\');
-                ext_char_buffer_c(&buffer, 'N');
-            }
-            else if (PyBytes_Check(item)) {
-                const char *t = PyBytes_AsString(item);
-
-                while (*t) {
-                    switch (*t) {
-                        case '\\':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\\');
-                            break;
-                        case '\t':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\t');
-                            break;
-                        case '\r':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\r');
-                            break;
-                        case '\n':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\n');
-                            break;
-                        default:
-                            ext_char_buffer_c(&buffer, *t);
-                    }
-                    ++t;
-                }
-            }
-            else if (PyUnicode_Check(item)) {
-                PyObject *s = get_encoded_string(item, encoding);
-                if (!s) {
-                    PQputCopyEnd(self->cnx, "Encoding error");
-                    PyMem_Free(buffer.data);
-                    Py_DECREF(item);
-                    Py_DECREF(columns);
-                    Py_DECREF(iter_row);
-                    return NULL; /* pass the UnicodeEncodeError */
-                }
-                else {
-                    const char *t = PyBytes_AsString(s);
-
-                    while (*t) {
-                        switch (*t) {
-                            case '\\':
-                                ext_char_buffer_c(&buffer, '\\');
-                                ext_char_buffer_c(&buffer, '\\');
-                                break;
-                            case '\t':
-                                ext_char_buffer_c(&buffer, '\\');
-                                ext_char_buffer_c(&buffer, '\t');
-                                break;
-                            case '\r':
-                                ext_char_buffer_c(&buffer, '\\');
-                                ext_char_buffer_c(&buffer, '\r');
-                                break;
-                            case '\n':
-                                ext_char_buffer_c(&buffer, '\\');
-                                ext_char_buffer_c(&buffer, '\n');
-                                break;
-                            default:
-                                ext_char_buffer_c(&buffer, *t);
-                        }
-                        ++t;
-                    }
-                    Py_DECREF(s);
-                }
-            }
-            else if (PyLong_Check(item) || PyDate_Check(item) ||
-                     PyDateTime_Check(item) || PyTime_Check(item) ||
-                     PyDelta_Check(item)) {
-                PyObject *s = PyObject_Str(item);
-                const char *t = PyUnicode_AsUTF8(s);
-
-                ext_char_buffer_s(&buffer, t);
-                Py_DECREF(s);
-            }
-            else {
-                PyObject *s = PyObject_Repr(item);
-                const char *t = PyUnicode_AsUTF8(s);
-
-                while (*t) {
-                    switch (*t) {
-                        case '\\':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\\');
-                            break;
-                        case '\t':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\t');
-                            break;
-                        case '\r':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\r');
-                            break;
-                        case '\n':
-                            ext_char_buffer_c(&buffer, '\\');
-                            ext_char_buffer_c(&buffer, '\n');
-                            break;
-                        default:
-                            ext_char_buffer_c(&buffer, *t);
-                    }
-                    ++t;
-                }
-                Py_DECREF(s);
+            if (_inserttable_append_value(&buffer, PyTuple_GET_ITEM(row, j),
+                                          encoding) < 0) {
+                errormsg = "Invalid data";
+                goto cleanup;
             }
         }
 
-        Py_DECREF(columns);
+        Py_CLEAR(row);
 
         /* terminate line */
         ext_char_buffer_c(&buffer, '\n');
         if (buffer.error) {
-            PQputCopyEnd(self->cnx, "Memory error");
-            PyMem_Free(buffer.data);
-            Py_DECREF(iter_row);
-            return PyErr_NoMemory();
+            PyErr_NoMemory();
+            errormsg = "Memory error";
+            goto cleanup;
         }
 
         if (buffer.size > 128 * 1024) {
             /* send buffered data after reaching 128KB */
-            ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
-            buffer.size = 0;
-            if (ret != 1) {
-                const char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
-                                                 : "Data cannot be queued";
-                PyErr_SetString(PyExc_IOError, errormsg);
-                PQputCopyEnd(self->cnx, errormsg);
-                PyMem_Free(buffer.data);
-                Py_DECREF(iter_row);
-                return NULL;
+            if (_inserttable_put_data(self, &buffer) < 0) {
+                errormsg = "Data cannot be sent";
+                goto cleanup;
             }
         }
     }
 
     /* flush any remaining data */
-    if (buffer.size) {
-        ret = PQputCopyData(self->cnx, buffer.data, (int)buffer.size);
-        buffer.size = 0;
-        if (ret != 1) {
-            const char *errormsg = ret == -1 ? PQerrorMessage(self->cnx)
-                                             : "Data cannot be queued";
-            PyErr_SetString(PyExc_IOError, errormsg);
-            PQputCopyEnd(self->cnx, errormsg);
-            PyMem_Free(buffer.data);
-            Py_DECREF(iter_row);
-            return NULL;
-        }
+    if (buffer.size && _inserttable_put_data(self, &buffer) < 0) {
+        errormsg = "Data cannot be sent";
+        goto cleanup;
     }
 
-    PyMem_Free(buffer.data);
-
-    Py_DECREF(iter_row);
-    if (PyErr_Occurred()) {
-        return NULL; /* pass the iteration error */
-    }
-
-    ret = PQputCopyEnd(self->cnx, NULL);
-    if (ret != 1) {
-        PyErr_SetString(PyExc_IOError, ret == -1 ? PQerrorMessage(self->cnx)
-                                                 : "Data cannot be queued");
-        return NULL;
+    errormsg = NULL; /* the copy operation will be ended below */
+    if (PQputCopyEnd(self->cnx, NULL) != 1) {
+        set_error(PyExc_IOError, "Cannot end copy", self->cnx, NULL);
+        _inserttable_drain(self);
+        goto cleanup;
     }
 
     Py_BEGIN_ALLOW_THREADS
     result = PQgetResult(self->cnx);
     Py_END_ALLOW_THREADS
-    if (PQresultStatus(result) != PGRES_COMMAND_OK) {
-        PyErr_SetString(PyExc_ValueError, PQerrorMessage(self->cnx));
-        PQclear(result);
-        return NULL;
+    if (PQresultStatus(result) == PGRES_COMMAND_OK)
+        ret = PyLong_FromLong(atol(PQcmdTuples(result)));
+    else
+        set_error(PyExc_ValueError, "Cannot copy", self->cnx, NULL);
+    PQclear(result);
+    _inserttable_drain(self);
+
+cleanup:
+    if (errormsg) {
+        /* abort the copy operation, the error is already set */
+        PQputCopyEnd(self->cnx, errormsg);
+        _inserttable_drain(self);
     }
-    else {
-        long ntuples = atol(PQcmdTuples(result));
-        PQclear(result);
-        return PyLong_FromLong(ntuples);
-    }
+    PyMem_Free(buffer.data);
+    Py_XDECREF(row);
+    Py_XDECREF(cols);
+    Py_XDECREF(iter_row);
+    return ret;
 }
 
 /* Get transaction state. */
