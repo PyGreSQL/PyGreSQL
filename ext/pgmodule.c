@@ -85,6 +85,94 @@ OBJECTS
 
 /* MODULE FUNCTIONS */
 
+/* Get a connection parameter given as str or bytes as a C string
+   (internal use only). A str is encoded as UTF-8, since there is no
+   client encoding before connecting, bytes are passed unchanged.
+   The string is valid as long as the object exists. Returns NULL with
+   an exception if the object has a wrong type or contains NUL. */
+static const char *
+_param_string(PyObject *obj)
+{
+    const char *s;
+    Py_ssize_t size;
+
+    if (PyBytes_Check(obj)) {
+        char *b;
+
+        /* this raises ValueError if the bytes contain NUL */
+        return PyBytes_AsStringAndSize(obj, &b, NULL) ? NULL : b;
+    }
+    if (!PyUnicode_Check(obj)) {
+        PyErr_Format(PyExc_TypeError,
+                     "Connection parameters must be str, bytes or None,"
+                     " not %.100s",
+                     Py_TYPE(obj)->tp_name);
+        return NULL;
+    }
+    if (!(s = PyUnicode_AsUTF8AndSize(obj, &size)))
+        return NULL; /* pass the UnicodeEncodeError */
+    if (strlen(s) != (size_t)size) {
+        PyErr_SetString(PyExc_ValueError, "embedded null character");
+        return NULL;
+    }
+    return s;
+}
+
+/* Converter for connection parameters given as str, bytes or None
+   (internal use only). Stores a borrowed reference to the object or
+   NULL for None in addr, after checking that it is a valid parameter. */
+static int
+_param_converter(PyObject *obj, void *addr)
+{
+    if (obj == Py_None) {
+        obj = NULL;
+    }
+    else if (!_param_string(obj)) {
+        return 0;
+    }
+    *(PyObject **)addr = obj;
+    return 1;
+}
+
+/* Converter for port numbers given as int or None (internal use only).
+   Stores the port in addr as an int, or -1 for None or -1, which both
+   stand for the default port. */
+static int
+_port_converter(PyObject *obj, void *addr)
+{
+    long port = -1;
+
+    if (obj != Py_None) {
+        port = PyLong_AsLong(obj);
+        if (port == -1 && PyErr_Occurred())
+            return 0; /* pass the TypeError or OverflowError */
+        if (port < -1 || port > 65535) {
+            PyErr_SetString(PyExc_ValueError,
+                            "The port must be between 0 and 65535,"
+                            " or -1 or None for the default port");
+            return 0;
+        }
+    }
+    *(int *)addr = (int)port;
+    return 1;
+}
+
+/* Get the value of a connection parameter as a C string (internal use
+   only). If the parameter has not been passed, the default value is
+   used and a reference to it is stored in defaults, since the default
+   could be changed while the GIL is released. Returns 0 on error. */
+static int
+_param_value(PyObject *param, PyObject *dflt, const char **value,
+             PyObject **defaults, size_t *ndef)
+{
+    if (!param) {
+        if (dflt == Py_None)
+            return 1;
+        param = defaults[(*ndef)++] = Py_NewRef(dflt);
+    }
+    return (*value = _param_string(param)) != NULL;
+}
+
 /* Connect to a database. */
 static char pg_connect__doc__[] =
     "connect(dbname, host, port, opt, user, passwd, nowait) -- connect to a "
@@ -98,6 +186,8 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     static const char *kwlist[] = {"dbname", "host",   "port",   "opt",
                                    "user",   "passwd", "nowait", NULL};
 
+    PyObject *host_obj = NULL, *opt_obj = NULL, *dbname_obj = NULL,
+             *user_obj = NULL, *passwd_obj = NULL;
     const char *pghost, *pgopt, *pgdbname, *pguser, *pgpasswd;
     int pgport = -1, nowait = 0, nkw = 0;
     char port_buffer[20];
@@ -109,42 +199,30 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 
     pghost = pgopt = pgdbname = pguser = pgpasswd = NULL;
 
-    /*
-     * parses standard arguments With the right compiler warnings, this
-     * will issue a diagnostic. There is really no way around it.  If I
-     * don't declare kwlist as const char *kwlist[] then it complains when
-     * I try to assign all those constant strings to it.
-     */
-    if (!PyArg_ParseTupleAndKeywords(args, dict, "|zzizzzi", (char **)kwlist,
-                                     &pgdbname, &pghost, &pgport, &pgopt,
-                                     &pguser, &pgpasswd, &nowait)) {
+    /* the string parameters can be str, bytes or None (use the default),
+       the port can be an int or None (use the default) */
+    if (!PyArg_ParseTupleAndKeywords(
+            args, dict, "|O&O&O&O&O&O&i", (char **)kwlist, _param_converter,
+            &dbname_obj, _param_converter, &host_obj, _port_converter, &pgport,
+            _param_converter, &opt_obj, _param_converter, &user_obj,
+            _param_converter, &passwd_obj, &nowait)) {
         return NULL;
     }
 
-    /* handles defaults variables (for uninitialised vars), which are
-       stored as str and encoded as UTF-8 like the arguments; references
-       are kept, since they could be changed while the GIL is released */
-    if ((!pghost) && (pg_default_host != Py_None))
-        pghost =
-            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_host));
-
+    /* handles defaults variables (for uninitialised vars) */
     if ((pgport == -1) && (pg_default_port != Py_None))
         pgport = (int)PyLong_AsLong(pg_default_port);
 
-    if ((!pgopt) && (pg_default_opt != Py_None))
-        pgopt = PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_opt));
-
-    if ((!pgdbname) && (pg_default_base != Py_None))
-        pgdbname =
-            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_base));
-
-    if ((!pguser) && (pg_default_user != Py_None))
-        pguser =
-            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_user));
-
-    if ((!pgpasswd) && (pg_default_passwd != Py_None))
-        pgpasswd =
-            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_passwd));
+    if (!_param_value(host_obj, pg_default_host, &pghost, defaults, &ndef) ||
+        !_param_value(opt_obj, pg_default_opt, &pgopt, defaults, &ndef) ||
+        !_param_value(dbname_obj, pg_default_base, &pgdbname, defaults,
+                      &ndef) ||
+        !_param_value(user_obj, pg_default_user, &pguser, defaults, &ndef) ||
+        !_param_value(passwd_obj, pg_default_passwd, &pgpasswd, defaults,
+                      &ndef)) {
+        while (ndef) Py_DECREF(defaults[--ndef]);
+        return NULL;
+    }
 
     if (!(conn_obj = PyObject_GC_New(connObject, &connType))) {
         while (ndef) Py_DECREF(defaults[--ndef]);
@@ -447,7 +525,7 @@ pg_set_decimal_point(PyObject *Py_UNUSED(self), PyObject *args)
     }
     else {
         PyErr_SetString(PyExc_TypeError,
-                        "Function set_decimal_mark() expects"
+                        "Function set_decimal_point() expects"
                         " a decimal mark character as argument");
     }
     return ret;
@@ -652,171 +730,102 @@ pg_set_jsondecode(PyObject *Py_UNUSED(self), PyObject *func)
     return ret;
 }
 
-/* Get default host. */
+/* Set a default connection parameter given as str, bytes or None
+   (internal use only). Returns the previous value. */
+static PyObject *
+_set_default(PyObject **dflt, PyObject *args, const char *format)
+{
+    PyObject *value, *old;
+
+    if (!PyArg_ParseTuple(args, format, _param_converter, &value)) {
+        return NULL;
+    }
+
+    old = *dflt;
+    *dflt = Py_NewRef(value ? value : Py_None);
+    return old;
+}
+
+/* Get default database host. */
 static char pg_get_defhost__doc__[] =
     "get_defhost() -- return default database host";
 
 static PyObject *
 pg_get_defhost(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    return Py_XNewRef(pg_default_host);
+    return Py_NewRef(pg_default_host);
 }
 
-/* Set default host. */
+/* Set default database host. */
 static char pg_set_defhost__doc__[] =
-    "set_defhost(string) -- set default database host and return previous "
-    "value";
+    "set_defhost(host) -- set default database host and return previous value";
 
 static PyObject *
 pg_set_defhost(PyObject *Py_UNUSED(self), PyObject *args)
 {
-    char *tmp = NULL;
-    PyObject *old;
-
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &tmp)) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "Function set_defhost() expects a string or None as argument");
-        return NULL;
-    }
-
-    /* adjusts value */
-    old = pg_default_host;
-
-    if (tmp) {
-        pg_default_host = PyUnicode_FromString(tmp);
-    }
-    else {
-        pg_default_host = Py_NewRef(Py_None);
-    }
-
-    return old;
+    return _set_default(&pg_default_host, args, "O&:set_defhost");
 }
 
-/* Get default database. */
+/* Get default database name. */
 static char pg_get_defbase__doc__[] =
     "get_defbase() -- return default database name";
 
 static PyObject *
 pg_get_defbase(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    return Py_XNewRef(pg_default_base);
+    return Py_NewRef(pg_default_base);
 }
 
-/* Set default database. */
+/* Set default database name. */
 static char pg_set_defbase__doc__[] =
-    "set_defbase(string) -- set default database name and return previous "
-    "value";
+    "set_defbase(name) -- set default database name and return previous value";
 
 static PyObject *
 pg_set_defbase(PyObject *Py_UNUSED(self), PyObject *args)
 {
-    char *tmp = NULL;
-    PyObject *old;
-
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &tmp)) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "Function set_defbase() Argument a string or None as argument");
-        return NULL;
-    }
-
-    /* adjusts value */
-    old = pg_default_base;
-
-    if (tmp) {
-        pg_default_base = PyUnicode_FromString(tmp);
-    }
-    else {
-        pg_default_base = Py_NewRef(Py_None);
-    }
-
-    return old;
+    return _set_default(&pg_default_base, args, "O&:set_defbase");
 }
 
-/* Get default options. */
+/* Get default connection options. */
 static char pg_get_defopt__doc__[] =
-    "get_defopt() -- return default database options";
+    "get_defopt() -- return default connection options";
 
 static PyObject *
 pg_get_defopt(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    return Py_XNewRef(pg_default_opt);
+    return Py_NewRef(pg_default_opt);
 }
 
-/* Set default options. */
+/* Set default connection options. */
 static char pg_set_defopt__doc__[] =
-    "set_defopt(string) -- set default options and return previous value";
+    "set_defopt(options) -- set default connection options and return "
+    "previous value";
 
 static PyObject *
-pg_setdefopt(PyObject *Py_UNUSED(self), PyObject *args)
+pg_set_defopt(PyObject *Py_UNUSED(self), PyObject *args)
 {
-    char *tmp = NULL;
-    PyObject *old;
-
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &tmp)) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "Function set_defopt() expects a string or None as argument");
-        return NULL;
-    }
-
-    /* adjusts value */
-    old = pg_default_opt;
-
-    if (tmp) {
-        pg_default_opt = PyUnicode_FromString(tmp);
-    }
-    else {
-        pg_default_opt = Py_NewRef(Py_None);
-    }
-
-    return old;
+    return _set_default(&pg_default_opt, args, "O&:set_defopt");
 }
 
-/* Get default username. */
+/* Get default database username. */
 static char pg_get_defuser__doc__[] =
     "get_defuser() -- return default database username";
 
 static PyObject *
 pg_get_defuser(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    return Py_XNewRef(pg_default_user);
+    return Py_NewRef(pg_default_user);
 }
 
-/* Set default username. */
-
+/* Set default database username. */
 static char pg_set_defuser__doc__[] =
-    "set_defuser(name) -- set default username and return previous value";
+    "set_defuser(name) -- set default database username and return previous "
+    "value";
 
 static PyObject *
 pg_set_defuser(PyObject *Py_UNUSED(self), PyObject *args)
 {
-    char *tmp = NULL;
-    PyObject *old;
-
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &tmp)) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "Function set_defuser() expects a string or None as argument");
-        return NULL;
-    }
-
-    /* adjusts value */
-    old = pg_default_user;
-
-    if (tmp) {
-        pg_default_user = PyUnicode_FromString(tmp);
-    }
-    else {
-        pg_default_user = Py_NewRef(Py_None);
-    }
-
-    return old;
+    return _set_default(&pg_default_user, args, "O&:set_defuser");
 }
 
 /* Set default password. */
@@ -826,23 +835,13 @@ static char pg_set_defpasswd__doc__[] =
 static PyObject *
 pg_set_defpasswd(PyObject *Py_UNUSED(self), PyObject *args)
 {
-    char *tmp = NULL;
+    PyObject *old;
 
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "z", &tmp)) {
-        PyErr_SetString(
-            PyExc_TypeError,
-            "Function set_defpasswd() expects a string or None as argument");
+    if (!(old = _set_default(&pg_default_passwd, args, "O&:set_defpasswd")))
         return NULL;
-    }
 
-    if (tmp) {
-        pg_default_passwd = PyUnicode_FromString(tmp);
-    }
-    else {
-        pg_default_passwd = Py_NewRef(Py_None);
-    }
-
+    /* the previous password is not returned */
+    Py_DECREF(old);
     Py_RETURN_NONE;
 }
 
@@ -853,7 +852,7 @@ static char pg_get_defport__doc__[] =
 static PyObject *
 pg_get_defport(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(noargs))
 {
-    return Py_XNewRef(pg_default_port);
+    return Py_NewRef(pg_default_port);
 }
 
 /* Set default port. */
@@ -863,27 +862,22 @@ static char pg_set_defport__doc__[] =
 static PyObject *
 pg_set_defport(PyObject *Py_UNUSED(self), PyObject *args)
 {
-    long int port = -2;
-    PyObject *old;
+    PyObject *port_obj, *old;
+    int port;
 
-    /* gets arguments */
-    if ((!PyArg_ParseTuple(args, "l", &port)) || (port < -1)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "Function set_deport expects"
-                        " a positive integer or -1 as argument");
+    if (!PyArg_ParseTuple(args, "O&:set_defport", _port_converter, &port)) {
         return NULL;
     }
 
-    /* adjusts value */
+    if (port == -1) {
+        port_obj = Py_NewRef(Py_None);
+    }
+    else if (!(port_obj = PyLong_FromLong(port))) {
+        return NULL;
+    }
+
     old = pg_default_port;
-
-    if (port != -1) {
-        pg_default_port = PyLong_FromLong(port);
-    }
-    else {
-        pg_default_port = Py_NewRef(Py_None);
-    }
-
+    pg_default_port = port_obj;
     return old;
 }
 
@@ -1091,7 +1085,7 @@ static struct PyMethodDef pg_methods[] = {
     {"get_defbase", pg_get_defbase, METH_NOARGS, pg_get_defbase__doc__},
     {"set_defbase", pg_set_defbase, METH_VARARGS, pg_set_defbase__doc__},
     {"get_defopt", pg_get_defopt, METH_NOARGS, pg_get_defopt__doc__},
-    {"set_defopt", pg_setdefopt, METH_VARARGS, pg_set_defopt__doc__},
+    {"set_defopt", pg_set_defopt, METH_VARARGS, pg_set_defopt__doc__},
     {"get_defport", pg_get_defport, METH_NOARGS, pg_get_defport__doc__},
     {"set_defport", pg_set_defport, METH_VARARGS, pg_set_defport__doc__},
     {"get_defuser", pg_get_defuser, METH_NOARGS, pg_get_defuser__doc__},

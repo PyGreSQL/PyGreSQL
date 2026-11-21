@@ -23,22 +23,26 @@ connect -- Open a PostgreSQL connection
     Open a :mod:`pg` connection
 
     :param dbname: name of connected database (*None* = :data:`defbase`)
-    :type str: str or None
+    :type dbname: str, bytes or None
     :param host: name of the server host (*None* = :data:`defhost`)
-    :type host:  str or None
-    :param port: port used by the database server (-1 = :data:`defport`)
-    :type port: int
+    :type host: str, bytes or None
+    :param port: port used by the database server (-1 or *None* =
+        :data:`defport`)
+    :type port: int or None
     :param opt: connection options (*None* = :data:`defopt`)
-    :type opt: str or None
+    :type opt: str, bytes or None
     :param user: PostgreSQL user (*None* = :data:`defuser`)
-    :type user: str or None
+    :type user: str, bytes or None
     :param passwd: password for user (*None* = :data:`defpasswd`)
-    :type passwd: str or None
+    :type passwd: str, bytes or None
     :param nowait: whether the connection should happen asynchronously
     :type nowait: bool
     :returns: If successful, the :class:`Connection` handling the connection
     :rtype: :class:`Connection`
     :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: parameters containing NUL characters, or a port
+        that is not between 0 and 65535 (other than -1)
+    :raises UnicodeEncodeError: parameters that cannot be encoded as UTF-8
     :raises SyntaxError: duplicate argument definition
     :raises pg.InternalError: some error occurred during pg connection definition
     :raises Exception: (all exceptions relative to object allocation)
@@ -50,6 +54,9 @@ parameters given in the syntax line. The ``opt`` parameter can be used
 to pass command-line options to the server. For a precise description
 of the parameters, please refer to the PostgreSQL user manual.
 See :meth:`Connection.poll` for a description of the ``nowait`` parameter.
+The parameters given as ``str`` are encoded as UTF-8, since there is no
+client encoding before the connection has been established. They can
+also be passed as ``bytes``, which are passed unchanged.
 
 If you want to add additional parameters not specified here, you must
 pass a connection string or a connection URI instead of the ``dbname``
@@ -57,6 +64,10 @@ pass a connection string or a connection URI instead of the ``dbname``
 
 .. versionchanged:: 5.2
     Support for asynchronous connections via the ``nowait`` parameter.
+
+.. versionchanged:: 6.3
+    The parameters can also be passed as ``bytes``, and ``None`` can be
+    passed as ``port``.
 
 Example::
 
@@ -88,32 +99,42 @@ For example, version 15.4 will be returned as 150400.
 get/set_defhost -- default server host
 --------------------------------------
 
-.. function:: get_defhost(host)
+The following functions get and set the default values of the
+connection parameters that are used by :func:`connect` when the
+parameters are not passed. Environment variables won't be looked up by
+these functions. The string values can also be set as ``bytes``, which
+are then passed unchanged to libpq and also returned as ``bytes``, while
+values set as ``str`` are encoded as UTF-8 when connecting.
+
+.. versionchanged:: 6.3
+    The values can also be set as ``bytes``, and ``None`` can be passed
+    to :func:`set_defport`. Invalid ports raise a :exc:`ValueError` now.
+
+.. function:: get_defhost()
 
     Get the default host
 
-    :returns: the current default host specification
-    :rtype: str or None
+    :returns: the current default host
+    :rtype: str, bytes or None
     :raises TypeError: too many arguments
 
-This method returns the current default host specification,
+This function returns the current default host,
 or ``None`` if the environment variables should be used.
-Environment variables won't be looked up.
 
 .. function:: set_defhost(host)
 
     Set the default host
 
-    :param host: the new default host specification
-    :type host: str or None
-    :returns: the previous default host specification
-    :rtype: str or None
+    :param host: the new default host
+    :type host: str, bytes or None
+    :returns: the previous default host
+    :rtype: str, bytes or None
     :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: a value containing NUL characters
 
-This methods sets the default host value for new connections.
-If ``None`` is supplied as parameter, environment variables will
-be used in future connections. It returns the previous setting
-for default host.
+This function sets the default host for new connections.
+If ``None`` is passed, environment variables will be used
+in future connections. It returns the previous setting.
 
 get/set_defport -- default server port
 --------------------------------------
@@ -122,55 +143,56 @@ get/set_defport -- default server port
 
     Get the default port
 
-    :returns: the current default port specification
-    :rtype: int
+    :returns: the current default port
+    :rtype: int or None
     :raises TypeError: too many arguments
 
-This method returns the current default port specification,
+This function returns the current default port,
 or ``None`` if the environment variables should be used.
-Environment variables won't be looked up.
 
-.. function::  set_defport(port)
+.. function:: set_defport(port)
 
     Set the default port
 
     :param port: the new default port
-    :type port: int
-    :returns: previous default port specification
+    :type port: int or None
+    :returns: the previous default port
     :rtype: int or None
+    :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: a port that is not between 0 and 65535 (other than -1)
 
-This methods sets the default port value for new connections. If -1 is
-supplied as parameter, environment variables will be used in future
-connections. It returns the previous setting for default port.
+This function sets the default port for new connections.
+If ``None`` is passed (or -1), environment variables will be used
+in future connections. It returns the previous setting.
 
-get/set_defopt --  default connection options
----------------------------------------------
+get/set_defopt -- default connection options
+--------------------------------------------
 
 .. function:: get_defopt()
 
     Get the default connection options
 
-    :returns: the current default options specification
-    :rtype: str or None
+    :returns: the current default connection options
+    :rtype: str, bytes or None
     :raises TypeError: too many arguments
 
-This method returns the current default connection options specification,
-or ``None`` if the environment variables should be used. Environment variables
-won't be looked up.
+This function returns the current default connection options,
+or ``None`` if the environment variables should be used.
 
 .. function:: set_defopt(options)
 
     Set the default connection options
 
     :param options: the new default connection options
-    :type options: str or None
-    :returns: previous default options specification
-    :rtype: str or None
+    :type options: str, bytes or None
+    :returns: the previous default connection options
+    :rtype: str, bytes or None
     :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: a value containing NUL characters
 
-This methods sets the default connection options value for new connections.
-If ``None`` is supplied as parameter, environment variables will be used in
-future connections. It returns the previous setting for default options.
+This function sets the default connection options for new connections.
+If ``None`` is passed, environment variables will be used
+in future connections. It returns the previous setting.
 
 get/set_defbase -- default database name
 ----------------------------------------
@@ -179,27 +201,27 @@ get/set_defbase -- default database name
 
     Get the default database name
 
-    :returns: the current default database name specification
-    :rtype: str or None
+    :returns: the current default database name
+    :rtype: str, bytes or None
     :raises TypeError: too many arguments
 
-This method returns the current default database name specification, or
-``None`` if the environment variables should be used. Environment variables
-won't be looked up.
+This function returns the current default database name,
+or ``None`` if the environment variables should be used.
 
 .. function:: set_defbase(base)
 
     Set the default database name
 
-    :param base: the new default base name
-    :type base: str or None
-    :returns: the previous default database name specification
-    :rtype: str or None
+    :param base: the new default database name
+    :type base: str, bytes or None
+    :returns: the previous default database name
+    :rtype: str, bytes or None
     :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: a value containing NUL characters
 
-This method sets the default database name value for new connections. If
-``None`` is supplied as parameter, environment variables will be used in
-future connections. It returns the previous setting for default host.
+This function sets the default database name for new connections.
+If ``None`` is passed, environment variables will be used
+in future connections. It returns the previous setting.
 
 get/set_defuser -- default database user
 ----------------------------------------
@@ -208,56 +230,45 @@ get/set_defuser -- default database user
 
     Get the default database user
 
-    :returns: the current default database user specification
-    :rtype: str or None
+    :returns: the current default database user
+    :rtype: str, bytes or None
     :raises TypeError: too many arguments
 
-This method returns the current default database user specification, or
-``None`` if the environment variables should be used. Environment variables
-won't be looked up.
+This function returns the current default database user,
+or ``None`` if the environment variables should be used.
 
 .. function:: set_defuser(user)
 
     Set the default database user
 
     :param user: the new default database user
-    :type base: str or None
-    :returns: the previous default database user specification
-    :rtype: str or None
+    :type user: str, bytes or None
+    :returns: the previous default database user
+    :rtype: str, bytes or None
     :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: a value containing NUL characters
 
-This method sets the default database user name for new connections. If
-``None`` is supplied as parameter, environment variables will be used in
-future connections. It returns the previous setting for default host.
+This function sets the default database user for new connections.
+If ``None`` is passed, environment variables will be used
+in future connections. It returns the previous setting.
 
-get/set_defpasswd -- default database password
-----------------------------------------------
-
-.. function:: get_defpasswd()
-
-    Get the default database password
-
-    :returns: the current default database password specification
-    :rtype: str or None
-    :raises TypeError: too many arguments
-
-This method returns the current default database password specification, or
-``None`` if the environment variables should be used. Environment variables
-won't be looked up.
+set_defpasswd -- default database password
+------------------------------------------
 
 .. function:: set_defpasswd(passwd)
 
     Set the default database password
 
     :param passwd: the new default database password
-    :type base: str or None
-    :returns: the previous default database password specification
-    :rtype: str or None
+    :type passwd: str, bytes or None
+    :rtype: None
     :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: a value containing NUL characters
 
-This method sets the default database password for new connections. If
-``None`` is supplied as parameter, environment variables will be used in
-future connections. It returns the previous setting for default host.
+This function sets the default database password for new connections.
+If ``None`` is passed, environment variables will be used in future
+connections. For security reasons, there is no function to get the
+default password, and the previous password is not returned.
 
 escape_string -- escape a string for use within SQL
 ---------------------------------------------------

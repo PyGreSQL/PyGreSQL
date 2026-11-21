@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import tracemalloc
 import unittest
 from collections.abc import Sequence
 from datetime import timedelta
@@ -96,14 +97,84 @@ class TestHasConnect(unittest.TestCase):
     def test_def_port(self):
         d0 = pg.get_defport()
         d1 = 1234
-        pg.set_defport(d1)
+        self.assertEqual(pg.set_defport(d1), d0)
         self.assertEqual(pg.get_defport(), d1)
-        if d0 is None:
-            d0 = -1
-        pg.set_defport(d0)
-        if d0 == -1:
-            d0 = None
+        # None was not accepted before, so that the previous value
+        # could not always be restored
+        self.assertEqual(pg.set_defport(None), d1)
+        self.assertIsNone(pg.get_defport())
+        self.assertIsNone(pg.set_defport(d1))
+        self.assertEqual(pg.set_defport(-1), d1)
+        self.assertIsNone(pg.get_defport())
+        self.assertIsNone(pg.set_defport(d0))
         self.assertEqual(pg.get_defport(), d0)
+
+    def test_def_port_invalid(self):
+        d0 = pg.get_defport()
+        self.addCleanup(pg.set_defport, d0)
+        self.assertRaises(TypeError, pg.set_defport)
+        self.assertRaises(TypeError, pg.set_defport, '1234')
+        self.assertRaises(TypeError, pg.set_defport, 1234.0)
+        self.assertRaises(TypeError, pg.set_defport, 1234, 5678)
+        # invalid ports raised TypeError before, or were not checked
+        self.assertRaises(ValueError, pg.set_defport, -2)
+        self.assertRaises(ValueError, pg.set_defport, 65536)
+        self.assertRaises(ValueError, pg.set_defport, 2**32 + 1234)
+        self.assertEqual(pg.get_defport(), d0)
+        self.assertEqual(pg.set_defport(0), d0)
+        self.assertEqual(pg.set_defport(65535), 0)
+
+    def test_def_strings(self):
+        for name in 'host', 'opt', 'base', 'user':
+            with self.subTest(name=name):
+                get = getattr(pg, f'get_def{name}')
+                set_ = getattr(pg, f'set_def{name}')
+                d0 = get()
+                self.addCleanup(set_, d0)
+                d1 = f'pgtest{name}'
+                self.assertEqual(set_(d1), d0)
+                self.assertEqual(get(), d1)
+                # bytes were not accepted before
+                d2 = f'pgtest{name}'.encode()
+                self.assertEqual(set_(d2), d1)
+                self.assertEqual(get(), d2)
+                self.assertEqual(set_(None), d2)
+                self.assertIsNone(get())
+                self.assertRaises(TypeError, set_)
+                self.assertRaises(TypeError, set_, 1234)
+                self.assertRaises(TypeError, set_, bytearray(b'x'))
+                self.assertRaises(TypeError, set_, 'x', 'y')
+                # this raised TypeError before
+                self.assertRaises(ValueError, set_, 'x\0y')
+                self.assertRaises(ValueError, set_, b'x\0y')
+                self.assertRaises(UnicodeEncodeError, set_, '\udcff')
+                self.assertIsNone(get())
+
+    def test_def_passwd(self):
+        self.addCleanup(pg.set_defpasswd, None)
+        # the previous password is not returned
+        set_defpasswd: Any = pg.set_defpasswd  # returns None
+        self.assertIsNone(set_defpasswd('pgtestpasswd'))
+        self.assertIsNone(set_defpasswd(b'pgtestpasswd'))
+        self.assertIsNone(set_defpasswd(None))
+        self.assertRaises(TypeError, pg.set_defpasswd, 1234)
+        self.assertRaises(ValueError, pg.set_defpasswd, 'x\0y')
+        self.assertFalse(hasattr(pg, 'get_defpasswd'))
+
+    def test_def_passwd_not_leaked(self):
+        self.addCleanup(pg.set_defpasswd, None)
+        set_defpasswd = pg.set_defpasswd
+        set_defpasswd('x' * 10000)
+        tracemalloc.start()
+        try:
+            before = tracemalloc.get_traced_memory()[0]
+            for _i in range(100):
+                set_defpasswd('x' * 10000)
+            leaked = tracemalloc.get_traced_memory()[0] - before
+        finally:
+            tracemalloc.stop()
+        # the previous password was leaked before (here about 1 MB)
+        self.assertLess(leaked, 100000)
 
     def test_def_opt(self):
         d0 = pg.get_defopt()
@@ -985,6 +1056,12 @@ class TestConfigFunctions(unittest.TestCase):
         r = pg.get_decimal_point()
         self.assertIsInstance(r, str)
         self.assertEqual(r, point)
+
+    def test_set_decimal_point_invalid(self):
+        # the error message mentioned set_decimal_mark() before
+        with self.assertRaisesRegex(TypeError, r'^Function set_decimal_point'):
+            pg.set_decimal_point('xx')
+        self.assertEqual(pg.get_decimal_point(), '.')
 
     def test_get_decimal(self):
         r = pg.get_decimal()

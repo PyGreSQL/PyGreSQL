@@ -203,6 +203,14 @@ Version 6.3.0 (unreleased)
     a list, or when the conversion of a parameter to a string changed the
     list of parameters. `connect()` raised a `SystemError` when default values
     had been set with `set_defhost()` and similar functions.
+  - The string parameters of `connect()` and the values set with
+    `set_defhost()` and similar functions can now also be bytes, which are
+    passed unchanged. `None` can now be passed as port to `connect()` and
+    `set_defport()`, so that the previous value returned by `set_defport()`
+    can always be restored. Invalid ports now raise a `ValueError` instead
+    of a `TypeError`, or of being silently truncated. `set_defpasswd()`
+    leaked the previous password. A `get_defpasswd()` function never
+    existed, it has been removed from the documentation.
 
 - Modernization and build:
 

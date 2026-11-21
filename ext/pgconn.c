@@ -86,7 +86,8 @@ conn_getattr(connObject *self, PyObject *nameobj)
     if (!strcmp(name, "port"))
         return PyLong_FromLong(atol(PQport(self->cnx)));
 
-    /* the connection parameters have been passed as UTF-8 by connect() */
+    /* the connection parameters have been passed as UTF-8 by connect(),
+       unless they have been passed as bytes */
 
     /* selected database */
     if (!strcmp(name, "db"))

@@ -100,6 +100,31 @@ class TestCanConnect(unittest.TestCase):
         except pg.Error:
             self.fail('Cannot close the database connection')
 
+    def test_can_connect_with_bytes(self):
+        # bytes were not accepted as parameters before
+        connection = pg.connect(
+            dbname.encode(), dbhost.encode() if dbhost else None, dbport,
+            user=dbuser.encode() if dbuser else None,
+            passwd=dbpasswd.encode() if dbpasswd else None)
+        try:
+            self.assertEqual(connection.db, dbname)
+        finally:
+            connection.close()
+
+    def test_can_connect_with_default_port(self):
+        # None was not accepted as port before
+        connection = pg.connect(
+            dbname, dbhost, None, user=dbuser, passwd=dbpasswd)
+        connection.close()
+
+    def test_connect_with_bad_parameters(self):
+        self.assertRaises(TypeError, pg.connect, 1)
+        self.assertRaises(TypeError, pg.connect, dbname, port='5432')
+        self.assertRaises(ValueError, pg.connect, 'db\0name')
+        self.assertRaises(ValueError, pg.connect, b'db\0name')
+        self.assertRaises(ValueError, pg.connect, dbname, port=-2)
+        self.assertRaises(ValueError, pg.connect, dbname, port=65536)
+
     def test_can_connect_no_wait(self):
         try:
             connection = connect_nowait()
@@ -1473,7 +1498,7 @@ class TestStringsSentToServer(unittest.TestCase):
         def restore_defaults():
             pg.set_defbase(old[0])
             pg.set_defhost(old[1])
-            pg.set_defport(old[2] if old[2] is not None else -1)
+            pg.set_defport(old[2])
             pg.set_defuser(old[3])
             pg.set_defpasswd(None)
 
@@ -1488,6 +1513,30 @@ class TestStringsSentToServer(unittest.TestCase):
         try:
             self.assertEqual(c.db, dbname)
             self.assertEqual(c.query('select 1').singlescalar(), 1)
+        finally:
+            c.close()
+
+    def test_connect_with_bytes_defaults(self):
+        old = (pg.get_defbase(), pg.get_defhost(),
+               pg.get_defport(), pg.get_defuser())
+
+        def restore_defaults():
+            pg.set_defbase(old[0])
+            pg.set_defhost(old[1])
+            pg.set_defport(old[2])
+            pg.set_defuser(old[3])
+            pg.set_defpasswd(None)
+
+        self.addCleanup(restore_defaults)
+        # bytes were not accepted as defaults before
+        pg.set_defbase(dbname.encode())
+        pg.set_defhost(dbhost.encode() if dbhost else None)
+        pg.set_defport(dbport)
+        pg.set_defuser(dbuser.encode() if dbuser else None)
+        pg.set_defpasswd(dbpasswd.encode() if dbpasswd else None)
+        c = pg.connect()
+        try:
+            self.assertEqual(c.db, dbname)
         finally:
             c.close()
 

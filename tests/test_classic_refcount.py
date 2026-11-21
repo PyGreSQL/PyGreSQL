@@ -262,13 +262,34 @@ class TestModuleRefCounts(RefCountTestCase):
                 get = getattr(pg, f'get_def{name}')
                 set_ = getattr(pg, f'set_def{name}')
                 old = get()
-                # the default port is reset with -1, not with None
-                reset = -1 if name == 'port' and old is None else old
-                self.addCleanup(set_, reset)
+                self.addCleanup(set_, old)
                 self.assert_refcount_unchanged(get, old)
                 set_(value)
                 value = get()
                 self.assert_refcount_unchanged(get, value)
+                # the previous value is returned as a new reference
+                self.assert_refcount_unchanged(
+                    partial(set_, value), value)
+
+    def test_set_defaults_with_bytes(self):
+        for name in 'host', 'base', 'opt', 'user':
+            with self.subTest(name=name):
+                get = getattr(pg, f'get_def{name}')
+                set_ = getattr(pg, f'set_def{name}')
+                self.addCleanup(set_, get())
+                value = f'some_{name}'.encode()
+                set_(value)
+                self.assertIs(get(), value)
+                self.assert_refcount_unchanged(get, value)
+                self.assert_refcount_unchanged(partial(set_, value), value)
+
+    def test_set_defpasswd(self):
+        self.addCleanup(pg.set_defpasswd, None)
+        passwd = ''.join(['some', '_passwd'])  # not interned
+        pg.set_defpasswd(passwd)
+        # the previous password was leaked before
+        self.assert_refcount_unchanged(
+            lambda: pg.set_defpasswd(passwd), passwd)
 
 
 if __name__ == '__main__':
