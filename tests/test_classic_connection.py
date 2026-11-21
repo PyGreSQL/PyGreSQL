@@ -297,6 +297,17 @@ class TestConnectObject(unittest.TestCase):
         query = self.connection.send_query('')
         self.assertRaises(ValueError, query.getresult)
 
+    def test_method_send_query_fields_after_error(self):
+        query = self.connection.send_query("select 1 as a; select 1/0")
+        self.assertEqual(query.getresult(), [(1,)])
+        self.assertEqual(query.listfields(), ('a',))
+        self.assertRaises(pg.DataError, query.getresult)
+        # the fields of the previous result were kept, which crashed
+        self.assertEqual(query.listfields(), ())
+        self.assertEqual(query.fieldinfo(), ())
+        self.assertRaises(ValueError, query.fieldname, 0)
+        self.assertEqual(len(query), 0)
+
     def test_all_query_members(self):
         query = self.connection.query("select true where false")
         members = [
@@ -1185,6 +1196,9 @@ class TestUndecodableText(unittest.TestCase):
                          (0, text, 25, -1, -1))
         # this raised SystemError before
         self.assertEqual(s.fetch(1), [(b'w' + raw + b'r',)])
+        s.movefirst()
+        # this raised UnicodeDecodeError before
+        self.assertEqual(s.field(0), b'w' + raw + b'r')
 
 
 class TestSourceFields(unittest.TestCase):
@@ -1229,6 +1243,81 @@ class TestSourceFields(unittest.TestCase):
         self.assertEqual(field('"MixedCase"'), 'b')
         self.assertEqual(field(b'a'), '1')
         self.assertRaises(ValueError, field, 'c')
+        # after the last row, field() crashed before
+        self.s.movenext()
+        self.assertRaises(IndexError, field, 0)
+        self.s.execute("select null as a")
+        self.assertEqual(field(0), None)  # was an empty string
+        self.s.execute("select 1 as a where false")
+        self.assertRaises(IndexError, field, 0)
+        self.s.movelast()
+        self.assertRaises(IndexError, field, 0)
+
+
+class TestFakeServer(unittest.TestCase):
+    """Test the handling of unusual server responses with a fake server."""
+
+    @staticmethod
+    def message(kind: bytes, payload: bytes = b'') -> bytes:
+        """Create a message of the frontend/backend protocol."""
+        return kind + (len(payload) + 4).to_bytes(4, 'big') + payload
+
+    def serve(self, server: socket.socket, response: bytes) -> None:
+        """Accept one connection and send the response to all queries."""
+        message = self.message
+        conn = server.accept()[0]
+        with conn, conn.makefile('rb') as f:
+            conn.settimeout(5)
+            size = int.from_bytes(f.read(4), 'big')
+            f.read(size - 4)  # skip the startup message
+            params = b''.join(
+                message(b'S', name + b'\0' + value + b'\0')
+                for name, value in (
+                    (b'server_version', b'19.0'),
+                    (b'server_encoding', b'UTF8'),
+                    (b'client_encoding', b'UTF8'),
+                    (b'DateStyle', b'ISO, MDY'),
+                    (b'integer_datetimes', b'on'),
+                    (b'standard_conforming_strings', b'on')))
+            conn.sendall(message(b'R', bytes(4)) + params
+                         + message(b'K', bytes(8)) + message(b'Z', b'I'))
+            while True:
+                kind = f.read(1)
+                if not kind or kind == b'X':  # closed or terminated
+                    break
+                size = int.from_bytes(f.read(4), 'big')
+                f.read(size - 4)
+                if kind == b'Q':  # simple query
+                    conn.sendall(response)
+
+    def connect(self, response: bytes) -> pg.Connection:
+        """Connect to a fake server sending the given query response."""
+        server = socket.create_server(('127.0.0.1', 0))
+        self.addCleanup(server.close)
+        server.settimeout(5)
+        port = server.getsockname()[1]
+        thread = threading.Thread(
+            target=self.serve, args=(server, response), daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 5)
+        connection = pg.connect(
+            f'host=127.0.0.1 port={port} dbname=test user=test'
+            ' sslmode=disable gssencmode=disable connect_timeout=5')
+        self.addCleanup(connection.close)
+        return connection
+
+    def test_results_after_error(self):
+        message = self.message
+        error = message(b'E', b'SERROR\0VERROR\0C42000\0Mboom\0\0')
+        done = message(b'C', b'SELECT 0\0')
+        connection = self.connect(
+            error + done + done + message(b'Z', b'I'))
+        query = connection.send_query("select 1")
+        # this crashed before when more than one result followed the error
+        self.assertRaises(pg.ProgrammingError, query.getresult)
+        # the remaining results have been consumed, the query is invalid
+        self.assertRaises(TypeError, query.getresult)
+        self.assertEqual(connection.transaction(), pg.TRANS_IDLE)
 
 
 class TestParamQueries(unittest.TestCase):

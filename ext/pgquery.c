@@ -143,11 +143,15 @@ _get_async_result(queryObject *self, int keep)
         }
         self->result = PQgetResult(self->pgcnx->cnx);
         Py_END_ALLOW_THREADS
+        /* forget the previous result set, also if this is not a new one */
+        self->max_row = 0;
+        self->num_fields = 0;
+        if (self->col_types) {
+            PyMem_Free(self->col_types);
+            self->col_types = NULL;
+        }
         if (!self->result) {
             /* end of result set, return None */
-            self->max_row = 0;
-            self->num_fields = 0;
-            self->col_types = NULL;
             Py_RETURN_NONE;
         }
 
@@ -157,14 +161,28 @@ _get_async_result(queryObject *self, int keep)
             self->result = NULL; /* since this has been already cleared */
             if (!result) {
                 /* Raise an error. We need to call PQgetResult() to clear the
-                   connection state. This should return NULL the first time. */
-                self->result = PQgetResult(self->pgcnx->cnx);
-                while (self->result) {
-                    PQclear(self->result);
-                    self->result = PQgetResult(self->pgcnx->cnx);
-                    Py_DECREF(self->pgcnx);
-                    self->pgcnx = NULL;
+                   connection state. This should return NULL the first time.
+                   Otherwise, consume all remaining results and invalidate
+                   the query, since its results cannot be fetched any more.
+                   Stop at a copy state, since it would be returned again. */
+                PGconn *cnx = self->pgcnx->cnx;
+                PGresult *res;
+                int drained = 0;
+
+                Py_BEGIN_ALLOW_THREADS
+                while ((res = PQgetResult(cnx))) {
+                    ExecStatusType res_status = PQresultStatus(res);
+
+                    PQclear(res);
+                    drained = 1;
+                    if (res_status == PGRES_COPY_IN ||
+                        res_status == PGRES_COPY_OUT ||
+                        res_status == PGRES_COPY_BOTH)
+                        break;
                 }
+                Py_END_ALLOW_THREADS
+                if (drained)
+                    Py_CLEAR(self->pgcnx);
             }
             else if (result == Py_None) {
                 /* It would be confusing to return None here because the

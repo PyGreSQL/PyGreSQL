@@ -768,8 +768,16 @@ source_field(sourceObject *self, PyObject *desc)
         return NULL;
     }
 
-    return PyUnicode_FromString(
-        PQgetvalue(self->result, self->current_row, num));
+    if (self->current_row < 0 || self->current_row >= self->max_row) {
+        PyErr_SetString(PyExc_IndexError, "No current row");
+        return NULL;
+    }
+    if (PQgetisnull(self->result, self->current_row, num)) {
+        Py_RETURN_NONE;
+    }
+    return get_decoded_string_or_bytes(
+        PQgetvalue(self->result, self->current_row, num),
+        PQgetlength(self->result, self->current_row, num), self->encoding);
 }
 
 /* Get the list of source object attributes. */

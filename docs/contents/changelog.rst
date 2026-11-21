@@ -103,6 +103,13 @@ Version 6.3.0 (unreleased)
     field number.
   - The `fieldinfo()` and `field()` methods of the source object can now
     look up fields by name (passed as str or bytes), which always failed.
+    `field()` crashed when there was no current row, it now raises an
+    `IndexError`. It now returns `None` for NULL values instead of an empty
+    string, and decodes values with the client encoding instead of UTF-8.
+  - Fetching the results of `send_query()` crashed when an error was
+    followed by more than one further result. After an error, the field
+    methods of the query used the fields of the previous result, which
+    could also crash. The column types of every further result were leaked.
   - Casting records with a sequence of cast functions leaked references to
     these functions.
 
