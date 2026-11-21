@@ -117,12 +117,12 @@ class TestHasConnect(unittest.TestCase):
         self.assertRaises(TypeError, pg.set_defport, 1234.0)
         self.assertRaises(TypeError, pg.set_defport, 1234, 5678)
         # invalid ports raised TypeError before, or were not checked
-        self.assertRaises(ValueError, pg.set_defport, -2)
-        self.assertRaises(ValueError, pg.set_defport, 65536)
-        self.assertRaises(ValueError, pg.set_defport, 2**32 + 1234)
+        for port in (0, -2, 65536, 2**32 + 1234, 2**64, -2**64):
+            with self.subTest(port=port):
+                self.assertRaises(ValueError, pg.set_defport, port)
         self.assertEqual(pg.get_defport(), d0)
-        self.assertEqual(pg.set_defport(0), d0)
-        self.assertEqual(pg.set_defport(65535), 0)
+        self.assertEqual(pg.set_defport(1), d0)
+        self.assertEqual(pg.set_defport(65535), 1)
 
     def test_def_strings(self):
         for name in 'host', 'opt', 'base', 'user':

@@ -143,12 +143,14 @@ _port_converter(PyObject *obj, void *addr)
     long port = -1;
 
     if (obj != Py_None) {
-        port = PyLong_AsLong(obj);
+        int overflow;
+
+        port = PyLong_AsLongAndOverflow(obj, &overflow);
         if (port == -1 && PyErr_Occurred())
-            return 0; /* pass the TypeError or OverflowError */
-        if (port < -1 || port > 65535) {
+            return 0; /* pass the TypeError */
+        if (overflow || port == 0 || port < -1 || port > 65535) {
             PyErr_SetString(PyExc_ValueError,
-                            "The port must be between 0 and 65535,"
+                            "The port must be between 1 and 65535,"
                             " or -1 or None for the default port");
             return 0;
         }

@@ -41,7 +41,7 @@ connect -- Open a PostgreSQL connection
     :rtype: :class:`Connection`
     :raises TypeError: bad argument type, or too many arguments
     :raises ValueError: parameters containing NUL characters, or a port
-        that is not between 0 and 65535 (other than -1)
+        that is not between 1 and 65535 (other than -1)
     :raises UnicodeEncodeError: parameters that cannot be encoded as UTF-8
     :raises SyntaxError: duplicate argument definition
     :raises pg.InternalError: some error occurred during pg connection definition
@@ -159,7 +159,7 @@ or ``None`` if the environment variables should be used.
     :returns: the previous default port
     :rtype: int or None
     :raises TypeError: bad argument type, or too many arguments
-    :raises ValueError: a port that is not between 0 and 65535 (other than -1)
+    :raises ValueError: a port that is not between 1 and 65535 (other than -1)
 
 This function sets the default port for new connections.
 If ``None`` is passed (or -1), environment variables will be used

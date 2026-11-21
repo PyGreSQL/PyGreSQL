@@ -122,8 +122,9 @@ class TestCanConnect(unittest.TestCase):
         self.assertRaises(TypeError, pg.connect, dbname, port='5432')
         self.assertRaises(ValueError, pg.connect, 'db\0name')
         self.assertRaises(ValueError, pg.connect, b'db\0name')
-        self.assertRaises(ValueError, pg.connect, dbname, port=-2)
-        self.assertRaises(ValueError, pg.connect, dbname, port=65536)
+        for port in 0, -2, 65536, 2**64:
+            with self.subTest(port=port):
+                self.assertRaises(ValueError, pg.connect, dbname, port=port)
 
     def test_can_connect_no_wait(self):
         try:
