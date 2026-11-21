@@ -73,17 +73,19 @@ read, write, tell, seek, unlink -- file-like large object handling
 This function allows reading data from a large object, starting at the
 current position.
 
-.. method:: LargeObject.write(string)
+.. method:: LargeObject.write(data)
 
     Write data to large object
 
-    :param bytes data: buffer of bytes to be written
+    :param data: buffer of bytes to be written
+    :type data: bytes or str
     :rtype: None
     :raises TypeError: invalid connection, bad parameter type, or too many parameters
     :raises IOError: object is not opened, or write error
 
 This function allows writing data to a large object, starting at the current
-position.
+position. A string is encoded as UTF-8, independent of the client encoding,
+since the server stores large objects without conversion.
 
 .. method:: LargeObject.seek(offset, whence)
 
@@ -148,7 +150,8 @@ export -- save a large object to a file
 
     Export a large object to a file
 
-    :param str name: file to be created
+    :param name: file to be created
+    :type name: str, bytes or path-like object
     :rtype: None
     :raises TypeError: invalid connection or invalid object,
      bad parameter type, or too many parameters
@@ -156,7 +159,11 @@ export -- save a large object to a file
 
 This methods allows saving the content of a large object to a file in a
 very simple way. The file is created on the host running the PyGreSQL
-interface, not on the server host.
+interface, not on the server host, so the name is encoded with the file
+system encoding like :func:`os.fsencode` does.
+
+.. versionchanged:: 6.3
+    Path-like objects and bytes are accepted as file names.
 
 Object attributes
 -----------------

@@ -252,43 +252,44 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
     if ((encoding = get_client_encoding(self)) < 0)
         return NULL;
 
-    if (PyBytes_Check(query_str_obj)) {
-        query = PyBytes_AsString(query_str_obj);
-        query_str_obj = NULL;
-    }
-    else if (PyUnicode_Check(query_str_obj)) {
-        query_str_obj = get_encoded_string(query_str_obj, encoding);
-        if (!query_str_obj)
-            return NULL; /* pass the UnicodeEncodeError */
-        query = PyBytes_AsString(query_str_obj);
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError,
-                        "Method query() expects a string as first argument");
+    if (!(query_str_obj = get_encoded_arg(
+              query_str_obj, encoding,
+              "Method query() expects a string as first argument")))
         return NULL;
-    }
+    query = PyBytes_AS_STRING(query_str_obj);
 
     /* If param_obj is passed, ensure it's a non-empty tuple. We want to treat
      * an empty tuple the same as no argument since we'll get that when the
      * caller passes no arguments to db.query(), and historic behaviour was
      * to call PQexec() in that case, which can execute multiple commands. */
     if (param_obj) {
-        param_obj = PySequence_Fast(
+        PyObject *seq_obj = PySequence_Fast(
             param_obj, "Method query() expects a sequence as second argument");
+
+        /* use a tuple with own references to the parameters, since a list
+         * could be changed while the parameters are converted to strings */
+        param_obj = seq_obj ? PySequence_Tuple(seq_obj) : NULL;
+        Py_XDECREF(seq_obj);
         if (!param_obj) {
-            Py_XDECREF(query_str_obj);
+            Py_DECREF(query_str_obj);
             return NULL;
         }
-        nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
+        nparms = (int)PyTuple_GET_SIZE(param_obj);
 
         /* if there's a single argument and it's a list or tuple, it
          * contains the positional arguments. */
         if (nparms == 1) {
-            PyObject *first_obj = PySequence_Fast_GET_ITEM(param_obj, 0);
+            PyObject *first_obj = PyTuple_GET_ITEM(param_obj, 0);
             if (PyList_Check(first_obj) || PyTuple_Check(first_obj)) {
+                /* get the tuple before the one holding the list is
+                   released, since that may be its only reference */
+                seq_obj = PySequence_Tuple(first_obj);
                 Py_DECREF(param_obj);
-                param_obj = PySequence_Fast(first_obj, NULL);
-                nparms = (int)PySequence_Fast_GET_SIZE(param_obj);
+                if (!(param_obj = seq_obj)) {
+                    Py_DECREF(query_str_obj);
+                    return NULL;
+                }
+                nparms = (int)PyTuple_GET_SIZE(param_obj);
             }
         }
     }
@@ -305,7 +306,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
         if (!str || !parms) {
             PyMem_Free((void *)parms);
             PyMem_Free(str);
-            Py_XDECREF(query_str_obj);
+            Py_DECREF(query_str_obj);
             Py_XDECREF(param_obj);
             return PyErr_NoMemory();
         }
@@ -314,50 +315,38 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
          * the caller to pass whatever they like, and prevents us
          * from having to map types to OIDs */
         for (i = 0, s = str, p = parms; i < nparms; ++i, ++p) {
-            PyObject *obj = PySequence_Fast_GET_ITEM(param_obj, i);
+            PyObject *obj = PyTuple_GET_ITEM(param_obj, i);
+            PyObject *bytes_obj;
 
             if (obj == Py_None) {
                 *p = NULL;
+                continue;
             }
-            else if (PyBytes_Check(obj)) {
-                *p = PyBytes_AsString(obj);
+            if (PyBytes_Check(obj) || PyUnicode_Check(obj)) {
+                Py_INCREF(obj);
             }
-            else if (PyUnicode_Check(obj)) {
-                PyObject *str_obj = get_encoded_string(obj, encoding);
-                if (!str_obj) {
-                    PyMem_Free((void *)parms);
-                    while (s != str) {
-                        s--;
-                        Py_DECREF(*s);
-                    }
-                    PyMem_Free(str);
-                    Py_XDECREF(query_str_obj);
-                    Py_XDECREF(param_obj);
-                    /* pass the UnicodeEncodeError */
-                    return NULL;
+            else if (!(obj = PyObject_Str(obj))) {
+                PyErr_SetString(
+                    PyExc_TypeError,
+                    "Query parameter has no string representation");
+            }
+            /* like the query, encode with the client encoding and check for
+               NUL characters, since parameters are passed as C strings */
+            bytes_obj = obj ? get_encoded_arg(obj, encoding, NULL) : NULL;
+            Py_XDECREF(obj);
+            if (!bytes_obj) {
+                PyMem_Free((void *)parms);
+                while (s != str) {
+                    s--;
+                    Py_DECREF(*s);
                 }
-                *s++ = str_obj;
-                *p = PyBytes_AsString(str_obj);
+                PyMem_Free(str);
+                Py_DECREF(query_str_obj);
+                Py_XDECREF(param_obj);
+                return NULL;
             }
-            else {
-                PyObject *str_obj = PyObject_Str(obj);
-                if (!str_obj) {
-                    PyMem_Free((void *)parms);
-                    while (s != str) {
-                        s--;
-                        Py_DECREF(*s);
-                    }
-                    PyMem_Free(str);
-                    Py_XDECREF(query_str_obj);
-                    Py_XDECREF(param_obj);
-                    PyErr_SetString(
-                        PyExc_TypeError,
-                        "Query parameter has no string representation");
-                    return NULL;
-                }
-                *s++ = str_obj;
-                *p = PyUnicode_AsUTF8(str_obj);
-            }
+            *s++ = bytes_obj;
+            *p = PyBytes_AS_STRING(bytes_obj);
         }
 
         Py_BEGIN_ALLOW_THREADS
@@ -399,7 +388,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
     }
 
     /* we don't need the query and its params any more */
-    Py_XDECREF(query_str_obj);
+    Py_DECREF(query_str_obj);
     Py_XDECREF(param_obj);
 
     /* checks result validity */
@@ -491,9 +480,10 @@ static char conn_prepare__doc__[] =
 static PyObject *
 conn_prepare(connObject *self, PyObject *args)
 {
-    char *name, *query;
-    Py_ssize_t name_length, query_length;
+    static const char usage[] = "Method prepare() takes two string arguments";
+    PyObject *name_obj, *query_obj;
     PGresult *result;
+    int encoding;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -501,17 +491,27 @@ conn_prepare(connObject *self, PyObject *args)
     }
 
     /* reads args */
-    if (!PyArg_ParseTuple(args, "s#s#", &name, &name_length, &query,
-                          &query_length)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "Method prepare() takes two string arguments");
+    if (!PyArg_ParseTuple(args, "OO", &name_obj, &query_obj)) {
+        PyErr_SetString(PyExc_TypeError, usage);
+        return NULL;
+    }
+    if ((encoding = get_client_encoding(self)) < 0)
+        return NULL;
+    /* encode like query() and query_prepared() */
+    if (!(name_obj = get_encoded_arg(name_obj, encoding, usage)))
+        return NULL;
+    if (!(query_obj = get_encoded_arg(query_obj, encoding, usage))) {
+        Py_DECREF(name_obj);
         return NULL;
     }
 
     /* create prepared statement */
     Py_BEGIN_ALLOW_THREADS
-    result = PQprepare(self->cnx, name, query, 0, NULL);
+    result = PQprepare(self->cnx, PyBytes_AS_STRING(name_obj),
+                       PyBytes_AS_STRING(query_obj), 0, NULL);
     Py_END_ALLOW_THREADS
+    Py_DECREF(name_obj);
+    Py_DECREF(query_obj);
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
         PQclear(result);
         Py_RETURN_NONE; /* success */
@@ -531,9 +531,11 @@ static char conn_describe_prepared__doc__[] =
 static PyObject *
 conn_describe_prepared(connObject *self, PyObject *args)
 {
-    char *name;
-    Py_ssize_t name_length;
+    static const char usage[] =
+        "Method describe_prepared() takes a string argument";
+    PyObject *name_obj;
     PGresult *result;
+    int encoding;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -541,16 +543,20 @@ conn_describe_prepared(connObject *self, PyObject *args)
     }
 
     /* reads args */
-    if (!PyArg_ParseTuple(args, "s#", &name, &name_length)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "Method describe_prepared() takes a string argument");
+    if (!PyArg_ParseTuple(args, "O", &name_obj)) {
+        PyErr_SetString(PyExc_TypeError, usage);
         return NULL;
     }
+    if ((encoding = get_client_encoding(self)) < 0)
+        return NULL;
+    if (!(name_obj = get_encoded_arg(name_obj, encoding, usage)))
+        return NULL;
 
     /* describe prepared statement */
     Py_BEGIN_ALLOW_THREADS
-    result = PQdescribePrepared(self->cnx, name);
+    result = PQdescribePrepared(self->cnx, PyBytes_AS_STRING(name_obj));
     Py_END_ALLOW_THREADS
+    Py_DECREF(name_obj);
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
         queryObject *query_obj = PyObject_New(queryObject, &queryType);
         if (!query_obj)
@@ -558,7 +564,7 @@ conn_describe_prepared(connObject *self, PyObject *args)
         Py_XINCREF(self);
         query_obj->pgcnx = self;
         query_obj->result = result;
-        query_obj->encoding = PQclientEncoding(self->cnx);
+        query_obj->encoding = encoding;
         query_obj->current_row = 0;
         query_obj->max_row = PQntuples(result);
         query_obj->num_fields = PQnfields(result);
@@ -585,9 +591,8 @@ static char conn_putline__doc__[] =
 static PyObject *
 conn_putline(connObject *self, PyObject *args)
 {
-    char *line;
-    Py_ssize_t line_length;
-    int ret;
+    PyObject *line_obj;
+    int encoding, ret;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -595,14 +600,29 @@ conn_putline(connObject *self, PyObject *args)
     }
 
     /* read args */
-    if (!PyArg_ParseTuple(args, "s#", &line, &line_length)) {
+    if (!PyArg_ParseTuple(args, "O", &line_obj)) {
+        return NULL;
+    }
+    /* like query(), check the connection also when bytes are passed */
+    if ((encoding = get_client_encoding(self)) < 0)
+        return NULL;
+    if (PyBytes_Check(line_obj)) {
+        Py_INCREF(line_obj);
+    }
+    else if (PyUnicode_Check(line_obj)) {
+        if (!(line_obj = get_encoded_string(line_obj, encoding)))
+            return NULL; /* pass the UnicodeEncodeError */
+    }
+    else {
         PyErr_SetString(PyExc_TypeError,
                         "Method putline() takes a string argument");
         return NULL;
     }
 
-    /* send line to backend */
-    ret = PQputCopyData(self->cnx, line, (int)line_length);
+    /* send line to backend (the size is passed, so NUL bytes are sent) */
+    ret = PQputCopyData(self->cnx, PyBytes_AS_STRING(line_obj),
+                        (int)PyBytes_GET_SIZE(line_obj));
+    Py_DECREF(line_obj);
     if (ret != 1) {
         set_error_text(
             PyExc_IOError,
@@ -1160,7 +1180,11 @@ static char conn_parameter__doc__[] =
 static PyObject *
 conn_parameter(connObject *self, PyObject *args)
 {
-    const char *name;
+    static const char usage[] =
+        "Method parameter() takes a string as argument";
+    PyObject *name_obj;
+    const char *value;
+    int encoding;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1168,16 +1192,20 @@ conn_parameter(connObject *self, PyObject *args)
     }
 
     /* get query args */
-    if (!PyArg_ParseTuple(args, "s", &name)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "Method parameter() takes a string as argument");
+    if (!PyArg_ParseTuple(args, "O", &name_obj)) {
+        PyErr_SetString(PyExc_TypeError, usage);
         return NULL;
     }
 
-    name = PQparameterStatus(self->cnx, name);
+    /* this is only a lookup, so the name is encoded like field names */
+    encoding = PQclientEncoding(self->cnx);
+    if (!(name_obj = get_encoded_name(name_obj, encoding, usage)))
+        return NULL;
+    value = PQparameterStatus(self->cnx, PyBytes_AS_STRING(name_obj));
+    Py_DECREF(name_obj);
 
-    if (name)
-        return get_decoded_text(name, PQclientEncoding(self->cnx));
+    if (value)
+        return get_decoded_text(value, encoding);
 
     /* unknown parameter, return None */
     Py_RETURN_NONE;
@@ -1245,6 +1273,13 @@ conn_escape_literal(connObject *self, PyObject *string)
         return NULL;
     }
 
+    /* libpq stops at NUL characters, so they would be truncated */
+    if (memchr(from, '\0', (size_t)from_length)) {
+        Py_XDECREF(tmp_obj);
+        PyErr_SetString(PyExc_ValueError, "embedded null character");
+        return NULL;
+    }
+
     to = PQescapeLiteral(self->cnx, from, (size_t)from_length);
 
     Py_XDECREF(tmp_obj);
@@ -1301,6 +1336,13 @@ conn_escape_identifier(connObject *self, PyObject *string)
         return NULL;
     }
 
+    /* libpq stops at NUL characters, so they would be truncated */
+    if (memchr(from, '\0', (size_t)from_length)) {
+        Py_XDECREF(tmp_obj);
+        PyErr_SetString(PyExc_ValueError, "embedded null character");
+        return NULL;
+    }
+
     to = PQescapeIdentifier(self->cnx, from, (size_t)from_length);
 
     Py_XDECREF(tmp_obj);
@@ -1353,6 +1395,13 @@ conn_escape_string(connObject *self, PyObject *string)
     else {
         PyErr_SetString(PyExc_TypeError,
                         "Method escape_string() expects a string as argument");
+        return NULL;
+    }
+
+    /* libpq stops at NUL characters, so they would be truncated */
+    if (memchr(from, '\0', (size_t)from_length)) {
+        Py_XDECREF(tmp_obj);
+        PyErr_SetString(PyExc_ValueError, "embedded null character");
         return NULL;
     }
 
@@ -1522,7 +1571,7 @@ static char conn_loimport__doc__[] =
 static PyObject *
 conn_loimport(connObject *self, PyObject *args)
 {
-    char *name;
+    PyObject *name_obj;
     Oid lo_oid;
 
     /* checks validity */
@@ -1530,15 +1579,14 @@ conn_loimport(connObject *self, PyObject *args)
         return NULL;
     }
 
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "s", &name)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "Method loimport() takes a string argument");
+    /* gets arguments (a local file name, encoded like by os.fsencode) */
+    if (!PyArg_ParseTuple(args, "O&", PyUnicode_FSConverter, &name_obj)) {
         return NULL;
     }
 
     /* imports file and checks result */
-    lo_oid = lo_import(self->cnx, name);
+    lo_oid = lo_import(self->cnx, PyBytes_AS_STRING(name_obj));
+    Py_DECREF(name_obj);
     if (lo_oid == 0) {
         set_error_msg(OperationalError, "Can't create large object");
         return NULL;

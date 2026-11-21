@@ -62,6 +62,14 @@ client encoding ``SQL_ASCII``, text values that are not plain ASCII are
 returned as ``bytes``, also as elements of arrays and records. See the
 section on text encoding in the documentation of the :mod:`pg` module.
 
+Queries and parameters that cannot be encoded with the client encoding,
+and text containing NUL characters, which PostgreSQL does not support,
+raise a :exc:`DataError`.
+
+.. versionchanged:: 6.3
+    These raised an :exc:`OperationalError` or NUL characters were
+    silently truncated.
+
 Adaptation of parameters
 ------------------------
 

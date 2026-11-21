@@ -201,11 +201,14 @@ prepare -- create a prepared statement
 
     Create a prepared statement
 
-    :param str name: name of the prepared statement
-    :param str command: SQL command
+    :param name: name of the prepared statement
+    :type name: str or bytes
+    :param command: SQL command
+    :type command: str or bytes
     :rtype: None
     :raises TypeError: bad argument types, or wrong number of arguments
     :raises TypeError: invalid connection
+    :raises ValueError: name or command contains NUL characters
     :raises pg.ProgrammingError: error in query or duplicate query
 
 This method creates a prepared statement with the specified name for the
@@ -229,10 +232,12 @@ describe_prepared -- describe a prepared statement
 
     Describe a prepared statement
 
-    :param str name: name of the prepared statement
+    :param name: name of the prepared statement
+    :type name: str or bytes
     :rtype: :class:`Query`
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
+    :raises ValueError: name contains NUL characters
     :raises pg.OperationalError: prepared statement does not exist
 
 This method returns a :class:`Query` object describing the prepared
@@ -359,7 +364,8 @@ parameter -- get a current server parameter setting
 
     Look up a current parameter setting of the server
 
-    :param str name: the name of the parameter to look up
+    :param name: the name of the parameter to look up
+    :type name: str or bytes
     :returns: the current setting of the specified parameter
     :rtype: str or None
     :raises TypeError: too many (any) arguments
@@ -647,11 +653,17 @@ putline -- write a line to the server socket
 
     Write a line to the server socket
 
-    :param str line: line to be written
+    :param line: line to be written
+    :type line: str or bytes
     :rtype: None
     :raises TypeError: invalid connection, bad parameter type, or too many parameters
 
 This method allows to directly write a string to the server socket.
+A string is encoded with the client encoding, bytes are sent unchanged
+(including NUL bytes, e.g. for the binary COPY format).
+
+.. versionchanged:: 6.3
+    Strings are encoded with the client encoding instead of UTF-8.
 
 getline -- get a line from server socket
 ----------------------------------------
@@ -730,14 +742,20 @@ loimport -- import a file to a large object
 
     Import a file to a large object
 
-    :param str name: the name of the file to be imported
+    :param name: the name of the file to be imported
+    :type name: str, bytes or path-like object
     :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
     :raises TypeError: invalid connection, bad argument type, or too many arguments
     :raises pg.OperationalError: error during file import
 
 This methods allows to create large objects in a very simple way. You just
-give the name of a file containing the data to be used.
+give the name of a file containing the data to be used. The file is read on
+the host running the PyGreSQL interface, so the name is encoded with the
+file system encoding like :func:`os.fsencode` does.
+
+.. versionchanged:: 6.3
+    Path-like objects and bytes are accepted as file names.
 
 Object attributes
 -----------------

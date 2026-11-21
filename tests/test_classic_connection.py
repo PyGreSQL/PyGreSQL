@@ -1265,6 +1265,182 @@ class TestServerStringsLatin1(unittest.TestCase):
         self.assertEqual(str(cm.exception), 'wärme')
 
 
+class TestStringsSentToServer(unittest.TestCase):
+    """Test encoding and checking strings that are sent to the server."""
+
+    def setUp(self):
+        self.c = connect()
+
+    def tearDown(self):
+        self.c.close()
+
+    def set_latin1(self):
+        try:
+            self.c.query('set client_encoding=latin1')
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support latin1")
+
+    def test_query_with_nul(self):
+        query = self.c.query
+
+        class S:
+            def __str__(self):
+                return 'a\0b'
+
+        # these were silently truncated before
+        self.assertRaises(ValueError, query, 'select 1\0select 2')
+        self.assertRaises(ValueError, query, b'select 1\0select 2')
+        self.assertRaises(ValueError, query, 'select $1', ['a\0b'])
+        self.assertRaises(ValueError, query, 'select $1', [b'a\0b'])
+        self.assertRaises(ValueError, query, 'select $1', [S()])
+        self.assertRaises(ValueError, self.c.send_query, 'select 1\0')
+        self.assertRaises(
+            ValueError, self.c.send_query, 'select $1', ['a\0b'])
+        self.assertRaises(ValueError, self.c.query_prepared, 'q\0x')
+        self.c.prepare('q', 'select $1::text')
+        self.assertRaises(ValueError, self.c.query_prepared, 'q', ['a\0b'])
+        source = self.c.source()
+        self.assertRaises(ValueError, source.execute, 'select 1\0select 2')
+        self.assertEqual(query('select $1::text', ['ab']).singlescalar(), 'ab')
+
+    def test_escape_with_nul(self):
+        # these were silently truncated before
+        for escape in (self.c.escape_string, self.c.escape_literal,
+                       self.c.escape_identifier, pg.escape_string):
+            self.assertRaises(ValueError, escape, 'a\0b')
+            self.assertRaises(ValueError, escape, b'a\0b')
+        self.assertEqual(self.c.escape_bytea(b'a\0b'), b'\\x610062')
+        db = pg.DB(self.c)
+        self.assertRaises(
+            ValueError, db.query_formatted, 'select %s', ['a\0b'],
+            inline=True)
+
+    def test_query_with_params_changed_by_str(self):
+        params: list = []
+
+        class S:
+            def __str__(self) -> str:
+                params.clear()
+                gc.collect()
+                return 'x'
+
+        params.extend([S()] + [object() for _i in range(2000)])
+        # this crashed before (the converted items were freed)
+        self.assertRaises(pg.DatabaseError, self.c.query, 'select 1', params)
+
+    def test_query_with_params_from_iterator(self):
+        # this crashed before
+        q = self.c.query('select $1::text', (p for p in [['abc']]))
+        self.assertEqual(q.getresult(), [('abc',)])
+
+    def test_query_with_other_params_latin1(self):
+        self.set_latin1()
+
+        class S:
+            def __init__(self, s: str) -> None:
+                self.s = s
+
+            def __str__(self) -> str:
+                return self.s
+
+        query = self.c.query
+        # these were encoded as UTF-8 before
+        self.assertEqual(
+            query('select $1::text', [S('wärme')]).singlescalar(), 'wärme')
+        self.assertRaises(
+            UnicodeEncodeError, query, 'select $1::text', [S('мир')])
+
+    def test_prepare_latin1(self):
+        self.set_latin1()
+        prepare, describe = self.c.prepare, self.c.describe_prepared
+        query = self.c.query_prepared
+        # the name and the query were encoded as UTF-8 before,
+        # but query_prepared() used the client encoding
+        self.assertIsNone(prepare('größe', 'select \'wärme\' as "ä"'))
+        self.assertEqual(query('größe').getresult(), [('wärme',)])
+        self.assertEqual(describe('größe').listfields(), ('ä',))
+        self.assertIsNone(prepare(b'kl\xe4in', b"select 'k\xe4lte'"))
+        self.assertEqual(query('kläin').singlescalar(), 'kälte')
+        self.assertEqual(describe(b'kl\xe4in').listfields(), ('?column?',))
+        self.assertRaises(UnicodeEncodeError, prepare, 'мир', 'select 1')
+        self.assertRaises(UnicodeEncodeError, prepare, 'q', "select 'мир'")
+        self.assertRaises(UnicodeEncodeError, describe, 'мир')
+
+    def test_prepare_with_nul(self):
+        prepare, describe = self.c.prepare, self.c.describe_prepared
+        # these were silently truncated before
+        self.assertRaises(ValueError, prepare, 'q\0x', 'select 1')
+        self.assertRaises(ValueError, prepare, 'q', 'select 1\0select 2')
+        self.assertRaises(ValueError, describe, 'q\0x')
+        self.assertRaises(TypeError, prepare, 'q')
+        self.assertRaises(TypeError, prepare, 'q', 1)
+        self.assertRaises(TypeError, describe, 1)
+
+    def test_putline_latin1(self):
+        self.set_latin1()
+        query, putline = self.c.query, self.c.putline
+        query('create temporary table test_copy (t text)')
+        query('copy test_copy from stdin')
+        try:
+            # this was encoded as UTF-8 before
+            putline('wärme\n')
+            putline(b'k\xe4lte\n')
+            self.assertRaises(UnicodeEncodeError, putline, 'мир\n')
+            self.assertRaises(TypeError, putline, 1)
+        finally:
+            self.c.endcopy()
+        r = query('select t from test_copy').getresult()
+        self.assertEqual(sorted(r), [('kälte',), ('wärme',)])
+
+    def test_putdata_error_is_always_sent(self):
+        self.set_latin1()
+        self.c.query('create temporary table test_copy (n int)')
+        source = self.c.source()
+        source.execute('copy test_copy from stdin')
+        # characters that cannot be encoded raised UnicodeEncodeError before
+        # and the copy was not aborted, NUL characters truncated the message
+        with self.assertRaises(OSError) as cm:
+            source.putdata(ValueError('wärme ошибка\0x'))
+        escaped = 'ошибка'.encode('ascii', 'backslashreplace').decode()
+        self.assertEqual(str(cm.exception), f'wärme {escaped}\\x00x')
+        self.assertEqual(self.c.transaction(), pg.TRANS_IDLE)
+
+    def test_parameter_name(self):
+        parameter = self.c.parameter
+        encoding = parameter('client_encoding')
+        self.assertIsNotNone(encoding)
+        # bytes were not accepted before
+        self.assertEqual(parameter(b'client_encoding'), encoding)
+        self.assertIsNone(parameter('größe'))
+        self.assertRaises(ValueError, parameter, 'client_encoding\0x')
+        self.assertRaises(TypeError, parameter, 1)
+
+    def test_connect_with_defaults(self):
+        old = (pg.get_defbase(), pg.get_defhost(),
+               pg.get_defport(), pg.get_defuser())
+
+        def restore_defaults():
+            pg.set_defbase(old[0])
+            pg.set_defhost(old[1])
+            pg.set_defport(old[2] if old[2] is not None else -1)
+            pg.set_defuser(old[3])
+            pg.set_defpasswd(None)
+
+        self.addCleanup(restore_defaults)
+        pg.set_defbase(dbname)
+        pg.set_defhost(dbhost)
+        pg.set_defport(dbport)
+        pg.set_defuser(dbuser)
+        pg.set_defpasswd(dbpasswd)
+        # this raised SystemError before
+        c = pg.connect()
+        try:
+            self.assertEqual(c.db, dbname)
+            self.assertEqual(c.query('select 1').singlescalar(), 1)
+        finally:
+            c.close()
+
+
 class TestUndecodableText(unittest.TestCase):
     """Test text that cannot be decoded with the client encoding."""
 

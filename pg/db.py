@@ -32,6 +32,8 @@ from .helpers import namediter, oid_key, quote_if_unqualified
 from .notify import NotificationHandler
 
 if TYPE_CHECKING:
+    from os import PathLike
+
     from pgdb.connection import Connection as DbApi2Connection
 
 AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
@@ -500,7 +502,7 @@ class DB:
         return self.query(*self.adapter.format_query(
             command, parameters, types, inline))
 
-    def query_prepared(self, name: str, *args: Any) -> Query:
+    def query_prepared(self, name: str | bytes, *args: Any) -> Query:
         """Execute a prepared SQL statement.
 
         This works like the query() method, except that instead of passing
@@ -516,7 +518,7 @@ class DB:
         self._do_debug('EXECUTE', name)
         return db.query_prepared(name)
 
-    def prepare(self, name: str, command: str) -> None:
+    def prepare(self, name: str | bytes, command: str | bytes) -> None:
         """Create a prepared SQL statement.
 
         This creates a prepared statement for the given command with the
@@ -534,7 +536,7 @@ class DB:
         self._do_debug('prepare', name, command)
         self._valid_db.prepare(name, command)
 
-    def describe_prepared(self, name: str | None = None) -> Query:
+    def describe_prepared(self, name: str | bytes | None = None) -> Query:
         """Describe a prepared SQL statement.
 
         This method returns a Query object describing the result columns of
@@ -1419,7 +1421,7 @@ class DB:
         """
         return self._valid_db.transaction()
 
-    def parameter(self, name: str) -> str | None:
+    def parameter(self, name: str | bytes) -> str | None:
         """Look up a current parameter setting of the server."""
         return self._valid_db.parameter(name)
 
@@ -1444,7 +1446,7 @@ class DB:
         """Escape binary data for use within SQL as type 'bytea'."""
         return self._valid_db.escape_bytea(s)
 
-    def putline(self, line: str) -> None:
+    def putline(self, line: str | bytes) -> None:
         """Write a line to the server socket."""
         self._valid_db.putline(line)
 
@@ -1476,7 +1478,8 @@ class DB:
         """Build a large object from given oid."""
         return self._valid_db.getlo(oid)
 
-    def loimport(self, filename: str) -> LargeObject:
+    def loimport(self, filename: str | bytes | PathLike[str] | PathLike[bytes]
+                 ) -> LargeObject:
         """Import a file to a large object."""
         return self._valid_db.loimport(filename)
 

@@ -270,6 +270,7 @@ escape_string -- escape a string for use within SQL
     :returns: the escaped string
     :rtype: str
     :raises TypeError: bad argument type, or too many arguments
+    :raises ValueError: the string contains NUL characters
 
 This function escapes a string for use within an SQL command.
 This is useful when inserting data values as literal constants

@@ -98,12 +98,14 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     static const char *kwlist[] = {"dbname", "host",   "port",   "opt",
                                    "user",   "passwd", "nowait", NULL};
 
-    char *pghost, *pgopt, *pgdbname, *pguser, *pgpasswd;
+    const char *pghost, *pgopt, *pgdbname, *pguser, *pgpasswd;
     int pgport = -1, nowait = 0, nkw = 0;
     char port_buffer[20];
     const char *keywords[sizeof(kwlist) / sizeof(*kwlist) + 1],
         *values[sizeof(kwlist) / sizeof(*kwlist) + 1];
     connObject *conn_obj;
+    PyObject *defaults[5] = {NULL}; /* references to the defaults used */
+    size_t ndef = 0;
 
     pghost = pgopt = pgdbname = pguser = pgpasswd = NULL;
 
@@ -119,26 +121,33 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
         return NULL;
     }
 
-    /* handles defaults variables (for uninitialised vars) */
+    /* handles defaults variables (for uninitialised vars), which are
+       stored as str and encoded as UTF-8 like the arguments; references
+       are kept, since they could be changed while the GIL is released */
     if ((!pghost) && (pg_default_host != Py_None))
-        pghost = PyBytes_AsString(pg_default_host);
+        pghost =
+            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_host));
 
     if ((pgport == -1) && (pg_default_port != Py_None))
         pgport = (int)PyLong_AsLong(pg_default_port);
 
     if ((!pgopt) && (pg_default_opt != Py_None))
-        pgopt = PyBytes_AsString(pg_default_opt);
+        pgopt = PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_opt));
 
     if ((!pgdbname) && (pg_default_base != Py_None))
-        pgdbname = PyBytes_AsString(pg_default_base);
+        pgdbname =
+            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_base));
 
     if ((!pguser) && (pg_default_user != Py_None))
-        pguser = PyBytes_AsString(pg_default_user);
+        pguser =
+            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_user));
 
     if ((!pgpasswd) && (pg_default_passwd != Py_None))
-        pgpasswd = PyBytes_AsString(pg_default_passwd);
+        pgpasswd =
+            PyUnicode_AsUTF8(defaults[ndef++] = Py_NewRef(pg_default_passwd));
 
     if (!(conn_obj = PyObject_GC_New(connObject, &connType))) {
+        while (ndef) Py_DECREF(defaults[--ndef]);
         set_error_msg(InternalError, "Can't create new connection object");
         return NULL;
     }
@@ -185,6 +194,7 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     conn_obj->cnx = nowait ? PQconnectStartParams(keywords, values, 1)
                            : PQconnectdbParams(keywords, values, 1);
     Py_END_ALLOW_THREADS
+    while (ndef) Py_DECREF(defaults[--ndef]);
 
     if (PQstatus(conn_obj->cnx) == CONNECTION_BAD) {
         set_error(InternalError, "Cannot connect", conn_obj->cnx, NULL);
@@ -236,12 +246,23 @@ pg_escape_string(PyObject *Py_UNUSED(self), PyObject *string)
         return NULL;
     }
 
+    /* libpq stops at NUL characters, so they would be truncated */
+    if (memchr(from, '\0', (size_t)from_length)) {
+        Py_XDECREF(tmp_obj);
+        PyErr_SetString(PyExc_ValueError, "embedded null character");
+        return NULL;
+    }
+
     to_length = 2 * (size_t)from_length + 1;
     if ((Py_ssize_t)to_length < from_length) { /* overflow */
         to_length = (size_t)from_length;
         from_length = (from_length - 1) / 2;
     }
     to = (char *)PyMem_Malloc(to_length);
+    if (!to) {
+        Py_XDECREF(tmp_obj);
+        return PyErr_NoMemory();
+    }
     to_length = (size_t)PQescapeString(to, from, (size_t)from_length);
 
     Py_XDECREF(tmp_obj);

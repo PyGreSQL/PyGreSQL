@@ -359,22 +359,24 @@ static char large_export__doc__[] =
 static PyObject *
 large_export(largeObject *self, PyObject *args)
 {
-    char *name;
+    PyObject *name_obj;
+    int ret;
 
     /* checks validity */
     if (!_check_lo_obj(self, CHECK_CLOSE)) {
         return NULL;
     }
 
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "s", &name)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "The method export() takes a filename as argument");
+    /* gets arguments (a local file name, encoded like by os.fsencode) */
+    if (!PyArg_ParseTuple(args, "O&", PyUnicode_FSConverter, &name_obj)) {
         return NULL;
     }
 
     /* runs command */
-    if (lo_export(self->pgcnx->cnx, self->lo_oid, name) != 1) {
+    ret =
+        lo_export(self->pgcnx->cnx, self->lo_oid, PyBytes_AS_STRING(name_obj));
+    Py_DECREF(name_obj);
+    if (ret != 1) {
         PyErr_SetString(PyExc_IOError, "Error while exporting large object");
         return NULL;
     }

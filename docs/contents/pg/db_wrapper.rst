@@ -859,6 +859,7 @@ when storing data using :meth:`DB.insert` and similar.
     :returns: the escaped string
     :rtype: str
     :raises DataError: a bytes string with invalid multibyte characters
+    :raises ValueError: the string contains NUL characters
 
 This method escapes a string for use within an SQL command. This is useful
 when inserting data values as literal constants in SQL commands. Certain
@@ -875,6 +876,7 @@ from being interpreted specially by the SQL parser.
     :returns: the escaped string
     :rtype: str
     :raises DataError: a bytes string with invalid multibyte characters
+    :raises ValueError: the string contains NUL characters
 
 This method escapes a string for use as an SQL identifier, such as a table,
 column, or function name. This is useful when a user-supplied identifier
@@ -891,6 +893,7 @@ whose case should be preserved.
     :param str string: the string that is to be escaped
     :returns: the escaped string
     :rtype: str
+    :raises ValueError: the string contains NUL characters
 
 Similar to the module function :func:`pg.escape_string` with the same name,
 but the behavior of this method is adjusted depending on the connection

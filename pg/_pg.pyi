@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
+from os import PathLike
 from typing import Any, TypeAlias, TypeVar
 
 AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
 SomeNamedTuple: TypeAlias = Any  # alias for accessing arbitrary named tuples
+StrOrBytesPath: TypeAlias = str | bytes | PathLike[str] | PathLike[bytes]
 
 version: str
 __version__: str
@@ -98,7 +100,7 @@ class Source:
     ntuples: int
     nfields: int
 
-    def execute(self, sql: str) -> int | None:
+    def execute(self, sql: str | bytes) -> int | None:
         """Execute a SQL statement."""
         ...
 
@@ -151,7 +153,7 @@ class LargeObject:
         """Read data from large object."""
         ...
 
-    def write(self, data: bytes) -> None:
+    def write(self, data: bytes | str) -> None:
         """Write data to large object."""
         ...
 
@@ -171,7 +173,7 @@ class LargeObject:
         """Return the large object size."""
         ...
 
-    def export(self, filename: str) -> None:
+    def export(self, filename: StrOrBytesPath) -> None:
         """Export a large object to a file."""
         ...
 
@@ -202,7 +204,8 @@ class Connection:
         """Create a new source object for this connection."""
         ...
 
-    def query(self, cmd: str, args: Sequence | None = None) -> Query:
+    def query(self, cmd: str | bytes, args: Sequence | None = None
+              ) -> Query:
         """Create a new query object for this connection.
 
         Note that if the command is something other than DQL, this method
@@ -210,19 +213,21 @@ class Connection:
         """
         ...
 
-    def send_query(self, cmd: str, args: Sequence | None = None) -> Query:
+    def send_query(self, cmd: str | bytes, args: Sequence | None = None
+                   ) -> Query:
         """Create a new asynchronous query object for this connection."""
         ...
 
-    def query_prepared(self, name: str, args: Sequence | None = None) -> Query:
+    def query_prepared(self, name: str | bytes,
+                       args: Sequence | None = None) -> Query:
         """Execute a prepared statement."""
         ...
 
-    def prepare(self, name: str, cmd: str) -> None:
+    def prepare(self, name: str | bytes, cmd: str | bytes) -> None:
         """Create a prepared statement."""
         ...
 
-    def describe_prepared(self, name: str) -> Query:
+    def describe_prepared(self, name: str | bytes) -> Query:
         """Describe a prepared statement."""
         ...
 
@@ -285,7 +290,7 @@ class Connection:
         """
         ...
 
-    def parameter(self, name: str) -> str | None:
+    def parameter(self, name: str | bytes) -> str | None:
         """Look up a current parameter setting of the server."""
         ...
 
@@ -309,7 +314,7 @@ class Connection:
         """Escape binary data for use within SQL as type 'bytea'."""
         ...
 
-    def putline(self, line: str) -> None:
+    def putline(self, line: str | bytes) -> None:
         """Write a line to the server socket."""
         ...
 
@@ -341,7 +346,7 @@ class Connection:
         """Build a large object from given oid."""
         ...
 
-    def loimport(self, filename: str) -> LargeObject:
+    def loimport(self, filename: StrOrBytesPath) -> LargeObject:
         """Import a file to a large object."""
         ...
 

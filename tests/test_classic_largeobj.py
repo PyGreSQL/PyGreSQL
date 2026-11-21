@@ -10,6 +10,7 @@ These tests need a database to test against.
 """
 
 import os
+import pathlib
 import tempfile
 import unittest
 from contextlib import suppress
@@ -140,6 +141,32 @@ class TestCreatingLargeObjects(unittest.TestCase):
             large_object.unlink()
         finally:
             del large_object
+
+    def test_lo_import_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = pathlib.Path(tmpdir, 'import.txt')
+            data = b'some data to be imported'
+            path.write_bytes(data)
+            # file names are now passed like os.fsencode() does,
+            # so that path-like objects can be used
+            large_object = self.c.loimport(path)
+        self.assertIsLargeObject(large_object)
+        large_object.open(pg.INV_READ)
+        self.assertEqual(large_object.read(80), data)
+        large_object.close()
+        large_object.unlink()
+        self.assertRaises(ValueError, self.c.loimport, 'invalid\0name')
+        self.assertRaises(TypeError, self.c.loimport, 0)
+
+    def test_lo_import_bytes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = pathlib.Path(tmpdir, 'import.txt')
+            path.write_bytes(b'data')
+            large_object = self.c.loimport(os.fsencode(path))
+        large_object.open(pg.INV_READ)
+        self.assertEqual(large_object.read(80), b'data')
+        large_object.close()
+        large_object.unlink()
 
 
 class TestLargeObjects(unittest.TestCase):
@@ -275,6 +302,7 @@ class TestLargeObjects(unittest.TestCase):
         self.assertEqual(r.decode(), 'käse')
 
     def test_write_utf8_string(self):
+        self.pgcnx.query('set client_encoding=utf8')
         read = self.obj.read
         self.obj.open(pg.INV_WRITE)
         self.obj.write('käse')
@@ -283,6 +311,18 @@ class TestLargeObjects(unittest.TestCase):
         r = read(80)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r.decode(), 'käse')
+
+    def test_write_string_with_other_encoding(self):
+        try:
+            self.pgcnx.query('set client_encoding=sql_ascii')
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support sql_ascii")
+        self.obj.open(pg.INV_WRITE)
+        # large objects are not converted, so strings are always UTF-8
+        self.obj.write('käse сыр')
+        self.obj.close()
+        self.obj.open(pg.INV_READ)
+        self.assertEqual(self.obj.read(80), 'käse сыр'.encode())
 
     def test_seek(self):
         seek = self.obj.seek
@@ -438,6 +478,23 @@ class TestLargeObjects(unittest.TestCase):
             os.remove(fname)
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
+
+    def test_export_path(self):
+        data = b'some data to be exported'
+        self.obj.open(pg.INV_WRITE)
+        self.obj.write(data)
+        self.obj.close()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = pathlib.Path(tmpdir, 'export.txt')
+            # file names are now passed like os.fsencode() does,
+            # so that path-like objects can be used
+            self.obj.export(path)
+            self.assertEqual(path.read_bytes(), data)
+            path = pathlib.Path(tmpdir, 'export2.txt')
+            self.obj.export(os.fsencode(path))
+            self.assertEqual(path.read_bytes(), data)
+        self.assertRaises(ValueError, self.obj.export, 'invalid\0name')
+        self.assertRaises(TypeError, self.obj.export, 0)
 
     def test_export_in_existent(self):
         export = self.obj.export

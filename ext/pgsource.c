@@ -153,7 +153,7 @@ static char source_execute__doc__[] =
 static PyObject *
 source_execute(sourceObject *self, PyObject *sql)
 {
-    PyObject *tmp_obj = NULL; /* auxiliary string object */
+    PyObject *tmp_obj; /* auxiliary string object */
     char *query;
     int encoding;
 
@@ -165,20 +165,10 @@ source_execute(sourceObject *self, PyObject *sql)
     if ((encoding = get_client_encoding(self->pgcnx)) < 0)
         return NULL;
 
-    if (PyBytes_Check(sql)) {
-        query = PyBytes_AsString(sql);
-    }
-    else if (PyUnicode_Check(sql)) {
-        tmp_obj = get_encoded_string(sql, encoding);
-        if (!tmp_obj)
-            return NULL; /* pass the UnicodeEncodeError */
-        query = PyBytes_AsString(tmp_obj);
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError,
-                        "Method execute() expects a string as argument");
+    if (!(tmp_obj = get_encoded_arg(
+              sql, encoding, "Method execute() expects a string as argument")))
         return NULL;
-    }
+    query = PyBytes_AS_STRING(tmp_obj);
 
     /* frees previous result */
     if (self->result) {
@@ -196,7 +186,7 @@ source_execute(sourceObject *self, PyObject *sql)
     Py_END_ALLOW_THREADS
 
     /* we don't need the auxiliary string any more */
-    Py_XDECREF(tmp_obj);
+    Py_DECREF(tmp_obj);
 
     /* checks result validity */
     if (!self->result) {
@@ -546,10 +536,12 @@ source_putdata(sourceObject *self, PyObject *buffer)
             return NULL;
         if (!(str_obj = PyObject_Str(buffer)))
             return NULL; /* pass the error raised by __str__() */
-        tmp_obj = get_encoded_string(str_obj, encoding);
+        /* the message must not prevent aborting the copy, so characters
+           that cannot be encoded and NUL characters are escaped */
+        tmp_obj = get_encoded_text(str_obj, encoding);
         Py_DECREF(str_obj);
         if (!tmp_obj)
-            return NULL; /* pass the UnicodeEncodeError */
+            return NULL;
         /* errormsg points into tmp_obj, which must be kept until the end */
         errormsg = PyBytes_AsString(tmp_obj);
         buf = NULL;

@@ -59,10 +59,15 @@ Text encoding
 Strings are encoded and decoded with the client encoding of the connection
 (the PostgreSQL setting ``client_encoding``) as follows:
 
-- Queries, parameters, and table and column names passed to the database are
-  encoded with the client encoding. A string that cannot be encoded raises a
-  :exc:`UnicodeEncodeError`. You can always pass ``bytes`` instead, which are
-  sent unchanged.
+- Queries, parameters, names of prepared statements, table and column names
+  and data for COPY are encoded with the client encoding. A string that
+  cannot be encoded raises a :exc:`UnicodeEncodeError`, e.g. non-ASCII text
+  with the client encoding ``SQL_ASCII``. You can always pass ``bytes``
+  instead, which are sent unchanged. Queries, parameters and names, and
+  strings passed to the escape methods, must not contain NUL characters, they
+  raise a :exc:`ValueError` instead of being truncated. Strings written to
+  large objects are always encoded as UTF-8, since the server stores large
+  objects without conversion.
 - Text values returned by the database are decoded to ``str``. With the
   client encoding ``SQL_ASCII``, PostgreSQL does not convert text and its
   actual encoding is unknown, so values that are not plain ASCII are
@@ -90,7 +95,9 @@ and again only after the client encoding has been changed).
 .. versionchanged:: 6.3
     Undecodable text values are returned as ``bytes`` again, also as elements
     of arrays and records. Field names, error messages, notifications and
-    parameter values are decoded with the client encoding.
+    parameter values are decoded with the client encoding. Names of prepared
+    statements and data for COPY are encoded with the client encoding.
+    Strings with NUL characters raise a ValueError.
     PostgreSQL encodings that have different names in Python can be used.
 
 

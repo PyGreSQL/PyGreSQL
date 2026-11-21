@@ -1279,6 +1279,44 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertEqual(con.DataError, pgdb.DataError)
         self.assertEqual(con.NotSupportedError, pgdb.NotSupportedError)
 
+    def test_nul_characters(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            # these were silently truncated before
+            for params in (['a\0b'], [['a', 'b\0c']], [pgdb.Json('a\0b')]):
+                with self.assertRaises(pgdb.DataError) as cm:
+                    cur.execute("select %s", params)
+                self.assertIn('NUL', str(cm.exception))
+            self.assertRaises(
+                pgdb.DataError, cur.execute, "select %(x)s", {'x': 'a\0b'})
+            # this raised an OperationalError ("Internal error") before
+            self.assertRaises(pgdb.DataError, cur.execute, "select 'a\0b'")
+            # bytes are passed as bytea, so they can contain NUL bytes
+            cur.execute("select %s::bytea", [b'a\0b'])
+            self.assertEqual(cur.fetchone()[0], b'a\0b')
+        finally:
+            con.close()
+
+    def test_unencodable_characters(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            try:
+                cur.execute("set client_encoding=latin1")
+            except pgdb.DatabaseError:
+                self.skipTest("database does not support latin1")
+            # these raised an OperationalError ("Internal error") before
+            with self.assertRaises(pgdb.DataError) as cm:
+                cur.execute("select %s", ['мир'])
+            self.assertIsInstance(cm.exception.__cause__, UnicodeEncodeError)
+            self.assertRaises(pgdb.DataError, cur.execute, "select 'мир'")
+            # a malformed operation is still an internal error
+            self.assertRaises(
+                pgdb.OperationalError, cur.execute, "select %x", ['a'])
+        finally:
+            con.close()
+
     def test_lost_connection(self):
         con = self._connect()
         try:

@@ -19,12 +19,13 @@ from uuid import UUID as Uuid  # noqa: N811
 from pg.core import (
     RESULT_DQL,
     DatabaseError,
+    DataError,
     Error,
     InterfaceError,
     NotSupportedError,
 )
 from pg.core import Connection as Cnx
-from pg.error import db_error, if_error, op_error
+from pg.error import db_error, error, if_error, op_error
 from pg.helpers import QuoteDict, RowCache
 
 from .adapt import Hstore, Json, Literal
@@ -81,10 +82,9 @@ class Cursor:
             case bytes():
                 return f"'{self._cnx.escape_bytea(value).decode('ascii')}'"
             case str():
-                value = self._cnx.escape_string(value)
-                return f"'{value}'"
+                return f"'{self._escape_text(value)}'"
             case Hstore() | Json():
-                return f"'{self._cnx.escape_string(str(value))}'"
+                return f"'{self._escape_text(str(value))}'"
             case float():
                 if isinf(value):
                     return "'-Infinity'" if value < 0 else "'Infinity'"
@@ -137,6 +137,12 @@ class Cursor:
         if isinstance(value, (tuple, list)):
             value = self._quote(value)
         return value
+
+    def _escape_text(self, value: str) -> str:
+        """Escape a text value, which must not contain NUL characters."""
+        if '\0' in value:
+            raise error('Text values cannot contain NUL characters', DataError)
+        return self._cnx.escape_string(value)
 
     def _quoteparams(self, string: str,
                      parameters: Mapping | Sequence | None) -> str:
@@ -247,6 +253,9 @@ class Cursor:
             for parameters in seq_of_parameters:
                 sql = operation
                 sql = self._quoteparams(sql, parameters)
+                if '\0' in sql:
+                    raise error(
+                        'Queries cannot contain NUL characters', DataError)
                 rows = self._src.execute(sql)
                 if rows:  # true if not DML
                     rowcount += rows
@@ -254,6 +263,8 @@ class Cursor:
                     self.rowcount = -1
         except DatabaseError:
             raise  # database provides error message
+        except UnicodeError as err:  # cannot encode the query or parameters
+            raise error(f"Error in '{sql}': {err}", DataError) from err
         except Error as err:
             # noinspection PyTypeChecker
             raise if_error(f"Error in '{sql}': '{err}'") from err

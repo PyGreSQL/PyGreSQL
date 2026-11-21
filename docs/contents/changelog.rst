@@ -32,6 +32,11 @@ Version 6.3.0 (unreleased)
     `TypeCache.get_fields()` are now typed named tuples.
   - Plain `bytes` parameters are now adapted as `bytea`, like values wrapped
     with `Binary()`. Before, they were not properly quoted.
+  - Text parameters and queries containing NUL characters, which PostgreSQL
+    does not support, now raise a `DataError`. Before, the text was silently
+    truncated at the NUL character. Queries and parameters that cannot be
+    encoded with the client encoding now also raise a `DataError` instead
+    of an `OperationalError` ("Internal error").
 
 - Fixes in the C extension:
 
@@ -134,6 +139,29 @@ Version 6.3.0 (unreleased)
     `getdata()` method of the source object, which raised a
     `UnicodeDecodeError`. When `getnotify()` failed, it leaked memory.
     `getline()` leaked the final result of every COPY operation.
+  - Some strings sent to the server were encoded as UTF-8 instead of the
+    client encoding: the name and the command passed to `prepare()`, the name
+    passed to `describe_prepared()` (so that statements with non-ASCII names
+    could not be used with `query_prepared()`), lines passed to `putline()`,
+    and query parameters that are converted with `str()`. Like queries, these
+    now raise a `UnicodeEncodeError` if they cannot be encoded, e.g. non-ASCII
+    text with the client encoding SQL_ASCII, where it was sent as UTF-8.
+    Strings written to large objects are still encoded as UTF-8, since the
+    server does not convert large objects; this is now documented.
+  - Queries, parameters and names of prepared statements containing NUL
+    characters were silently truncated, as were strings passed to the
+    escape methods and `escape_string()`, which also affected inline
+    parameters. These now raise a `ValueError`. The error message of an
+    exception passed to `putdata()` is now always sent, characters that
+    cannot be encoded and NUL characters are escaped. Before, such messages
+    were truncated or raised a `UnicodeEncodeError` without aborting the COPY.
+  - The name passed to `parameter()` can now also be bytes. The file names
+    passed to `loimport()` and `LargeObject.export()` are now encoded with
+    the file system encoding, and path-like objects are accepted.
+  - `query()` crashed when the parameters were passed as an iterator yielding
+    a list, or when the conversion of a parameter to a string changed the
+    list of parameters. `connect()` raised a `SystemError` when default values
+    had been set with `set_defhost()` and similar functions.
 
 - Modernization and build:
 

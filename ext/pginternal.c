@@ -194,26 +194,26 @@ get_decoded_text(const char *str, int encoding)
     return obj;
 }
 
-/* Get a name for a lookup given as str or as bytes as a new reference to a
-   bytes object. Like get_decoded_text(), names that cannot be encoded with
-   the given encoding are encoded as UTF-8. Return NULL and set a TypeError
-   with the given message if the name is neither str nor bytes, or a
-   ValueError if it contains NUL characters. */
-PyObject *
-get_encoded_name(PyObject *name, int encoding, const char *usage)
+/* Get a str or bytes argument as a new reference to a bytes object. A str
+   is encoded with the given encoding, or with UTF-8 if this fails and the
+   fallback is set. Return NULL and set a TypeError with the given message if
+   the argument is neither str nor bytes, or a ValueError if it contains NUL
+   characters, since it would be truncated there. */
+static PyObject *
+_get_encoded_bytes(PyObject *obj, int encoding, int fallback,
+                   const char *usage)
 {
     PyObject *bytes;
 
-    if (PyBytes_Check(name)) {
-        bytes = Py_NewRef(name);
+    if (PyBytes_Check(obj)) {
+        bytes = Py_NewRef(obj);
     }
-    else if (PyUnicode_Check(name)) {
-        /* encode like names are decoded, since this is only a lookup */
-        if (!(bytes = get_encoded_string(name, encoding))) {
-            if (!_is_codec_error())
-                return NULL;
+    else if (PyUnicode_Check(obj)) {
+        if (!(bytes = get_encoded_string(obj, encoding))) {
+            if (!fallback || !_is_codec_error())
+                return NULL; /* pass the UnicodeEncodeError */
             PyErr_Clear();
-            if (!(bytes = PyUnicode_AsUTF8String(name)))
+            if (!(bytes = PyUnicode_AsUTF8String(obj)))
                 return NULL;
         }
     }
@@ -225,6 +225,70 @@ get_encoded_name(PyObject *name, int encoding, const char *usage)
         Py_DECREF(bytes);
         PyErr_SetString(PyExc_ValueError, "embedded null character");
         return NULL;
+    }
+    return bytes;
+}
+
+/* Get a string argument that is sent to the server, such as a query, a query
+   parameter or the name of a prepared statement, given as str or as bytes,
+   as a new reference to a bytes object. A str is encoded with the client
+   encoding (UnicodeEncodeError if impossible), bytes are passed unchanged.
+   Return NULL and set a TypeError with the given message if the argument is
+   neither str nor bytes, or a ValueError if it contains NUL characters. */
+PyObject *
+get_encoded_arg(PyObject *obj, int encoding, const char *usage)
+{
+    return _get_encoded_bytes(obj, encoding, 0, usage);
+}
+
+/* Get a name for a lookup given as str or as bytes as a new reference to a
+   bytes object. Like get_decoded_text(), names that cannot be encoded with
+   the given encoding are encoded as UTF-8. Return NULL and set a TypeError
+   with the given message if the name is neither str nor bytes, or a
+   ValueError if it contains NUL characters. */
+PyObject *
+get_encoded_name(PyObject *name, int encoding, const char *usage)
+{
+    /* encode like names are decoded, since this is only a lookup */
+    return _get_encoded_bytes(name, encoding, 1, usage);
+}
+
+/* Get text for humans given as str (e.g. an error message sent to the
+   server) as a new reference to a bytes object encoded with the given
+   encoding. Like get_decoded_text(), this never fails because of the
+   encoding: characters that cannot be encoded are replaced with backslash
+   escapes, and so are NUL characters, which would truncate a C string. */
+PyObject *
+get_encoded_text(PyObject *text, int encoding)
+{
+    PyObject *bytes;
+    Py_ssize_t pos = PyUnicode_FindChar(text, 0, 0, PY_SSIZE_T_MAX, 1);
+
+    if (pos == -2)
+        return NULL;
+    if (pos >= 0) {
+        PyObject *nul = PyUnicode_FromOrdinal(0), *esc, *tmp = NULL;
+
+        esc = nul ? PyUnicode_FromString("\\x00") : NULL;
+        if (esc)
+            tmp = PyUnicode_Replace(text, nul, esc, -1);
+        Py_XDECREF(nul);
+        Py_XDECREF(esc);
+        if (!tmp)
+            return NULL;
+        bytes = get_encoded_text(tmp, encoding);
+        Py_DECREF(tmp);
+        return bytes;
+    }
+    bytes = get_encoded_string(text, encoding);
+    if (!bytes && _is_codec_error()) {
+        const char *codec = encoding == pg_encoding_utf8 ? "utf-8"
+                            : encoding == pg_encoding_latin1
+                                ? "latin-1"
+                                : get_codec(encoding);
+
+        PyErr_Clear();
+        bytes = PyUnicode_AsEncodedString(text, codec, "backslashreplace");
     }
     return bytes;
 }
