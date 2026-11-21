@@ -76,9 +76,15 @@ Strings are encoded and decoded with the client encoding of the connection
   to :meth:`Query.fieldnum` or :meth:`Query.fieldinfo` are encoded the same
   way, so the names returned by :meth:`Query.listfields` can be used there.
 
+The PostgreSQL encodings are mapped to the corresponding Python codecs, e.g.
+``WIN1252`` to ``cp1252``. Encodings that are not supported by Python are
+handled like ``SQL_ASCII``: strings must be plain ASCII, and text values
+that are not plain ASCII are returned as ``bytes``.
+
 .. versionchanged:: 6.3
     Undecodable text values are returned as ``bytes`` again, also as elements
     of arrays and records. Field names are decoded with the client encoding.
+    PostgreSQL encodings that have different names in Python can be used.
 
 
 Adaptation of parameters

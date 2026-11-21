@@ -1067,6 +1067,55 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertEqual(v, result)
 
+    def test_client_encodings(self):
+        # the PostgreSQL names of these encodings were passed to Python,
+        # which does not know many of them (e.g. WIN1252, KOI8R, SJIS);
+        # JOHAB with Hangul does not work, the server rejects the input
+        if self.c.parameter('server_encoding') != 'UTF8':
+            self.skipTest("server can only convert some encodings")
+        query = self.c.query
+        for encoding, char in (
+                ('BIG5', '中'), ('EUC_CN', '中'), ('EUC_JIS_2004', 'あ'),
+                ('EUC_JP', 'あ'), ('EUC_KR', '한'), ('GB18030', '中'),
+                ('GBK', '中'), ('ISO_8859_5', 'ж'), ('ISO_8859_6', 'ع'),
+                ('ISO_8859_7', 'λ'), ('ISO_8859_8', 'א'), ('JOHAB', '中'),
+                ('KOI8R', 'ж'), ('KOI8U', 'ї'), ('LATIN1', 'ä'),
+                ('LATIN2', 'ő'), ('LATIN3', 'ĝ'), ('LATIN4', 'ā'),
+                ('LATIN5', 'ğ'), ('LATIN6', 'ŋ'), ('LATIN7', 'ą'),
+                ('LATIN8', 'ŵ'), ('LATIN9', '€'), ('LATIN10', 'ș'),
+                ('SHIFT_JIS_2004', 'あ'), ('SJIS', 'あ'), ('UHC', '한'),
+                ('UTF8', '€'), ('WIN866', 'ж'), ('WIN874', 'ก'),
+                ('WIN1250', 'ő'), ('WIN1251', 'ж'), ('WIN1252', '€'),
+                ('WIN1253', 'λ'), ('WIN1254', 'ğ'), ('WIN1255', 'א'),
+                ('WIN1256', 'ع'), ('WIN1257', 'ą'), ('WIN1258', 'ư')):
+            with self.subTest(encoding=encoding):
+                query(f'set client_encoding={encoding}'.encode())
+                code = ord(char)
+                r = query(f"select chr({code}), '{char}' = chr({code}),"
+                          f" $1::text = chr({code})", (char,)).getresult()
+                self.assertEqual(r, [(char, True, True)])
+                r = query(f'select 1 as "{char}"').listfields()
+                self.assertEqual(r, (char,))
+
+    def test_client_encoding_without_codec(self):
+        # EUC_TW is not supported by Python, so it is handled like SQL_ASCII
+        try:
+            self.c.query('set client_encoding=euc_tw')
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support euc_tw")
+        query = self.c.query
+        r = query("select 'abc', $1::text", ('def',)).getresult()
+        self.assertEqual(r, [('abc', 'def')])
+        self.assertRaises(UnicodeEncodeError, query, "select '中'")
+        self.assertRaises(UnicodeEncodeError, query, 'select $1', ('中',))
+        if self.c.parameter('server_encoding') == 'UTF8':
+            r = query('select chr(20013)').singlescalar()
+            self.assertEqual(r, b'\xc4\xe3')  # 中 in EUC_TW
+            r = query(b'select $1::text = chr(20013)', (r,)).singlescalar()
+            self.assertIs(r, True)
+        self.assertEqual(self.c.escape_literal("a'b"), "'a''b'")
+        self.assertRaises(UnicodeEncodeError, self.c.escape_literal, '中')
+
     def test_field_names_latin1(self):
         try:
             self.c.query('set client_encoding=latin1')

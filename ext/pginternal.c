@@ -30,6 +30,80 @@
 
 /* Shared functions for encoding and decoding strings */
 
+/* Python codec names for the PostgreSQL encodings (the same as in
+   psycopg 3), except those that are handled directly (UTF8, LATIN1 and
+   SQL_ASCII) and those that are not supported by Python. */
+static const char *const codec_names[][2] = {
+    {"BIG5", "big5"},
+    {"EUC_CN", "gb2312"},
+    {"EUC_JIS_2004", "euc_jis_2004"},
+    {"EUC_JP", "euc_jp"},
+    {"EUC_KR", "euc_kr"},
+    {"GB18030", "gb18030"},
+    {"GBK", "gbk"},
+    {"ISO_8859_5", "iso8859-5"},
+    {"ISO_8859_6", "iso8859-6"},
+    {"ISO_8859_7", "iso8859-7"},
+    {"ISO_8859_8", "iso8859-8"},
+    {"JOHAB", "johab"},
+    {"KOI8R", "koi8-r"},
+    {"KOI8U", "koi8-u"},
+    {"LATIN2", "iso8859-2"},
+    {"LATIN3", "iso8859-3"},
+    {"LATIN4", "iso8859-4"},
+    {"LATIN5", "iso8859-9"},
+    {"LATIN6", "iso8859-10"},
+    {"LATIN7", "iso8859-13"},
+    {"LATIN8", "iso8859-14"},
+    {"LATIN9", "iso8859-15"},
+    {"LATIN10", "iso8859-16"},
+    {"SHIFT_JIS_2004", "shift_jis_2004"},
+    {"SJIS", "shift_jis"},
+    {"UHC", "cp949"},
+    {"WIN866", "cp866"},
+    {"WIN874", "cp874"},
+    {"WIN1250", "cp1250"},
+    {"WIN1251", "cp1251"},
+    {"WIN1252", "cp1252"},
+    {"WIN1253", "cp1253"},
+    {"WIN1254", "cp1254"},
+    {"WIN1255", "cp1255"},
+    {"WIN1256", "cp1256"},
+    {"WIN1257", "cp1257"},
+    {"WIN1258", "cp1258"},
+};
+
+/* Python codec names indexed by PostgreSQL encoding ids */
+#define MAX_ENCODING_ID 64
+static const char *codecs[MAX_ENCODING_ID];
+
+/* Initialize the Python codec names for the PostgreSQL encoding ids. */
+void
+init_codecs(void)
+{
+    size_t i;
+
+    for (i = 0; i < sizeof(codec_names) / sizeof(*codec_names); ++i) {
+        int encoding = pg_char_to_encoding(codec_names[i][0]);
+
+        if (encoding >= 0 && encoding < MAX_ENCODING_ID)
+            codecs[encoding] = codec_names[i][1];
+    }
+}
+
+/* Get the Python codec name for a PostgreSQL encoding id. Encodings that
+   have no Python codec are handled like SQL_ASCII: all client encodings are
+   supersets of ASCII, so ASCII text is safe, and other text that cannot be
+   decoded is returned as bytes. */
+static const char *
+get_codec(int encoding)
+{
+    const char *codec =
+        encoding >= 0 && encoding < MAX_ENCODING_ID ? codecs[encoding] : NULL;
+
+    return codec ? codec : "ascii";
+}
+
 PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding)
 {
@@ -39,9 +113,7 @@ get_decoded_string(const char *str, Py_ssize_t size, int encoding)
         return PyUnicode_DecodeLatin1(str, size, "strict");
     if (encoding == pg_encoding_ascii)
         return PyUnicode_DecodeASCII(str, size, "strict");
-    /* encoding name should be properly translated to Python here */
-    return PyUnicode_Decode(str, size, pg_encoding_to_char(encoding),
-                            "strict");
+    return PyUnicode_Decode(str, size, get_codec(encoding), "strict");
 }
 
 /* Check whether the current exception means that a string could not be
@@ -130,9 +202,8 @@ get_encoded_string(PyObject *unicode_obj, int encoding)
         return PyUnicode_AsLatin1String(unicode_obj);
     if (encoding == pg_encoding_ascii)
         return PyUnicode_AsASCIIString(unicode_obj);
-    /* encoding name should be properly translated to Python here */
-    return PyUnicode_AsEncodedString(unicode_obj,
-                                     pg_encoding_to_char(encoding), "strict");
+    return PyUnicode_AsEncodedString(unicode_obj, get_codec(encoding),
+                                     "strict");
 }
 
 /* Helper functions */

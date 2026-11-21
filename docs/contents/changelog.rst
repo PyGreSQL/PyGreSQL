@@ -112,6 +112,11 @@ Version 6.3.0 (unreleased)
     could also crash. The column types of every further result were leaked.
   - Casting records with a sequence of cast functions leaked references to
     these functions.
+  - Client encodings whose PostgreSQL names are not known to Python, such as
+    WIN1252, KOI8R or SJIS, caused a `LookupError` for every query passed as
+    str. The PostgreSQL encodings are now mapped to the corresponding Python
+    codecs. Encodings that are not supported by Python are handled like
+    SQL_ASCII.
 
 - Modernization and build:
 

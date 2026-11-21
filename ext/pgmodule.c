@@ -1204,6 +1204,7 @@ PyInit__pg(void)
     pg_encoding_utf8 = pg_char_to_encoding("UTF8");
     pg_encoding_latin1 = pg_char_to_encoding("LATIN1");
     pg_encoding_ascii = pg_char_to_encoding("SQL_ASCII");
+    init_codecs();
 
     return mod;
 

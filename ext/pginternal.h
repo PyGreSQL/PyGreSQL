@@ -28,6 +28,8 @@
 #define PYGRES_OTHER 11
 /* Array types */
 #define PYGRES_ARRAY 16
+void
+init_codecs(void);
 PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding);
 PyObject *
