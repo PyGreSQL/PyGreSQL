@@ -117,6 +117,11 @@ Version 6.3.0 (unreleased)
     str. The PostgreSQL encodings are now mapped to the corresponding Python
     codecs. Encodings that are not supported by Python are handled like
     SQL_ASCII.
+  - After the connection to the server was lost, queries and other methods
+    of the connection raised a `LookupError` ("unknown encoding"), they now
+    raise an `OperationalError`. Also, a query that failed because the
+    connection was lost now raises an `OperationalError` instead of a
+    `ProgrammingError`, also in the `pgdb` module.
 
 - Modernization and build:
 

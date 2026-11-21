@@ -104,6 +104,21 @@ get_codec(int encoding)
     return codec ? codec : "ascii";
 }
 
+/* Get the client encoding of a connection. If it is unknown, because the
+   connection is bad (e.g. lost) or not yet established, return -1 and set
+   an OperationalError. */
+int
+get_client_encoding(PGconn *cnx)
+{
+    int encoding = PQclientEncoding(cnx);
+
+    if (encoding < 0)
+        set_error_msg(OperationalError, PQstatus(cnx) == CONNECTION_BAD
+                                            ? "Connection has been lost"
+                                            : "Connection is not established");
+    return encoding;
+}
+
 PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding)
 {
@@ -1352,6 +1367,11 @@ set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result)
         if (sqlstate)
             type = get_error_type(sqlstate);
     }
+    /* a query that failed without an SQLSTATE because the connection has
+       been lost (the error then comes from libpq) is an operational error */
+    if (!sqlstate && type == ProgrammingError && cnx &&
+        PQstatus(cnx) == CONNECTION_BAD)
+        type = OperationalError;
 
     set_error_msg_and_state(type, msg, encoding, sqlstate);
 }

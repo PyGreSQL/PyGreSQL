@@ -162,7 +162,8 @@ source_execute(sourceObject *self, PyObject *sql)
         return NULL;
     }
 
-    encoding = PQclientEncoding(self->pgcnx->cnx);
+    if ((encoding = get_client_encoding(self->pgcnx->cnx)) < 0)
+        return NULL;
 
     if (PyBytes_Check(sql)) {
         query = PyBytes_AsString(sql);
@@ -527,20 +528,25 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
     else if (PyUnicode_Check(buffer)) {
         /* or pass a unicode string */
-        tmp_obj =
-            get_encoded_string(buffer, PQclientEncoding(self->pgcnx->cnx));
+        int encoding = get_client_encoding(self->pgcnx->cnx);
+
+        if (encoding < 0)
+            return NULL;
+        tmp_obj = get_encoded_string(buffer, encoding);
         if (!tmp_obj)
             return NULL; /* pass the UnicodeEncodeError */
         PyBytes_AsStringAndSize(tmp_obj, &buf, &nbytes);
     }
     else if (PyErr_GivenExceptionMatches(buffer, PyExc_BaseException)) {
         /* or pass a Python exception for sending an error message */
-        PyObject *str_obj = PyObject_Str(buffer);
+        int encoding = get_client_encoding(self->pgcnx->cnx);
+        PyObject *str_obj;
 
-        if (!str_obj)
+        if (encoding < 0)
+            return NULL;
+        if (!(str_obj = PyObject_Str(buffer)))
             return NULL; /* pass the error raised by __str__() */
-        tmp_obj =
-            get_encoded_string(str_obj, PQclientEncoding(self->pgcnx->cnx));
+        tmp_obj = get_encoded_string(str_obj, encoding);
         Py_DECREF(str_obj);
         if (!tmp_obj)
             return NULL; /* pass the UnicodeEncodeError */
@@ -626,10 +632,15 @@ source_getdata(sourceObject *self, PyObject *args)
     if (nbytes == -1) { /* copy is done */
         ret = _source_end_copy(self, NULL);
     }
-    else { /* a row has been returned */
-        ret = decode ? get_decoded_string(buffer, nbytes,
-                                          PQclientEncoding(self->pgcnx->cnx))
-                     : PyBytes_FromStringAndSize(buffer, nbytes);
+    else if (!decode) { /* a row has been returned */
+        ret = PyBytes_FromStringAndSize(buffer, nbytes);
+        PQfreemem(buffer);
+    }
+    else { /* a row has been returned and shall be decoded */
+        int encoding = get_client_encoding(self->pgcnx->cnx);
+
+        ret =
+            encoding < 0 ? NULL : get_decoded_string(buffer, nbytes, encoding);
         PQfreemem(buffer);
     }
 

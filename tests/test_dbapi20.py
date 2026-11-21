@@ -1279,6 +1279,27 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertEqual(con.DataError, pgdb.DataError)
         self.assertEqual(con.NotSupportedError, pgdb.NotSupportedError)
 
+    def test_lost_connection(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select pg_backend_pid()")
+            pid = cur.fetchone()[0]
+            con.rollback()
+            other = self._connect()
+            try:
+                other.cursor().execute(f"select pg_terminate_backend({pid})")
+            finally:
+                other.close()
+            # this raised a ProgrammingError before
+            self.assertRaises(pgdb.OperationalError, cur.execute, "select 1")
+            # this raised an OperationalError for a LookupError before
+            with self.assertRaises(pgdb.OperationalError) as cm:
+                cur.execute("select 1")
+            self.assertEqual(str(cm.exception), "Connection has been lost")
+        finally:
+            con.close()
+
     def test_transaction(self):
         table = self.table_prefix + 'booze'
         con1 = self._connect()

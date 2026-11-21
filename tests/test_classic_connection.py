@@ -483,6 +483,59 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(calls, [('(1,2)', 600)])  # 600 is the point type
 
 
+class TestLostConnection(unittest.TestCase):
+    """Test a connection that has been lost or is not yet established."""
+
+    def setUp(self):
+        self.c = connect()
+        other = connect()
+        try:
+            other.query(f'select pg_terminate_backend({self.c.backend_pid})')
+        finally:
+            other.close()
+
+    def tearDown(self):
+        self.c.close()
+
+    def test_lost_connection(self):
+        c = self.c
+        # the first query that notices the lost connection
+        # raised a ProgrammingError before
+        self.assertRaises(pg.OperationalError, c.query, 'select 1')
+        self.assertEqual(c.status, 0)
+        # the following raised a LookupError (unknown encoding) before
+        for method, args in (
+                (c.query, ('select 1',)), (c.query, (b'select 1',)),
+                (c.query, ('select $1', (1,))),
+                (c.send_query, ('select 1',)),
+                (c.query_prepared, ('q',)),
+                (c.prepare, ('q', 'select 1')), (c.describe_prepared, ('q',)),
+                (c.escape_literal, ('a',)), (c.escape_identifier, ('a',)),
+                (c.escape_string, ('a',)), (c.escape_bytea, ('a',)),
+                (c.inserttable, ('t', [(1,)])),
+                (c.source().execute, ('select 1',)),
+                (c.source().execute, (b'select 1',))):
+            with self.subTest(method=method.__name__, args=args):
+                with self.assertRaises(pg.OperationalError) as cm:
+                    method(*args)
+                if method not in (c.prepare, c.describe_prepared):
+                    self.assertEqual(
+                        str(cm.exception), 'Connection has been lost')
+        # escaping bytes does not need the client encoding
+        self.assertEqual(c.escape_literal(b"a'b"), b"'a''b'")
+
+    def test_connection_not_established(self):
+        c = connect_nowait()
+        try:
+            for query in 'select 1', b'select 1':
+                with self.assertRaises(pg.OperationalError) as cm:
+                    c.query(query)
+                self.assertEqual(
+                    str(cm.exception), 'Connection is not established')
+        finally:
+            c.close()
+
+
 class TestSimpleQueries(unittest.TestCase):
     """Test simple queries via a basic pg connection."""
 

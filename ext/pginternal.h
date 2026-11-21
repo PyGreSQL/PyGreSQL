@@ -30,6 +30,8 @@
 #define PYGRES_ARRAY 16
 void
 init_codecs(void);
+int
+get_client_encoding(PGconn *cnx);
 PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding);
 PyObject *
