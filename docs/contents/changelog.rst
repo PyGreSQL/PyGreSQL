@@ -116,7 +116,8 @@ Version 6.3.0 (unreleased)
     WIN1252, KOI8R or SJIS, caused a `LookupError` for every query passed as
     str. The PostgreSQL encodings are now mapped to the corresponding Python
     codecs. Encodings that are not supported by Python are handled like
-    SQL_ASCII.
+    SQL_ASCII, and a `UnicodeWarning` is issued when such an encoding is
+    used on a connection.
   - After the connection to the server was lost, queries and other methods
     of the connection raised a `LookupError` ("unknown encoding"), they now
     raise an `OperationalError`. Also, a query that failed because the

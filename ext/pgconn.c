@@ -246,7 +246,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
         return NULL;
     }
 
-    if ((encoding = get_client_encoding(self->cnx)) < 0)
+    if ((encoding = get_client_encoding(self)) < 0)
         return NULL;
 
     if (PyBytes_Check(query_str_obj)) {
@@ -970,7 +970,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         n = -1; /* number of columns not yet known */
     }
 
-    if ((encoding = get_client_encoding(self->cnx)) < 0)
+    if ((encoding = get_client_encoding(self)) < 0)
         goto cleanup;
 
     /* import datetime C API (this is not compatible with subinterpreters) */
@@ -1225,7 +1225,7 @@ conn_escape_literal(connObject *self, PyObject *string)
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
     else if (PyUnicode_Check(string)) {
-        if ((encoding = get_client_encoding(self->cnx)) < 0)
+        if ((encoding = get_client_encoding(self)) < 0)
             return NULL;
         tmp_obj = get_encoded_string(string, encoding);
         if (!tmp_obj)
@@ -1281,7 +1281,7 @@ conn_escape_identifier(connObject *self, PyObject *string)
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
     else if (PyUnicode_Check(string)) {
-        if ((encoding = get_client_encoding(self->cnx)) < 0)
+        if ((encoding = get_client_encoding(self)) < 0)
             return NULL;
         tmp_obj = get_encoded_string(string, encoding);
         if (!tmp_obj)
@@ -1337,7 +1337,7 @@ conn_escape_string(connObject *self, PyObject *string)
         PyBytes_AsStringAndSize(string, &from, &from_length);
     }
     else if (PyUnicode_Check(string)) {
-        if ((encoding = get_client_encoding(self->cnx)) < 0)
+        if ((encoding = get_client_encoding(self)) < 0)
             return NULL;
         tmp_obj = get_encoded_string(string, encoding);
         if (!tmp_obj)
@@ -1398,7 +1398,7 @@ conn_escape_bytea(connObject *self, PyObject *data)
         PyBytes_AsStringAndSize(data, &from, &from_length);
     }
     else if (PyUnicode_Check(data)) {
-        if ((encoding = get_client_encoding(self->cnx)) < 0)
+        if ((encoding = get_client_encoding(self)) < 0)
             return NULL;
         tmp_obj = get_encoded_string(data, encoding);
         if (!tmp_obj)

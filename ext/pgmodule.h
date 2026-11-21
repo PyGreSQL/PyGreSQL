@@ -91,6 +91,7 @@ typedef struct {
     PyObject *cast_hook;       /* external typecast method */
     PyObject *notice_receiver; /* current notice receiver */
     PQnoticeReceiver default_notice_receiver; /* receiver of libpq */
+    int encoding; /* last checked client encoding */
 } connObject;
 
 #define is_connObject(v) (PyType(v) == &connType)

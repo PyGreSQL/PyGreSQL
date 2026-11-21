@@ -104,18 +104,39 @@ get_codec(int encoding)
     return codec ? codec : "ascii";
 }
 
+/* Check whether a PostgreSQL encoding is supported by Python. */
+static int
+has_codec(int encoding)
+{
+    return encoding == pg_encoding_utf8 || encoding == pg_encoding_latin1 ||
+           encoding == pg_encoding_ascii ||
+           (encoding >= 0 && encoding < MAX_ENCODING_ID && codecs[encoding]);
+}
+
 /* Get the client encoding of a connection. If it is unknown, because the
    connection is bad (e.g. lost) or not yet established, return -1 and set
-   an OperationalError. */
+   an OperationalError. When the client encoding has changed to one that is
+   not supported by Python, issue a UnicodeWarning (once per change). */
 int
-get_client_encoding(PGconn *cnx)
+get_client_encoding(connObject *cnx)
 {
-    int encoding = PQclientEncoding(cnx);
+    int encoding = PQclientEncoding(cnx->cnx);
 
-    if (encoding < 0)
-        set_error_msg(OperationalError, PQstatus(cnx) == CONNECTION_BAD
+    if (encoding < 0) {
+        set_error_msg(OperationalError, PQstatus(cnx->cnx) == CONNECTION_BAD
                                             ? "Connection has been lost"
                                             : "Connection is not established");
+        return -1;
+    }
+    if (encoding != cnx->encoding) {
+        if (!has_codec(encoding) &&
+            PyErr_WarnFormat(PyExc_UnicodeWarning, 1,
+                             "The client encoding %s is not supported by"
+                             " Python, non-ASCII text is returned as bytes",
+                             pg_encoding_to_char(encoding)) < 0)
+            return -1; /* the warning has been turned into an error */
+        cnx->encoding = encoding;
+    }
     return encoding;
 }
 

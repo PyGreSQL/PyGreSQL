@@ -21,6 +21,7 @@ import tempfile
 import threading
 import time
 import unittest
+import warnings
 import weakref
 from collections import namedtuple
 from collections.abc import Callable, Iterable, Sequence
@@ -1157,17 +1158,34 @@ class TestUnicodeQueries(unittest.TestCase):
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support euc_tw")
         query = self.c.query
-        r = query("select 'abc', $1::text", ('def',)).getresult()
+        # a warning is issued once when the client encoding is used
+        with self.assertWarns(UnicodeWarning) as cm:
+            r = query("select 'abc', $1::text", ('def',)).getresult()
         self.assertEqual(r, [('abc', 'def')])
-        self.assertRaises(UnicodeEncodeError, query, "select '中'")
-        self.assertRaises(UnicodeEncodeError, query, 'select $1', ('中',))
-        if self.c.parameter('server_encoding') == 'UTF8':
-            r = query('select chr(20013)').singlescalar()
-            self.assertEqual(r, b'\xc4\xe3')  # 中 in EUC_TW
-            r = query(b'select $1::text = chr(20013)', (r,)).singlescalar()
-            self.assertIs(r, True)
-        self.assertEqual(self.c.escape_literal("a'b"), "'a''b'")
-        self.assertRaises(UnicodeEncodeError, self.c.escape_literal, '中')
+        self.assertIn('EUC_TW is not supported', str(cm.warning))
+        with warnings.catch_warnings():
+            warnings.simplefilter('error')
+            self.assertRaises(UnicodeEncodeError, query, "select '中'")
+            self.assertRaises(
+                UnicodeEncodeError, query, 'select $1', ('中',))
+            if self.c.parameter('server_encoding') == 'UTF8':
+                r = query('select chr(20013)').singlescalar()
+                self.assertEqual(r, b'\xc4\xe3')  # 中 in EUC_TW
+                r = query(b'select $1::text = chr(20013)', (r,)
+                          ).singlescalar()
+                self.assertIs(r, True)
+            self.assertEqual(self.c.escape_literal("a'b"), "'a''b'")
+            self.assertRaises(
+                UnicodeEncodeError, self.c.escape_literal, '中')
+            # the warning is issued again after the encoding changed
+            query('set client_encoding=utf8')
+            query("select 'abc'")
+            query('set client_encoding=euc_tw')
+            self.assertRaises(UnicodeWarning, query, "select 'abc'")
+        # the warning can also be filtered or turned into an error
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            self.assertEqual(query("select 'abc'").singlescalar(), 'abc')
 
     def test_field_names_latin1(self):
         try:

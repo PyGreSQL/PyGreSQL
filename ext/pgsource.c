@@ -162,7 +162,7 @@ source_execute(sourceObject *self, PyObject *sql)
         return NULL;
     }
 
-    if ((encoding = get_client_encoding(self->pgcnx->cnx)) < 0)
+    if ((encoding = get_client_encoding(self->pgcnx)) < 0)
         return NULL;
 
     if (PyBytes_Check(sql)) {
@@ -528,7 +528,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
     else if (PyUnicode_Check(buffer)) {
         /* or pass a unicode string */
-        int encoding = get_client_encoding(self->pgcnx->cnx);
+        int encoding = get_client_encoding(self->pgcnx);
 
         if (encoding < 0)
             return NULL;
@@ -539,7 +539,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
     else if (PyErr_GivenExceptionMatches(buffer, PyExc_BaseException)) {
         /* or pass a Python exception for sending an error message */
-        int encoding = get_client_encoding(self->pgcnx->cnx);
+        int encoding = get_client_encoding(self->pgcnx);
         PyObject *str_obj;
 
         if (encoding < 0)
@@ -637,7 +637,7 @@ source_getdata(sourceObject *self, PyObject *args)
         PQfreemem(buffer);
     }
     else { /* a row has been returned and shall be decoded */
-        int encoding = get_client_encoding(self->pgcnx->cnx);
+        int encoding = get_client_encoding(self->pgcnx);
 
         ret =
             encoding < 0 ? NULL : get_decoded_string(buffer, nbytes, encoding);

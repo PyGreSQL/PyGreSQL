@@ -79,7 +79,9 @@ Strings are encoded and decoded with the client encoding of the connection
 The PostgreSQL encodings are mapped to the corresponding Python codecs, e.g.
 ``WIN1252`` to ``cp1252``. Encodings that are not supported by Python are
 handled like ``SQL_ASCII``: strings must be plain ASCII, and text values
-that are not plain ASCII are returned as ``bytes``.
+that are not plain ASCII are returned as ``bytes``. A :exc:`UnicodeWarning`
+is issued when the connection is used with such a client encoding (once,
+and again only after the client encoding has been changed).
 
 .. versionchanged:: 6.3
     Undecodable text values are returned as ``bytes`` again, also as elements

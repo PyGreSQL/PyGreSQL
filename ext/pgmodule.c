@@ -149,6 +149,7 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     conn_obj->cast_hook = NULL;
     conn_obj->notice_receiver = NULL;
     conn_obj->default_notice_receiver = NULL;
+    conn_obj->encoding = -1;
     PyObject_GC_Track(conn_obj);
 
     if (pghost) {
