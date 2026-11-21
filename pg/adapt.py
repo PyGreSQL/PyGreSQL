@@ -16,7 +16,7 @@ from uuid import UUID
 from .attrs import AttrDict
 from .cast import Typecasts
 from .core import InterfaceError, ProgrammingError
-from .helpers import quote_if_unqualified
+from .helpers import format_text, join_text, quote_if_unqualified
 
 if TYPE_CHECKING:
     from .db import DB
@@ -42,11 +42,19 @@ class Hstore(dict):
 
     _re_quote = regex(r'^[Nn][Uu][Ll][Ll]$|[\s,=>]')
     _re_escape = regex(r'(["\\])')
+    _re_quote_bytes = regex(rb'^[Nn][Uu][Ll][Ll]$|[\s,=>]')
+    _re_escape_bytes = regex(rb'(["\\])')
 
     @classmethod
-    def _quote(cls, s: Any) -> str:
+    def _quote(cls, s: Any) -> str | bytes:
         if s is None:
             return 'NULL'
+        if isinstance(s, bytes):  # raw text in the client encoding
+            if not s:
+                return b'""'
+            quote_bytes = cls._re_quote_bytes.search(s)
+            s = cls._re_escape_bytes.sub(rb'\\\1', s)
+            return b'"' + s + b'"' if quote_bytes else s
         if not isinstance(s, str):
             s = str(s)
         if not s:
@@ -59,8 +67,20 @@ class Hstore(dict):
 
     def __str__(self) -> str:
         """Create a printable representation of the hstore value."""
+        value = self._literal(lambda: 'utf-8')
+        if isinstance(value, bytes):  # show raw bytes with escapes
+            value = value.decode('utf-8', 'backslashreplace')
+        return value
+
+    def _literal(self, encoding: Callable[[], str]) -> str | bytes:
+        """Create the hstore literal, as bytes if it contains bytes.
+
+        Keys and values given as bytes are raw text in the client encoding,
+        and the encoding function returns the codec for this encoding.
+        """
         q = self._quote
-        return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
+        return join_text([join_text([q(k), q(v)], '=>', encoding)
+                          for k, v in self.items()], ',', encoding)
 
 
 class Json:
@@ -376,16 +396,16 @@ class Adapter:
             return str(v)
         return self.db.encode_json(v)
 
-    def _adapt_hstore(self, v: Any) -> str | None:
+    def _adapt_hstore(self, v: Any) -> str | bytes | None:
         """Adapt a hstore parameter."""
         if v is None:
             return None
-        if isinstance(v, str):
+        if isinstance(v, (str, bytes)):
             return v
-        if isinstance(v, Hstore):
-            return str(v)
         if isinstance(v, dict):
-            return str(Hstore(v))
+            if not isinstance(v, Hstore):
+                v = Hstore(v)
+            return v._literal(self._encoding)
         raise TypeError(f'Hstore parameter {v} has wrong type')
 
     def _adapt_uuid(self, v: Any) -> str | None:
@@ -396,9 +416,28 @@ class Adapter:
             return v
         return str(v)
 
+    def _encoding(self) -> str:
+        """Get the Python codec name of the client encoding."""
+        return self.db.encoding
+
+    def _join(self, parts: list[str | bytes], sep: str = ',',
+              start: str = '', end: str = '') -> str | bytes:
+        """Join parts of a literal, as bytes if any of the parts is bytes."""
+        return join_text(parts, sep, self._encoding, start, end)
+
+    _re_array_quote_bytes = regex(rb'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
+    _re_record_quote_bytes = regex(rb'[(),"\\]')
+    _re_escape_bytes = regex(rb'(["\\])')
+
     @classmethod
-    def _quote_array_element(cls, v: str) -> str:
+    def _quote_array_element(cls, v: str | bytes) -> str | bytes:
         """Quote an adapted element of an array if necessary."""
+        if isinstance(v, bytes):
+            if not v:
+                return b'""'
+            if cls._re_array_quote_bytes.search(v):
+                v = b'"' + cls._re_escape_bytes.sub(rb'\\\1', v) + b'"'
+            return v
         if not v:
             return '""'
         if cls._re_array_quote.search(v):
@@ -407,40 +446,60 @@ class Adapter:
         return v
 
     @classmethod
-    def _adapt_text_array(cls, v: Any) -> str:
-        """Adapt a text type array parameter."""
+    def _quote_record_field(cls, v: str | bytes) -> str | bytes:
+        """Quote an adapted field of a record if necessary."""
+        if isinstance(v, bytes):
+            if not v:
+                return b'""'
+            if cls._re_record_quote_bytes.search(v):
+                v = b'"' + cls._re_escape_bytes.sub(rb'\\\1', v) + b'"'
+            return v
+        if not v:
+            return '""'
+        if cls._re_record_quote.search(v):
+            v = cls._re_record_escape.sub(r'\\\1', v)
+            v = f'"{v}"'
+        return v
+
+    def _adapt_array(self, v: Any,
+                     adapt: Callable[[Any], str | bytes | None]
+                     ) -> str | bytes:
+        """Adapt an array parameter using the given element adapter.
+
+        Elements given as bytes are raw text in the client encoding,
+        which is passed unchanged.
+        """
         if isinstance(v, list):
-            adapt = cls._adapt_text_array
-            return '{' + ','.join(adapt(v) for v in v) + '}'
+            return self._join(
+                [self._adapt_array(v, adapt) for v in v], ',', '{', '}')
         if v is None:
             return 'null'
-        return cls._quote_array_element(str(v))
+        if isinstance(v, bytes):
+            return self._quote_array_element(v)
+        v = adapt(v)
+        return 'null' if v is None else v
+
+    def _adapt_text_array(self, v: Any) -> str | bytes:
+        """Adapt a text type array parameter."""
+        return self._adapt_array(
+            v, lambda v: self._quote_array_element(str(v)))
 
     _adapt_date_array = _adapt_text_array
 
-    @classmethod
-    def _adapt_bool_array(cls, v: Any) -> str:
+    def _adapt_bool_array(self, v: Any) -> str | bytes:
         """Adapt a boolean array parameter."""
-        if isinstance(v, list):
-            adapt = cls._adapt_bool_array
-            return '{' + ','.join(adapt(v) for v in v) + '}'
-        if v is None:
-            return 'null'
-        if isinstance(v, str):
-            if not v:
-                return 'null'
-            v = v.lower() in cls._bool_true_values
-        return 't' if v else 'f'
+        def adapt(v: Any) -> str | None:
+            if isinstance(v, str):
+                if not v:
+                    return None
+                v = v.lower() in self._bool_true_values
+            return 't' if v else 'f'
+        return self._adapt_array(v, adapt)
 
-    @classmethod
-    def _adapt_num_array(cls, v: Any) -> str:
+    def _adapt_num_array(self, v: Any) -> str | bytes:
         """Adapt a numeric array parameter."""
-        if isinstance(v, list):
-            adapt = cls._adapt_num_array
-            v = '{' + ','.join(adapt(v) for v in v) + '}'
-        if not v and v != 0:
-            return 'null'
-        return str(v)
+        return self._adapt_array(
+            v, lambda v: None if not v and v != 0 else str(v))
 
     _adapt_int_array = _adapt_float_array = _adapt_money_array = \
         _adapt_num_array
@@ -454,84 +513,74 @@ class Adapter:
             return b'null'
         return self.db.escape_bytea(v).replace(b'\\', b'\\\\')
 
-    def _adapt_json_array(self, v: Any) -> str:
+    def _adapt_json_array(self, v: Any) -> str | bytes:
         """Adapt a json array parameter."""
-        if isinstance(v, list):
-            adapt = self._adapt_json_array
-            return '{' + ','.join(adapt(v) for v in v) + '}'
-        if v is None or v == '':  # empty strings are adapted as null
-            return 'null'
-        v = self._adapt_json(v)
-        return self._quote_array_element(v)
+        def adapt(v: Any) -> str | bytes | None:
+            if v == '':  # empty strings are adapted as null
+                return None
+            v = self._adapt_json(v)
+            return None if v is None else self._quote_array_element(v)
+        return self._adapt_array(v, adapt)
 
-    def _adapt_hstore_array(self, v: Any) -> str:
+    def _adapt_hstore_array(self, v: Any) -> str | bytes:
         """Adapt a hstore array parameter."""
-        if isinstance(v, list):
-            adapt = self._adapt_hstore_array
-            return '{' + ','.join(adapt(v) for v in v) + '}'
-        v = self._adapt_hstore(v)
-        if v is None:
-            return 'null'
-        return self._quote_array_element(v)
+        def adapt(v: Any) -> str | bytes | None:
+            v = self._adapt_hstore(v)
+            return None if v is None else self._quote_array_element(v)
+        return self._adapt_array(v, adapt)
 
-    def _adapt_uuid_array(self, v: Any) -> str:
+    def _adapt_uuid_array(self, v: Any) -> str | bytes:
         """Adapt a UUID array parameter."""
-        if isinstance(v, list):
-            adapt = self._adapt_uuid_array
-            return '{' + ','.join(adapt(v) for v in v) + '}'
-        v = self._adapt_uuid(v)
-        if v is None:
-            return 'null'
-        return self._quote_array_element(v)
+        def adapt(v: Any) -> str | bytes | None:
+            v = self._adapt_uuid(v)
+            return None if v is None else self._quote_array_element(v)
+        return self._adapt_array(v, adapt)
 
-    def _adapt_record_array(self, v: Any, typ: Any) -> str:
+    def _adapt_record_array(self, v: Any, typ: Any) -> str | bytes:
         """Adapt a record array parameter with given type."""
-        if isinstance(v, list):
-            return '{' + ','.join(
-                self._adapt_record_array(v, typ) for v in v) + '}'
-        if v is None:
-            return 'null'
-        if isinstance(v, tuple):
-            elem = getattr(typ, 'elem', None)
-            elem_type = self.db.dbtypes.get(elem) if elem else None
-            v = self._adapt_record(v, elem_type or self.guess_simple_type(v))
-        else:
-            v = str(v)
-        return self._quote_array_element(v)
+        elem = getattr(typ, 'elem', None)
+        elem_type = self.db.dbtypes.get(elem) if elem else None
 
-    def _adapt_record(self, v: Any, typ: Any) -> str:
+        def adapt(v: Any) -> str | bytes:
+            if isinstance(v, tuple):
+                v = self._adapt_record(
+                    v, elem_type or self.guess_simple_type(v))
+            else:
+                v = str(v)
+            return self._quote_array_element(v)
+        return self._adapt_array(v, adapt)
+
+    def _adapt_record(self, v: Any, typ: Any) -> str | bytes:
         """Adapt a record parameter with given type."""
         typ = self.get_attnames(typ).values()
         if len(typ) != len(v):
             raise TypeError(f'Record parameter {v} has wrong size')
         adapt = self.adapt
-        value = []
+        value: list[str | bytes] = []
         for v, t in zip(v, typ, strict=True):  # noqa: B020
             v = adapt(v, t)
             if v is None:
                 v = ''
             else:
-                if isinstance(v, bytes):
-                    v = v.decode('ascii')
-                elif not isinstance(v, str):
+                if not isinstance(v, (str, bytes)):
                     v = str(v)
-                if v:
-                    if self._re_record_quote.search(v):
-                        v = self._re_record_escape.sub(r'\\\1', v)
-                        v = f'"{v}"'
-                else:
-                    v = '""'
+                v = self._quote_record_field(v)
             value.append(v)
-        v = ','.join(value)
-        return f'({v})'
+        return self._join(value, ',', '(', ')')
 
-    def adapt(self, value: Any, typ: Any =  None) -> str:
-        """Adapt a value with known database type."""
+    def adapt(self, value: Any, typ: Any =  None) -> Any:
+        """Adapt a value with known database type.
+
+        Values given as bytes for other types than bytea are raw text in
+        the client encoding, which is passed unchanged.
+        """
         if value is not None and not isinstance(value, Literal):
             if typ:
                 simple = self.get_simple_name(typ)
             else:
                 typ = simple = self.guess_simple_type(value) or 'text'
+            if isinstance(value, bytes) and simple != 'bytea':
+                return value
             pg_str = getattr(value, '__pg_str__', None)
             if pg_str:
                 value = pg_str(typ)
@@ -655,16 +704,21 @@ class Adapter:
             return value
         if isinstance(value, list):
             q = self.adapt_inline
-            s = '[{}]' if nested else 'ARRAY[{}]'
-            return s.format(','.join(str(q(v, nested=True)) for v in value))
+            return self._join(
+                [self._inline_part(q(v, nested=True)) for v in value],
+                ',', '[' if nested else 'ARRAY[', ']')
         if isinstance(value, tuple):
             q = self.adapt_inline
-            return '({})'.format(','.join(str(q(v)) for v in value))
+            return self._join(
+                [self._inline_part(q(v)) for v in value], ',', '(', ')')
         if isinstance(value, Json):
             value = self.db.escape_string(str(value))
             return f"'{value}'::json"
         if isinstance(value, Hstore):
-            value = self.db.escape_string(str(value))
+            value = value._literal(self._encoding)
+            if isinstance(value, bytes):
+                return b"'" + self.db.escape_string(value) + b"'::hstore"
+            value = self.db.escape_string(value)
             return f"'{value}'::hstore"
         if isinstance(value, UUID):
             return f"'{value}'::uuid"
@@ -676,6 +730,11 @@ class Adapter:
         if isinstance(value, (tuple, list)):
             value = self.adapt_inline(value)
         return value
+
+    @staticmethod
+    def _inline_part(value: Any) -> str | bytes:
+        """Convert an adapted inline value to a part of a literal."""
+        return value if isinstance(value, (str, bytes)) else str(value)
 
     def parameter_list(self) -> _ParameterList:
         """Return a parameter list for parameters with known database types.
@@ -691,7 +750,7 @@ class Adapter:
                      values: list | tuple | dict | None = None,
                      types: list | tuple | dict | None = None,
                      inline: bool=False
-                     ) -> tuple[str, _ParameterList]:
+                     ) -> tuple[str | bytes, _ParameterList]:
         """Format a database query using the given values and types.
 
         The optional types describe the values and must be passed as a list,
@@ -723,7 +782,8 @@ class Adapter:
                         for value, typ in zip(values, types, strict=True)]
                 else:
                     seq_literals = [add(value) for value in values]
-            command %= tuple(seq_literals)
+            formatted = format_text(
+                command, tuple(seq_literals), self._encoding)
         elif isinstance(values, dict):
             # we want to allow extra keys in the dictionary,
             # so we first must find the values actually used in the command
@@ -750,7 +810,7 @@ class Adapter:
                 else:
                     map_literals = {key: add(used_values[key])
                                 for key in sorted(used_values)}
-            command %= map_literals
+            formatted = format_text(command, map_literals, self._encoding)
         else:
             raise TypeError('The values must be passed as tuple, list or dict')
-        return command, params
+        return formatted, params

@@ -10,6 +10,8 @@ from time import localtime
 from typing import Any
 from uuid import UUID as Uuid  # noqa: N811
 
+from pg.helpers import join_text
+
 from .typecode import TypeCode
 
 __all__ = [
@@ -208,11 +210,19 @@ class Hstore(dict):
 
     _re_quote = regex(r'^[Nn][Uu][Ll][Ll]$|[\s,=>]')
     _re_escape = regex(r'(["\\])')
+    _re_quote_bytes = regex(rb'^[Nn][Uu][Ll][Ll]$|[\s,=>]')
+    _re_escape_bytes = regex(rb'(["\\])')
 
     @classmethod
-    def _quote(cls, s: Any) -> str:
+    def _quote(cls, s: Any) -> str | bytes:
         if s is None:
             return 'NULL'
+        if isinstance(s, bytes):  # raw text in the client encoding
+            if not s:
+                return b'""'
+            quote_bytes = cls._re_quote_bytes.search(s)
+            s = cls._re_escape_bytes.sub(rb'\\\1', s)
+            return b'"' + s + b'"' if quote_bytes else s
         if not isinstance(s, str):
             s = str(s)
         if not s:
@@ -225,8 +235,20 @@ class Hstore(dict):
 
     def __str__(self) -> str:
         """Create a printable representation of the hstore value."""
+        value = self._literal(lambda: 'utf-8')
+        if isinstance(value, bytes):  # show raw bytes with escapes
+            value = value.decode('utf-8', 'backslashreplace')
+        return value
+
+    def _literal(self, encoding: Callable[[], str]) -> str | bytes:
+        """Create the hstore literal, as bytes if it contains bytes.
+
+        Keys and values given as bytes are raw text in the client encoding,
+        and the encoding function returns the codec for this encoding.
+        """
         q = self._quote
-        return ','.join(f'{q(k)}=>{q(v)}' for k, v in self.items())
+        return join_text([join_text([q(k), q(v)], '=>', encoding)
+                          for k, v in self.items()], ',', encoding)
 
 
 class Json:

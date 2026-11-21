@@ -62,6 +62,12 @@ client encoding ``SQL_ASCII``, text values that are not plain ASCII are
 returned as ``bytes``, also as elements of arrays and records. See the
 section on text encoding in the documentation of the :mod:`pg` module.
 
+Keys and values of :func:`Hstore` values given as ``bytes`` are regarded
+as raw text in the client encoding, which is sent unchanged, so that such
+hstore values can be written back. Other ``bytes`` parameters, including
+elements of lists and tuples, are always adapted as ``bytea``, since the
+types of the parameters are not known in advance.
+
 Queries and parameters that cannot be encoded with the client encoding,
 and text containing NUL characters, which PostgreSQL does not support,
 raise a :exc:`DataError`.

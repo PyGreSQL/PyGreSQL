@@ -13,7 +13,7 @@ from collections.abc import (
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from math import isinf, isnan
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, AnyStr, NamedTuple
 from uuid import UUID as Uuid  # noqa: N811
 
 from pg.core import (
@@ -26,7 +26,7 @@ from pg.core import (
 )
 from pg.core import Connection as Cnx
 from pg.error import db_error, error, if_error, op_error
-from pg.helpers import QuoteDict, RowCache
+from pg.helpers import QuoteDict, RowCache, format_text, join_text
 
 from .adapt import Hstore, Json, Literal
 from .cast import TypeCache
@@ -83,7 +83,12 @@ class Cursor:
                 return f"'{self._cnx.escape_bytea(value).decode('ascii')}'"
             case str():
                 return f"'{self._escape_text(value)}'"
-            case Hstore() | Json():
+            case Hstore():
+                v = value._literal(self._encoding)
+                if isinstance(v, bytes):  # contains raw text
+                    return b"'" + self._escape_text(v) + b"'"
+                return f"'{self._escape_text(v)}'"
+            case Json():
                 return f"'{self._escape_text(str(value))}'"
             case float():
                 if isinf(value):
@@ -116,9 +121,7 @@ class Cursor:
                 # necessary at the top level.
                 if not value:  # exception for empty array
                     return "'{}'"
-                q = self._quote
-                v = ','.join(str(q(v)) for v in value)
-                return f'ARRAY[{v}]'
+                return self._join(value, 'ARRAY[', ']')
             case tuple():
                 # Quote as a ROW constructor.  This is better than using a
                 # record literal because it carries the information that this
@@ -126,9 +129,7 @@ class Cursor:
                 # in order to make this usable with the IN syntax as well.
                 # It is only necessary when the records has a single column
                 # which is not really useful.
-                q = self._quote
-                v = ','.join(str(q(v)) for v in value)
-                return f'({v})'
+                return self._join(value, '(', ')')
         try:  # noinspection PyUnresolvedReferences
             value = value.__pg_repr__()
         except AttributeError as e:
@@ -138,14 +139,38 @@ class Cursor:
             value = self._quote(value)
         return value
 
-    def _escape_text(self, value: str) -> str:
+    def _encoding(self) -> str:
+        """Get the Python codec name of the client encoding."""
+        return self._cnx.encoding
+
+    def _join(self, values: Sequence, start: str, end: str) -> str | bytes:
+        """Quote and join values, as bytes if any of them is quoted as bytes.
+
+        Values quoted as bytes contain raw text in the client encoding.
+        """
+        parts = [v if isinstance(v, (str, bytes)) else str(v)
+                 for v in map(self._quote, values)]
+        return join_text(parts, ',', self._encoding, start, end)
+
+    def _decode_sql(self, sql: str | bytes) -> str:
+        """Decode a query containing raw text for an error message."""
+        if isinstance(sql, str):
+            return sql
+        try:
+            codec = self._encoding()
+        except Exception:  # e.g. the connection has been lost
+            codec = 'utf-8'
+        return sql.decode(codec, 'backslashreplace')
+
+    def _escape_text(self, value: AnyStr) -> AnyStr:
         """Escape a text value, which must not contain NUL characters."""
-        if '\0' in value:
+        if (b'\0' in value if isinstance(value, bytes)
+                else '\0' in value):
             raise error('Text values cannot contain NUL characters', DataError)
         return self._cnx.escape_string(value)
 
     def _quoteparams(self, string: str,
-                     parameters: Mapping | Sequence | None) -> str:
+                     parameters: Mapping | Sequence | None) -> str | bytes:
         """Quote parameters.
 
         This function works for both mappings and sequences.
@@ -159,11 +184,16 @@ class Cursor:
             except (TypeError, ValueError):
                 return string  # silently accept unescaped quotes
         if isinstance(parameters, dict):
-            parameters = QuoteDict(parameters)
-            parameters.quote = self._quote
-        else:
-            parameters = tuple(map(self._quote, parameters))
-        return string % parameters
+            quote_dict = QuoteDict(parameters)
+            quote_dict.quote = self._quote
+            formatted = string % quote_dict
+            quoted = quote_dict.quoted
+            if any(isinstance(value, bytes) for value in quoted.values()):
+                # some values contain raw text, the query must be bytes
+                return format_text(string, quoted, self._encoding)
+            return formatted
+        return format_text(
+            string, tuple(map(self._quote, parameters)), self._encoding)
 
     def _make_description(self, info: tuple[int, str, int, int, int]
                           ) -> CursorDescription:
@@ -239,7 +269,7 @@ class Cursor:
         self.rowcount = -1
         # first try to execute all queries
         rowcount = 0
-        sql = "BEGIN"
+        sql: str | bytes = "BEGIN"
         try:
             if not self._connection._tnx and not self._connection.autocommit:
                 try:
@@ -251,9 +281,9 @@ class Cursor:
                 else:
                     self._connection._tnx = True
             for parameters in seq_of_parameters:
-                sql = operation
-                sql = self._quoteparams(sql, parameters)
-                if '\0' in sql:
+                sql = self._quoteparams(operation, parameters)
+                if (b'\0' in sql if isinstance(sql, bytes)
+                        else '\0' in sql):
                     raise error(
                         'Queries cannot contain NUL characters', DataError)
                 rows = self._src.execute(sql)
@@ -264,11 +294,14 @@ class Cursor:
         except DatabaseError:
             raise  # database provides error message
         except UnicodeError as err:  # cannot encode the query or parameters
+            sql = self._decode_sql(sql)
             raise error(f"Error in '{sql}': {err}", DataError) from err
         except Error as err:
+            sql = self._decode_sql(sql)
             # noinspection PyTypeChecker
             raise if_error(f"Error in '{sql}': '{err}'") from err
         except Exception as err:
+            sql = self._decode_sql(sql)
             raise op_error(f"Internal error in '{sql}': {err}") from err
         # then initialize result raw count and description
         if self._src.resulttype == RESULT_DQL:

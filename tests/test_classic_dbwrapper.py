@@ -3920,6 +3920,58 @@ class TestDBClass(unittest.TestCase):
                              Decimal('1.5'), date(2026, 11, 21)))
         self.assertEqual(p.name, b'w' + raw)
 
+    def test_write_back_undecodable_text(self):
+        self.require_hstore()
+        query = self.db.query
+        # with SQL_ASCII, the server sends text without conversion
+        query('set client_encoding=sql_ascii')
+        query('create type test_item_type as (name text, tags text[])')
+        self.addCleanup(query, 'drop type test_item_type')
+        self.create_table(
+            'test_items', 'n smallint primary key, h hstore, a text[],'
+            ' i test_item_type, ia test_item_type[]', temporary=False)
+        # chr(228) is non-ASCII in all server encodings
+        raw = query('select chr(228)').singlescalar()
+        self.assertIsInstance(raw, bytes)
+        query("insert into test_items values (1,"
+              " hstore('k' || chr(228), 'v' || chr(228)) || 'x=>y',"
+              " array['a' || chr(228), 'b c'],"
+              " row('w' || chr(228), array[chr(228), 'x']),"
+              " array[row(chr(228), null)::test_item_type])")
+        row = self.db.get('test_items', 1)
+        self.assertEqual(row['h'], {b'k' + raw: b'v' + raw, 'x': 'y'})
+        if pg.get_array():
+            self.assertEqual(row['a'], [b'a' + raw, 'b c'])
+            self.assertEqual(row['i'], (b'w' + raw, [raw, 'x']))
+            self.assertEqual(row['ia'], [(raw, None)])
+        # the raw text can be written back (this raised errors or
+        # wrote the representation of the bytes objects before)
+        row['n'] = 2
+        r = self.db.insert('test_items', row)
+        for key in 'h', 'a', 'i', 'ia':
+            self.assertEqual(r[key], row[key])
+        r['n'] = 3
+        self.db.insert('test_items', r)
+        r = self.db.get('test_items', 3)
+        for key in 'h', 'a', 'i', 'ia':
+            self.assertEqual(r[key], row[key])
+        r = query('select count(distinct (h, a, i, ia)) from test_items')
+        self.assertEqual(r.singlescalar(), 1)
+        q = 'select count(*) from test_items where h=%s'
+        h = pg.Hstore(row['h'])
+        for inline in (False, True):
+            r = self.db.query_formatted(q, (h,), inline=inline)
+            self.assertEqual(r.singlescalar(), 3)
+        r = self.db.query_formatted(q, (row['h'],), ('hstore',))
+        self.assertEqual(r.singlescalar(), 3)
+        q = 'select count(*) from test_items where a=%s'
+        r = self.db.query_formatted(q, (row['a'],), ('text[]',))
+        self.assertEqual(r.singlescalar(), 3)
+        q = 'select count(*) from test_items where i=%s::test_item_type'
+        r = self.db.query_formatted(
+            q, (row['i'],), (self.db.dbtypes['test_item_type'],))
+        self.assertEqual(r.singlescalar(), 3)
+
     def test_date(self):
         query = self.db.query
         for datestyle in (
@@ -4809,6 +4861,51 @@ class TestDBClassAdapter(unittest.TestCase):
             '{"{\\"k\\": \\"v\\"}",null}', '{k=>v,null}',
             '{00000000-0000-0000-0000-000000000001,null}',
             '{"(1,a b,)","(2,\\"\\\\\\"\\",\\"{3,4}\\")"}'])
+
+    def test_adapt_query_typed_with_raw_bytes(self):
+        format_query = self.adapter.format_query
+        values: Any = [b'raw'] * 8
+        types = ('text', 'int', 'bool', 'date', 'json', 'hstore', 'uuid',
+                 'int[]')
+        sql, params = format_query(
+            ','.join(['%s'] * 8), values, types)
+        self.assertEqual(sql, ','.join(f'${n}' for n in range(1, 9)))
+        self.assertEqual(params, values)  # raw text is passed unchanged
+        sql, params = format_query('%s', (b'raw',), ('bytea',))
+        self.assertEqual(params, [b'\\x726177'])  # binary data is escaped
+        sql, params = format_query('%s', ([b'raw', b'a b', b'', None, 'x'],),
+                                   ('text[]',))
+        self.assertEqual(params, [b'{raw,"a b","",null,x}'])
+        sql, params = format_query('%s', ([b'1', 2],), ('int[]',))
+        self.assertEqual(params, [b'{1,2}'])
+        sql, params = format_query('%s', ([[b'f', True]],), ('bool[]',))
+        self.assertEqual(params, [b'{{f,t}}'])
+        sql, params = format_query('%s', ([b'"\\', 'x'],), ('text[]',))
+        self.assertEqual(params, [b'{"\\"\\\\",x}'])
+        sql, params = format_query(
+            '%s', ({b'k': b'a b', 'x': None, b'n': b'"'},), ('hstore',))
+        self.assertEqual(params, [b'k=>"a b",x=>NULL,n=>\\"'])
+        sql, params = format_query(
+            '%s', ([{b'k': b'v'}, {'x': 'y'}],), ('hstore[]',))
+        self.assertEqual(params, [b'{k=>v,x=>y}'])
+        sql, params = format_query(
+            '%s', ([pg.Hstore({b'k': b'a,b'})],), ('hstore[]',))
+        self.assertEqual(params, [b'{"k=>\\"a,b\\""}'])
+
+    def test_adapt_query_inline_with_raw_bytes(self):
+        format_query = self.adapter.format_query
+        h = pg.Hstore({b'k': b'a b', 'x': "it's"})
+        sql, params = format_query('select %s, %s', (h, 1), inline=True)
+        self.assertEqual(
+            sql, b'select \'k=>"a b",x=>it\'\'s\'::hstore, 1')
+        self.assertEqual(params, [])
+        sql, params = format_query(
+            'select %(h)s, %(x)s', {'h': [h], 'x': 'y'}, inline=True)
+        self.assertEqual(
+            sql, b'select ARRAY[\'k=>"a b",x=>it\'\'s\'::hstore], \'y\'')
+        self.assertEqual(str(h), 'k=>"a b",x=>it\'s')
+        h = pg.Hstore({b'\xfc': b'\xfc'})
+        self.assertEqual(str(h), '\\xfc=>\\xfc')
 
     def test_adapt_query_untyped_with_bytes(self):
         format_query = self.adapter.format_query

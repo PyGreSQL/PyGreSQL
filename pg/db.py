@@ -458,7 +458,7 @@ class DB:
             self._do_debug(cmd)
             self._valid_db.query(cmd)
 
-    def query(self, command: str, *args: Any) -> Query:
+    def query(self, command: str | bytes, *args: Any) -> Query:
         """Execute a SQL command string.
 
         This method simply sends a SQL query to the database.  If the query is

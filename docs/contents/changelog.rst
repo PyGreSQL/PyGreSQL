@@ -44,6 +44,13 @@ Version 6.3.0 (unreleased)
   - `UUID` objects can now also be passed as inline parameters.
   - The `DbType` objects for array types have a new attribute ``elem``
     with the type OID of the array elements.
+  - Parameters given as `bytes` for a known type other than bytea are now
+    passed unchanged as raw text in the client encoding, also as elements of
+    arrays, fields of records and keys and values of hstore values. This way,
+    text returned as `bytes` because it could not be decoded (e.g. with the
+    client encoding SQL_ASCII) can be written back. Before, the Python
+    representation of the bytes was sent, errors were raised, or `b'f'` was
+    adapted as true for boolean parameters.
   - Fields of record parameters containing a closing parenthesis are now
     quoted. Before, they caused a syntax error.
   - The new `Connection.encoding` attribute contains the Python codec name
@@ -58,6 +65,10 @@ Version 6.3.0 (unreleased)
   - Keys and values of hstore parameters containing tabs, newlines or other
     whitespace besides spaces are now quoted. Before, they caused a syntax
     error, or such whitespace at the start or end was silently stripped.
+  - Keys and values of hstore parameters given as `bytes` are now passed
+    unchanged as raw text in the client encoding, so that hstore values with
+    text that could not be decoded can be written back. Before, the Python
+    representation of the bytes was sent.
   - Text parameters and queries containing NUL characters, which PostgreSQL
     does not support, now raise a `DataError`. Before, the text was silently
     truncated at the NUL character. Queries and parameters that cannot be

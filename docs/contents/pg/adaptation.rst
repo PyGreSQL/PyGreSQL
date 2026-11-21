@@ -77,6 +77,13 @@ Strings are encoded and decoded with the client encoding of the connection
   method of the source object (used by ``Cursor.copy_to()`` in :mod:`pgdb`).
   JSON values are then passed to the JSON decoder as ``bytes``, which
   :func:`json.loads` decodes as UTF-8.
+- Such raw text can be written back unchanged. When ``bytes`` are passed as
+  parameters for a known type other than ``bytea``, they are regarded as raw
+  text in the client encoding and sent unchanged, see below. This also
+  applies to the elements of arrays, the fields of records and the keys and
+  values of hstore values. The other parts of such values are then encoded
+  with the client encoding, which is available as the Python codec name in
+  the :attr:`Connection.encoding` attribute.
 - Field names, error messages, notices, notification channels and parameter
   values (:meth:`Connection.parameter`) are always ``str``. If they cannot
   be decoded with the client encoding, they are decoded as UTF-8 with
@@ -211,6 +218,14 @@ table column, the data type will be clear from the context.
 Byte strings (``bytes``) are adapted as binary data of the PostgreSQL type
 ``bytea``, while ``str`` values are adapted as text.  If you have text that
 is already encoded as bytes, decode it to ``str`` before passing it.
+However, when the type of the parameter is known and is not ``bytea``,
+i.e. when it has been passed with the *types* parameter or the value is
+written to a table column with methods like :meth:`DB.insert`, then
+``bytes`` are regarded as raw text in the client encoding and sent
+unchanged.  This also applies to the elements of arrays and the fields of
+records, and always to the keys and values of hstore values.  This way, text
+that PyGreSQL returned as ``bytes`` because it could not be decoded can be
+written back unchanged.
 
 .. versionchanged:: 6.3
     Byte strings were adapted as text in earlier versions, unless they had

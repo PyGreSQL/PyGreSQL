@@ -17,6 +17,8 @@ __all__ = [
     'QuoteDict',
     'RowCache',
     'dictiter',
+    'format_text',
+    'join_text',
     'namediter',
     'namednext',
     'oid_key',
@@ -26,6 +28,49 @@ __all__ = [
 
 
 # Small helper functions
+
+def format_text(command: str, params: tuple | dict,
+                encoding: Callable[[], str]) -> str | bytes:
+    """Format a command with literals, as bytes if any literal is bytes.
+
+    Literals given as bytes are raw text in the client encoding. In this
+    case, the command and the other literals are encoded with the codec
+    returned by the given encoding function.
+    """
+    values = params.values() if isinstance(params, dict) else params
+    if not any(isinstance(value, bytes) for value in values):
+        return command % params
+    codec = encoding()
+
+    def encode(value: Any) -> bytes:
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode(codec)
+
+    if isinstance(params, dict):
+        params = {key.encode(codec): encode(value)
+                  for key, value in params.items()}
+    else:
+        params = tuple(map(encode, params))
+    return command.encode(codec) % params
+
+
+def join_text(parts: Sequence[str | bytes], sep: str,
+              encoding: Callable[[], str],
+              start: str = '', end: str = '') -> str | bytes:
+    """Join parts of a literal, as bytes if any of the parts is bytes.
+
+    Parts given as bytes are raw text in the client encoding. In this case,
+    the parts given as str are encoded with the codec returned by the given
+    encoding function (raising a UnicodeEncodeError if that is impossible).
+    """
+    if not any(isinstance(part, bytes) for part in parts):
+        return start + sep.join(parts) + end  # type: ignore[arg-type]
+    codec = encoding()
+    return start.encode() + sep.encode().join(
+        part if isinstance(part, bytes) else part.encode(codec)
+        for part in parts) + end.encode()
+
 
 def quote_if_unqualified(param: str, name: int | str) -> str:
     """Quote parameter representing a qualified name.
@@ -49,11 +94,18 @@ class QuoteDict(dict):
     The quote attribute must be set to the desired quote function.
     """
 
-    quote: Callable[[str], str]
+    quote: Callable[[Any], Any]
+    quoted: dict[str, Any]  # the quoted values that have been accessed
 
-    def __getitem__(self, key: str) -> str:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the dictionary."""
+        super().__init__(*args, **kwargs)
+        self.quoted = {}
+
+    def __getitem__(self, key: str) -> Any:
         """Get a quoted value."""
-        return self.quote(super().__getitem__(key))
+        value = self.quoted[key] = self.quote(super().__getitem__(key))
+        return value
 
 
 class RowCache:

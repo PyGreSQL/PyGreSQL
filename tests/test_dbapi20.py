@@ -740,6 +740,42 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertIsInstance(result, dict)
         self.assertEqual(result, d)
 
+    def test_hstore_with_undecodable_text(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            try:
+                cur.execute("select 'k=>v'::hstore")
+            except pgdb.DatabaseError:
+                self.skipTest("hstore extension not enabled")
+            # with SQL_ASCII, the server sends text without conversion
+            cur.execute('set client_encoding=sql_ascii')
+            # chr(228) is non-ASCII in all server encodings
+            cur.execute("select chr(228), hstore('k' || chr(228),"
+                        " 'v' || chr(228)) || 'x=>\"it''s\"'")
+            raw, h = cur.fetchone()
+            self.assertIsInstance(raw, bytes)
+            self.assertEqual(h, {b'k' + raw: b'v' + raw, 'x': "it's"})
+            # the raw text can be written back (this wrote the
+            # representation of the bytes objects before)
+            h = pgdb.Hstore(h)
+            cur.execute('select %s::hstore', (h,))
+            self.assertEqual(cur.fetchone()[0], h)
+            cur.execute('select %(h)s::hstore, %(x)s', {'h': h, 'x': 1})
+            self.assertEqual(cur.fetchone(), (h, 1))
+            cur.execute("select %s = (hstore('k' || chr(228),"
+                        " 'v' || chr(228)) || 'x=>\"it''s\"', 'x')",
+                        ((h, 'x'),))
+            self.assertIs(cur.fetchone()[0], True)
+            cur.execute('select %s::hstore[]', ([h, None],))
+            self.assertEqual(cur.fetchone()[0], [h, None])
+            cur.execute(
+                "select %s::hstore = hstore('k' || chr(228), 'v' || chr(228))",
+                (pgdb.Hstore({b'k' + raw: b'v' + raw}),))
+            self.assertIs(cur.fetchone()[0], True)
+        finally:
+            con.close()
+
     def test_uuid(self):
         self.assertIs(Uuid, pgdb.Uuid)
         d = Uuid('{12345678-1234-5678-1234-567812345678}')
