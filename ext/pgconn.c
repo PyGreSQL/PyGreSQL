@@ -961,6 +961,16 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
+    /* checks columns type (None means all columns) */
+    if (columns == Py_None)
+        columns = NULL;
+    if (columns && !(PyTuple_Check(columns) || PyList_Check(columns))) {
+        PyErr_SetString(PyExc_TypeError,
+                        "Method inserttable() expects a tuple or a list"
+                        " as third argument");
+        return NULL;
+    }
+
     /* checks list type */
     if (!(iter_row = PyObject_GetIter(rows))) {
         PyErr_SetString(
@@ -981,15 +991,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         goto cleanup;
     }
 
-    /* checks columns type (None means all columns) */
-    if (columns && columns != Py_None) {
-        if (!(PyTuple_Check(columns) || PyList_Check(columns))) {
-            PyErr_SetString(PyExc_TypeError,
-                            "Method inserttable() expects a tuple or a list"
-                            " as third argument");
-            goto cleanup;
-        }
-
+    if (columns) {
         /* use a tuple that cannot be changed while we are using it
            (do not use __iter__ here, which may be overridden) */
         cols = PyList_Check(columns) ? PyList_AsTuple(columns)

@@ -2771,6 +2771,10 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.c.inserttable('test', []), 0)
         self.assertEqual(self.get_back(), [])
 
+    def test_inserttable_bad_columns_without_rows(self):
+        # the type of the columns was not checked without rows before
+        self.assertRaises(TypeError, self.c.inserttable, 'test', [], 5)
+
     def test_inserttable_datetime_adapt(self):
         data = [(datetime.date(1999, 1, 2), datetime.time(11, 12, 13),
                  datetime.datetime(1999, 1, 2, 11, 12, 13),

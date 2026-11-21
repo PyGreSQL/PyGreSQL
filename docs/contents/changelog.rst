@@ -214,7 +214,8 @@ Version 6.3.0 (unreleased)
   - The second parameter of `inserttable()` can now be passed with the
     documented keyword ``values`` (instead of ``data``), and ``None`` is
     accepted for ``columns``. When there is nothing to insert, the method
-    now returns 0 instead of `None`.
+    now returns 0 instead of `None`, and the type of ``columns`` is checked
+    in this case as well.
   - Calling `dir()` on connections, large objects and source objects
     leaked references.
 

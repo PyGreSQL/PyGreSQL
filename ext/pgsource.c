@@ -784,7 +784,7 @@ source_field(sourceObject *self, PyObject *desc)
 
 /* Get the list of source object attributes. */
 static PyObject *
-source_dir(connObject *self, PyObject *Py_UNUSED(noargs))
+source_dir(sourceObject *self, PyObject *Py_UNUSED(noargs))
 {
     PyObject *attrs, *ret;
 
