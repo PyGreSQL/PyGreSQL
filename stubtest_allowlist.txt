@@ -1,0 +1,6 @@
+# Allowlist for mypy stubtest of the C extension (tox -e stubtest).
+#
+# These types are in the stub, since they are returned by or passed to
+# functions of the extension, but they are not module attributes.
+pg._pg.Notice
+pg._pg.Source

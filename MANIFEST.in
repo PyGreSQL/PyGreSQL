@@ -12,6 +12,7 @@ include README.rst
 include LICENSE.txt
 
 include tox.ini
+include stubtest_allowlist.txt
 include pyproject.toml
 
 include docs/Makefile

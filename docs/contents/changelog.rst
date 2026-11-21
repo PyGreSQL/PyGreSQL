@@ -220,6 +220,11 @@ Version 6.3.0 (unreleased)
 
 - Modernization and build:
 
+  - Fixed the type hints for the C extension in `pg/_pg.pyi`: parameters
+    that can only be passed by position, wrong and missing parameters,
+    return types and methods, and the `Notice` type passed to notice
+    receivers. The hints are now checked with mypy's stubtest.
+
   - Modernized the code using Python 3.10 features and the Python 3.10 C API.
     The C extension now checks all errors during initialization.
   - All project metadata is now defined in `pyproject.toml`. Building requires

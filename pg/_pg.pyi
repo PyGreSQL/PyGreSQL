@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
 from os import PathLike
-from typing import Any, TypeAlias, TypeVar
+from typing import Any, TypeAlias, TypeVar, final, overload
 
-AnyStr = TypeVar('AnyStr', str, bytes, str | bytes)
-SomeNamedTuple: TypeAlias = Any  # alias for accessing arbitrary named tuples
-StrOrBytesPath: TypeAlias = str | bytes | PathLike[str] | PathLike[bytes]
+# stub-only helpers (private, so that they are not checked by stubtest)
+_AnyStr = TypeVar('_AnyStr', str, bytes, str | bytes)
+_SomeNamedTuple: TypeAlias = Any  # alias for accessing arbitrary named tuples
+_StrOrBytesPath: TypeAlias = str | bytes | PathLike[str] | PathLike[bytes]
 
 version: str
 __version__: str
@@ -91,8 +92,27 @@ class MultipleResultsError(InvalidResultError):
     """Exception when a database operation produced multiple results."""
 
 
+@final
+class Notice:
+    """Notice object passed to notice receivers.
+
+    This type is not available as a module attribute.
+    """
+
+    pgcnx: Connection | None
+    message: str
+    severity: str
+    primary: str
+    detail: str | None
+    hint: str | None
+
+
+@final
 class Source:
-    """Source object."""
+    """Source object.
+
+    This type is not available as a module attribute.
+    """
 
     pgcnx: Connection
     arraysize: int
@@ -100,12 +120,37 @@ class Source:
     ntuples: int
     nfields: int
 
-    def execute(self, sql: str | bytes) -> int | None:
+    def execute(self, sql: str | bytes, /) -> int | None:
         """Execute a SQL statement."""
         ...
 
-    def fetch(self, num: int) -> list[tuple]:
+    def fetch(self, num: int = ..., /) -> list[tuple]:
         """Return the next num rows from the last result in a list."""
+        ...
+
+    def movefirst(self) -> None:
+        """Move to the first result row."""
+        ...
+
+    def movelast(self) -> None:
+        """Move to the last result row."""
+        ...
+
+    def movenext(self) -> None:
+        """Move to the next result row."""
+        ...
+
+    def moveprev(self) -> None:
+        """Move to the previous result row."""
+        ...
+
+    def field(self, desc: int | str | bytes, /) -> str | bytes | None:
+        """Get the specified field value of the current row."""
+        ...
+
+    def fieldinfo(self, desc: int | str | bytes, /
+                  ) -> tuple[int, str, int, int, int]:
+        """Get information on the specified field."""
         ...
 
     def listinfo(self) -> tuple[tuple[int, str, int, int, int], ...]:
@@ -116,12 +161,12 @@ class Source:
         """Return oid of last inserted row (if available)."""
         ...
 
-    def putdata(self, buffer: str | bytes | BaseException | None
+    def putdata(self, buffer: str | bytes | BaseException | None, /
                 ) -> int | None:
         """Send data to server during copy from stdin."""
         ...
 
-    def getdata(self, decode: bool | None = None) -> str | bytes | int:
+    def getdata(self, decode: bool = False, /) -> str | bytes | int:
         """Receive data to server during copy to stdout."""
         ...
 
@@ -130,6 +175,7 @@ class Source:
         ...
 
 
+@final
 class LargeObject:
     """Large object."""
 
@@ -137,7 +183,7 @@ class LargeObject:
     pgcnx: Connection
     error: str
 
-    def open(self, mode: int) -> None:
+    def open(self, mode: int, /) -> None:
         """Open a large object.
 
         The valid values for 'mode' parameter are defined as the module level
@@ -149,15 +195,15 @@ class LargeObject:
         """Close a large object."""
         ...
 
-    def read(self, size: int) -> bytes:
+    def read(self, size: int, /) -> bytes:
         """Read data from large object."""
         ...
 
-    def write(self, data: bytes | str) -> None:
+    def write(self, data: bytes | str, /) -> None:
         """Write data to large object."""
         ...
 
-    def seek(self, offset: int, whence: int) -> int:
+    def seek(self, offset: int, whence: int, /) -> int:
         """Change current position in large object.
 
         The valid values for the 'whence' parameter are defined as the
@@ -173,11 +219,16 @@ class LargeObject:
         """Return the large object size."""
         ...
 
-    def export(self, filename: StrOrBytesPath) -> None:
+    def tell(self) -> int:
+        """Return the current position in the large object."""
+        ...
+
+    def export(self, filename: _StrOrBytesPath, /) -> None:
         """Export a large object to a file."""
         ...
 
 
+@final
 class Connection:
     """Connection object.
 
@@ -205,7 +256,7 @@ class Connection:
         """Create a new source object for this connection."""
         ...
 
-    def query(self, cmd: str | bytes, args: Sequence | None = None
+    def query(self, cmd: str | bytes, args: Sequence | None = None, /
               ) -> Query:
         """Create a new query object for this connection.
 
@@ -214,21 +265,21 @@ class Connection:
         """
         ...
 
-    def send_query(self, cmd: str | bytes, args: Sequence | None = None
+    def send_query(self, cmd: str | bytes, args: Sequence | None = None, /
                    ) -> Query:
         """Create a new asynchronous query object for this connection."""
         ...
 
     def query_prepared(self, name: str | bytes,
-                       args: Sequence | None = None) -> Query:
+                       args: Sequence | None = None, /) -> Query:
         """Execute a prepared statement."""
         ...
 
-    def prepare(self, name: str | bytes, cmd: str | bytes) -> None:
+    def prepare(self, name: str | bytes, cmd: str | bytes, /) -> None:
         """Create a prepared statement."""
         ...
 
-    def describe_prepared(self, name: str | bytes) -> Query:
+    def describe_prepared(self, name: str | bytes, /) -> Query:
         """Describe a prepared statement."""
         ...
 
@@ -256,15 +307,16 @@ class Connection:
         """Get the function that handles all external typecasting."""
         ...
 
-    def set_cast_hook(self, hook: Callable | None) -> None:
+    def set_cast_hook(self, hook: Callable | None, /) -> None:
         """Set a function that will handle all external typecasting."""
         ...
 
-    def get_notice_receiver(self) -> Callable | None:
+    def get_notice_receiver(self) -> Callable[[Notice], Any] | None:
         """Get the current notice receiver."""
         ...
 
-    def set_notice_receiver(self, receiver: Callable | None) -> None:
+    def set_notice_receiver(
+            self, receiver: Callable[[Notice], Any] | None, /) -> None:
         """Set a custom notice receiver."""
         ...
 
@@ -275,7 +327,7 @@ class Connection:
     def inserttable(self, table: str | bytes,
                     values: Sequence[list|tuple],
                     columns: list[str] | tuple[str, ...] | None = None,
-                    freeze: bool=False) -> int:
+                    *, freeze: bool = False) -> int:
         """Insert a Python iterable into a database table."""
         ...
 
@@ -291,7 +343,7 @@ class Connection:
         """
         ...
 
-    def parameter(self, name: str | bytes) -> str | None:
+    def parameter(self, name: str | bytes, /) -> str | None:
         """Look up a current parameter setting of the server."""
         ...
 
@@ -299,23 +351,23 @@ class Connection:
         """Look up the date format currently being used by the database."""
         ...
 
-    def escape_literal(self, s: AnyStr) -> AnyStr:
+    def escape_literal(self, s: _AnyStr, /) -> _AnyStr:
         """Escape a literal constant for use within SQL."""
         ...
 
-    def escape_identifier(self, s: AnyStr) -> AnyStr:
+    def escape_identifier(self, s: _AnyStr, /) -> _AnyStr:
         """Escape an identifier for use within SQL."""
         ...
 
-    def escape_string(self, s: AnyStr) -> AnyStr:
+    def escape_string(self, s: _AnyStr, /) -> _AnyStr:
         """Escape a string for use within SQL."""
         ...
 
-    def escape_bytea(self, s: AnyStr) -> AnyStr:
+    def escape_bytea(self, s: _AnyStr, /) -> _AnyStr:
         """Escape binary data for use within SQL as type 'bytea'."""
         ...
 
-    def putline(self, line: str | bytes) -> None:
+    def putline(self, line: str | bytes, /) -> None:
         """Write a line to the server socket."""
         ...
 
@@ -327,7 +379,7 @@ class Connection:
         """Synchronize client and server."""
         ...
 
-    def set_non_blocking(self, nb: bool) -> None:
+    def set_non_blocking(self, nb: bool, /) -> None:
         """Set the non-blocking mode of the connection."""
         ...
 
@@ -335,7 +387,7 @@ class Connection:
         """Get the non-blocking mode of the connection."""
         ...
 
-    def locreate(self, mode: int) -> LargeObject:
+    def locreate(self, mode: int, /) -> LargeObject:
         """Create a large object in the database.
 
         The valid values for 'mode' parameter are defined as the module level
@@ -343,15 +395,16 @@ class Connection:
         """
         ...
 
-    def getlo(self, oid: int) -> LargeObject:
+    def getlo(self, oid: int, /) -> LargeObject:
         """Build a large object from given oid."""
         ...
 
-    def loimport(self, filename: StrOrBytesPath) -> LargeObject:
+    def loimport(self, filename: _StrOrBytesPath, /) -> LargeObject:
         """Import a file to a large object."""
         ...
 
 
+@final
 class Query:
     """Query object.
 
@@ -365,7 +418,7 @@ class Query:
     def __len__(self) -> int:
         ...
 
-    def __getitem__(self, key: int) -> object:
+    def __getitem__(self, key: int, /) -> object:
         ...
 
     def __iter__(self) -> Query:
@@ -386,11 +439,11 @@ class Query:
         """Get query values as iterable of dictionaries."""
         ...
 
-    def namedresult(self) -> list[SomeNamedTuple]:
+    def namedresult(self) -> list[_SomeNamedTuple]:
         """Get query values as list of named tuples."""
         ...
 
-    def namediter(self) -> Iterable[SomeNamedTuple]:
+    def namediter(self) -> Iterable[_SomeNamedTuple]:
         """Get query values as iterable of named tuples."""
         ...
 
@@ -410,16 +463,17 @@ class Query:
         """Get single row from the result of a query as a dictionary."""
         ...
 
-    def onenamed(self) -> SomeNamedTuple | None:
+    def onenamed(self) -> _SomeNamedTuple | None:
         """Get one row from the result of a query as named tuple."""
         ...
 
-    def singlenamed(self) -> SomeNamedTuple:
+    def singlenamed(self) -> _SomeNamedTuple:
         """Get single row from the result of a query as named tuple."""
         ...
 
     def scalarresult(self) -> list:
         """Get first fields from query result as list of scalar values."""
+        ...
 
     def scalariter(self) -> Iterable:
         """Get first fields from query result as iterable of scalar values."""
@@ -433,11 +487,11 @@ class Query:
         """Get single row from the result of a query as scalar value."""
         ...
 
-    def fieldname(self, num: int) -> str:
+    def fieldname(self, num: int, /) -> str:
         """Get field name from its number."""
         ...
 
-    def fieldnum(self, name: str | bytes) -> int:
+    def fieldnum(self, name: str | bytes, /) -> int:
         """Get field number from its name."""
         ...
 
@@ -445,7 +499,7 @@ class Query:
         """List field names of query result."""
         ...
 
-    def fieldinfo(self, column: int | str | bytes | None
+    def fieldinfo(self, column: int | str | bytes | None = None, /
                   ) -> tuple[str, int, int, int]:
         """Get information on one or all fields of the query.
 
@@ -461,47 +515,55 @@ class Query:
         ...
 
 
-def connect(dbname: str | None = None,
-            host: str | None = None,
+def connect(dbname: str | bytes | None = None,
+            host: str | bytes | None = None,
             port: int | None = None,
-            opt: str | None = None,
-            user: str | None = None,
-            passwd: str | None = None,
-            nowait: int | None = None) -> Connection:
+            opt: str | bytes | None = None,
+            user: str | bytes | None = None,
+            passwd: str | bytes | None = None,
+            nowait: bool = False) -> Connection:
     """Connect to a PostgreSQL database."""
     ...
 
 
-def cast_array(s: str | bytes, cast: Callable | None = None,
-               delim: bytes | None = None) -> list:
+def cast_array(string: str | bytes, cast: Callable | None = None,
+               delim: bytes = b',') -> list:
     """Cast a string representing a PostgreSQL array to a Python list."""
     ...
 
 
-def cast_record(s: str | bytes,
+def cast_record(string: str | bytes,
                 cast: Callable | list[Callable | None] |
                       tuple[Callable | None, ...] | None = None,
-                delim: bytes | None = None) -> tuple:
+                delim: bytes = b',') -> tuple:
     """Cast a string representing a PostgreSQL record to a Python tuple."""
     ...
 
 
-def cast_hstore(s: str) -> dict[str, str | None]:
+@overload
+def cast_hstore(string: str, /) -> dict[str, str | None]:
     """Cast a string as a hstore."""
     ...
 
 
-def escape_bytea(s: AnyStr) -> AnyStr:
+@overload
+def cast_hstore(string: bytes, /
+                ) -> dict[str | bytes, str | bytes | None]:
+    """Cast bytes as a hstore (non-ASCII text is returned as bytes)."""
+    ...
+
+
+def escape_bytea(s: _AnyStr, /) -> _AnyStr:
     """Escape binary data for use within SQL as type 'bytea'."""
     ...
 
 
-def unescape_bytea(s: AnyStr) -> bytes:
+def unescape_bytea(s: _AnyStr, /) -> bytes:
     """Unescape 'bytea' data that has been retrieved as text."""
     ...
 
 
-def escape_string(s: AnyStr) -> AnyStr:
+def escape_string(s: _AnyStr, /) -> _AnyStr:
     """Escape a string for use within SQL."""
     ...
 
@@ -516,7 +578,7 @@ def get_array() -> bool:
     ...
 
 
-def set_array(on: bool) -> None:
+def set_array(on: bool | int, /) -> None:
     """Set whether arrays are returned as list objects."""
     ...
 
@@ -526,7 +588,7 @@ def get_bool() -> bool:
     ...
 
 
-def set_bool(on: bool | int) -> None:
+def set_bool(on: bool | int, /) -> None:
     """Set whether boolean values are returned as bool objects."""
     ...
 
@@ -536,7 +598,7 @@ def get_bytea_escaped() -> bool:
     ...
 
 
-def set_bytea_escaped(on: bool | int) -> None:
+def set_bytea_escaped(on: bool | int, /) -> None:
     """Set whether 'bytea' values are returned as escaped strings."""
     ...
 
@@ -546,7 +608,7 @@ def get_datestyle() -> str | None:
     ...
 
 
-def set_datestyle(datestyle: str | None) -> None:
+def set_datestyle(datestyle: str | None, /) -> None:
     """Set a fixed date style that shall be assumed when typecasting."""
     ...
 
@@ -556,8 +618,8 @@ def get_decimal() -> type:
     ...
 
 
-def set_decimal(cls: type) -> None:
-    """Set a fixed date style that shall be assumed when typecasting."""
+def set_decimal(cls: type, /) -> None:
+    """Set a decimal type to be used for numeric values."""
     ...
 
 
@@ -566,77 +628,73 @@ def get_decimal_point() -> str | None:
     ...
 
 
-def set_decimal_point(mark: str | None) -> None:
+def set_decimal_point(mark: str | None, /) -> None:
     """Specify which decimal mark is used for interpreting monetary values."""
     ...
 
 
-def get_jsondecode() -> Callable[[str], object] | None:
+def get_jsondecode() -> Callable[[str | bytes], object] | None:
     """Get the function that deserializes JSON formatted strings."""
     ...
 
 
-def set_jsondecode(decode: Callable[[str], object] | None) -> None:
+def set_jsondecode(decode: Callable[[str | bytes], object] | None, /
+                   ) -> None:
     """Set a function that will deserialize JSON formatted strings."""
     ...
 
 
-def get_defbase() -> str | None:
+def get_defbase() -> str | bytes | None:
     """Get the default database name."""
     ...
 
 
-def set_defbase(base: str | None) -> None:
-    """Set the default database name."""
+def set_defbase(base: str | bytes | None, /) -> str | bytes | None:
+    """Set the default database name and return the previous value."""
     ...
 
 
-def get_defhost() -> str | None:
+def get_defhost() -> str | bytes | None:
     """Get the default host."""
     ...
 
 
-def set_defhost(host: str | None) -> None:
-    """Set the default host."""
+def set_defhost(host: str | bytes | None, /) -> str | bytes | None:
+    """Set the default host and return the previous value."""
     ...
 
 
 def get_defport() -> int | None:
-    """Get the default host."""
+    """Get the default port."""
     ...
 
 
-def set_defport(port: int | None) -> None:
-    """Set the default port."""
+def set_defport(port: int | None, /) -> int | None:
+    """Set the default port and return the previous value."""
     ...
 
 
-def get_defopt() -> str | None:
+def get_defopt() -> str | bytes | None:
     """Get the default connection options."""
     ...
 
 
-def set_defopt(opt: str | None) -> None:
-    """Set the default connection options."""
+def set_defopt(opt: str | bytes | None, /) -> str | bytes | None:
+    """Set the default connection options and return the previous value."""
     ...
 
 
-def get_defuser() -> str | None:
+def get_defuser() -> str | bytes | None:
     """Get the default database user."""
     ...
 
 
-def set_defuser(user: str | None) -> None:
-    """Set the default database user."""
+def set_defuser(user: str | bytes | None, /) -> str | bytes | None:
+    """Set the default database user and return the previous value."""
     ...
 
 
-def get_defpasswd() -> str | None:
-    """Get the default database password."""
-    ...
-
-
-def set_defpasswd(passwd: str | None) -> None:
+def set_defpasswd(passwd: str | bytes | None, /) -> None:
     """Set the default database password."""
     ...
 

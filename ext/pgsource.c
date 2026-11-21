@@ -734,7 +734,8 @@ source_listInfo(sourceObject *self, PyObject *Py_UNUSED(noargs))
 
 /* List fields information for last result. */
 static char source_fieldinfo__doc__[] =
-    "fieldinfo(desc) -- get specified field info (position, name, type oid)";
+    "fieldinfo(desc) -- get specified field info"
+    " (position, name, type oid, size, type modifier)";
 
 static PyObject *
 source_fieldinfo(sourceObject *self, PyObject *desc)

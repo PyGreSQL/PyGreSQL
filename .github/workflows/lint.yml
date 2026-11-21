@@ -20,8 +20,12 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.15"
+      - name: Install libpq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev
       - name: Install tox
         run: pip install tox
       - name: Run quality checks
-        run: tox -e ruff,mypy,cformat,docs
+        run: tox -e ruff,mypy,stubtest,cformat,docs
         timeout-minutes: 5
