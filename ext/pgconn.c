@@ -1592,15 +1592,20 @@ conn_set_notice_receiver(connObject *self, PyObject *func)
     PyObject *ret = NULL;
 
     if (func == Py_None) {
-        Py_XDECREF(self->notice_receiver);
-        self->notice_receiver = NULL;
+        Py_CLEAR(self->notice_receiver);
+        /* restore the default receiver of libpq (prints to stderr) */
+        if (self->cnx && self->default_notice_receiver)
+            PQsetNoticeReceiver(self->cnx, self->default_notice_receiver,
+                                NULL);
         ret = Py_NewRef(Py_None);
     }
     else if (PyCallable_Check(func)) {
-        Py_XINCREF(func);
-        Py_XDECREF(self->notice_receiver);
-        self->notice_receiver = func;
-        PQsetNoticeReceiver(self->cnx, notice_receiver, self);
+        PQnoticeReceiver old;
+
+        Py_XSETREF(self->notice_receiver, Py_NewRef(func));
+        old = PQsetNoticeReceiver(self->cnx, notice_receiver, self);
+        if (old && old != notice_receiver)
+            self->default_notice_receiver = old;
         ret = Py_NewRef(Py_None);
     }
     else {
@@ -1644,6 +1649,9 @@ conn_close(connObject *self, PyObject *Py_UNUSED(noargs))
     Py_END_ALLOW_THREADS
 
     self->cnx = NULL;
+    /* the notice receiver will not be called any more, but the cast hook
+       may still be needed to get the results of queries */
+    Py_CLEAR(self->notice_receiver);
     Py_RETURN_NONE;
 }
 

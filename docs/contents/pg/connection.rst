@@ -552,7 +552,8 @@ get/set_notice_receiver -- custom notice receiver
 
 This method gets the custom notice receiver callback function that has
 been set with :meth:`Connection.set_notice_receiver`, or ``None`` if no
-custom notice receiver has ever been set on the connection.
+custom notice receiver has been set on the connection, or if it has been
+reset or the connection has been closed.
 
 .. versionadded:: 4.1
 
@@ -560,7 +561,7 @@ custom notice receiver has ever been set on the connection.
 
     Set a custom notice receiver
 
-    :param func: the custom notice receiver callback function
+    :param func: the custom notice receiver callback function or ``None``
     :rtype: None
     :raises TypeError: the specified notice receiver is not callable
 
@@ -608,11 +609,16 @@ connection, e.g. while a query is running. Therefore it must not run
 queries or other commands on the connection, and must not close it.
 It may set another notice receiver, though.
 
+If you set the notice receiver to ``None``, the default notice receiver
+of libpq is restored, which prints the messages to ``sys.stderr``.
+To ignore all notices, set a receiver that does nothing instead.
+
 .. versionadded:: 4.1
 
 .. versionchanged:: 6.3
-    The notice can be used after the receiver has returned, and exceptions
-    raised by the receiver are reported as unraisable.
+    The notice can be used after the receiver has returned, exceptions
+    raised by the receiver are reported as unraisable, and setting the
+    receiver to ``None`` restores the default receiver.
 
 putline -- write a line to the server socket
 --------------------------------------------

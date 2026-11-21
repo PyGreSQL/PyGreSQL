@@ -16,9 +16,11 @@ import datetime
 import os
 import socket
 import sys
+import tempfile
 import threading
 import time
 import unittest
+import weakref
 from collections import namedtuple
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
@@ -2709,6 +2711,65 @@ class TestNotificatons(unittest.TestCase):
         # the message is decoded as UTF-8 with escapes as a fallback
         self.assertEqual(received, [
             'wär' if encoding == 'UTF8' else 'w\\xe4r'])
+
+    def test_notice_receiver_replaced_in_del(self):
+        c = self.c
+        received = []
+
+        class Receiver:
+            def __call__(self, notice):
+                pass
+
+            def __del__(self):
+                # the old receiver must already have been replaced
+                received.append(c.get_notice_receiver())
+
+        def other_receiver(notice):
+            pass
+
+        c.set_notice_receiver(Receiver())
+        c.set_notice_receiver(other_receiver)
+        self.assertEqual(received, [other_receiver])
+        c.set_notice_receiver(Receiver())
+        c.set_notice_receiver(None)
+        self.assertEqual(received, [other_receiver, None])
+
+    def test_set_notice_receiver_none_restores_default(self):
+        query = self.c.query
+        self.c.set_notice_receiver(lambda notice: None)
+        self.c.set_notice_receiver(None)
+        # the default receiver of libpq prints the message to stderr
+        with tempfile.TemporaryFile() as f:
+            stderr = os.dup(2)
+            try:
+                sys.stderr.flush()
+                os.dup2(f.fileno(), 2)
+                query("do $$ begin raise warning 'Bilbo was here!'; end $$")
+            finally:
+                os.dup2(stderr, 2)
+                os.close(stderr)
+            f.seek(0)
+            output = f.read()
+        self.assertIn(b'Bilbo was here!', output)
+
+    def test_notice_receiver_released_with_connection(self):
+        class Receiver:
+            def __call__(self, notice):
+                pass
+
+        for close in (True, False):
+            with self.subTest(close=close):
+                c = connect()
+                receiver = Receiver()
+                ref = weakref.ref(receiver)
+                c.set_notice_receiver(receiver)
+                del receiver
+                self.assertIsNotNone(ref())
+                if close:
+                    c.close()
+                else:
+                    del c
+                self.assertIsNone(ref())
 
     def test_notice_receiver_with_client_encoding(self):
         encoding = self.c.parameter('server_encoding')

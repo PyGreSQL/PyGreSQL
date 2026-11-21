@@ -53,6 +53,9 @@ Version 6.3.0 (unreleased)
     encoding instead of UTF-8, and `str(notice)` works again. Exceptions
     raised in the receiver are now reported as unraisable exceptions instead
     of causing a `SystemError` in the query that produced the notice.
+    Setting the notice receiver to `None` now restores the default receiver
+    of libpq, which prints notices to stderr, instead of ignoring notices.
+  - Closing a connection now releases its notice receiver.
 
 - Modernization and build:
 

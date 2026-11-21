@@ -148,6 +148,7 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     conn_obj->date_format = date_format;
     conn_obj->cast_hook = NULL;
     conn_obj->notice_receiver = NULL;
+    conn_obj->default_notice_receiver = NULL;
 
     if (pghost) {
         keywords[nkw] = "host";
