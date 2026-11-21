@@ -81,9 +81,8 @@ Strings are encoded and decoded with the client encoding of the connection
   values (:meth:`Connection.parameter`) are always ``str``. If they cannot
   be decoded with the client encoding, they are decoded as UTF-8 with
   backslash escapes for invalid bytes (e.g. the byte 0xE4 becomes the four
-  characters ``\xe4``). Field names passed
-  to :meth:`Query.fieldnum` or :meth:`Query.fieldinfo` are encoded the same
-  way, so the names returned by :meth:`Query.listfields` can be used there.
+  characters ``\xe4``). The names returned by :meth:`Query.listfields` can
+  always be passed to :meth:`Query.fieldnum` or :meth:`Query.fieldinfo`.
 
 The PostgreSQL encodings are mapped to the corresponding Python codecs, e.g.
 ``WIN1252`` to ``cp1252``. Encodings that are not supported by Python are

@@ -376,9 +376,16 @@ type, using a hardcoded table definition. The number returned is the
 field rank in the query result. The name is encoded with the client
 encoding, it can also be passed as bytes, which are not encoded.
 
+The name is first compared with the field names as returned by
+:meth:`Query.listfields`, so that these can always be passed back, even if
+they contain upper case characters or backslash escapes for bytes that could
+not be decoded. If no field has exactly that name, the name is looked up like
+in SQL, i.e. converted to lower case unless it is enclosed in double quotes.
+
 .. versionchanged:: 6.3
     The name is encoded with the client encoding instead of UTF-8,
-    and it can also be passed as bytes.
+    and it can also be passed as bytes. Names as returned by
+    :meth:`Query.listfields` are always found.
 
 fieldinfo -- detailed info about query result fields
 ----------------------------------------------------

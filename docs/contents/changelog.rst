@@ -101,11 +101,15 @@ Version 6.3.0 (unreleased)
     `str()` of a query or source object. Field names that cannot be decoded
     with the client encoding are now decoded as UTF-8 with backslash escapes.
     `Query.fieldnum()` now encodes the name with the client encoding instead
-    of UTF-8, falling back to UTF-8 like the decoding of field names, so
-    that the names returned by `Query.listfields()` can be used. It also
-    accepts bytes. Names containing NUL characters now raise a `ValueError`
-    instead of being truncated. `Query.fieldname()` crashed with a negative
-    field number.
+    of UTF-8, falling back to UTF-8 like the decoding of field names, and it
+    also accepts bytes. The name is now first compared with the field names
+    as returned by `Query.listfields()`, so that these can always be used,
+    even if they are in mixed case or contain backslash escapes, and only
+    then looked up like in SQL (in lower case unless quoted). Before, a name
+    like ``A`` found the field ``a`` instead of ``"A"``. This also applies to
+    `Query.fieldinfo()` and to the source object. Names containing NUL
+    characters now raise a `ValueError` instead of being truncated.
+    `Query.fieldname()` crashed with a negative field number.
   - The `fieldinfo()` and `field()` methods of the source object can now
     look up fields by name (passed as str or bytes), which always failed.
     `field()` crashed when there was no current row, it now raises an

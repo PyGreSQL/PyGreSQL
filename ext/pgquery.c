@@ -346,15 +346,12 @@ query_fieldnum(queryObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "O", &name_obj)) {
         return NULL;
     }
-    if (!(name_obj = get_encoded_name(
-              name_obj, self->encoding,
-              "Method fieldnum() takes a string as argument"))) {
-        return NULL;
-    }
 
     /* gets field number */
-    num = PQfnumber(self->result, PyBytes_AS_STRING(name_obj));
-    Py_DECREF(name_obj);
+    num = get_field_number(self->result, name_obj, self->encoding,
+                           "Method fieldnum() takes a string as argument");
+    if (num == -2)
+        return NULL;
     if (num == -1) {
         PyErr_SetString(PyExc_ValueError, "Unknown field");
         return NULL;
@@ -409,13 +406,11 @@ query_fieldinfo(queryObject *self, PyObject *args)
             num = (int)PyLong_AsLong(field);
         }
         else {
-            PyObject *name = get_encoded_name(
-                field, self->encoding,
+            num = get_field_number(
+                self->result, field, self->encoding,
                 "Field should be given as column number or name");
-            if (!name)
+            if (num == -2)
                 return NULL;
-            num = PQfnumber(self->result, PyBytes_AS_STRING(name));
-            Py_DECREF(name);
         }
         if (num < 0 || num >= self->num_fields) {
             PyErr_SetString(PyExc_IndexError, "Unknown field");

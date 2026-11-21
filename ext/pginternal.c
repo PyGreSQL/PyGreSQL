@@ -293,6 +293,59 @@ get_encoded_text(PyObject *text, int encoding)
     return bytes;
 }
 
+/* Get the number of a field in a result from its name given as str or bytes.
+   The name is first compared with the field names as returned by the module
+   (i.e. as decoded by get_decoded_text() if given as str), so that these can
+   always be passed back, even if they are in upper case or contain backslash
+   escapes. Otherwise it is looked up with PQfnumber() like in SQL, i.e. it
+   is converted to lower case unless it is quoted. Return -1 if there is no
+   such field, or -2 and set an exception (see get_encoded_name) if the name
+   is invalid. */
+int
+get_field_number(const PGresult *res, PyObject *name, int encoding,
+                 const char *usage)
+{
+    PyObject *bytes = get_encoded_name(name, encoding, usage);
+    const int n = PQnfields(res);
+    int num;
+
+    if (!bytes)
+        return -2;
+
+    /* the same raw name (cheap, finds names that could be decoded) */
+    for (num = 0; num < n; ++num)
+        if (!strcmp(PQfname(res, num), PyBytes_AS_STRING(bytes)))
+            break;
+
+    /* the same decoded name (finds names with backslash escapes) */
+    if (num == n && PyUnicode_Check(name)) {
+        for (num = 0; num < n; ++num) {
+            PyObject *field = get_decoded_text(PQfname(res, num), encoding);
+            int equal;
+
+            if (!field) {
+                Py_DECREF(bytes);
+                return -2;
+            }
+            equal = PyObject_RichCompareBool(field, name, Py_EQ);
+            Py_DECREF(field);
+            if (equal) {
+                if (equal < 0) {
+                    Py_DECREF(bytes);
+                    return -2;
+                }
+                break;
+            }
+        }
+    }
+
+    /* otherwise like in SQL (lower case unless quoted) */
+    if (num == n)
+        num = PQfnumber(res, PyBytes_AS_STRING(bytes));
+    Py_DECREF(bytes);
+    return num;
+}
+
 PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding)
 {

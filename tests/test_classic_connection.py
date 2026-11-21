@@ -849,6 +849,33 @@ class TestSimpleQueries(unittest.TestCase):
         self.assertRaises(ValueError, self.c.query(q).fieldnum, 'y\0z')
         self.assertRaises(ValueError, self.c.query(q).fieldinfo, b'y\0z')
 
+    def test_fieldnum_mixed_case(self):
+        q = self.c.query('select 1 as "Xy", 2 as xy2')
+        self.assertEqual(q.listfields(), ('Xy', 'xy2'))
+        # names that are not quoted are converted to lower case, so this
+        # failed before, now names are also compared with the field names
+        self.assertEqual(q.fieldnum('Xy'), 0)
+        self.assertEqual(q.fieldinfo('Xy')[0], 'Xy')
+        self.assertEqual(q.fieldnum('"Xy"'), 0)
+        self.assertEqual(q.fieldnum('XY2'), 1)
+        self.assertRaises(ValueError, q.fieldnum, 'xy')
+        self.assertRaises(ValueError, q.fieldnum, '"xy"')
+        self.assertEqual(q.fieldnum(b'Xy'), 0)
+        s = self.c.source()
+        s.execute('select 1 as "Xy"')
+        self.assertEqual(s.fieldinfo('Xy'), (0, 'Xy', 23, 4, -1))
+
+    def test_fieldnum_names_differing_in_case(self):
+        q = self.c.query('select 1 as a, 2 as "A", 3 as "B", 4 as b')
+        names = q.listfields()
+        self.assertEqual(names, ('a', 'A', 'B', 'b'))
+        # the names from listfields() are always found
+        self.assertEqual([q.fieldnum(name) for name in names], [0, 1, 2, 3])
+        self.assertEqual([q.fieldinfo(name)[0] for name in names], list(names))
+        self.assertEqual(q.fieldnum('"A"'), 1)
+        self.assertEqual(q.fieldnum('"b"'), 3)
+        self.assertEqual(q.fieldnum(b'B'), 2)
+
     def test_field_info_name(self):
         q = ('select true as FooBar, 42::smallint as "FooBar",'
              ' 4.2::numeric(4,2) as foo_bar, \'baz\'::char(3) as "Foo Bar"')
@@ -1174,6 +1201,11 @@ class TestUnicodeQueries(unittest.TestCase):
                 r = query(b'select $1::text = chr(20013)', (r,)
                           ).singlescalar()
                 self.assertIs(r, True)
+                # field names that are not valid UTF-8 contain escapes,
+                # they could not be passed back before
+                q = query(b'select 1 as "\xc4\xe3"')
+                self.assertEqual(q.listfields(), ('\\xc4\\xe3',))
+                self.assertEqual(q.fieldnum('\\xc4\\xe3'), 0)
             self.assertEqual(self.c.escape_literal("a'b"), "'a''b'")
             self.assertRaises(
                 UnicodeEncodeError, self.c.escape_literal, '中')
@@ -1527,12 +1559,15 @@ class TestUndecodableText(unittest.TestCase):
         self.assertEqual(q.dictresult(), [{f'w{text}r': 1, 'b': 2}])
         self.assertEqual(q.namedresult(), [(1, 2)])
         # names are looked up like they are decoded, i.e. with UTF-8
-        # instead of SQL_ASCII, so the names from listfields() can be used
-        # if they were valid UTF-8 (otherwise they contain escapes)
+        # instead of SQL_ASCII, and also compared with the decoded names,
+        # so the names from listfields() can be used even if they are not
+        # valid UTF-8 and contain escapes (this failed before)
+        self.assertEqual(q.fieldnum(f'w{text}r'), 0)
+        self.assertEqual(q.fieldinfo(f'w{text}r')[0], f'w{text}r')
         if self.c.parameter('server_encoding') == 'UTF8':
             self.assertEqual(q.fieldnum(f'"w{text}r"'), 0)
             self.assertEqual(q.fieldinfo(f'"w{text}r"')[0], f'w{text}r')
-        else:
+        else:  # quoted names with escapes cannot be found
             self.assertRaises(ValueError, q.fieldnum, f'"w{text}r"')
         self.assertRaises(ValueError, q.fieldnum, '"wör"')
 
@@ -1583,6 +1618,7 @@ class TestUndecodableText(unittest.TestCase):
         self.assertEqual(s.listinfo(), ((0, text, 25, -1, -1),))
         self.assertEqual(s.fieldinfo(b'"' + raw + b'"'),
                          (0, text, 25, -1, -1))
+        self.assertEqual(s.fieldinfo(text), (0, text, 25, -1, -1))
         # this raised SystemError before
         self.assertEqual(s.fetch(1), [(b'w' + raw + b'r',)])
         s.movefirst()

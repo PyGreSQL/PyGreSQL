@@ -655,12 +655,9 @@ _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
         num = (int)PyLong_AsLong(param);
     }
     else {
-        PyObject *name = get_encoded_name(param, self->encoding, usage);
-
-        if (!name)
+        num = get_field_number(self->result, param, self->encoding, usage);
+        if (num == -2)
             return -1;
-        num = PQfnumber(self->result, PyBytes_AS_STRING(name));
-        Py_DECREF(name);
     }
 
     /* checks field validity */
