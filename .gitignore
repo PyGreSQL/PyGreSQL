@@ -33,6 +33,7 @@ Thumbs.db
 .idea/
 .vs/
 .vscode/
+devcontainer-lock.json
 
 /AGENTS.md
 /CLAUDE.md
