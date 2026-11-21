@@ -1,3 +1,10 @@
+# limit the logs of the database servers
+x-pg-logging: &pg-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "1"
+
 services:
   dev:
     build:
@@ -17,6 +24,7 @@ services:
   pg12:
     image: postgres:12
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-12:/var/lib/postgresql/data
     environment:
@@ -27,6 +35,7 @@ services:
   pg13:
     image: postgres:13
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-13:/var/lib/postgresql/data
     environment:
@@ -37,6 +46,7 @@ services:
   pg14:
     image: postgres:14
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-14:/var/lib/postgresql/data
     environment:
@@ -47,6 +57,7 @@ services:
   pg15:
     image: postgres:15
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-15:/var/lib/postgresql/data
     environment:
@@ -57,6 +68,7 @@ services:
   pg16:
     image: postgres:16
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-16:/var/lib/postgresql/data
     environment:
@@ -67,6 +79,7 @@ services:
   pg17:
     image: postgres:17
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-17:/var/lib/postgresql/data
     environment:
@@ -77,6 +90,7 @@ services:
   pg18:
     image: postgres:18
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-18:/var/lib/postgresql
     environment:
@@ -87,6 +101,7 @@ services:
   pg19:
     image: postgres:19
     restart: unless-stopped
+    logging: *pg-logging
     volumes:
       - postgres-data-19:/var/lib/postgresql
     environment:
