@@ -4478,6 +4478,18 @@ class TestDBClass(unittest.TestCase):
         r = query("select * from test_table_freeze").getresult()
         self.assertEqual(r, values)
 
+    def test_inserttable_with_keywords(self):
+        values = [(i,) for i in range(1, 4)]
+        self.create_table('test_table_keywords', 'n integer')
+        inserttable = self.db.inserttable
+        self.assertEqual(inserttable(
+            table='test_table_keywords', values=values, columns=['n']), 3)
+        r = self.db.query("select * from test_table_keywords").getresult()
+        self.assertEqual(r, values)
+        # freeze is a keyword-only parameter like in the connection
+        self.assertRaises(TypeError, inserttable,
+                          'test_table_keywords', values, None, True)
+
     def test_inserttable_with_freeze_no_transaction(self):
         # use inserttable() with freeze and table created before transaction
         values = [(i,) for i in range(1, 4)]

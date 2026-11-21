@@ -211,11 +211,14 @@ Version 6.3.0 (unreleased)
     of a `TypeError`, or of being silently truncated. `set_defpasswd()`
     leaked the previous password. A `get_defpasswd()` function never
     existed, it has been removed from the documentation.
-  - The second parameter of `inserttable()` can now be passed with the
-    documented keyword ``values`` (instead of ``data``), and ``None`` is
-    accepted for ``columns``. When there is nothing to insert, the method
-    now returns 0 instead of `None`, and the type of ``columns`` is checked
-    in this case as well.
+  - The keyword for the second parameter of `Connection.inserttable()` is
+    now ``values``, as documented and as in `DB.inserttable()`. Since
+    version 6.2.1, it had been named ``data`` by mistake; this keyword is
+    no longer accepted. Like in `Connection.inserttable()`, ``freeze`` is
+    now a keyword-only parameter in `DB.inserttable()` as well.
+    ``None`` is now accepted for ``columns``. When
+    there is nothing to insert, the method now returns 0 instead of `None`,
+    and the type of ``columns`` is checked in this case as well.
   - Calling `dir()` on connections, large objects and source objects
     leaked references.
 

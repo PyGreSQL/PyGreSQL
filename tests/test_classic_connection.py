@@ -3207,6 +3207,10 @@ class TestInserttable(unittest.TestCase):
         self.assertEqual(self.c.inserttable(
             table='test', values=data, columns=None), len(data))
         self.assertEqual(self.get_back(), data)
+        # the keyword was named "data" by mistake in 6.2.1 to 6.2.3
+        self.assertRaises(TypeError, self.c.inserttable, 'test', data=data)
+        self.assertRaises(TypeError, self.c.inserttable,
+                          'test', data, None, True)
 
     def test_insert_table_with_freeze_true_without_truncate(self):
         try:

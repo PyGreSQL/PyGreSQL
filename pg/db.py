@@ -1403,7 +1403,7 @@ class DB:
     def inserttable(self, table: str | bytes,
                     values: Sequence[list|tuple],
                     columns: list[str] | tuple[str, ...] | None = None,
-                    freeze: bool=False) -> int:
+                    *, freeze: bool = False) -> int:
         """Insert a Python iterable into a database table."""
         if columns is None:
             return self._valid_db.inserttable(table, values, freeze=freeze)
