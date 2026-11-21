@@ -328,7 +328,7 @@ class Adapter:
         'localtime', 'localtimestamp'])
 
     _re_array_quote = regex(r'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
-    _re_record_quote = regex(r'[(,"\\]')
+    _re_record_quote = regex(r'[(),"\\]')
     _re_array_escape = _re_record_escape = regex(r'(["\\])')
 
     def __init__(self, db: DB):

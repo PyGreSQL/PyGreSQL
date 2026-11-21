@@ -44,6 +44,8 @@ Version 6.3.0 (unreleased)
   - `UUID` objects can now also be passed as inline parameters.
   - The `DbType` objects for array types have a new attribute ``elem``
     with the type OID of the array elements.
+  - Fields of record parameters containing a closing parenthesis are now
+    quoted. Before, they caused a syntax error.
   - The new `Connection.encoding` attribute contains the Python codec name
     of the client encoding.
 

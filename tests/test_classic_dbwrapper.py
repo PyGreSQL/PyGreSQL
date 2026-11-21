@@ -3891,6 +3891,17 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(p.age, 61)
         self.assertIsInstance(p.age, int)
 
+    def test_record_with_special_characters(self):
+        query = self.db.query
+        query('create type test_pair_type as (a text, b text)')
+        self.addCleanup(query, 'drop type test_pair_type')
+        typ = self.db.dbtypes['test_pair_type']
+        q = 'select %s::test_pair_type'
+        for value in (('a)b', 'c'), ('(', ')'), (' x ', 'y,z'),
+                      ('"', '\\'), ('', None)):
+            r = self.db.query_formatted(q, (value,), (typ,)).singlescalar()
+            self.assertEqual(r, value)
+
     def test_record_with_undecodable_text(self):
         query = self.db.query
         # with SQL_ASCII, the server sends text without conversion
