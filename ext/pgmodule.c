@@ -138,7 +138,7 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     if ((!pgpasswd) && (pg_default_passwd != Py_None))
         pgpasswd = PyBytes_AsString(pg_default_passwd);
 
-    if (!(conn_obj = PyObject_New(connObject, &connType))) {
+    if (!(conn_obj = PyObject_GC_New(connObject, &connType))) {
         set_error_msg(InternalError, "Can't create new connection object");
         return NULL;
     }
@@ -149,6 +149,7 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     conn_obj->cast_hook = NULL;
     conn_obj->notice_receiver = NULL;
     conn_obj->default_notice_receiver = NULL;
+    PyObject_GC_Track(conn_obj);
 
     if (pghost) {
         keywords[nkw] = "host";

@@ -19,6 +19,7 @@
 static void
 conn_dealloc(connObject *self)
 {
+    PyObject_GC_UnTrack(self);
     /* do not call the notice receiver on a deallocated connection */
     Py_CLEAR(self->notice_receiver);
     if (self->cnx) {
@@ -26,8 +27,29 @@ conn_dealloc(connObject *self)
         PQfinish(self->cnx);
         Py_END_ALLOW_THREADS
     }
-    Py_XDECREF(self->cast_hook);
-    PyObject_Del(self);
+    Py_CLEAR(self->cast_hook);
+    PyObject_GC_Del(self);
+}
+
+/* Visit the objects referenced by the connection (for the GC). */
+static int
+conn_traverse(connObject *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->cast_hook);
+    Py_VISIT(self->notice_receiver);
+    return 0;
+}
+
+/* Clear the objects referenced by the connection (for the GC).
+   This breaks reference cycles through the hooks, e.g. when the
+   notice receiver is a bound method of an object that holds the
+   connection. */
+static int
+conn_clear(connObject *self)
+{
+    Py_CLEAR(self->cast_hook);
+    Py_CLEAR(self->notice_receiver);
+    return 0;
 }
 
 /* Get connection attributes. */
@@ -1796,7 +1818,9 @@ PyTypeObject connType = {
     .tp_basicsize = sizeof(connObject),
     .tp_dealloc = (destructor)conn_dealloc,
     .tp_getattro = (getattrofunc)conn_getattr,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_doc = conn__doc__,
+    .tp_traverse = (traverseproc)conn_traverse,
+    .tp_clear = (inquiry)conn_clear,
     .tp_methods = conn_methods,
 };

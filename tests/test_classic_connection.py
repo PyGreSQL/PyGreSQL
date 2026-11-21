@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ctypes
 import datetime
+import gc
 import os
 import socket
 import sys
@@ -2770,6 +2771,22 @@ class TestNotificatons(unittest.TestCase):
                 else:
                     del c
                 self.assertIsNone(ref())
+
+    def test_notice_receiver_in_reference_cycle(self):
+        class Holder:
+            def __init__(self):
+                self.c = connect()
+                self.c.set_notice_receiver(self.receive)
+
+            def receive(self, notice):
+                pass
+
+        holder = Holder()
+        ref = weakref.ref(holder)
+        # the connection holds the bound method, which holds the holder
+        del holder
+        gc.collect()
+        self.assertIsNone(ref())
 
     def test_notice_receiver_with_client_encoding(self):
         encoding = self.c.parameter('server_encoding')

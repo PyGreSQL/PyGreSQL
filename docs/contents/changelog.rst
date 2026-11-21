@@ -55,7 +55,10 @@ Version 6.3.0 (unreleased)
     of causing a `SystemError` in the query that produced the notice.
     Setting the notice receiver to `None` now restores the default receiver
     of libpq, which prints notices to stderr, instead of ignoring notices.
-  - Closing a connection now releases its notice receiver.
+  - Connections now support the cyclic garbage collector, so that they are
+    freed when their notice receiver or cast hook refers back to them, e.g.
+    as a bound method of an object holding the connection. Closing the
+    connection also releases the notice receiver.
 
 - Modernization and build:
 
