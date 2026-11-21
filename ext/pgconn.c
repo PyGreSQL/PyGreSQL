@@ -1842,13 +1842,20 @@ conn_get_notify(connObject *self, PyObject *Py_UNUSED(noargs))
 static PyObject *
 conn_dir(connObject *self, PyObject *Py_UNUSED(noargs))
 {
-    PyObject *attrs;
+    PyObject *attrs, *ret;
 
-    attrs = PyObject_Dir(PyObject_Type((PyObject *)self));
-    PyObject_CallMethod(
+    /* the type is a borrowed reference, the result of extend() a new one */
+    if (!(attrs = PyObject_Dir((PyObject *)Py_TYPE(self))))
+        return NULL;
+    ret = PyObject_CallMethod(
         attrs, "extend", "[ssssssssssssss]", "host", "port", "db", "options",
         "error", "status", "user", "protocol_version", "server_version",
         "encoding", "socket", "backend_pid", "ssl_in_use", "ssl_attributes");
+    if (!ret) {
+        Py_DECREF(attrs);
+        return NULL;
+    }
+    Py_DECREF(ret);
 
     return attrs;
 }

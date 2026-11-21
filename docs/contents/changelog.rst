@@ -215,6 +215,8 @@ Version 6.3.0 (unreleased)
     documented keyword ``values`` (instead of ``data``), and ``None`` is
     accepted for ``columns``. When there is nothing to insert, the method
     now returns 0 instead of `None`.
+  - Calling `dir()` on connections, large objects and source objects
+    leaked references.
 
 - Modernization and build:
 

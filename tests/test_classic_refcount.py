@@ -115,6 +115,27 @@ class TestConnectionRefCounts(RefCountTestCase):
         self.assert_refcount_unchanged(
             lambda: self.c.set_notice_receiver(None), None)
 
+    def test_dir(self):
+        # the type and the result of list.extend() were leaked before
+        self.assertIn('host', dir(self.c))
+        self.assert_refcount_unchanged(lambda: dir(self.c), pg.Connection)
+        # unrelated objects referring to None may be freed meanwhile with
+        # Python < 3.12, so only check that no reference to None is leaked
+        drift = refcount_drift(lambda: dir(self.c), None)
+        self.assertLessEqual(
+            drift, 0, f'Reference count of None increased by {drift}')
+        source = self.c.source()
+        self.assertIn('pgcnx', dir(source))
+        self.assert_refcount_unchanged(lambda: dir(source), type(source))
+        self.c.query('begin')
+        try:
+            large = self.c.locreate(pg.INV_READ | pg.INV_WRITE)
+            self.assertIn('oid', dir(large))
+            self.assert_refcount_unchanged(lambda: dir(large), type(large))
+            large.unlink()
+        finally:
+            self.c.query('rollback')
+
     def test_ssl_in_use(self):
         ssl_in_use = self.c.ssl_in_use
         self.assertIsInstance(ssl_in_use, bool)
