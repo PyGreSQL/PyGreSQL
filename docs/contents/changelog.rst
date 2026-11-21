@@ -25,6 +25,11 @@ Version 6.3.0 (unreleased)
     This also applies to inline parameters, which were not properly quoted
     before. Note that bytes passed for text columns are now stored as an
     escaped bytea string like ``\x616263``; pass `str` values for text.
+  - Backslashes in keys and values of hstore parameters are now escaped.
+    Before, they were dropped or caused a syntax error.
+  - Keys and values of hstore parameters containing tabs, newlines or other
+    whitespace besides spaces are now quoted. Before, they caused a syntax
+    error, or such whitespace at the start or end was silently stripped.
 
 - Changes in the `pgdb` module:
 
@@ -32,6 +37,9 @@ Version 6.3.0 (unreleased)
     `TypeCache.get_fields()` are now typed named tuples.
   - Plain `bytes` parameters are now adapted as `bytea`, like values wrapped
     with `Binary()`. Before, they were not properly quoted.
+  - Keys and values of hstore parameters containing tabs, newlines or other
+    whitespace besides spaces are now quoted. Before, they caused a syntax
+    error, or such whitespace at the start or end was silently stripped.
   - Text parameters and queries containing NUL characters, which PostgreSQL
     does not support, now raise a `DataError`. Before, the text was silently
     truncated at the NUL character. Queries and parameters that cannot be

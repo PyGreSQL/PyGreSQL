@@ -723,10 +723,13 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 self.skipTest("hstore extension not enabled")
         finally:
             con.close()
-        d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever', 'back\\': '\\slash',
+        d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
              '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
              '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
-             'None': None, 'NULL': 'NULL', 'empty': ''}
+             'None': None, 'NULL': 'NULL', 'empty': '',
+             'back\\': '\\slash', '\\': '\\\\',
+             'tab\tkey': 'line\nbreak', ' pad ': '\r\f\v',
+             'v\vtab': 'null'}
         con = self._connect()
         try:
             cur = con.cursor()

@@ -206,11 +206,11 @@ Uuid = Uuid  # Construct an object holding a UUID value
 class Hstore(dict):
     """Wrapper class for marking hstore values."""
 
-    _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
+    _re_quote = regex(r'^[Nn][Uu][Ll][Ll]$|[\s,=>]')
     _re_escape = regex(r'(["\\])')
 
     @classmethod
-    def _quote(cls, s: Any) -> Any:
+    def _quote(cls, s: Any) -> str:
         if s is None:
             return 'NULL'
         if not isinstance(s, str):

@@ -4080,9 +4080,17 @@ class TestDBClass(unittest.TestCase):
         d = {'k': 'v', 'foo': 'bar', 'baz': 'whatever',
              '1a': 'anything at all', '2=b': 'value = 2', '3>c': 'value > 3',
              '4"c': 'value " 4', "5'c": "value ' 5", 'hello, world': '"hi!"',
-             'None': None, 'NULL': 'NULL', 'empty': ''}
+             'None': None, 'NULL': 'NULL', 'empty': '',
+             'back\\': '\\slash', '\\': '\\\\',
+             'tab\tkey': 'line\nbreak', ' pad ': '\r\f\v',
+             'v\vtab': 'null'}
         q = "select $1::hstore"
         r = self.db.query(q, (pg.Hstore(d),)).getresult()[0][0]
+        self.assertIsInstance(r, dict)
+        self.assertEqual(r, d)
+        q = "select %s::hstore"
+        r = self.db.query_formatted(
+            q, (pg.Hstore(d),), inline=True).getresult()[0][0]
         self.assertIsInstance(r, dict)
         self.assertEqual(r, d)
 

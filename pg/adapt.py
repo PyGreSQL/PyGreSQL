@@ -40,7 +40,8 @@ class Bytea(bytes):
 class Hstore(dict):
     """Wrapper class for marking hstore values."""
 
-    _re_quote = regex('^[Nn][Uu][Ll][Ll]$|[ ,=>]')
+    _re_quote = regex(r'^[Nn][Uu][Ll][Ll]$|[\s,=>]')
+    _re_escape = regex(r'(["\\])')
 
     @classmethod
     def _quote(cls, s: Any) -> str:
@@ -50,8 +51,9 @@ class Hstore(dict):
             s = str(s)
         if not s:
             return '""'
-        s = s.replace('"', '\\"')
-        if cls._re_quote.search(s):
+        quote = cls._re_quote.search(s)
+        s = cls._re_escape.sub(r'\\\1', s)
+        if quote:
             s = f'"{s}"'
         return s
 
