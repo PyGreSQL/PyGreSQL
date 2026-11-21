@@ -498,7 +498,7 @@ inserttable -- insert an iterable into a table
     :param table: the table name
     :type table: str or bytes
     :param list values: iterable of row values, which must be lists or tuples
-    :param list columns: list or tuple of column names
+    :param list columns: list or tuple of column names (*None* = all columns)
     :param bool freeze: if True, immediately freeze the inserted rows
     :rtype: int
     :raises TypeError: invalid connection, bad argument type, or too many arguments

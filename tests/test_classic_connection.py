@@ -2761,7 +2761,13 @@ class TestInserttable(unittest.TestCase):
 
     def test_inserttable_no_column(self):
         data = [()] * 10
-        self.c.inserttable('test', data, [])
+        # None was returned instead of 0 before
+        self.assertEqual(self.c.inserttable('test', data, []), 0)
+        self.assertEqual(self.get_back(), [])
+
+    def test_inserttable_no_rows(self):
+        # None was returned instead of 0 before
+        self.assertEqual(self.c.inserttable('test', []), 0)
         self.assertEqual(self.get_back(), [])
 
     def test_inserttable_datetime_adapt(self):
@@ -3187,6 +3193,14 @@ class TestInserttable(unittest.TestCase):
     def test_insert_table_with_freeze_false(self):
         data = self.data
         self.c.inserttable('test', data, freeze=False)
+        self.assertEqual(self.get_back(), data)
+
+    def test_insert_table_with_keywords(self):
+        data = self.data
+        # the documented keyword "values" and columns=None were not
+        # accepted before
+        self.assertEqual(self.c.inserttable(
+            table='test', values=data, columns=None), len(data))
         self.assertEqual(self.get_back(), data)
 
     def test_insert_table_with_freeze_true_without_truncate(self):

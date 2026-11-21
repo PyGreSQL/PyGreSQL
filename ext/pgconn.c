@@ -924,7 +924,8 @@ _inserttable_drain(connObject *self)
 
 /* Insert table */
 static char conn_inserttable__doc__[] =
-    "inserttable(table, data, [columns]) -- insert iterable into table\n\n"
+    "inserttable(table, values, [columns], *, freeze=False) -- insert "
+    "iterable into table\n\n"
     "The fields in the iterable must be in the same order as in the table\n"
     "or in the list or tuple of columns if one is specified.\n\n"
     "If the optional argument 'freeze' is set to True, the inserted rows\n"
@@ -942,7 +943,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     PyObject *ret = NULL;
     Py_ssize_t i, j, m, n;
 
-    static char *kwlist[] = {"table", "data", "columns", "freeze", NULL};
+    static char *kwlist[] = {"table", "values", "columns", "freeze", NULL};
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -976,12 +977,12 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     }
     else if (!m) {
         /* no rows specified, nothing to do */
-        ret = Py_NewRef(Py_None);
+        ret = PyLong_FromLong(0);
         goto cleanup;
     }
 
-    /* checks columns type */
-    if (columns) {
+    /* checks columns type (None means all columns) */
+    if (columns && columns != Py_None) {
         if (!(PyTuple_Check(columns) || PyList_Check(columns))) {
             PyErr_SetString(PyExc_TypeError,
                             "Method inserttable() expects a tuple or a list"
@@ -998,7 +999,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         n = PyTuple_GET_SIZE(cols);
         if (!n) {
             /* no columns specified, nothing to do */
-            ret = Py_NewRef(Py_None);
+            ret = PyLong_FromLong(0);
             goto cleanup;
         }
     }

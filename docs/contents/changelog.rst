@@ -211,6 +211,10 @@ Version 6.3.0 (unreleased)
     of a `TypeError`, or of being silently truncated. `set_defpasswd()`
     leaked the previous password. A `get_defpasswd()` function never
     existed, it has been removed from the documentation.
+  - The second parameter of `inserttable()` can now be passed with the
+    documented keyword ``values`` (instead of ``data``), and ``None`` is
+    accepted for ``columns``. When there is nothing to insert, the method
+    now returns 0 instead of `None`.
 
 - Modernization and build:
 
