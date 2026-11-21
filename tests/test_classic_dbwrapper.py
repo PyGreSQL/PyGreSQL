@@ -3891,6 +3891,24 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(p.age, 61)
         self.assertIsInstance(p.age, int)
 
+    def test_record_with_undecodable_text(self):
+        query = self.db.query
+        # with SQL_ASCII, the server sends text without conversion
+        query('set client_encoding=sql_ascii')
+        query('create temp table test_person'
+              ' (name text, tags varchar[], amount numeric, day date)')
+        # chr(228) is non-ASCII in all server encodings
+        raw = query('select chr(228)').singlescalar()
+        self.assertIsInstance(raw, bytes)
+        p = query("select row('w' || chr(228), array['x', chr(228)],"
+                  " 1.5, '2026-11-21')::test_person").singlescalar()
+        # undecodable text is returned as bytes, also inside records
+        # (this raised SystemError before), but the other fields of the
+        # record are still decoded and cast
+        self.assertEqual(p, (b'w' + raw, ['x', raw],
+                             Decimal('1.5'), date(2026, 11, 21)))
+        self.assertEqual(p.name, b'w' + raw)
+
     def test_date(self):
         query = self.db.query
         for datestyle in (

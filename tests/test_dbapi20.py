@@ -794,6 +794,33 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             con.close()
         self.assertEqual(row, values)
 
+    def test_select_undecodable_text(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            # with SQL_ASCII, the server sends text without conversion
+            cur.execute("set client_encoding=sql_ascii")
+            cur.execute("create temp table test_person"
+                        " (name text, age int, amount numeric, day date)")
+            # chr(228) is non-ASCII in all server encodings
+            cur.execute("select chr(228)")
+            raw = cur.fetchone()[0]
+            self.assertIsInstance(raw, bytes)
+            cur.execute(
+                "select 'w' || chr(228) || 'r', array['abc', 'w' || chr(228)],"
+                " row('w' || chr(228), 61, 1.5, '2026-11-21')::test_person")
+            row = cur.fetchone()
+        finally:
+            con.close()
+        # undecodable text is returned as bytes, also inside arrays and
+        # records (this raised SystemError before), but the other elements
+        # are still decoded and cast
+        self.assertEqual(row[0], b'w' + raw + b'r')
+        self.assertEqual(row[1], ['abc', b'w' + raw])
+        self.assertEqual(row[2], (b'w' + raw, 61, Decimal('1.5'),
+                                  date(2026, 11, 21)))
+        self.assertEqual(row[2].name, b'w' + raw)
+
     def test_unicode_list_and_tuple(self):
         value = ('Käse', 'Würstchen')
         con = self._connect()

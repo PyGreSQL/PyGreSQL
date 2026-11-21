@@ -332,6 +332,14 @@ class TestParseArray(unittest.TestCase):
             else:
                 self.assertEqual(f(string, cast), expected)
 
+    def test_parser_with_bytes(self):
+        f = pg.cast_array
+        # elements are decoded as ASCII if possible, otherwise passed as bytes
+        self.assertEqual(f(b'{a,b}'), ['a', 'b'])
+        self.assertEqual(f(b'{a,\xe4}'), ['a', b'\xe4'])
+        self.assertEqual(f(b'{1.5,NULL}', Decimal), [Decimal('1.5'), None])
+        self.assertEqual(f(b'{{a},{\xe4}}'), [['a'], [b'\xe4']])
+
     def test_parser_without_cast(self):
         f = pg.cast_array
 
@@ -611,6 +619,14 @@ class TestParseRecord(unittest.TestCase):
                 self.assertRaises(ValueError, f, string, cast)
             else:
                 self.assertEqual(f(string, cast), expected)
+
+    def test_parser_with_bytes(self):
+        f = pg.cast_record
+        # elements are decoded as ASCII if possible, otherwise passed as bytes
+        self.assertEqual(f(b'(a,b)'), ('a', 'b'))
+        self.assertEqual(f(b'(a,\xe4)'), ('a', b'\xe4'))
+        self.assertEqual(f(b'(\xe4,1.5,)', [None, Decimal, int]),
+                         (b'\xe4', Decimal('1.5'), None))
 
     def test_parser_without_cast(self):
         f = pg.cast_record

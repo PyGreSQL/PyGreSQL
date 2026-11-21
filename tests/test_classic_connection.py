@@ -1044,6 +1044,88 @@ class TestUnicodeQueries(unittest.TestCase):
         self.assertEqual(v, result)
 
 
+class TestUndecodableText(unittest.TestCase):
+    """Test text that cannot be decoded with the client encoding."""
+
+    def setUp(self):
+        self.c = connect()
+        # with SQL_ASCII, the server sends text without conversion
+        self.c.query('set client_encoding=sql_ascii')
+        # chr(228) is non-ASCII in all server encodings
+        self.raw = self.c.query("select chr(228)").singlescalar()
+        self.assertIsInstance(self.raw, bytes)
+        # messages are decoded as UTF-8 with escapes instead
+        self.text = self.raw.decode('utf-8', 'backslashreplace')
+
+    def tearDown(self):
+        self.c.close()
+
+    def test_text_as_bytes(self):
+        # this raised SystemError before
+        raw = self.raw
+        q = "select 'abc' as a, 'w' || chr(228) || 'r' as b"
+        self.assertEqual(self.c.query(q).getresult(),
+                         [('abc', b'w' + raw + b'r')])
+        self.assertEqual(self.c.query(q).dictresult(),
+                         [{'a': 'abc', 'b': b'w' + raw + b'r'}])
+        self.assertEqual(self.c.query(q).namedresult(),
+                         [('abc', b'w' + raw + b'r')])
+        self.assertEqual(list(self.c.query(q)), [('abc', b'w' + raw + b'r')])
+        q = "select ('w' || chr(228))::varchar, (chr(228) || 'r')::name"
+        self.assertEqual(self.c.query(q).getresult(),
+                         [(b'w' + raw, raw + b'r')])
+
+    def test_text_array_as_bytes(self):
+        raw = self.raw
+        q = "select array['abc', 'w' || chr(228) || 'r', null]"
+        self.assertEqual(self.c.query(q).singlescalar(),
+                         ['abc', b'w' + raw + b'r', None])
+
+    def test_json_as_bytes(self):
+        jsondecode = pg.get_jsondecode()
+        self.addCleanup(pg.set_jsondecode, jsondecode)
+        decoded = []
+
+        def decode(s: str | bytes) -> list:
+            decoded.append(s)
+            return decoded
+
+        pg.set_jsondecode(decode)
+        q = "select json_build_array(chr(228))"
+        self.assertIs(self.c.query(q).singlescalar(), decoded)
+        self.assertEqual(decoded, [b'["' + self.raw + b'"]'])
+
+    def test_cast_hook_gets_bytes(self):
+        received = []
+
+        def cast_hook(value: Any, pgtype: int) -> Any:
+            received.append((value, pgtype))
+            return value
+
+        self.c.set_cast_hook(cast_hook)
+        q = "select row('w' || chr(228))::record"
+        self.assertEqual(self.c.query(q).singlescalar(),
+                         b'(w' + self.raw + b')')
+        self.assertEqual(received, [(b'(w' + self.raw + b')', 2249)])
+
+    def test_error_message(self):
+        q = "do $$ begin raise exception 'w%r', chr(228); end $$"
+        with self.assertRaises(pg.InternalError) as cm:
+            # this raised SystemError before
+            self.c.query(q)
+        error = cm.exception
+        self.assertIsInstance(error.args[0], str)
+        self.assertIn(f'w{self.text}r', error.args[0])
+        self.assertEqual(error.sqlstate, 'P0001')
+
+    def test_source(self):
+        raw = self.raw
+        s = self.c.source()
+        s.execute("select 'w' || chr(228) || 'r' as a")
+        # this raised SystemError before
+        self.assertEqual(s.fetch(1), [(b'w' + raw + b'r',)])
+
+
 class TestParamQueries(unittest.TestCase):
     """Test queries with parameters via a basic pg connection."""
 

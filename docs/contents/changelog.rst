@@ -80,6 +80,19 @@ Version 6.3.0 (unreleased)
     `DataError`. The escape methods of a connection that had been closed
     after the method was looked up now raise a `TypeError` instead of
     crashing or returning an empty string.
+  - Text that cannot be decoded with the client encoding, e.g. non-ASCII
+    text with the client encoding SQL_ASCII, is returned as bytes again
+    instead of raising a `SystemError`, also when fetched with the source
+    object (used by `pgdb`). In arrays and records, only the elements that
+    cannot be decoded are returned as bytes, so that the other elements are
+    still cast properly. Accordingly, `cast_array()` and `cast_record()` now
+    decode the elements of a bytes string as ASCII where possible. Such JSON
+    values are passed to the JSON decoder as bytes, which the default decoder
+    `json.loads()` decodes as UTF-8. Error messages that cannot be decoded
+    also raised a `SystemError`, they are now decoded as UTF-8 with backslash
+    escapes, like notices.
+  - Casting records with a sequence of cast functions leaked references to
+    these functions.
 
 - Modernization and build:
 

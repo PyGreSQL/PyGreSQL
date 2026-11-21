@@ -221,6 +221,15 @@ class TestModuleRefCounts(RefCountTestCase):
         pg.set_jsondecode(hook)  # the module keeps one reference
         self.assert_refcount_unchanged(lambda: pg.set_jsondecode(hook), hook)
 
+    def test_cast_record_with_casts(self):
+        def cast(v: str) -> str:
+            return v
+
+        casts = [cast, None]
+        # the casts taken from the sequence were leaked before
+        self.assert_refcount_unchanged(
+            lambda: pg.cast_record('(a,b)', casts), cast)
+
     def test_get_decimal(self):
         decimal = pg.get_decimal()
         self.assertIs(decimal, Decimal)

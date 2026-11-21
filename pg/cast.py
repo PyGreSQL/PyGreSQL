@@ -416,9 +416,11 @@ class Typecasts(dict):
     def create_array_cast(self, basecast: Callable) -> Callable:
         """Create an array typecast for the given base cast."""
         cast_array = self['anyarray']
+        # values that cannot be decoded are passed as bytes, keep them
+        elemcast = None if basecast is str else basecast
 
         def cast(v: Any) -> list:
-            return cast_array(v, basecast)
+            return cast_array(v, elemcast)
         return cast
 
     def create_record_cast(self, name: str, fields: AttrDict,
@@ -426,10 +428,12 @@ class Typecasts(dict):
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
         record = namedtuple(name, fields)  # type: ignore[misc]
+        # values that cannot be decoded are passed as bytes, keep them
+        fieldcasts = [None if c is str else c for c in casts]
 
         def cast(v: Any) -> record:
             # noinspection PyArgumentList
-            return record(*cast_record(v, casts))
+            return record(*cast_record(v, fieldcasts))
         return cast
 
 

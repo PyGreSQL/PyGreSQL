@@ -634,7 +634,8 @@ are not supported by default in PostgreSQL.
 
     Cast a string representing a PostgreSQL array to a Python list
 
-    :param str string: the string with the text representation of the array
+    :param string: the string with the text representation of the array
+    :type string: str or bytes
     :param cast: a typecast function for the elements of the array
     :type cast: callable or None
     :param bytes delim: delimiter character between adjacent elements
@@ -654,7 +655,9 @@ argument which will be the text representation of the element and must output
 the corresponding Python object that shall be put into the list.  If you don't
 pass a cast function or set it to *None*, then unprocessed text strings will
 be returned as elements of the array.  If you don't pass a delimiter character,
-then a comma will be used by default.
+then a comma will be used by default.  If *string* is passed as ``bytes``,
+the elements are decoded as ASCII where possible and passed as ``bytes``
+otherwise.
 
 .. versionadded:: 5.0
 
@@ -662,7 +665,8 @@ then a comma will be used by default.
 
     Cast a string representing a PostgreSQL record to a Python tuple
 
-    :param str string: the string with the text representation of the record
+    :param string: the string with the text representation of the record
+    :type string: str or bytes
     :param cast: typecast function(s) for the elements of the record
     :type cast: callable, list or tuple of callables, or None
     :param bytes delim: delimiter character between adjacent elements
@@ -683,7 +687,9 @@ single argument which will be the text representation of the element and must
 output the corresponding Python object that shall be put into the tuple.  If
 you don't pass cast function(s) or pass *None* instead, then unprocessed text
 strings will be returned as elements of the tuple.  If you don't pass a
-delimiter character, then a comma will be used by default.
+delimiter character, then a comma will be used by default.  If *string* is
+passed as ``bytes``, the elements are decoded as ASCII where possible and
+passed as ``bytes`` otherwise.
 
 .. versionadded:: 5.0
 

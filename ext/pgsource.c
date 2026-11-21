@@ -336,12 +336,15 @@ source_fetch(sourceObject *self, PyObject *args)
                 char *s = PQgetvalue(self->result, k, j);
                 Py_ssize_t length = PQgetlength(self->result, k, j);
                 if (PQfformat(self->result, j) == 0) { /* textual format */
-                    str = get_decoded_string(s, length, encoding);
-                    if (!str) /* cannot decode */
-                        str = PyBytes_FromStringAndSize(s, length);
+                    str = get_decoded_string_or_bytes(s, length, encoding);
                 }
                 else {
                     str = PyBytes_FromStringAndSize(s, length);
+                }
+                if (!str) {
+                    Py_DECREF(rowtuple);
+                    Py_DECREF(res_list);
+                    return NULL;
                 }
             }
             PyTuple_SET_ITEM(rowtuple, j, str);

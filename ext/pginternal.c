@@ -44,6 +44,48 @@ get_decoded_string(const char *str, Py_ssize_t size, int encoding)
                             "strict");
 }
 
+/* Check whether the current exception means that a string could not be
+   decoded or encoded, because it is invalid or the codec is unknown. */
+static int
+_is_codec_error(void)
+{
+    return PyErr_ExceptionMatches(PyExc_UnicodeError) ||
+           PyErr_ExceptionMatches(PyExc_LookupError);
+}
+
+/* Get a decoded string, or the raw bytes if it cannot be decoded with the
+   given encoding (e.g. non-ASCII characters with the encoding SQL_ASCII). */
+PyObject *
+get_decoded_string_or_bytes(const char *str, Py_ssize_t size, int encoding)
+{
+    PyObject *obj = get_decoded_string(str, size, encoding);
+
+    if (!obj && _is_codec_error()) {
+        PyErr_Clear();
+        obj = PyBytes_FromStringAndSize(str, size);
+    }
+    return obj;
+}
+
+/* Get a decoded name or message (field names, error messages, notices).
+   These are always returned as strings, so if they cannot be decoded with
+   the given encoding, they are decoded as UTF-8 with backslash escapes.
+   An encoding of -1 (unknown) means the encoding of the current locale. */
+PyObject *
+get_decoded_text(const char *str, int encoding)
+{
+    Py_ssize_t size = (Py_ssize_t)strlen(str);
+    PyObject *obj = encoding == -1
+                        ? PyUnicode_DecodeLocaleAndSize(str, size, NULL)
+                        : get_decoded_string(str, size, encoding);
+
+    if (!obj && _is_codec_error()) {
+        PyErr_Clear();
+        obj = PyUnicode_DecodeUTF8(str, size, "backslashreplace");
+    }
+    return obj;
+}
+
 PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding)
 {
@@ -246,8 +288,8 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
 
         case PYGRES_JSON:
             /* this type should only be passed when jsondecode is set */
-            obj = get_decoded_string(s, size, encoding);
-            if (obj && jsondecode) { /* was able to decode */
+            obj = get_decoded_string_or_bytes(s, size, encoding);
+            if (obj && jsondecode) {
                 tmp_obj = obj;
                 obj = PyObject_CallFunction(jsondecode, "(O)", obj);
                 Py_DECREF(tmp_obj);
@@ -255,10 +297,7 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
             break;
 
         default: /* PYGRES_TEXT */
-            obj = get_decoded_string(s, size, encoding);
-            if (!obj) { /* cannot decode */
-                obj = PyBytes_FromStringAndSize(s, size);
-            }
+            obj = get_decoded_string_or_bytes(s, size, encoding);
     }
 
     return obj;
@@ -275,7 +314,7 @@ cast_other(char *s, Py_ssize_t size, int encoding, Oid pgtype,
 
     obj = cast_sized_text(s, size, encoding, PYGRES_TEXT);
 
-    if (cast_hook) {
+    if (obj && cast_hook) {
         PyObject *tmp_obj = obj;
         obj = PyObject_CallFunction(cast_hook, "(OI)", obj, pgtype);
         Py_DECREF(tmp_obj);
@@ -645,12 +684,9 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
                         element = cast_sized_simple(estr, esize, type);
                 }
                 else { /* external casting of base type */
-                    element = encoding == pg_encoding_ascii
-                                  ? NULL
-                                  : get_decoded_string(estr, esize, encoding);
-                    if (!element) { /* no decoding necessary or possible */
-                        element = PyBytes_FromStringAndSize(estr, esize);
-                    }
+                    /* pass bytes if the element cannot be decoded */
+                    element =
+                        get_decoded_string_or_bytes(estr, esize, encoding);
                     if (element && cast) {
                         PyObject *tmp = element;
                         element =
@@ -824,12 +860,8 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
                     element = cast_sized_simple(estr, esize, etype);
             }
             else { /* external casting of base type */
-                element = encoding == pg_encoding_ascii
-                              ? NULL
-                              : get_decoded_string(estr, esize, encoding);
-                if (!element) { /* no decoding necessary or possible */
-                    element = PyBytes_FromStringAndSize(estr, esize);
-                }
+                /* pass bytes if the element cannot be decoded */
+                element = get_decoded_string_or_bytes(estr, esize, encoding);
                 if (element && cast) {
                     if (len) {
                         PyObject *ecast = PySequence_GetItem(cast, i);
@@ -841,6 +873,7 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
                                     ecast, element, NULL);
                                 Py_DECREF(tmp);
                             }
+                            Py_DECREF(ecast);
                         }
                         else {
                             Py_DECREF(element);
@@ -1165,33 +1198,26 @@ static void
 set_error_msg_and_state(PyObject *type, const char *msg, int encoding,
                         const char *sqlstate)
 {
-    PyObject *err_obj, *msg_obj, *sql_obj = NULL;
+    PyObject *err_obj, *msg_obj, *sql_obj;
 
-    if (encoding == -1) /* unknown */
-        msg_obj = PyUnicode_DecodeLocale(msg, NULL);
-    else
-        msg_obj = get_decoded_string(msg, (Py_ssize_t)strlen(msg), encoding);
-    if (!msg_obj) /* cannot decode */
-        msg_obj = PyBytes_FromString(msg);
+    if (!(msg_obj = get_decoded_text(msg, encoding)))
+        return;
 
-    if (sqlstate) {
-        sql_obj = PyUnicode_FromStringAndSize(sqlstate, 5);
-    }
-    else {
-        sql_obj = Py_NewRef(Py_None);
+    sql_obj = sqlstate ? PyUnicode_FromStringAndSize(sqlstate, 5)
+                       : Py_NewRef(Py_None);
+    if (!sql_obj) {
+        Py_DECREF(msg_obj);
+        return;
     }
 
     err_obj = PyObject_CallFunctionObjArgs(type, msg_obj, NULL);
     if (err_obj) {
-        Py_DECREF(msg_obj);
-        PyObject_SetAttrString(err_obj, "sqlstate", sql_obj);
-        Py_DECREF(sql_obj);
-        PyErr_SetObject(type, err_obj);
+        if (!PyObject_SetAttrString(err_obj, "sqlstate", sql_obj))
+            PyErr_SetObject(type, err_obj);
         Py_DECREF(err_obj);
     }
-    else {
-        PyErr_SetString(type, msg);
-    }
+    Py_DECREF(sql_obj);
+    Py_DECREF(msg_obj);
 }
 
 /* Set given database error message. */
@@ -1477,18 +1503,10 @@ _notice_field(const PGresult *res, int fieldcode, int encoding)
 {
     const char *s = fieldcode ? PQresultErrorField(res, fieldcode)
                               : PQresultErrorMessage(res);
-    Py_ssize_t size;
-    PyObject *obj;
 
     if (!s)
         Py_RETURN_NONE;
-    size = (Py_ssize_t)strlen(s);
-    obj = get_decoded_string(s, size, encoding);
-    if (!obj) { /* cannot decode in the client encoding */
-        PyErr_Clear();
-        obj = PyUnicode_DecodeUTF8(s, size, "backslashreplace");
-    }
-    return obj;
+    return get_decoded_text(s, encoding);
 }
 
 /* Create a notice object with copies of all fields of the given result.

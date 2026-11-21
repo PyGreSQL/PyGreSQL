@@ -31,6 +31,10 @@
 PyObject *
 get_decoded_string(const char *str, Py_ssize_t size, int encoding);
 PyObject *
+get_decoded_string_or_bytes(const char *str, Py_ssize_t size, int encoding);
+PyObject *
+get_decoded_text(const char *str, int encoding);
+PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding);
 
 /* Result/Type helpers */

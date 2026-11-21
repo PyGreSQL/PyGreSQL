@@ -465,13 +465,13 @@ def connect(dbname: str | None = None,
     ...
 
 
-def cast_array(s: str, cast: Callable | None = None,
+def cast_array(s: str | bytes, cast: Callable | None = None,
                delim: bytes | None = None) -> list:
     """Cast a string representing a PostgreSQL array to a Python list."""
     ...
 
 
-def cast_record(s: str,
+def cast_record(s: str | bytes,
                 cast: Callable | list[Callable | None] |
                       tuple[Callable | None, ...] | None = None,
                 delim: bytes | None = None) -> tuple:

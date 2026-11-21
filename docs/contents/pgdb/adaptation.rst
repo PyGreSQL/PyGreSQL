@@ -53,6 +53,15 @@ record                             tuple
        information, you can request it separately with the `array_lower()`
        function provided by PostgreSQL.
 
+Text encoding
+-------------
+
+Strings are encoded and decoded with the client encoding of the connection,
+in the same way as in the classic :mod:`pg` module. In particular, with the
+client encoding ``SQL_ASCII``, text values that are not plain ASCII are
+returned as ``bytes``, also as elements of arrays and records. See the
+section on text encoding in the documentation of the :mod:`pg` module.
+
 Adaptation of parameters
 ------------------------
 

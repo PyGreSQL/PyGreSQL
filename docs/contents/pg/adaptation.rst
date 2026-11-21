@@ -53,6 +53,31 @@ record                             tuple
        information, you can request it separately with the `array_lower()`
        function provided by PostgreSQL.
 
+Text encoding
+-------------
+
+Strings are encoded and decoded with the client encoding of the connection
+(the PostgreSQL setting ``client_encoding``) as follows:
+
+- Queries, parameters, and table and column names passed to the database are
+  encoded with the client encoding. A string that cannot be encoded raises a
+  :exc:`UnicodeEncodeError`. You can always pass ``bytes`` instead, which are
+  sent unchanged.
+- Text values returned by the database are decoded to ``str``. With the
+  client encoding ``SQL_ASCII``, PostgreSQL does not convert text and its
+  actual encoding is unknown, so values that are not plain ASCII are
+  returned as ``bytes`` instead. This also applies to the elements of arrays,
+  records and hstore values. JSON values are then passed to the JSON decoder
+  as ``bytes``, which :func:`json.loads` decodes as UTF-8.
+- Error messages and notices are always ``str``. If they cannot be decoded
+  with the client encoding, they are decoded as UTF-8 with backslash escapes
+  for invalid bytes (e.g. the byte 0xE4 becomes the four characters
+  ``\xe4``).
+
+.. versionchanged:: 6.3
+    Undecodable text values are returned as ``bytes`` again, also as elements
+    of arrays and records.
+
 
 Adaptation of parameters
 ------------------------
