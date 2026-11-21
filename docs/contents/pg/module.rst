@@ -367,11 +367,14 @@ PostgreSQL numeric values. The default class is :class:`decimal.Decimal`.
 
     Set a decimal type to be used for numeric values
 
-    :param class cls: the Python class to be used for PostgreSQL numeric values
+    :param cls: the Python class to be used for PostgreSQL numeric values
+    :type cls: class or None
 
 This function can be used to specify the Python class that shall
 be used by PyGreSQL to hold PostgreSQL numeric values.
-The default class is :class:`decimal.Decimal`.
+The default class is :class:`decimal.Decimal`. If ``None`` is passed,
+numeric values are returned as :class:`float`, and :func:`get_decimal`
+returns ``None``.
 
 get/set_decimal_point -- decimal mark used for monetary values
 --------------------------------------------------------------

@@ -499,11 +499,23 @@ class Query:
         """List field names of query result."""
         ...
 
-    def fieldinfo(self, column: int | str | bytes | None = None, /
-                  ) -> tuple[str, int, int, int]:
-        """Get information on one or all fields of the query.
+    @overload
+    def fieldinfo(self, /) -> tuple[tuple[str, int, int, int], ...]:
+        """Get information on all fields of the query.
 
         The four-tuples contain the following information:
+        The field name, the internal OID number of the field type,
+        the size in bytes of the column or a negative value if it is
+        of variable size, and a type-specific modifier value.
+        """
+        ...
+
+    @overload
+    def fieldinfo(self, column: int | str | bytes, /
+                  ) -> tuple[str, int, int, int]:
+        """Get information on one field of the query.
+
+        The four-tuple contains the following information:
         The field name, the internal OID number of the field type,
         the size in bytes of the column or a negative value if it is
         of variable size, and a type-specific modifier value.
@@ -618,7 +630,7 @@ def get_decimal() -> type:
     ...
 
 
-def set_decimal(cls: type, /) -> None:
+def set_decimal(cls: type | None, /) -> None:
     """Set a decimal type to be used for numeric values."""
     ...
 

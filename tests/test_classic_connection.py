@@ -3985,6 +3985,15 @@ class TestConfigFunctions(unittest.TestCase):
         r = pg.get_decimal()
         self.assertIs(r, decimal_class)
 
+    def test_set_decimal_none(self):
+        decimal_class = pg.get_decimal()
+        self.addCleanup(pg.set_decimal, decimal_class)
+        pg.set_decimal(None)
+        self.assertIsNone(pg.get_decimal())
+        r = self.c.query("select 1.5::numeric").singlescalar()
+        self.assertIsInstance(r, float)
+        self.assertEqual(r, 1.5)
+
     def test_set_decimal(self):
         decimal_class = pg.get_decimal()
         # error if no parameter is passed
