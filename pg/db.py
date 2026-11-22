@@ -28,7 +28,7 @@ from .core import (
     unescape_bytea,
 )
 from .error import db_error, int_error, prg_error
-from .helpers import namediter, quote_if_unqualified
+from .helpers import namediter, split_qualified_name
 from .notify import NotificationHandler
 
 if TYPE_CHECKING:
@@ -108,9 +108,9 @@ class DB:
         self.db = db
         self.dbname = db.db
         self._regtypes = False
-        self._attnames: dict[str, AttrDict] = {}
-        self._generated: dict[str, frozenset[str]] = {}
-        self._pkeys: dict[str, str | tuple[str, ...]] = {}
+        self._attnames: dict[str | int, AttrDict] = {}
+        self._generated: dict[str | int, frozenset[str]] = {}
+        self._pkeys: dict[str | int, str | tuple[str, ...]] = {}
         self._privileges: dict[tuple[str, str], bool] = {}
         self.adapter = Adapter(self)
         self.dbtypes = DbTypes(self)
@@ -123,7 +123,7 @@ class DB:
             " JOIN pg_catalog.pg_type t"
             " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"
             " WHERE a.attrelid OPERATOR(pg_catalog.=)"
-            " {}::pg_catalog.regclass"
+            " $1::pg_catalog.regclass"
             " AND {} AND NOT a.attisdropped ORDER BY a.attnum")
         self._query_generated = (
             "(a.attidentity OPERATOR(pg_catalog.=) 'a' OR"
@@ -197,17 +197,23 @@ class DB:
             else:
                 print(s)
 
-    def _escape_qualified_name(self, s: str) -> str:
-        """Escape a qualified name.
+    def _escape_table(self, table: str) -> str:
+        """Escape a possibly schema-qualified table name.
 
-        Escapes the name for use as an SQL identifier, unless the
-        name contains a dot, in which case the name is ambiguous
-        (could be a qualified name or just a name with a dot in it)
-        and must be quoted manually by the caller.
+        The name is split into its parts (see split_qualified_name()),
+        and each part is escaped for use as an SQL identifier.
         """
-        if '.' not in s:
-            s = self.escape_identifier(s)
-        return s
+        if not isinstance(table, str):
+            raise TypeError('The table name must be a string')
+        return '.'.join(map(self.escape_identifier,
+                            split_qualified_name(table)))
+
+    def _relation_key(self, table: str | int) -> str | int:
+        """Get the key for a table in the caches and regclass queries.
+
+        This is the escaped name, or the relation oid if an int is given.
+        """
+        return table if isinstance(table, int) else self._escape_table(table)
 
     @staticmethod
     def _make_bool(d: Any) -> bool | str:
@@ -611,8 +617,8 @@ class DB:
         self._do_debug(cmd)
         return self._valid_db.query(cmd)
 
-    def pkey(self, table: str, composite: bool = False, flush: bool = False
-             ) -> str | tuple[str, ...]:
+    def pkey(self, table: str | int, composite: bool = False,
+             flush: bool = False) -> str | tuple[str, ...]:
         """Get the primary key of a table.
 
         Single primary keys are returned as strings unless you
@@ -628,10 +634,11 @@ class DB:
         if flush:
             pkeys.clear()
             self._do_debug('The pkey cache has been flushed')
+        name = self._relation_key(table)
         try:  # cache lookup
-            pkey = pkeys[table]
+            pkey = pkeys[name]
         except KeyError as e:  # cache miss, check the database
-            cmd = ("SELECT"  # noqa: S608
+            cmd = ("SELECT"
                    " a.attname, a.attnum, i.indkey"
                    " FROM pg_catalog.pg_index i"
                    " JOIN pg_catalog.pg_attribute a"
@@ -639,10 +646,9 @@ class DB:
                    " AND a.attnum OPERATOR(pg_catalog.=) ANY(i.indkey)"
                    " AND NOT a.attisdropped"
                    " WHERE i.indrelid OPERATOR(pg_catalog.=)"
-                   " {}::pg_catalog.regclass"
-                   " AND i.indisprimary ORDER BY a.attnum").format(
-                  quote_if_unqualified('$1', table))
-            res = self._valid_db.query(cmd, (table,)).getresult()
+                   " $1::pg_catalog.regclass"
+                   " AND i.indisprimary ORDER BY a.attnum")
+            res = self._valid_db.query(cmd, (name,)).getresult()
             if not res:
                 raise KeyError(f'Table {table} has no primary key') from e
             # we want to use the order defined in the primary key index here,
@@ -653,12 +659,12 @@ class DB:
                     res, key=lambda row: indkey.index(row[1])))
             else:
                 pkey = res[0][0]
-            pkeys[table] = pkey  # cache it
+            pkeys[name] = pkey  # cache it
         if composite and not isinstance(pkey, tuple):
             pkey = (pkey,)
         return pkey
 
-    def pkeys(self, table: str) -> tuple[str, ...]:
+    def pkeys(self, table: str | int) -> tuple[str, ...]:
         """Get the primary key of a table as a tuple.
 
         Same as pkey() with 'composite' set to True.
@@ -704,8 +710,8 @@ class DB:
         """
         return self.get_relations('r', system)
 
-    def get_attnames(self, table: str, with_oid: bool=True, flush: bool=False
-                     ) -> AttrDict:
+    def get_attnames(self, table: str | int, with_oid: bool = True,
+                     flush: bool = False) -> AttrDict:
         """Given the name of a table, dig out the set of attribute names.
 
         Returns a read-only dictionary of attribute names (the names are
@@ -726,19 +732,20 @@ class DB:
         if flush:
             attnames.clear()
             self._do_debug('The attnames cache has been flushed')
+        key = self._relation_key(table)
         try:  # cache lookup
-            names = attnames[table]
+            names = attnames[key]
         except KeyError:  # cache miss, check the database
             cmd = "a.attnum OPERATOR(pg_catalog.>) 0"
-            cmd = self._query_attnames.format(
-                quote_if_unqualified('$1', table), cmd)
-            res = self._valid_db.query(cmd, (table,)).getresult()
+            cmd = self._query_attnames.format(cmd)
+            res = self._valid_db.query(cmd, (key,)).getresult()
             types = self.dbtypes
             names = AttrDict((name[0], types.add(*name[1:])) for name in res)
-            attnames[table] = names  # cache it
+            attnames[key] = names  # cache it
         return names
 
-    def get_generated(self, table: str, flush: bool = False) -> frozenset[str]:
+    def get_generated(self, table: str | int, flush: bool = False
+                      ) -> frozenset[str]:
         """Given the name of a table, dig out the set of generated columns.
 
         Returns a set of column names that are generated and unalterable.
@@ -751,16 +758,16 @@ class DB:
         if flush:
             generated.clear()
             self._do_debug('The generated cache has been flushed')
+        key = self._relation_key(table)
         try:  # cache lookup
-            names = generated[table]
+            names = generated[key]
         except KeyError:  # cache miss, check the database
             cmd = "a.attnum OPERATOR(pg_catalog.>) 0"
             cmd = f"{cmd} AND {self._query_generated}"
-            cmd = self._query_attnames.format(
-                quote_if_unqualified('$1', table), cmd)
-            res = self._valid_db.query(cmd, (table,)).getresult()
+            cmd = self._query_attnames.format(cmd)
+            res = self._valid_db.query(cmd, (key,)).getresult()
             names = frozenset(name[0] for name in res)
-            generated[table] = names  # cache it
+            generated[key] = names  # cache it
         return names
 
     def use_regtypes(self, regtypes: bool | None = None) -> bool:
@@ -786,14 +793,14 @@ class DB:
             privileges.clear()
             self._do_debug('The privileges cache has been flushed')
         privilege = privilege.lower()
+        name = self._escape_table(table)
         try:  # ask cache
-            ret = privileges[table, privilege]
+            ret = privileges[name, privilege]
         except KeyError:  # cache miss, ask the database
-            cmd = "SELECT pg_catalog.has_table_privilege({}, $2)".format(
-                quote_if_unqualified('$1', table))
-            query = self._valid_db.query(cmd, (table, privilege))
+            cmd = "SELECT pg_catalog.has_table_privilege($1, $2)"
+            query = self._valid_db.query(cmd, (name, privilege))
             ret = query.singlescalar() == self._make_bool(True)
-            privileges[table, privilege] = ret  # cache it
+            privileges[name, privilege] = ret  # cache it
         return ret
 
     def _get_keynames(self, table: str, keyname: str | Sequence[str] | None
@@ -852,7 +859,7 @@ class DB:
         where = ' AND '.join(
             f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
             for k in keyname)
-        t = self._escape_qualified_name(table)
+        t = self._escape_table(table)
         cmd = f'SELECT * FROM {t} WHERE {where} LIMIT 1'  # noqa: S608
         self._do_debug(cmd, params)
         query = self._valid_db.query(cmd, params)
@@ -898,7 +905,7 @@ class DB:
         if not name_list:
             raise prg_error('No column found that can be inserted')
         names, values = ', '.join(name_list), ', '.join(value_list)
-        t = self._escape_qualified_name(table)
+        t = self._escape_table(table)
         cmd = (f'INSERT INTO {t} ({names})'  # noqa: S608
                f' VALUES ({values}) RETURNING *')
         self._do_debug(cmd, params)
@@ -949,7 +956,7 @@ class DB:
         if not values_list:
             return row
         values = ', '.join(values_list)
-        t = self._escape_qualified_name(table)
+        t = self._escape_table(table)
         cmd = (f'UPDATE {t} SET {values}'  # noqa: S608
                f' WHERE {where} RETURNING *')
         self._do_debug(cmd, params)
@@ -1037,7 +1044,7 @@ class DB:
         if not values:
             return row
         do = 'update set ' + ', '.join(update) if update else 'nothing'
-        t = self._escape_qualified_name(table)
+        t = self._escape_table(table)
         cmd = (f'INSERT INTO {t} AS included ({names})'  # noqa: S608
                f' VALUES ({values})'
                f' ON CONFLICT ({target}) DO {do} RETURNING *')
@@ -1106,7 +1113,7 @@ class DB:
         where = ' AND '.join(
             f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
             for k in keynames)
-        t = self._escape_qualified_name(table)
+        t = self._escape_table(table)
         cmd = f'DELETE FROM {t} WHERE {where}'  # noqa: S608
         self._do_debug(cmd, params)
         res = self._valid_db.query(cmd, params)
@@ -1158,7 +1165,7 @@ class DB:
                     raise ValueError(
                         'Contradictory table name and only options')
                 t = t[:-1].rstrip()
-            t = self._escape_qualified_name(t)
+            t = self._escape_table(t)
             if u:
                 t = f'ONLY {t}'
             tables.append(t)
@@ -1223,8 +1230,8 @@ class DB:
         if order is None or order is True:
             try:
                 order = self.pkeys(table)
-            except (KeyError, ProgrammingError):
-                with suppress(KeyError, ProgrammingError):
+            except (KeyError, ValueError, ProgrammingError):
+                with suppress(KeyError, ValueError, ProgrammingError):
                     order = list(self.get_attnames(table))
         if order and not isinstance(order, bool):
             if isinstance(order, (list, tuple)):
@@ -1272,7 +1279,7 @@ class DB:
         if not keyname:
             try:
                 keyname = self.pkeys(table)
-            except (KeyError, ProgrammingError) as e:
+            except (KeyError, ValueError, ProgrammingError) as e:
                 raise prg_error(f'Table {table} has no primary key') from e
         if isinstance(keyname, str):
             keynames: list[str] | tuple[str, ...] = (keyname,)

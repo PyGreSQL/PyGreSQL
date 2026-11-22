@@ -5265,6 +5265,79 @@ class TestSchemas(unittest.TestCase):
         self.assertEqual(get("t", 1, 'n')['d'], 1)
         self.assertEqual(get("s4.t4", 1, 'n')['d'], 4)
 
+    def test_qualified_names_with_special_characters(self):
+        db = self.db
+        query = db.query
+        query('drop schema if exists "s.5" cascade')
+        query('create schema "s.5"')
+        self.addCleanup(query, 'drop schema "s.5" cascade')
+        tables = {  # table name as passed: as written in SQL
+            's1.User': 's1."User"',
+            's1."my.table"': 's1."my.table"',
+            '"s.5"."q""t"': '"s.5"."q""t"'}
+        for table in tables.values():
+            query(f'create table {table} (n int primary key, d int)')
+            if table.startswith('s1.'):
+                self.addCleanup(query, f'drop table {table}')
+        for name, table in tables.items():
+            with self.subTest(name=name):
+                self.assertEqual(db.pkey(name), 'n')
+                self.assertEqual(
+                    db.get_attnames(name), {'n': 'int', 'd': 'int'})
+                self.assertEqual(db.get_generated(name), set())
+                self.assertTrue(db.has_table_privilege(name, 'insert'))
+                db.insert(name, n=1, d=2)
+                self.assertEqual(db.get(name, 1)['d'], 2)
+                db.update(name, n=1, d=3)
+                db.upsert(name, {'n': 2, 'd': 4})
+                q = f'select n, d from {table} order by n'
+                self.assertEqual(query(q).getresult(), [(1, 3), (2, 4)])
+                self.assertEqual(db.delete(name, n=1), 1)
+                db.truncate(name)
+                self.assertEqual(query(q).getresult(), [])
+        # the names returned by get_tables() can be passed back
+        names = [t for t in db.get_tables() if t in tables.values()]
+        self.assertEqual(sorted(names), sorted(tables.values()))
+        for name in names:
+            self.assertEqual(db.pkey(name), 'n')
+
+    def test_qualified_names_are_not_folded(self):
+        get = self.db.get
+        self.assertEqual(get("public.t", 1, 'n')['d'], 0)
+        self.assertEqual(get('"public"."t"', 1, 'n')['d'], 0)
+        self.assertRaises(pg.ProgrammingError, get, "public.T", 1, 'n')
+        self.assertRaises(pg.ProgrammingError, get, "PUBLIC.t", 1, 'n')
+
+    def test_qualified_names_share_cache(self):
+        db = self.db
+        self.assertEqual(db.get_attnames("s1.t1", flush=True),
+                         {'n': 'int', 'd': 'int'})
+        attnames = db._attnames
+        self.assertEqual(len(attnames), 1)
+        for name in '"s1".t1', 's1."t1"', '"s1"."t1"':
+            self.assertIs(db.get_attnames(name), attnames['"s1"."t1"'])
+        self.assertEqual(len(attnames), 1)
+
+    def test_malformed_qualified_names(self):
+        db = self.db
+        for name in 's1.', '.t', 's1..t1', '"s1".""', '"s1', 's1."t1':
+            with self.subTest(name=name):
+                self.assertRaises(ValueError, db.pkey, name)
+                self.assertRaises(ValueError, db.get_attnames, name)
+                self.assertRaises(ValueError, db.get, name, 1)
+                self.assertRaises(ValueError, db.insert, name, n=1)
+                self.assertRaises(ValueError, db.truncate, name)
+        self.assertRaises(TypeError, db.pkey, None)
+        self.assertRaises(TypeError, db.get_attnames, None)
+
+    def test_relation_oid_as_table(self):
+        db = self.db
+        oid = db.query("select 's1.t1'::regclass::oid").singlescalar()
+        self.assertIsInstance(oid, int)
+        self.assertEqual(db.get_attnames(oid), {'n': 'int', 'd': 'int'})
+        self.assertEqual(db.get_generated(oid), set())
+        self.assertRaises(KeyError, db.pkey, oid)  # table has no pkey
+
     def test_query_information_schema(self):
         q = "column_name"
         if self.db.server_version < 110000:

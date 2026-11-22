@@ -1055,6 +1055,41 @@ class TestEscapeFunctions(unittest.TestCase):
         self.assertEqual(r, b'O\x00ps\xff!')
 
 
+class TestSplitQualifiedName(unittest.TestCase):
+    """Test the helper function for splitting qualified names."""
+
+    def test_split_qualified_name(self):
+        from pg.helpers import split_qualified_name as split
+        self.assertEqual(split('t'), ['t'])
+        self.assertEqual(split('s.t'), ['s', 't'])
+        self.assertEqual(split('d.s.t'), ['d', 's', 't'])
+        self.assertEqual(split('S.T'), ['S', 'T'])
+        self.assertEqual(split('"S"."T"'), ['S', 'T'])
+        self.assertEqual(split('s."my.table"'), ['s', 'my.table'])
+        self.assertEqual(split('"my.schema".t'), ['my.schema', 't'])
+        self.assertEqual(split('s."q""t"'), ['s', 'q"t'])
+        self.assertEqual(split('""""'), ['"'])
+        self.assertEqual(split('a"b.c'), ['a"b', 'c'])
+        self.assertEqual(split('s . t'), ['s ', ' t'])
+        self.assertEqual(split('s.täst'), ['s', 'täst'])
+
+    def test_split_invalid_qualified_name(self):
+        from pg.helpers import split_qualified_name as split
+        for name in '', '""', '.t', 's.', 's..t', 's.""':
+            with self.assertRaises(ValueError) as cm:
+                split(name)
+            self.assertEqual(str(cm.exception), f'Empty part in name {name!r}')
+        for name in '"', '"t', 's."t', 's."t""':
+            with self.assertRaises(ValueError) as cm:
+                split(name)
+            self.assertIn('Unterminated quoted part', str(cm.exception))
+        for name in '"s"t', 's."t" ', '"s""t"x.u':
+            with self.assertRaises(ValueError) as cm:
+                split(name)
+            self.assertIn('Unexpected text after quoted part',
+                          str(cm.exception))
+
+
 class TestConfigFunctions(unittest.TestCase):
     """Test the functions for changing default settings.
 

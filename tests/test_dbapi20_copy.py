@@ -231,6 +231,25 @@ class TestCopyFrom(TestCopy):
         self.cursor.copy_from('42\tHello, world!', 'public.copytest')
         self.assertEqual(self.table_data, [(42, 'Hello, world!')])
 
+    def test_input_string_with_quoted_table_name(self):
+        self.cursor.execute(
+            'create temporary table "Copy.Test" (n int, t text)')
+        for name in 'Copy.Test', 'pg_temp.Copy.Test':
+            self.assertRaises(
+                pgdb.DatabaseError, self.cursor.copy_from, '1\tx', name)
+            self.con.rollback()
+        self.cursor.execute(
+            'create temporary table "Copy.Test" (n int, t text)')
+        self.cursor.copy_from('1\tx', '"Copy.Test"')
+        self.cursor.copy_from('2\ty', 'pg_temp."Copy.Test"')
+        self.cursor.execute('select * from "Copy.Test" order by n')
+        self.assertEqual(self.cursor.fetchall(), [(1, 'x'), (2, 'y')])
+
+    def test_input_string_with_malformed_table_name(self):
+        for name in 'public.', '"copytest', 'public."copytest"x':
+            self.assertRaises(
+                ValueError, self.cursor.copy_from, '1\tx', name)
+
     def test_input_string_with_newline(self):
         self.copy_from('42\tHello, world!\n')
         self.assertEqual(self.table_data, [(42, 'Hello, world!')])
@@ -418,6 +437,13 @@ class TestCopyTo(TestCopy):
     def test_generator_with_schema_name(self):
         ret = self.cursor.copy_to(None, 'public.copytest')
         self.assertEqual(''.join(ret), self.data_text)
+
+    def test_generator_with_quoted_table_name(self):
+        self.cursor.execute(
+            'create temporary table "Copy.Test" as select * from copytest')
+        for name in '"Copy.Test"', 'pg_temp."Copy.Test"':
+            ret = self.cursor.copy_to(None, name)
+            self.assertEqual(''.join(ret), self.data_text)
 
     def test_generator_bytes(self):
         ret = self.copy_to(decode=False)

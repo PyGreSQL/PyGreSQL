@@ -27,7 +27,13 @@ from pg.core import (
 )
 from pg.core import Connection as Cnx
 from pg.error import db_error, error, if_error, op_error
-from pg.helpers import QuoteDict, RowCache, format_text, join_text
+from pg.helpers import (
+    QuoteDict,
+    RowCache,
+    format_text,
+    join_text,
+    split_qualified_name,
+)
 
 from .adapt import Hstore, Json, Literal
 from .cast import TypeCache
@@ -480,7 +486,8 @@ class Cursor:
         if table.lower().startswith('select '):
             raise ValueError("Must specify a table, not a query")
         cnx = self._cnx
-        table = '.'.join(map(cnx.escape_identifier, table.split('.', 1)))
+        table = '.'.join(map(cnx.escape_identifier,
+                             split_qualified_name(table)))
         operation_parts = [f'copy {table}']
         options = []
         parameters = []
@@ -571,7 +578,8 @@ class Cursor:
                 raise ValueError("Columns must be specified in the query")
             table = f'({table})'
         else:
-            table = '.'.join(map(cnx.escape_identifier, table.split('.', 1)))
+            table = '.'.join(map(cnx.escape_identifier,
+                                 split_qualified_name(table)))
         operation_parts = [f'copy {table}']
         options = []
         parameters = []

@@ -139,6 +139,17 @@ Version 6.3.0 (unreleased)
     For `DB.upsert()`, it specifies the conflict target. If another unique
     key is used as *keyname*, `DB.update()` and `DB.upsert()` can also
     update the primary key. Before, this was only possible with OIDs.
+  - Table names qualified with a schema name are now handled the same way
+    in all methods of the `DB` wrapper, in `Connection.inserttable()` and
+    in the copy methods of the `pgdb` cursor (#67): the name is split at
+    dots, parts can be enclosed in double quotes (so that they can contain
+    dots), and all parts are taken literally and escaped separately, e.g.
+    ``'public.User'`` or ``'public."User"'`` for the table ``"User"``.
+    Before, the `DB` methods used names containing a dot unchanged in the
+    SQL command, so that ``'public.User'`` meant ``public.user``, and
+    `Connection.inserttable()` and the copy methods did not support quoted
+    parts (#47). A name with an empty part or an unterminated quote now
+    raises a `ValueError`.
 
 - Changes in the `pgdb` module:
 

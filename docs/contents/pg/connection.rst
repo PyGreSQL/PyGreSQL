@@ -609,7 +609,8 @@ The values must not contain NUL characters, which PostgreSQL does not
 support in text. Binary data for columns of type ``bytea`` must be
 wrapped with :func:`Bytea`; it is then sent in the hex format of bytea
 and may contain any bytes, including NUL bytes.
-``table`` is the table name, optionally qualified with a schema name.
+``table`` is the table name, optionally qualified with a schema name
+(see :ref:`table_names`).
 The table and column names can also be passed as bytes, which are not
 encoded, e.g. for non-ASCII names with the client encoding SQL_ASCII.
 ``columns`` is an optional tuple or list of column names to be passed on

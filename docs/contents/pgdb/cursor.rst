@@ -270,6 +270,9 @@ The input stream can be provided in form of a file-like object (which must
 have a ``read()`` method), a string, or an iterable returning one row or
 multiple rows of input data on each iteration.
 
+The table name can be qualified with a schema name, and parts of it can be
+enclosed in double quotes, as described in :ref:`table_names`.
+
 The format must be text, csv or binary. The sep option sets the column
 separator (delimiter) used in the non binary formats. The null option sets
 the textual representation of ``NULL`` in the input.
@@ -315,6 +318,8 @@ Output will be returned as byte strings unless you set decode to true.
 Rows that cannot be decoded with the client encoding (e.g. non-ASCII text
 with the client encoding ``SQL_ASCII``) are still returned as byte strings.
 
+The table name can be qualified with a schema name, and parts of it can be
+enclosed in double quotes, as described in :ref:`table_names`.
 Note that you can also use a ``SELECT`` query instead of the table name.
 
 The format must be text, csv or binary. The sep option sets the column

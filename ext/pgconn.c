@@ -1098,15 +1098,20 @@ conn_is_non_blocking(connObject *self, PyObject *Py_UNUSED(noargs))
 }
 
 /* Append an escaped identifier (str or bytes) to the buffer.
-   If qualified is set, the parts separated by dots are escaped separately.
+   If qualified is set, the name is split into parts at dots, and the parts
+   are escaped separately. A part can be enclosed in double quotes, with a
+   double quote inside written twice; it can then contain dots. This must
+   work like split_qualified_name() in pg/helpers.py.
    Return 0 on success or -1 with an exception set. */
 static int
 _inserttable_append_identifier(connObject *self, struct CharBuffer *buf,
                                PyObject *name, int encoding, int qualified)
 {
     PyObject *bytes_obj;
-    char *s, *end, *part_end, *escaped;
+    char *s, *end, *part, *part_end, *scratch = NULL, *escaped;
+    const char *error = NULL;
     Py_ssize_t len;
+    int ret = -1;
 
     if (PyBytes_Check(name)) {
         bytes_obj = Py_NewRef(name);
@@ -1122,38 +1127,76 @@ _inserttable_append_identifier(connObject *self, struct CharBuffer *buf,
         return -1;
     }
 
-    if (PyBytes_AsStringAndSize(bytes_obj, &s, &len) < 0) {
-        Py_DECREF(bytes_obj);
-        return -1;
-    }
+    if (PyBytes_AsStringAndSize(bytes_obj, &s, &len) < 0)
+        goto done;
     if (memchr(s, '\0', (size_t)len)) {
-        Py_DECREF(bytes_obj);
         PyErr_SetString(PyExc_ValueError,
                         "Table and column names must not contain NUL");
-        return -1;
+        goto done;
+    }
+    if (qualified) {
+        /* buffer for the contents of quoted parts */
+        scratch = PyMem_Malloc((size_t)len + 1);
+        if (!scratch) {
+            PyErr_NoMemory();
+            goto done;
+        }
     }
 
-    /* the dot cannot be part of a multibyte character in any of the client
-       encodings supported by PostgreSQL, so we can split the bytes */
-    for (end = s + len;; s = part_end + 1) {
-        part_end = qualified ? memchr(s, '.', (size_t)(end - s)) : NULL;
-        if (!part_end)
-            part_end = end;
-        escaped = PQescapeIdentifier(self->cnx, s, (size_t)(part_end - s));
+    /* neither the dot nor the double quote can be part of a multibyte
+       character in any of the client encodings supported by PostgreSQL,
+       so we can split the bytes */
+    for (end = s + len;; ++s) {
+        if (qualified && s < end && *s == '"') {
+            for (part = part_end = scratch, ++s;; ++s) {
+                if (s == end) {
+                    error = "Unterminated quoted part in name %R";
+                    goto done;
+                }
+                if (*s == '"') {
+                    if (s + 1 == end || s[1] != '"')
+                        break;
+                    ++s; /* doubled quote */
+                }
+                *part_end++ = *s;
+            }
+            if (++s < end && *s != '.') {
+                error = "Unexpected text after quoted part in name %R";
+                goto done;
+            }
+        }
+        else {
+            part = s;
+            part_end = qualified ? memchr(s, '.', (size_t)(end - s)) : NULL;
+            if (!part_end)
+                part_end = end;
+            s = part_end;
+        }
+        if (qualified && part_end == part) {
+            error = "Empty part in name %R";
+            goto done;
+        }
+        escaped =
+            PQescapeIdentifier(self->cnx, part, (size_t)(part_end - part));
         if (!escaped) {
-            Py_DECREF(bytes_obj);
             set_error(PyExc_ValueError, "Cannot escape identifier", self->cnx,
                       NULL);
-            return -1;
+            goto done;
         }
         ext_char_buffer_s(buf, escaped);
         PQfreemem(escaped);
-        if (part_end == end)
+        if (s == end)
             break;
         ext_char_buffer_c(buf, '.');
     }
+    ret = 0;
+
+done:
+    if (error)
+        PyErr_Format(PyExc_ValueError, error, name);
+    PyMem_Free(scratch);
     Py_DECREF(bytes_obj);
-    return 0;
+    return ret;
 }
 
 /* Append binary data to the buffer as bytea in hex format, escaped for COPY.

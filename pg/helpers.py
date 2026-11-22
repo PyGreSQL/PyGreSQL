@@ -83,6 +83,50 @@ def quote_if_unqualified(param: str, name: int | str) -> str:
         return f'quote_ident({param})'
     return param
 
+
+def split_qualified_name(name: str) -> list[str]:
+    """Split a possibly schema-qualified name into its parts.
+
+    The name is split at dots. A part can be enclosed in double quotes,
+    with a double quote inside written twice; it can then contain dots.
+    All parts are taken literally (case is preserved), so that they can
+    be escaped individually. Empty parts raise a ValueError.
+    """
+    parts: list[str] = []
+    end = len(name)
+    pos = 0
+    while True:
+        if name.startswith('"', pos):
+            chars: list[str] = []
+            pos += 1
+            while True:
+                quote = name.find('"', pos)
+                if quote < 0:
+                    raise ValueError(
+                        f'Unterminated quoted part in name {name!r}')
+                chars.append(name[pos:quote])
+                pos = quote + 1
+                if not name.startswith('"', pos):
+                    break
+                chars.append('"')
+                pos += 1
+            if pos < end and name[pos] != '.':
+                raise ValueError(
+                    f'Unexpected text after quoted part in name {name!r}')
+            part = ''.join(chars)
+        else:
+            dot = name.find('.', pos)
+            if dot < 0:
+                dot = end
+            part = name[pos:dot]
+            pos = dot
+        if not part:
+            raise ValueError(f'Empty part in name {name!r}')
+        parts.append(part)
+        if pos >= end:
+            return parts
+        pos += 1  # skip the dot
+
 class QuoteDict(dict):
     """Dictionary with auto quoting of its items.
 

@@ -50,6 +50,34 @@ single parameter named ``db``. This allows you to use all of the methods
 of the DB class with a DB-API 2 compliant connection. Note that the
 :meth:`DB.close` and :meth:`DB.reopen` methods are inoperative in this case.
 
+.. _table_names:
+
+Table names
+-----------
+Many methods of this class take the name of a table, which can be qualified
+with the name of a schema. The same rules apply to the table names passed to
+:meth:`Connection.inserttable` and to the methods
+:meth:`pgdb.Cursor.copy_from` and :meth:`pgdb.Cursor.copy_to`:
+
+- The name is split into parts at dots.
+- A part can be enclosed in double quotes. It can then contain dots,
+  and a double quote inside it must be written twice, as in SQL.
+- All parts are taken literally (upper case letters are *not* folded to
+  lower case) and each part is escaped separately.
+
+For instance, ``'User'`` and ``'public.User'`` both refer to the table
+``"User"``, and ``'"my.schema"."my.table"'`` refers to the table
+``"my.table"`` in the schema ``"my.schema"``. The qualified names returned
+by :meth:`DB.get_tables` and :meth:`DB.get_relations` can be passed back
+to these methods. A name with an empty part or an unterminated quote
+raises a :exc:`ValueError`.
+
+.. versionchanged:: 6.3
+    Before, names containing a dot were used unchanged in the SQL command
+    by the methods of this class, so that unquoted parts were folded to
+    lower case, while :meth:`Connection.inserttable` and the copy methods
+    split the name at dots and did not support quoted parts.
+
 pkey -- return the primary key of a table
 -----------------------------------------
 

@@ -3584,6 +3584,41 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable(b'public.test', data[2:])
         self.assertEqual(self.get_back(), data)
 
+    def test_inserttable_with_quoted_table_names(self):
+        query = self.c.query
+        tables = 'Test', 'my.test', 'my "test"'
+        for table in tables:
+            name = self.c.escape_identifier(table)
+            query(f"create temporary table {name} (n int)")
+        names = {
+            'Test': 'Test', 'pg_temp.Test': 'Test',
+            'pg_temp."Test"': 'Test', '"pg_temp"."Test"': 'Test',
+            'pg_temp."my.test"': 'my.test', b'pg_temp."my.test"': 'my.test',
+            'pg_temp."my ""test"""': 'my "test"'}
+        for n, name in enumerate(names, 1):
+            self.c.inserttable(name, [(n,)])
+        for table in tables:
+            name = self.c.escape_identifier(table)
+            r = query(f"select n from {name} order by n").getresult()
+            self.assertEqual(r, [
+                (n,) for n, t in enumerate(names.values(), 1) if t == table])
+
+    def test_inserttable_with_malformed_table_name(self):
+        for table, message in [
+                ('', 'Empty part'), ('test.', 'Empty part'),
+                ('.test', 'Empty part'), ('public..test', 'Empty part'),
+                (b'public.""', 'Empty part'),
+                ('"test', 'Unterminated quoted part'),
+                (b'public."test', 'Unterminated quoted part'),
+                ('"te"st', 'Unexpected text after quoted part')]:
+            with self.subTest(table=table):
+                with self.assertRaises(ValueError) as cm:
+                    self.c.inserttable(table, self.data)
+                self.assertEqual(
+                    str(cm.exception), f'{message} in name {table!r}')
+                self.assert_ready()
+        self.assertEqual(self.get_back(), [])
+
     def test_inserttable_with_invalid_table_name_type(self):
         for table in 42, None, ['test']:
             with self.assertRaises(TypeError) as cm:
