@@ -4534,6 +4534,24 @@ class TestDBClass(unittest.TestCase):
         if pg.get_array():  # array cast must also be reset
             self.assertEqual(r, ['<(0,0),1>'])
 
+    def test_db_types_typecast_for_record_fields(self):
+        query = self.db.query
+        query('create type pg_temp.test_rtype as (c circle)')
+        dbtypes = self.db.dbtypes
+        cmd = "select row('<(0,0),1>')::pg_temp.test_rtype"
+        self.assertEqual(query(cmd).getresult()[0][0], ('<(0,0),1>',))
+        # record casts must pick up changed casts for their fields
+        dbtypes.set_typecast('circle', lambda v: f'Circle: {v}')
+        self.assertEqual(query(cmd).getresult()[0][0], ('Circle: <(0,0),1>',))
+        dbtypes.reset_typecast('circle')
+        self.assertEqual(query(cmd).getresult()[0][0], ('<(0,0),1>',))
+        # a cast set for the composite type itself is kept
+        dbtypes.set_typecast('test_rtype', lambda v: f'Record: {v}')
+        dbtypes.set_typecast('circle', lambda v: f'Circle: {v}')
+        self.assertEqual(query(cmd).getresult()[0][0], 'Record: ("<(0,0),1>")')
+        dbtypes.reset_typecast()
+        self.assertEqual(query(cmd).getresult()[0][0], ('<(0,0),1>',))
+
     def test_db_types_typecast_with_domains(self):
         query = self.db.query
         query('create domain pg_temp.test_dint as int')
@@ -4559,14 +4577,13 @@ class TestDBClass(unittest.TestCase):
         dbtypes.set_typecast('test_dint', lambda v: f'<{v}>')
         self.assertEqual(dbtypes.typecast('42', 'test_dint'), '<42>')
         self.assertIs(dbtypes.get_typecast('test_ddint'), int)
-        dbtypes.reset_typecast('test_rtype')  # cached with field casts
         r = query(cmd).getresult()[0]
         self.assertEqual(r[0], 1)
         self.assertEqual(r[2][0], '<3>')
         if pg.get_array():
             self.assertEqual(r[1], ['<2>'])
             self.assertEqual(r[2][1], ['<4>'])
-        dbtypes.reset_typecast(['test_dint', 'test_rtype'])
+        dbtypes.reset_typecast('test_dint')
         self.assertIs(dbtypes.get_typecast('test_dint'), int)
         r = query(cmd).getresult()[0]
         self.assertEqual(r[2][0], 3)

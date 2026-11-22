@@ -513,14 +513,13 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             # unless a typecast has been set for the domain, which is used
             # for elements of arrays and fields of records
             type_cache.set_typecast('test_dint', lambda v: f'<{v}>')
-            type_cache.reset_typecast('test_rtype')  # cached field casts
             self.assertEqual(type_cache.typecast('42', 'test_dint'), '<42>')
             cur.execute(cmd)
             row = cur.fetchone()
             self.assertEqual(row[0], 42)
             self.assertEqual(row[1].i, '<42>')
             self.assertEqual(row[2], ['<1>', '<2>'])
-            type_cache.reset_typecast(['test_dint', 'test_rtype'])
+            type_cache.reset_typecast('test_dint')
             cur.execute(cmd)
             row = cur.fetchone()
             self.assertEqual(row[1].i, 42)

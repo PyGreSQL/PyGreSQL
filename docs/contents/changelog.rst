@@ -174,6 +174,10 @@ Version 6.3.0 (unreleased)
   - `DbTypes.typecast()` now also casts values when the type is passed as a
     type object, as returned by `DB.get_attnames()`. Before, the value was
     returned unchanged.
+  - `DbTypes.set_typecast()` and `DbTypes.reset_typecast()` now also affect
+    fields of composite types whose values have already been cast. Before,
+    the casts for these composite types kept the old typecast functions for
+    their fields until they were reset as well.
 
 - Changes in the `pgdb` module:
 
@@ -219,6 +223,10 @@ Version 6.3.0 (unreleased)
     be passed as bytes. Before, such type names were parsed as SQL type
     names, and invalid names could raise an error. Keys that are neither
     names nor OIDs, like None, now raise a `TypeError`.
+  - `TypeCache.set_typecast()` and `TypeCache.reset_typecast()` now also
+    affect fields of composite types whose values have already been cast.
+    Before, the casts for these composite types kept the old typecast
+    functions for their fields until they were reset as well.
 
 - Fixes in the C extension:
 

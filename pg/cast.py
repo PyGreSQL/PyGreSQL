@@ -333,6 +333,22 @@ class Typecasts(dict):
 
     connection: Connection | None = None  # set in connection specific instance
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the typecasts."""
+        super().__init__(*args, **kwargs)
+        self._records: set[str] = set()  # types with cached record casts
+
+    def _drop_record_casts(self) -> None:
+        """Drop the cached casts for composite types and their arrays.
+
+        These casts use the casts for their fields, which may change.
+        They will be created again when needed.
+        """
+        for typ in self._records:
+            self.pop(typ, None)
+            self.pop(f'_{typ}', None)
+        self._records.clear()
+
     def __missing__(self, typ: str) -> Callable | None:
         """Create a cast function if it is not cached.
 
@@ -357,6 +373,7 @@ class Typecasts(dict):
                 casts = [self[v.pgtype] for v in attnames.values()]
                 cast = self.create_record_cast(typ, attnames, casts)
                 self[typ] = cast
+                self._records.add(typ)
             else:
                 base = self.get_base(typ)
                 if base:
@@ -387,6 +404,7 @@ class Typecasts(dict):
 
     def set(self, typ: str | Sequence[str], cast: Callable | None) -> None:
         """Set a typecast function for the specified database type(s)."""
+        self._drop_record_casts()
         if isinstance(typ, str):
             typ = [typ]
         if cast is None:
@@ -405,6 +423,7 @@ class Typecasts(dict):
 
         When no type is specified, all typecasts will be reset.
         """
+        self._drop_record_casts()
         if typ is None:
             self.clear()
         else:

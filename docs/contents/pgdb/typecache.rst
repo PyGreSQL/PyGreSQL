@@ -89,11 +89,9 @@ takes another parameter named *connection*, then the current database
 connection will also be passed to the typecast function.  This may sometimes
 be necessary to look up certain database settings.
 
-Typecast functions for composite types are cached together with the typecast
-functions for their fields. If you change the typecast function for a type
-that is used in fields of composite types after values of these composite
-types have been cast, also reset the typecast functions for the composite
-types with :meth:`TypeCache.reset_typecast`.
+Changing the typecast function for a type also affects fields of composite
+types with that type, even if values of these composite types have already
+been cast.
 
 .. method:: TypeCache.reset_typecast([typ])
 
