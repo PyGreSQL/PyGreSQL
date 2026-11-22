@@ -33,6 +33,11 @@ Version 6.3.0 (unreleased)
   - Arrays of hstore, uuid and composite types can now be passed as
     parameters and inserted or updated in table columns. Before, this
     raised an `AttributeError` or a `DataError`.
+  - Arrays of types unknown to PyGreSQL, e.g. of enums or of ``inet``, can
+    now be inserted or updated in table columns, and passed as parameters
+    with type names like ``_inet``. Their simple type name, as returned by
+    `DB.get_attnames()`, is now ``text[]`` instead of ``text``. Before, the
+    list was sent as a Python string, which caused a `DataError`.
   - Elements of json arrays wrapped with `Json()` can now be adapted.
     Empty dicts, zero and `False` as elements of json arrays are no longer
     adapted as NULL. Similarly, zero and `False` as elements of text arrays

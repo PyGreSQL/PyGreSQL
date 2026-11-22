@@ -22,6 +22,7 @@ from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from io import StringIO
+from ipaddress import IPv4Address
 from operator import itemgetter
 from time import strftime
 from typing import Any, ClassVar, List  # noqa: UP035
@@ -4291,6 +4292,30 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(r.getresult()[0][0], expected)
         r = self.db.query_formatted('select %s::text', (u,), inline=True)
         self.assertEqual(r.getresult()[0][0], str(u))
+
+    def test_insert_get_array_of_unknown_type(self):
+        query = self.db.query
+        query("create type test_mood as enum ('sad', 'ok', 'happy')")
+        self.addCleanup(query, 'drop type test_mood')
+        self.create_table('unknown_array_test',
+                          'n smallint primary key, m test_mood[], i inet[]',
+                          temporary=False)
+        r = self.db.get_attnames('unknown_array_test')
+        self.assertEqual(r['m'].simple, 'text[]')
+        self.assertEqual(r['i'].simple, 'text[]')
+        if self.regtypes:
+            self.assertEqual(
+                r, dict(n='smallint', m='test_mood[]', i='inet[]'))
+        else:
+            self.assertEqual(r, dict(n='int', m='text[]', i='text[]'))
+        self.db.insert('unknown_array_test', n=1, m=['sad', None, 'happy'],
+                       i=[IPv4Address('192.168.0.1'), '10.0.0.0/8'])
+        r = query('select m::text, i::text from unknown_array_test')
+        self.assertEqual(r.getresult(), [
+            ('{sad,NULL,happy}', '{192.168.0.1,10.0.0.0/8}')])
+        r = self.db.query_formatted(
+            'select %s::test_mood[]::text', (['ok', 'sad'],), ('_test_mood',))
+        self.assertEqual(r.getresult()[0][0], '{ok,sad}')
 
     def test_insert_get_record_array(self):
         query = self.db.query

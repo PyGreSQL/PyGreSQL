@@ -143,17 +143,20 @@ class _SimpleTypes(dict):
     def __missing__(self, key: Any) -> str:
         """Unmapped types are interpreted as text.
 
-        Array type names like "int[]" are mapped to arrays of the simple
-        type of the element, arrays of records to "record[]".
+        Array type names like "int[]" or "_int4" are mapped to arrays of
+        the simple type of the element, arrays of records to "record[]".
         """
-        if isinstance(key, str) and key.endswith('[]'):
-            base = key[:-2]
-            while base.endswith('[]'):
-                base = base[:-2]
-            if base == 'record':
-                return 'record[]'
-            simple = self[base]
-            return simple if simple.endswith('[]') else f'{simple}[]'
+        if isinstance(key, str):
+            if key.endswith('[]'):
+                base = key[:-2]
+                while base.endswith('[]'):
+                    base = base[:-2]
+                if base == 'record':
+                    return 'record[]'
+                simple = self[base]
+                return simple if simple.endswith('[]') else f'{simple}[]'
+            if key.startswith('_'):  # PostgreSQL name of an array type
+                return self[f'{key[1:]}[]']
         return 'text'
 
     def get_type_dict(self) -> dict[type, str]:
@@ -259,11 +262,14 @@ class DbTypes(dict):
             simple = 'record'
         else:
             simple = _simpletypes[pgtype]
-            if simple == 'text' and category == 'A' and elem:
-                # check for arrays of composite types
-                elem_type = self.get(elem)
-                if elem_type and elem_type.relid:
-                    simple = 'record[]'
+            if simple.endswith('[]'):
+                if category != 'A' or not elem:
+                    simple = 'text'  # not an array, only named like one
+                elif simple == 'text[]':
+                    # check for arrays of composite types
+                    elem_type = self.get(elem)
+                    if elem_type and elem_type.relid:
+                        simple = 'record[]'
         typ = DbType(regtype if self._regtypes else simple)
         typ.oid = oid
         typ.simple = simple
