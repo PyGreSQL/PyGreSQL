@@ -58,23 +58,42 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertIn('.', v)
         self.assertEqual(pgdb.__version__, v)
 
+    def _check_application_name(self, application_name: str) -> None:
+        kwargs = {**self.connect_kw_args,
+                  'application_name': application_name}
+        con = pgdb.connect(**kwargs)
+        try:
+            cur = con.cursor()
+            cur.execute("select current_setting('application_name')")
+            self.assertEqual(cur.fetchone(), (application_name,))
+        finally:
+            con.close()
+
     def test_connect_kwargs(self):
-        application_name = 'PyGreSQL DB API 2.0 Test'
-        self.connect_kw_args['application_name'] = application_name
-        con = self._connect()
-        cur = con.cursor()
-        cur.execute("select application_name from pg_stat_activity"
-                    " where application_name = %s", (application_name,))
-        self.assertEqual(cur.fetchone(), (application_name,))
+        self._check_application_name('PyGreSQL DB API 2.0 Test')
 
     def test_connect_kwargs_with_special_chars(self):
-        special_name = 'Single \' and double " quote and \\ backslash!'
-        self.connect_kw_args['application_name'] = special_name
-        con = self._connect()
-        cur = con.cursor()
-        cur.execute("select application_name from pg_stat_activity"
-                    " where application_name = %s", (special_name,))
-        self.assertEqual(cur.fetchone(), (special_name,))
+        self._check_application_name(
+            'Single \' and double " quote and \\ backslash!')
+
+    def test_connect_kwargs_with_special_chars_without_space(self):
+        self._check_application_name("it's")
+        self._check_application_name('back\\slash')
+        self._check_application_name("'")
+        self._check_application_name('\\')
+        self._check_application_name('a=b')
+
+    def test_connect_kwargs_with_empty_value(self):
+        self._check_application_name('')
+
+    def test_connect_kwargs_with_special_dbname(self):
+        special_dbname = 'funny"db\'with\\quotes'
+        kwargs = {**self.connect_kw_args,
+                  'database': special_dbname, 'application_name': 'test'}
+        with self.assertRaises(pgdb.Error) as cm:
+            pgdb.connect(**kwargs)
+        # the name must arrive unchanged at the server
+        self.assertIn(f'"{special_dbname}"', str(cm.exception))
 
     def test_percent_sign(self):
         con = self._connect()
@@ -1371,7 +1390,7 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             # this raised a ProgrammingError before
             self.assertRaises(pgdb.OperationalError, cur.execute, "select 1")
             # this raised an OperationalError for a LookupError before
-            with self.assertRaises(pgdb.OperationalError) as cm:
+            with self.assertRaises(pgdb.Error) as cm:
                 cur.execute("select 1")
             self.assertEqual(str(cm.exception), "Connection has been lost")
         finally:

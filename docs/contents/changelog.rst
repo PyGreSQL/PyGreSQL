@@ -78,6 +78,10 @@ Version 6.3.0 (unreleased)
     truncated at the NUL character. Queries and parameters that cannot be
     encoded with the client encoding now also raise a `DataError` instead
     of an `OperationalError` ("Internal error").
+  - When `connect()` is called with additional keyword arguments, the
+    database name and the other values are now always quoted. Before,
+    values with quotes or backslashes but without spaces broke the
+    connection info string (#77, thanks to Zhenghua Lyu for the report).
 
 - Fixes in the C extension:
 

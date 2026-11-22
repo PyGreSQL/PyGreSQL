@@ -63,11 +63,10 @@ def connect(dsn: str | None = None,
         else:
             kwarg_list.insert(0, ('dbname', dbname))
         for kw, value in kwarg_list:
-            value = str(value)
-            if not value or ' ' in value:
-                value = value.replace('\\', '\\\\').replace("'", "\\'")
-                value = f"'{value}'"
-            kw_parts.append(f'{kw}={value}')
+            # always quote, since libpq also treats quotes and
+            # backslashes in unquoted values specially
+            value = str(value).replace('\\', '\\\\').replace("'", "\\'")
+            kw_parts.append(f"{kw}='{value}'")
         dbname = ' '.join(kw_parts)
     # open the connection
     cnx = get_cnx(dbname, dbhost, dbport, dbopt, dbuser, dbpasswd)
