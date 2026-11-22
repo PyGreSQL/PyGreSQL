@@ -515,11 +515,14 @@ The method takes an iterable of row values which must be tuples or lists
 of the same size, containing the values for each inserted row.
 These may contain string, integer, long or double (real) values as well as
 date, time, datetime or timedelta objects.
-Strings are encoded with the client encoding, bytes are passed unchanged.
+Strings are encoded with the client encoding, bytes are passed unchanged
+as the text representation of the value in the client encoding.
 Other objects are converted to strings with ``str()`` (integers, dates
 and times) or ``repr()`` and then also encoded with the client encoding.
 The values must not contain NUL characters, which PostgreSQL does not
-support in text.
+support in text. Binary data for columns of type ``bytea`` must be
+wrapped with :func:`Bytea`; it is then sent in the hex format of bytea
+and may contain any bytes, including NUL bytes.
 ``table`` is the table name, optionally qualified with a schema name.
 The table and column names can also be passed as bytes, which are not
 encoded, e.g. for non-ASCII names with the client encoding SQL_ASCII.

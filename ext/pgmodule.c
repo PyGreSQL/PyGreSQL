@@ -46,6 +46,7 @@ PyObject *dictiter = NULL;      /* function for getting dict results */
 PyObject *namediter = NULL;     /* function for getting named results */
 PyObject *namednext = NULL;     /* function for getting one named result */
 PyObject *scalariter = NULL;    /* function for getting scalar results */
+PyObject *bytea_type = NULL;    /* type for marking bytea values */
 PyObject *jsondecode = NULL;    /* function for decoding json strings */
 const char *date_format = NULL; /* date format that is always assumed */
 char decimal_point = '.';       /* decimal point used in money values */
@@ -677,17 +678,24 @@ pg_set_bytea_escaped(PyObject *Py_UNUSED(self), PyObject *args)
 /* set query helper functions (not part of public API) */
 
 static char pg_set_query_helpers__doc__[] =
-    "set_query_helpers(*helpers) -- set internal query helper functions";
+    "set_query_helpers(*helpers) -- set internal query helper functions\n\n"
+    "The helpers are the functions dictiter, namediter, namednext and\n"
+    "scalariter, and optionally the type used for marking bytea values.\n";
 
 static PyObject *
 pg_set_query_helpers(PyObject *Py_UNUSED(self), PyObject *args)
 {
+    PyObject *bytea = NULL;
+
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "O!O!O!O!", &PyFunction_Type, &dictiter,
+    if (!PyArg_ParseTuple(args, "O!O!O!O!|O!", &PyFunction_Type, &dictiter,
                           &PyFunction_Type, &namediter, &PyFunction_Type,
-                          &namednext, &PyFunction_Type, &scalariter)) {
+                          &namednext, &PyFunction_Type, &scalariter,
+                          &PyType_Type, &bytea)) {
         return NULL;
     }
+    if (bytea)
+        Py_XSETREF(bytea_type, Py_NewRef(bytea));
 
     Py_RETURN_NONE;
 }

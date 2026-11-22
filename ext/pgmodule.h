@@ -72,6 +72,7 @@ extern PyObject *dictiter;      /* function for getting dict results */
 extern PyObject *namediter;     /* function for getting named results */
 extern PyObject *namednext;     /* function for getting one named result */
 extern PyObject *scalariter;    /* function for getting scalar results */
+extern PyObject *bytea_type;    /* type for marking bytea values */
 extern PyObject *jsondecode;    /* function for decoding json strings */
 extern const char *date_format; /* date format that is always assumed */
 extern char decimal_point;      /* decimal point used in money values */

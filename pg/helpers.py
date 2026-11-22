@@ -172,6 +172,7 @@ def scalariter(q: Query) -> Iterator[Any]:
 
 def init_core() -> None:
     """Initialize the C extension module."""
+    from .adapt import Bytea  # not at the top since it imports this module
     set_decimal(Decimal)
     set_jsondecode(jsondecode)
-    set_query_helpers(dictiter, namediter, namednext, scalariter)
+    set_query_helpers(dictiter, namediter, namednext, scalariter, Bytea)

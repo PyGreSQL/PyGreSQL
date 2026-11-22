@@ -3173,6 +3173,48 @@ class TestInserttable(unittest.TestCase):
             'select "cölumn" from "täble" where "cölumn" = \'k\'').getresult(),
             [('k',)])
 
+    def test_inserttable_bytea_values(self):
+        self.c.query("create temporary table bin (n int, b bytea)")
+        data = bytes(range(256))  # including NUL, backslash, tab and newline
+        rows = [(1, pg.Bytea(data)), (2, pg.Bytea(data * 100)),
+                (3, pg.Bytea(b'')), (4, None)]
+        # binary data does not depend on the client encoding
+        for encoding in ('utf8', 'sql_ascii'):
+            self.c.query(f"set client_encoding={encoding}")
+            self.assertEqual(self.c.inserttable('bin', rows), 4)
+            self.assertEqual(self.c.query(
+                "select n, b from bin order by n").getresult(), rows)
+            self.c.query("truncate table bin")
+
+    def test_inserttable_bytea_subclass(self):
+        class MyBytea(pg.Bytea):
+            pass
+
+        self.c.query("create temporary table bin (b bytea)")
+        self.c.inserttable('bin', [(MyBytea(b'\0\\\xff'),)])
+        self.assertEqual(self.c.query("select b from bin").getresult(),
+                         [(b'\0\\\xff',)])
+
+    def test_inserttable_plain_bytes_for_bytea(self):
+        self.c.query("create temporary table bin (n int, b bytea)")
+        # plain bytes are passed unchanged as the text representation
+        self.c.inserttable('bin', [
+            (1, b'\\x4142'), (2, self.c.escape_bytea(b'\0\xff'))])
+        self.assertEqual(
+            self.c.query("select n, b from bin order by n").getresult(),
+            [(1, b'AB'), (2, b'\0\xff')])
+        self.assertRaises(ValueError, self.c.inserttable, 'bin', [(3, b'\0')])
+        self.assertRaises(ValueError, self.c.inserttable, 'bin', [(3, b'\\')])
+
+    def test_inserttable_bytea_and_old_query_helpers(self):
+        # the type for marking bytea values is optional for set_query_helpers
+        from pg.helpers import dictiter, namediter, namednext, scalariter
+        pg.set_query_helpers(dictiter, namediter, namednext, scalariter)
+        self.c.query("create temporary table bin (b bytea)")
+        self.c.inserttable('bin', [(pg.Bytea(b'\xff'),)])
+        self.assertEqual(self.c.query("select b from bin").getresult(),
+                         [(b'\xff',)])
+
     def test_insert_table_big_row_size(self):
         # inserting rows with a size exceeding 64k bytes should work
         t = '*' * 75000

@@ -828,6 +828,28 @@ _inserttable_append_identifier(connObject *self, struct CharBuffer *buf,
     return 0;
 }
 
+/* Append binary data to the buffer as bytea in hex format, escaped for COPY.
+   Return 0 on success or -1 with an exception set. */
+static int
+_inserttable_append_bytea(struct CharBuffer *buf, PyObject *item)
+{
+    static const char hex_digits[] = "0123456789abcdef";
+    char *s, *end;
+    Py_ssize_t len;
+
+    if (PyBytes_AsStringAndSize(item, &s, &len) < 0)
+        return -1;
+    /* the backslash of the hex format must be escaped in COPY text */
+    ext_char_buffer_s(buf, "\\\\x");
+    for (end = s + len; s < end; ++s) {
+        unsigned char c = (unsigned char)*s;
+
+        ext_char_buffer_c(buf, hex_digits[c >> 4]);
+        ext_char_buffer_c(buf, hex_digits[c & 0xf]);
+    }
+    return 0;
+}
+
 /* Append a value to the buffer in COPY text format.
    Return 0 on success or -1 with an exception set. */
 static int
@@ -843,6 +865,10 @@ _inserttable_append_value(struct CharBuffer *buf, PyObject *item, int encoding)
         ext_char_buffer_c(buf, 'N');
         return 0;
     }
+
+    /* binary data marked as bytea (plain bytes are raw text) */
+    if (bytea_type && PyObject_TypeCheck(item, (PyTypeObject *)bytea_type))
+        return _inserttable_append_bytea(buf, item);
 
     if (PyBytes_Check(item)) {
         bytes_obj = Py_NewRef(item);

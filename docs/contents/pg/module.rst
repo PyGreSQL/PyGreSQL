@@ -728,8 +728,10 @@ type of the parameters, if it cannot be derived from the context.
 .. versionadded:: 5.0
 
 .. versionchanged:: 6.3
-    Plain ``bytes`` values are now also adapted as ``bytea``, so this
-    wrapper is no longer needed for them.
+    Plain ``bytes`` parameters are now also adapted as ``bytea``, so this
+    wrapper is no longer needed for them. It is still needed for binary
+    data passed to :meth:`Connection.inserttable`, where plain ``bytes``
+    are raw text.
 
 .. function:: HStore(dict)
 

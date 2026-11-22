@@ -55,6 +55,10 @@ Version 6.3.0 (unreleased)
     quoted. Before, they caused a syntax error.
   - The new `Connection.encoding` attribute contains the Python codec name
     of the client encoding.
+  - `Connection.inserttable()` now writes values wrapped with `Bytea()` as
+    binary data, so that any bytes can be inserted into bytea columns.
+    Plain `bytes` are still passed unchanged as raw text. Before, binary
+    data had to be escaped by hand, e.g. with `escape_bytea()`.
 
 - Changes in the `pgdb` module:
 
