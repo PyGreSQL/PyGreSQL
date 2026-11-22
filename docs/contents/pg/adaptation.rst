@@ -59,8 +59,20 @@ strings. As parameters, you can also pass objects of the ``ipaddress``
 module, also as elements of lists and tuples: addresses and interfaces are
 adapted as ``inet``, networks as ``cidr``.
 
+If you want to get such objects back instead of strings, you can set the
+typecast functions ``cast_inet`` and ``cast_cidr`` from the ``pg.cast``
+module (see the section on typecasting below)::
+
+    >>> from pg.cast import cast_cidr, cast_inet
+    >>> pg.set_typecast('inet', cast_inet)
+    >>> pg.set_typecast('cidr', cast_cidr)
+
+Like in psycopg 3, ``cast_inet`` returns an interface for values with a
+prefix length such as ``192.168.0.1/24``, and an address for other values.
+
 .. versionchanged:: 6.3
-    Objects of the ``ipaddress`` module can be passed as inline parameters.
+    Objects of the ``ipaddress`` module can be passed as inline parameters,
+    and the typecast functions ``cast_inet`` and ``cast_cidr`` were added.
 
 Text encoding
 -------------

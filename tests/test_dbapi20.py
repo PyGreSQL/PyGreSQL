@@ -867,6 +867,40 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_network_types_as_ipaddress(self):
+        from pgdb.cast import cast_cidr, cast_inet
+        q = ("select '192.168.0.1'::inet, '2001:db8::1/64'::inet,"
+             " '192.168.0.0/24'::cidr,"
+             " array['10.0.0.1'::inet, null], array['2001:db8::/32'::cidr]")
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute(q)
+            r = cur.fetchone()
+            self.assertEqual(tuple(r[:3]), (
+                '192.168.0.1', '2001:db8::1/64', '192.168.0.0/24'))
+            con.type_cache.set_typecast('inet', cast_inet)
+            con.type_cache.set_typecast('cidr', cast_cidr)
+            cur.execute(q)
+            r = cur.fetchone()
+            self.assertEqual(tuple(r), (
+                IPv4Address('192.168.0.1'), IPv6Interface('2001:db8::1/64'),
+                IPv4Network('192.168.0.0/24'),
+                [IPv4Address('10.0.0.1'), None],
+                [IPv6Network('2001:db8::/32')]))
+            # round trip, also as fields of a composite type
+            table = self.table_prefix + 'booze'
+            i = IPv4Interface('192.168.0.1/24')
+            n = IPv4Network('192.168.0.0/24')
+            cur.execute(f"create table {table} (i inet, c cidr)")
+            cur.execute(f"insert into {table} values (%s, %s)", (i, n))
+            cur.execute(f"select *, {table} from {table}")
+            r = cur.fetchone()
+            self.assertEqual(tuple(r[:2]), (i, n))
+            self.assertEqual(tuple(r[2]), (i, n))
+        finally:
+            con.close()
+
     def test_insert_array(self):
         values: list[tuple[Any, Any]] = [
             (None, None), ([], []), ([None], [[None], ['null']]),

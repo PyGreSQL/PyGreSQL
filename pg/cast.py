@@ -7,6 +7,17 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime, timedelta
 from functools import partial
 from inspect import signature
+from ipaddress import (
+    IPv4Address,
+    IPv4Interface,
+    IPv4Network,
+    IPv6Address,
+    IPv6Interface,
+    IPv6Network,
+    ip_address,
+    ip_interface,
+    ip_network,
+)
 from re import compile as regex
 from typing import Any, ClassVar
 from uuid import UUID
@@ -28,7 +39,9 @@ from .tz import timezone_as_offset
 __all__ = [
     'Typecasts',
     'cast_bool',
+    'cast_cidr',
     'cast_date',
+    'cast_inet',
     'cast_int2vector',
     'cast_interval',
     'cast_json',
@@ -268,6 +281,26 @@ def cast_interval(value: str) -> timedelta:
     days += 365 * years + 30 * mons
     return timedelta(days=days, hours=hours, minutes=mins,
                      seconds=secs, microseconds=usecs)
+
+
+def cast_inet(value: str) -> (IPv4Address | IPv6Address
+                               | IPv4Interface | IPv6Interface):
+    """Cast an inet value to an IP address or interface.
+
+    Values with a prefix length are cast to an interface, other values
+    to an address, like in psycopg 3. This cast function is not used by
+    default, but can be set with set_typecast('inet', cast_inet).
+    """
+    return ip_interface(value) if '/' in value else ip_address(value)
+
+
+def cast_cidr(value: str) -> IPv4Network | IPv6Network:
+    """Cast a cidr value to an IP network.
+
+    This cast function is not used by default, but can be set with
+    set_typecast('cidr', cast_cidr).
+    """
+    return ip_network(value)
 
 
 class Typecasts(dict):

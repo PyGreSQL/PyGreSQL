@@ -51,6 +51,10 @@ Version 6.3.0 (unreleased)
     parameters, also as elements of arrays and records (#43). Addresses and
     interfaces are adapted as ``inet``, networks as ``cidr``, as in
     psycopg 3. Before, this raised an `InterfaceError`.
+  - The new typecast functions `cast_inet()` and `cast_cidr()` in `pg.cast`
+    cast ``inet`` and ``cidr`` values to objects of the `ipaddress` module.
+    They are not used by default, since these values are still returned as
+    strings, but can be set with `set_typecast()`.
   - The `DbType` objects for array types have a new attribute ``elem``
     with the type OID of the array elements.
   - Parameters given as `bytes` for a known type other than bytea are now
@@ -115,6 +119,9 @@ Version 6.3.0 (unreleased)
     as elements of lists and tuples (#43). Addresses and interfaces are
     adapted as ``inet``, networks as ``cidr``, as in psycopg 3. Before, this
     raised an `InterfaceError`.
+  - The typecast functions `cast_inet()` and `cast_cidr()`, which cast
+    ``inet`` and ``cidr`` values to objects of the `ipaddress` module, are
+    also available in `pgdb.cast`, to be set with `set_typecast()`.
   - Keys and values of hstore parameters containing tabs, newlines or other
     whitespace besides spaces are now quoted. Before, they caused a syntax
     error, or such whitespace at the start or end was silently stripped.

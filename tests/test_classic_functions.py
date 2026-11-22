@@ -18,6 +18,14 @@ import unittest
 from collections.abc import Sequence
 from datetime import timedelta
 from decimal import Decimal
+from ipaddress import (
+    IPv4Address,
+    IPv4Interface,
+    IPv4Network,
+    IPv6Address,
+    IPv6Interface,
+    IPv6Network,
+)
 from typing import Any
 
 import pg  # the module under test
@@ -952,6 +960,45 @@ class TestCastInterval(unittest.TestCase):
                 seconds=secs, microseconds=usecs)
             for value in values:
                 self.assertEqual(cast_interval(value), interval)
+
+
+class TestCastNetworkTypes(unittest.TestCase):
+    """Test the typecast functions for network types."""
+
+    def test_cast_inet(self):
+        from pg.cast import cast_inet
+        for value, expected in (
+                ('192.168.0.1', IPv4Address('192.168.0.1')),
+                ('2001:db8::1', IPv6Address('2001:db8::1')),
+                ('192.168.0.1/24', IPv4Interface('192.168.0.1/24')),
+                ('2001:db8::1/64', IPv6Interface('2001:db8::1/64')),
+                ('192.168.0.0/24', IPv4Interface('192.168.0.0/24'))):
+            r = cast_inet(value)
+            self.assertIs(type(r), type(expected))
+            self.assertEqual(r, expected)
+        self.assertRaises(ValueError, cast_inet, 'foo')
+
+    def test_cast_cidr(self):
+        from pg.cast import cast_cidr
+        for value, expected in (
+                ('192.168.0.0/24', IPv4Network('192.168.0.0/24')),
+                ('2001:db8::/32', IPv6Network('2001:db8::/32')),
+                ('10.1.2.3/32', IPv4Network('10.1.2.3/32'))):
+            r = cast_cidr(value)
+            self.assertIs(type(r), type(expected))
+            self.assertEqual(r, expected)
+        self.assertRaises(ValueError, cast_cidr, '192.168.0.1/24')
+
+    def test_pgdb_uses_same_functions(self):
+        from pg.cast import cast_cidr, cast_inet
+        from pgdb.cast import cast_cidr as pgdb_cast_cidr
+        from pgdb.cast import cast_inet as pgdb_cast_inet
+        self.assertIs(pgdb_cast_inet, cast_inet)
+        self.assertIs(pgdb_cast_cidr, cast_cidr)
+
+    def test_not_used_by_default(self):
+        self.assertIsNone(pg.get_typecast('inet'))
+        self.assertIsNone(pg.get_typecast('cidr'))
 
 
 class TestEscapeFunctions(unittest.TestCase):

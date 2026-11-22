@@ -13,6 +13,7 @@ from re import compile as regex
 from typing import Any, ClassVar, NamedTuple
 from uuid import UUID as Uuid  # noqa: N811
 
+from pg.cast import cast_cidr, cast_inet
 from pg.core import Connection as Cnx
 from pg.core import (
     ProgrammingError,
@@ -31,7 +32,9 @@ __all__ = [
     'TypeCache',
     'Typecasts',
     'cast_bool',
+    'cast_cidr',
     'cast_date',
+    'cast_inet',
     'cast_int2vector',
     'cast_interval',
     'cast_money',

@@ -4364,6 +4364,44 @@ class TestDBClass(unittest.TestCase):
             'select ia::text from network_test where i=$1', (a,))
         self.assertEqual(r.getresult(), [('{2001:db8::/32}',)])
 
+    def test_network_types_as_ipaddress(self):
+        from pg.cast import cast_cidr, cast_inet
+        query = self.db.query
+        q = ("select '192.168.0.1'::inet, '2001:db8::1/64'::inet,"
+             " '192.168.0.0/24'::cidr,"
+             " array['10.0.0.1'::inet, null], array['2001:db8::/32'::cidr]")
+        r = query(q).getresult()[0]
+        self.assertEqual(r[:3], ('192.168.0.1', '2001:db8::1/64',
+                                 '192.168.0.0/24'))
+        dbtypes = self.db.dbtypes
+        dbtypes.set_typecast('inet', cast_inet)
+        dbtypes.set_typecast('cidr', cast_cidr)
+        self.addCleanup(dbtypes.reset_typecast, ['inet', 'cidr'])
+        r = query(q).getresult()[0]
+        self.assertEqual(r[:3], (
+            IPv4Address('192.168.0.1'), IPv6Interface('2001:db8::1/64'),
+            IPv4Network('192.168.0.0/24')))
+        if pg.get_array():
+            self.assertEqual(r[3:], (
+                [IPv4Address('10.0.0.1'), None],
+                [IPv6Network('2001:db8::/32')]))
+        self.create_table('network_test', 'n smallint primary key,'
+                          ' i inet, c cidr, ia inet[]')
+        a = IPv4Address('192.168.0.1')
+        i = IPv4Interface('192.168.0.1/24')
+        n = IPv6Network('2001:db8::/32')
+        r = self.db.insert('network_test', n=1, i=i, c=n, ia=[a, i])
+        self.assertEqual(r['i'], i)
+        self.assertEqual(r['c'], n)
+        r = self.db.get('network_test', 1)
+        self.assertEqual(r['i'], i)
+        self.assertEqual(r['c'], n)
+        if pg.get_array():
+            self.assertEqual(r['ia'], [a, i])
+        r = query('select network_test from network_test').getresult()[0][0]
+        self.assertEqual(r.i, i)
+        self.assertEqual(r.c, n)
+
     def test_insert_get_array_of_unknown_type(self):
         query = self.db.query
         query("create type test_mood as enum ('sad', 'ok', 'happy')")
