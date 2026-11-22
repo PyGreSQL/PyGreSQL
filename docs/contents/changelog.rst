@@ -77,6 +77,9 @@ Version 6.3.0 (unreleased)
     results after the connection has been closed or reset now raises an
     error instead of returning None, and a query that returned all its
     results no longer takes the results of a later query.
+  - `DB.send_query()` now accepts the parameters as separate arguments like
+    `DB.query()`, in addition to a single list or tuple, and it now also
+    prints the query when debugging is enabled.
   - Using an asynchronous query or its connection again while results are
     fetched or converted, e.g. from another thread, a cast hook or a notice
     receiver, now raises an `InterfaceError`. Before, this could crash.

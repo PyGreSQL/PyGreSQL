@@ -894,6 +894,22 @@ class TestDBClass(unittest.TestCase):
         r = query(q, 4)
         self.assertEqual(r, '3')
 
+    def test_send_query_with_params(self):
+        send_query = self.db.send_query
+        q = "select $1::int + $2::int"
+        for args in ((1, 2), ((1, 2),), ([1, 2],)):
+            with self.subTest(args=args):
+                query = send_query(q, *args)
+                self.assertEqual(query.getresult(), [(3,)])
+                self.assertIsNone(query.getresult())
+        query = send_query(b"select $1::text", 'test')
+        self.assertEqual(query.getresult(), [('test',)])
+        self.assertIsNone(query.getresult())
+        query = send_query("select 1; select 2")
+        self.assertEqual(query.getresult(), [(1,)])
+        self.assertEqual(query.getresult(), [(2,)])
+        self.assertIsNone(query.getresult())
+
     def test_empty_query(self):
         self.assertRaises(ValueError, self.db.query, '')
 
@@ -5296,6 +5312,13 @@ class TestDebug(unittest.TestCase):
         self.db.query("select 2")
         self.assertEqual(output, ["select 1", "select 2"])
         self.assertEqual(self.get_output(), "")
+
+    def test_debug_send_query(self):
+        output: list[str] = []
+        self.db.debug = output.append
+        self.db.send_query("select 1").getresult()
+        self.db.send_query("select $1::int", 2).getresult()
+        self.assertEqual(output, ["select 1", "select $1::int\n(2,)"])
 
     def test_debug_multiple_args(self):
         output: list[str] = []

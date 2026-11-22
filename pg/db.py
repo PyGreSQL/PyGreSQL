@@ -1362,11 +1362,22 @@ class DB:
 
     # immediately wrapped methods
 
-    def send_query(self, cmd: str, args: Sequence | None = None) -> Query:
-        """Create a new asynchronous query object for this connection."""
-        if args is None:
-            return self._valid_db.send_query(cmd)
-        return self._valid_db.send_query(cmd, args)
+    def send_query(self, command: str | bytes, *args: Any) -> Query:
+        """Execute a SQL command string asynchronously.
+
+        Like query(), but without waiting for the results, which are
+        fetched with the methods of the returned Query object.
+        Arguments given after the query string will be substituted for
+        the corresponding numbered parameter.  Parameter values can also
+        be given as a single list or tuple argument.
+        """
+        # Wraps shared library function for debugging.
+        db = self._valid_db
+        if args:
+            self._do_debug(command, args)
+            return db.send_query(command, args)
+        self._do_debug(command)
+        return db.send_query(command)
 
     def poll(self) -> int:
         """Complete an asynchronous connection and get its state."""
