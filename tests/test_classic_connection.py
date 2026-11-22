@@ -3033,6 +3033,7 @@ class TestAsyncQueries(unittest.TestCase):
         self.assertEqual(c.getline(), '1')
         self.assertEqual(c.getline(), '2')
         self.assertIsNone(c.getline())
+        self.assertEqual(q.getresult(), '2')  # left to the query
         self.assertIsNone(q.getresult())
         self.assertEqual(c.transaction(), pg.TRANS_IDLE)
 
@@ -3879,6 +3880,37 @@ class TestDirectSocketAccess(unittest.TestCase):
         finally:
             with suppress(OSError):
                 self.c.endcopy()
+
+    def test_connection_is_idle_after_copy(self):
+        c = self.c
+        c.query("copy test from stdin")
+        c.putline("1\tapple\n")
+        c.endcopy()
+        self.assertEqual(c.transaction(), pg.TRANS_IDLE)
+        c.query("copy test to stdout")
+        self.assertEqual(c.getline(), "1\tapple")
+        self.assertIsNone(c.getline())
+        self.assertEqual(c.transaction(), pg.TRANS_IDLE)
+        # the connection can also be used for asynchronous queries
+        q = c.send_query("select 1")
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertIsNone(q.getresult())
+
+    def test_endcopy_raises_error_of_copy(self):
+        c = self.c
+        c.query("copy test from stdin")
+        c.putline("1\tapple\n")
+        c.putline("x\tpear\n")
+        with self.assertRaises(pg.DataError) as cm:
+            c.endcopy()
+        self.assertEqual(cm.exception.sqlstate, '22P02')
+        self.assertEqual(c.transaction(), pg.TRANS_IDLE)
+        self.assertEqual(c.query("select count(*) from test").getresult(),
+                         [(0,)])
+
+    def test_no_copy_in_progress(self):
+        self.assertRaises(OSError, self.c.getline)
+        self.assertRaises(OSError, self.c.endcopy)
 
     def test_parameter_checks(self):
         self.assertRaises(TypeError, self.c.putline)

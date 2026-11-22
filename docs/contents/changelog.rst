@@ -250,6 +250,12 @@ Version 6.3.0 (unreleased)
     and the type of ``columns`` is checked in this case as well.
   - Calling `dir()` on connections, large objects and source objects
     leaked references.
+  - After a COPY with `putline()` and `endcopy()`, errors of the COPY such
+    as invalid data or duplicate keys are now raised by `endcopy()`. Before,
+    they were silently discarded by the next query. After `getline()` or
+    `endcopy()`, the connection is now idle, so that e.g. `send_query()`
+    can be used again. `getline()` now raises an `OSError` instead of a
+    `MemoryError` when no COPY is in progress.
   - The query object returned by `describe_prepared()` had an uninitialized
     flag for asynchronous queries, so that it could be handled like one.
     Query objects also released the reference to the connection twice

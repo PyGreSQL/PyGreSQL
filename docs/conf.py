@@ -57,7 +57,7 @@ nitpick_ignore = [
                  'defuser'),
         'exc': ('Exception', 'IndexError', 'IOError', 'KeyError',
                 'MemoryError', 'SyntaxError', 'TypeError', 'ValueError',
-                'pg.InterfaceError', 'pg.InternalError',
+                'pg.DatabaseError', 'pg.InterfaceError', 'pg.InternalError',
                 'pg.InvalidResultError',
                 'pg.MultipleResultsError', 'pg.NoResultError',
                 'pg.OperationalError', 'pg.ProgrammingError'),

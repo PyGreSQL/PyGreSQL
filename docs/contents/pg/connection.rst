@@ -706,7 +706,8 @@ getline -- get a line from server socket
     :rtype: str, bytes or None
     :raises TypeError: invalid connection
     :raises TypeError: too many parameters
-    :raises MemoryError: buffer overflow
+    :raises OSError: no COPY in progress or other error reading the line
+    :raises pg.DatabaseError: the COPY failed (at the end)
 
 This method allows to directly read a string from the server socket.
 The line is decoded with the client encoding. Like text values, a line that
@@ -714,8 +715,15 @@ cannot be decoded is returned as ``bytes``. A final newline is removed, so
 this method is only suited for the text and CSV formats of COPY. Use the
 ``getdata()`` method of the source object for the binary format.
 
+At the end of the COPY, the final result of the command is fetched, so that
+the connection can be used again, and an error is raised if the COPY failed.
+If the COPY was started with :meth:`Connection.send_query`, the final result
+is returned by the query object instead.
+
 .. versionchanged:: 6.3
     The line is decoded with the client encoding instead of UTF-8.
+    An :exc:`OSError` instead of a :exc:`MemoryError` is raised when no
+    COPY is in progress, and the connection is idle after the COPY.
 
 endcopy -- synchronize client and server
 ----------------------------------------
@@ -727,9 +735,21 @@ endcopy -- synchronize client and server
     :rtype: None
     :raises TypeError: invalid connection
     :raises TypeError: too many parameters
+    :raises OSError: no COPY in progress or other error ending the COPY
+    :raises pg.DatabaseError: the COPY failed
 
 The use of direct access methods may desynchronize client and server.
 This method ensure that client and server will be synchronized.
+
+After the data has been sent with :meth:`Connection.putline`, this method
+ends the COPY and fetches the final result of the command, so that the
+connection can be used again, and raises an error if the COPY failed, e.g.
+because of invalid data. If the COPY was started with
+:meth:`Connection.send_query`, the final result is returned by the query
+object instead.
+
+.. versionchanged:: 6.3
+    Errors of the COPY are raised, and the connection is idle afterwards.
 
 locreate -- create a large object in the database
 -------------------------------------------------

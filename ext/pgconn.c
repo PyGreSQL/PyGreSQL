@@ -652,6 +652,44 @@ conn_describe_prepared(connObject *self, PyObject *args)
     return NULL; /* error */
 }
 
+/* Consume the results at the end of a COPY made with getline() or with
+   putline() and endcopy(), so that the connection becomes idle, and raise
+   an error if the COPY failed. If the COPY belongs to the pending
+   asynchronous query, the results are left to the query. Return 0 on
+   success or -1 with an exception set. */
+static int
+_conn_finish_copy(connObject *self)
+{
+    PGconn *cnx = self->cnx;
+    PGresult *result;
+    int error = 0;
+
+    if (self->async_query)
+        return 0;
+
+    for (;;) {
+        ExecStatusType status;
+
+        Py_BEGIN_ALLOW_THREADS
+        result = PQgetResult(cnx);
+        Py_END_ALLOW_THREADS
+        if (!result)
+            break;
+        status = PQresultStatus(result);
+        if (!error &&
+            (status == PGRES_BAD_RESPONSE || status == PGRES_FATAL_ERROR ||
+             status == PGRES_NONFATAL_ERROR)) {
+            set_error(ProgrammingError, "Cannot copy", cnx, result);
+            error = 1;
+        }
+        PQclear(result);
+        if (status == PGRES_COPY_IN || status == PGRES_COPY_OUT ||
+            status == PGRES_COPY_BOTH)
+            break;
+    }
+    return error ? -1 : 0;
+}
+
 static char conn_putline__doc__[] =
     "putline(line) -- send a line directly to the backend";
 
@@ -726,12 +764,13 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
     if (ret <= 0) {
         if (line != NULL)
             PQfreemem(line);
-        if (ret == -1) { /* end of copy, consume the final result */
-            PQclear(PQgetResult(self->cnx));
+        if (ret == -1) { /* end of copy, consume the final results */
+            if (_conn_finish_copy(self) < 0)
+                return NULL;
             Py_RETURN_NONE;
         }
         set_error_text(
-            PyExc_MemoryError,
+            PyExc_IOError,
             ret == -2 ? NULL
                       : "No line available, wait for read-ready and try again",
             self->cnx);
@@ -773,6 +812,9 @@ conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
                        self->cnx);
         return NULL;
     }
+    /* consume the final results, raising an error if the COPY failed */
+    if (_conn_finish_copy(self) < 0)
+        return NULL;
     Py_RETURN_NONE;
 }
 
