@@ -95,11 +95,12 @@ class BuildPgExt(build_ext):
     user_options = [*build_ext.user_options,  # noqa: RUF012
         ('strict', None, "count all compiler warnings as errors"),
         ('pedantic', None, "enable extra compiler warnings"),
+        ('analyze', None, "run the static analyzer of gcc (slow)"),
         ('memory-size', None, "enable memory size function"),
         ('no-memory-size', None, "disable memory size function")]
 
     boolean_options = [*build_ext.boolean_options,  # noqa: RUF012
-        'strict', 'pedantic', 'memory-size']
+        'strict', 'pedantic', 'analyze', 'memory-size']
 
     negative_opt = {  # noqa: RUF012
         'no-memory-size': 'memory-size'}
@@ -109,6 +110,7 @@ class BuildPgExt(build_ext):
         super().initialize_options()
         self.strict = False
         self.pedantic = False
+        self.analyze = False
         self.memory_size = None
         supported = pg_version >= min_pg_version
         if not supported:
@@ -126,6 +128,11 @@ class BuildPgExt(build_ext):
         if self.pedantic:
             extra_compile_args.extend([
                 '-Wextra', '-pedantic', '-Wshadow', '-Wmissing-prototypes'])
+        if self.analyze:
+            # optimizations hide problems such as a NULL check after a
+            # dereference, so the analysis must be done without them
+            extra_compile_args[extra_compile_args.index('-O2')] = '-O0'
+            extra_compile_args.append('-fanalyzer')
         if self.strict:
             extra_compile_args.append('-Werror')
         wanted = self.memory_size

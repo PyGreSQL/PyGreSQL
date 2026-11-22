@@ -27,5 +27,5 @@ jobs:
       - name: Install tox
         run: pip install tox
       - name: Run quality checks
-        run: tox -e ruff,mypy,stubtest,cformat,docs
+        run: tox -e ruff,mypy,stubtest,analyze,cformat,docs
         timeout-minutes: 5
