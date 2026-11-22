@@ -733,7 +733,7 @@ type of the parameters, if it cannot be derived from the context.
     data passed to :meth:`Connection.inserttable`, where plain ``bytes``
     are raw text.
 
-.. function:: HStore(dict)
+.. function:: Hstore(dict)
 
     A wrapper for holding an hstore dictionary
 
