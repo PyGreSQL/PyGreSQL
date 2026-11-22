@@ -250,9 +250,15 @@ records, and always to the keys and values of hstore values.  This way, text
 that PyGreSQL returned as ``bytes`` because it could not be decoded can be
 written back unchanged.
 
+Binary data passed as a parameter of type ``bytea`` is sent to the server
+unchanged in binary format, so it does not need to be escaped and does not
+depend on settings like ``standard_conforming_strings``. Binary data in
+arrays and records and binary data passed inline are sent as escaped text.
+
 .. versionchanged:: 6.3
     Byte strings were adapted as text in earlier versions, unless they had
-    been wrapped with :func:`Bytea`.
+    been wrapped with :func:`Bytea`. Binary data was always sent as
+    escaped text.
 
 When binding the parameters to a query, PyGreSQL not only adapts the basic
 types like ``int``, ``float``, ``bool`` and ``str``, but also tries to make

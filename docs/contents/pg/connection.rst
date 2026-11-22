@@ -78,6 +78,13 @@ client encoding. Values wrapped with :func:`Hstore` are converted to hstore
 literals, in which keys and values given as bytes are also passed unchanged.
 All other objects are converted to strings with ``str()`` and then also
 encoded with the client encoding.
+Binary data must be wrapped with :func:`Bytea`. It is then sent unchanged
+in binary format as a parameter of type ``bytea`` and may contain any
+bytes, including NUL bytes, which are not allowed in the other parameters.
+
+.. versionchanged:: 6.3
+    Values wrapped with :func:`Bytea` are sent as binary data. Before, they
+    were passed as text like plain bytes.
 
 If you don't pass any parameters, the command string can also include
 multiple SQL commands (separated by semicolons). You will only get the
@@ -239,6 +246,12 @@ of passing the command itself, you pass the name of a prepared statement.
 An empty name corresponds to the unnamed statement.  You must have previously
 created the corresponding named or unnamed statement with
 :meth:`Connection.prepare`, or an :exc:`pg.OperationalError` will be raised.
+
+The types of the parameters have been determined when the statement was
+prepared. Values wrapped with :func:`Bytea` are sent as binary data, so
+they can only be passed for parameters of type ``bytea``. Use a cast like
+``$1::bytea`` in the prepared statement if the type cannot be derived from
+the context.
 
 .. versionadded:: 5.1
 

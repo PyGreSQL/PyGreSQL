@@ -2085,6 +2085,53 @@ class TestParamQueries(unittest.TestCase):
                          (garbage,)).dictresult(),
             [{'garbage': garbage}])
 
+    def test_query_with_bytea_params(self):
+        query = self.c.query
+        data = bytes(range(256))  # including NUL and backslash
+        # binary data does not depend on the client encoding
+        for encoding in ('utf8', 'sql_ascii'):
+            query(f"set client_encoding={encoding}")
+            for value in (data, data * 100, b'', b'\0', b'\\x41'):
+                self.assertEqual(query(
+                    "select $1, pg_typeof($1)::text",
+                    (pg.Bytea(value),)).getresult(), [(value, 'bytea')])
+        self.assertEqual(query(
+            "select $1, $2, $3, $4", (1, pg.Bytea(b'\0'), None, 'x')
+        ).getresult(), [('1', b'\0', None, 'x')])
+
+    def test_query_with_bytea_subclass(self):
+        class MyBytea(pg.Bytea):
+            pass
+
+        self.assertEqual(self.c.query(
+            "select $1", (MyBytea(b'\0\\\xff'),)).getresult(),
+            [(b'\0\\\xff',)])
+
+    def test_query_with_bytea_params_are_typed(self):
+        query = self.c.query
+        # the parameter has the type bytea, not an inferred type
+        self.assertEqual(query(
+            "select $1::text", (pg.Bytea(b'AB'),)).getresult(),
+            [('\\x4142',)])
+        self.assertRaises(pg.ProgrammingError, query,
+                          "select $1 = 'AB'::text", (pg.Bytea(b'AB'),))
+
+    def test_query_with_plain_bytes_for_bytea(self):
+        query = self.c.query
+        # plain bytes are passed unchanged as the text representation
+        self.assertEqual(query(
+            "select $1::bytea", (b'\\x4142',)).getresult(), [(b'AB',)])
+        self.assertRaises(ValueError, query, "select $1::bytea", (b'\0',))
+
+    def test_query_with_bytea_and_failing_param(self):
+        query = self.c.query
+        self.assertRaises(ValueError, query, "select $1, $2",
+                          (pg.Bytea(b'\0'), 'a\0b'))
+        self.assertRaises(ValueError, query, "select $1, $2",
+                          ('a\0b', pg.Bytea(b'\0')))
+        self.assertEqual(query(
+            "select $1", (pg.Bytea(b'\0'),)).getresult(), [(b'\0',)])
+
 
 class TestPreparedQueries(unittest.TestCase):
     """Test prepared queries via a basic pg connection."""
@@ -2145,6 +2192,19 @@ class TestPreparedQueries(unittest.TestCase):
         self.assertEqual(
             self.c.query_prepared('q2', ['he', 'lo']).getresult(),
             [('he-lo',)])
+
+    def test_query_prepared_with_bytea_params(self):
+        data = bytes(range(256))  # including NUL and backslash
+        self.c.query("create temporary table bin (n int, b bytea)")
+        self.c.prepare('ins', "insert into bin values ($1, $2)")
+        self.c.query_prepared('ins', (1, pg.Bytea(data)))
+        self.c.query_prepared('ins', (2, pg.Bytea(b'')))
+        self.c.query_prepared('ins', (3, None))
+        # plain bytes are passed unchanged as the text representation
+        self.c.query_prepared('ins', (4, b'\\x4142'))
+        self.assertEqual(
+            self.c.query("select n, b from bin order by n").getresult(),
+            [(1, data), (2, b''), (3, None), (4, b'AB')])
 
     def test_describe_non_existent_query(self):
         self.assertRaises(
@@ -2660,6 +2720,13 @@ class TestAsyncQueries(unittest.TestCase):
                 with self.assertRaisesRegex(
                         TypeError, rf'^Method {method}\(\) expects a seq'):
                     func('select $1', None)
+
+    def test_send_query_with_bytea_params(self):
+        data = bytes(range(256))  # including NUL and backslash
+        q = self.c.send_query(
+            "select $1, pg_typeof($1)::text, $2", (pg.Bytea(data), 1))
+        self.assertEqual(q.getresult(), [(data, 'bytea', '1')])
+        self.assertIsNone(q.getresult())
 
     def test_result_methods_move_to_next_result(self):
         send_query = self.c.send_query

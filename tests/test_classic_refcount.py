@@ -246,6 +246,26 @@ class TestConnectionRefCounts(RefCountTestCase):
             self.assert_refcount_unchanged(query, value)
             self.assert_refcount_unchanged(inserttable, value)
 
+    def test_query_bytea_params(self):
+        # binary data sent unchanged must not leak or lose references
+        value = pg.Bytea(b'\0\xff')
+        self.c.prepare('q', 'select $1::bytea')
+
+        def send_query() -> None:
+            self.c.send_query('select $1', [value]).getresult()
+
+        for func in (partial(self.c.query, 'select $1', [value]),
+                     partial(self.c.query_prepared, 'q', [value]),
+                     send_query):
+            self.assert_refcount_unchanged(func, value)
+
+        # also not when a later parameter fails
+        def query() -> None:
+            with suppress(ValueError):
+                self.c.query('select $1, $2', [value, 'a\0b'])
+
+        self.assert_refcount_unchanged(query, value)
+
     def test_source_pgcnx(self):
         source = self.c.source()
         self.assertIs(source.pgcnx, self.c)

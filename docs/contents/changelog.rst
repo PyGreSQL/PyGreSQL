@@ -74,6 +74,18 @@ Version 6.3.0 (unreleased)
     binary data, so that any bytes can be inserted into bytea columns.
     Plain `bytes` are still passed unchanged as raw text. Before, binary
     data had to be escaped by hand, e.g. with `escape_bytea()`.
+  - Binary data is now sent as parameters of type bytea in binary format
+    (#20). This applies to values wrapped with `Bytea()` passed to
+    `Connection.query()`, `send_query()` and `query_prepared()`, and to
+    binary data for bytea parameters in `query_formatted()` and the other
+    methods of the `DB` wrapper. Plain `bytes` passed to the query methods
+    of the connection are still raw text. Binary data is no longer escaped
+    and doubled in size, may contain NUL bytes, and is no longer corrupted
+    when `standard_conforming_strings` is off. Since the parameters now
+    have the type bytea, a `Bytea()` value like ``Bytea(b'\\x41')`` is no
+    longer taken as the text representation of ``b'A'``, and comparing it
+    with text now raises an error instead of comparing the escaped string.
+    Binary data in arrays and records is still sent as escaped text.
   - Asynchronous queries created with `send_query()` have been fixed and
     are now tested thoroughly (#41). The methods returning a whole result
     move to the next result as before, but getting rows with `one()`,

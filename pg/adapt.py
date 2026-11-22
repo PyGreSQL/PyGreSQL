@@ -625,6 +625,20 @@ class Adapter:
                 value = adapt(value)
         return value
 
+    def _adapt_parameter(self, value: Any, typ: Any = None) -> Any:
+        """Adapt a value that is passed as a separate parameter.
+
+        Binary data for bytea is passed as Bytea, which is sent to the
+        server in binary format. Values nested in other values and values
+        put into the SQL inline are still adapted as text.
+        """
+        if isinstance(value, bytes) and not hasattr(value, '__pg_str__'):
+            simple = (self.get_simple_name(typ) if typ
+                      else self.guess_simple_type(value))
+            if simple == 'bytea':
+                return value if isinstance(value, Bytea) else Bytea(value)
+        return self.adapt(value, typ)
+
     @staticmethod
     def simple_type(name: str) -> DbType:
         """Create a simple database type with given attribute names."""
@@ -773,7 +787,7 @@ class Adapter:
         list and return either the literal value or a placeholder.
         """
         params = _ParameterList()
-        params.adapt = self.adapt
+        params.adapt = self._adapt_parameter
         return params
 
     def format_query(self, command: str,

@@ -729,9 +729,12 @@ type of the parameters, if it cannot be derived from the context.
 
 .. versionchanged:: 6.3
     Plain ``bytes`` parameters are now also adapted as ``bytea``, so this
-    wrapper is no longer needed for them. It is still needed for binary
-    data passed to :meth:`Connection.inserttable`, where plain ``bytes``
-    are raw text.
+    wrapper is no longer needed for them in :meth:`DB.query_formatted`
+    and the other methods of the :class:`DB` wrapper. It is still needed
+    for binary data passed to :meth:`Connection.query` and the other
+    query methods of the connection or to :meth:`Connection.inserttable`,
+    where plain ``bytes`` are raw text. Wrapped values are now sent as
+    binary data in the query methods.
 
 .. function:: Hstore(dict)
 

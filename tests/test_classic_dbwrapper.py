@@ -3276,6 +3276,33 @@ class TestDBClass(unittest.TestCase):
             self.assertIsInstance(r, bytes)
             self.assertEqual(r, s)
 
+    def test_query_formatted_bytea_is_binary(self):
+        if pg.get_bytea_escaped():
+            self.skipTest('bytea conversion is disabled')
+        query_formatted = self.db.query_formatted
+        data = bytes(range(256))  # including NUL and backslash
+        for value in (data, pg.Bytea(data)):
+            self.assertEqual(query_formatted(
+                'select %s, pg_typeof(%s)::text', (value, value)
+            ).getresult(), [(data, 'bytea')])
+        self.assertEqual(query_formatted(
+            'select %s', (b'\\x41',), ('bytea',)).getresult(), [(b'\\x41',)])
+
+    def test_query_formatted_bytea_non_standard_strings(self):
+        if pg.get_bytea_escaped():
+            self.skipTest('bytea conversion is disabled')
+        if self.db.server_version >= 190000:
+            self.skipTest('non-standard strings are not supported')
+        self.db.query('set standard_conforming_strings=off')
+        self.create_table('bytea_test', 'n smallint primary key, data bytea')
+        s = b"It's all \\ kinds \x00 of\r nasty \xff stuff!\n"
+        # binary data is not escaped, so it is independent of the setting
+        self.assertEqual(self.db.query_formatted(
+            'select %s', (s,)).getresult(), [(s,)])
+        r = self.db.insert('bytea_test', n=1, data=s)
+        self.assertEqual(r['data'], s)
+        self.assertEqual(self.db.get('bytea_test', 1)['data'], s)
+
     def test_query_formatted_bytea_array(self):
         if not pg.get_array() or pg.get_bytea_escaped():
             self.skipTest('array or bytea conversion is disabled')
@@ -5113,8 +5140,10 @@ class TestDBClassAdapter(unittest.TestCase):
             ','.join(['%s'] * 8), values, types)
         self.assertEqual(sql, ','.join(f'${n}' for n in range(1, 9)))
         self.assertEqual(params, values)  # raw text is passed unchanged
+        self.assertFalse(any(isinstance(p, pg.Bytea) for p in params))
         sql, params = format_query('%s', (b'raw',), ('bytea',))
-        self.assertEqual(params, [b'\\x726177'])  # binary data is escaped
+        self.assertEqual(params, [b'raw'])  # binary data is sent as binary
+        self.assertIsInstance(params[0], pg.Bytea)
         sql, params = format_query('%s', ([b'raw', b'a b', b'', None, 'x'],),
                                    ('text[]',))
         self.assertEqual(params, [b'{raw,"a b","",null,x}'])
@@ -5133,6 +5162,32 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query(
             '%s', ([pg.Hstore({b'k': b'a,b'})],), ('hstore[]',))
         self.assertEqual(params, [b'{"k=>\\"a,b\\""}'])
+
+    def test_adapt_query_with_bytea_params(self):
+        format_query = self.adapter.format_query
+        data = b'\0\\\xff'
+        # binary data for bytea parameters is passed as Bytea
+        for types in (None, ('bytea',)):
+            sql, params = format_query('%s', (data,), types)
+            self.assertEqual(sql, '$1')
+            self.assertEqual(params, [data])
+            self.assertIsInstance(params[0], pg.Bytea)
+        value = pg.Bytea(data)
+        sql, params = format_query('%s', (value,))
+        self.assertIs(params[0], value)
+        # Bytea marks binary data also for other types
+        sql, params = format_query('%s', (value,), ('text',))
+        self.assertIs(params[0], value)
+        # text for bytea parameters is still escaped
+        sql, params = format_query('%s', ('ab',), ('bytea',))
+        self.assertEqual(params, ['\\x6162'])
+        # nested binary data is adapted as text
+        sql, params = format_query('%s', ((1, data),))
+        self.assertEqual(params, [b'(1,"\\\\x005cff")'])
+        self.assertNotIsInstance(params[0], pg.Bytea)
+        sql, params = format_query('%s', (data,), inline=True)
+        self.assertEqual(sql, "'\\x005cff'")
+        self.assertEqual(params, [])
 
     def test_adapt_query_typed_hstore_with_raw_bytes_as_text(self):
         format_query = self.adapter.format_query
@@ -5166,8 +5221,10 @@ class TestDBClassAdapter(unittest.TestCase):
         value = b"it's \\ \x00\xff"
         sql, params = format_query("select %s, %s", (value, [b'a', b'']))
         self.assertEqual(sql, "select $1, $2")
-        self.assertEqual(params, [
-            b'\\x69742773205c2000ff', b'{\\\\x61,\\\\x}'])
+        # binary data is sent as binary, arrays of it as escaped text
+        self.assertEqual(params, [value, b'{\\\\x61,\\\\x}'])
+        self.assertIsInstance(params[0], pg.Bytea)
+        self.assertNotIsInstance(params[1], pg.Bytea)
 
     def test_adapt_query_untyped_dict(self):
         format_query = self.adapter.format_query

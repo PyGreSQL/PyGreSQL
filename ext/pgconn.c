@@ -431,28 +431,73 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
     if (nparms) {
         /* prepare arguments */
         PyObject **str, **s;
-        const char **parms, **p;
+        const char **parms;
+        Oid *types = NULL;
+        int *lengths = NULL, *formats = NULL;
+        int binary = 0;
         register int i;
+
+        /* binary data marked as bytea is sent in binary format, so the
+           lengths, formats and types are only needed if there is any */
+        if (bytea_type) {
+            for (i = 0; i < nparms; ++i) {
+                if (PyObject_TypeCheck(PyTuple_GET_ITEM(param_obj, i),
+                                       (PyTypeObject *)bytea_type)) {
+                    binary = 1;
+                    break;
+                }
+            }
+        }
 
         str = (PyObject **)PyMem_Malloc((size_t)nparms * sizeof(*str));
         parms = (const char **)PyMem_Malloc((size_t)nparms * sizeof(*parms));
-        if (!str || !parms) {
-            PyMem_Free((void *)parms);
-            PyMem_Free(str);
-            Py_DECREF(query_str_obj);
-            Py_XDECREF(param_obj);
-            return PyErr_NoMemory();
+        if (binary) {
+            types = (Oid *)PyMem_Calloc((size_t)nparms, sizeof(*types));
+            lengths = (int *)PyMem_Calloc((size_t)nparms, sizeof(*lengths));
+            formats = (int *)PyMem_Calloc((size_t)nparms, sizeof(*formats));
+        }
+        s = str;
+        if (!str || !parms || (binary && (!types || !lengths || !formats))) {
+            PyErr_NoMemory();
+            status = -1;
+            result = NULL;
+            goto cleanup;
         }
 
         /* convert optional args to a list of strings -- this allows
          * the caller to pass whatever they like, and prevents us
          * from having to map types to OIDs */
-        for (i = 0, s = str, p = parms; i < nparms; ++i, ++p) {
+        for (i = 0; i < nparms; ++i) {
             PyObject *obj = PyTuple_GET_ITEM(param_obj, i);
             PyObject *bytes_obj;
 
             if (obj == Py_None) {
-                *p = NULL;
+                parms[i] = NULL;
+                continue;
+            }
+            if (binary &&
+                PyObject_TypeCheck(obj, (PyTypeObject *)bytea_type)) {
+                char *data;
+                Py_ssize_t size;
+
+                /* binary data is sent unchanged, NUL bytes are allowed */
+                if (PyBytes_AsStringAndSize(obj, &data, &size) < 0) {
+                    status = -1;
+                    result = NULL;
+                    goto cleanup;
+                }
+                if (size > INT_MAX) {
+                    PyErr_SetString(PyExc_ValueError,
+                                    "Bytea parameter is too large");
+                    status = -1;
+                    result = NULL;
+                    goto cleanup;
+                }
+                *s++ = Py_NewRef(obj);
+                parms[i] = data;
+                lengths[i] = (int)size;
+                formats[i] = 1;
+                types[i] = BYTEAOID;
                 continue;
             }
             /* like the query, encode with the client encoding and check for
@@ -461,18 +506,12 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
             bytes_obj = obj ? get_encoded_arg(obj, encoding, NULL) : NULL;
             Py_XDECREF(obj);
             if (!bytes_obj) {
-                PyMem_Free((void *)parms);
-                while (s != str) {
-                    s--;
-                    Py_DECREF(*s);
-                }
-                PyMem_Free(str);
-                Py_DECREF(query_str_obj);
-                Py_XDECREF(param_obj);
-                return NULL;
+                status = -1;
+                result = NULL;
+                goto cleanup;
             }
             *s++ = bytes_obj;
-            *p = PyBytes_AS_STRING(bytes_obj);
+            parms[i] = PyBytes_AS_STRING(bytes_obj);
         }
 
         /* prepare the connection after the parameters have been converted,
@@ -489,28 +528,35 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
         else {
             Py_BEGIN_ALLOW_THREADS
             if (async) {
-                status = PQsendQueryParams(self->cnx, query, nparms, NULL,
-                                           (const char *const *)parms, NULL,
-                                           NULL, 0);
+                status = PQsendQueryParams(self->cnx, query, nparms, types,
+                                           (const char *const *)parms, lengths,
+                                           formats, 0);
                 result = NULL;
             }
             else {
-                result = prepared ? PQexecPrepared(self->cnx, query, nparms,
-                                                   parms, NULL, NULL, 0)
-                                  : PQexecParams(self->cnx, query, nparms,
-                                                 NULL, parms, NULL, NULL, 0);
+                result = prepared
+                             ? PQexecPrepared(self->cnx, query, nparms, parms,
+                                              lengths, formats, 0)
+                             : PQexecParams(self->cnx, query, nparms, types,
+                                            parms, lengths, formats, 0);
                 status = result != NULL;
             }
             Py_END_ALLOW_THREADS
             _conn_end(self);
         }
 
+    cleanup:
+        PyMem_Free(formats);
+        PyMem_Free(lengths);
+        PyMem_Free(types);
         PyMem_Free((void *)parms);
-        while (s != str) {
-            s--;
-            Py_DECREF(*s);
+        if (str) {
+            while (s != str) {
+                s--;
+                Py_DECREF(*s);
+            }
+            PyMem_Free(str);
         }
-        PyMem_Free(str);
     }
     else if (!_conn_begin(self)) {
         status = -1;
