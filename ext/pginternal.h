@@ -48,6 +48,8 @@ PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding);
 PyObject *
 get_encoded_text(PyObject *text, int encoding);
+PyObject *
+get_encoded_value(PyObject *obj, int encoding);
 int
 get_field_number(const PGresult *res, PyObject *name, int encoding,
                  const char *usage);

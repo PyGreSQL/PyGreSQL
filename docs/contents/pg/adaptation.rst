@@ -104,7 +104,9 @@ Strings are encoded and decoded with the client encoding of the connection
   applies to the elements of arrays, the fields of records and the keys and
   values of hstore values. The other parts of such values are then encoded
   with the client encoding, which is available as the Python codec name in
-  the :attr:`Connection.encoding` attribute.
+  the :attr:`Connection.encoding` attribute. Hstore values passed directly
+  as parameters to :meth:`Connection.query` and the other query methods, or
+  to :meth:`Connection.inserttable`, are converted in the same way.
 - Field names, error messages, notices, notification channels and parameter
   values (:meth:`Connection.parameter`) are always ``str``. If they cannot
   be decoded with the client encoding, they are decoded as UTF-8 with

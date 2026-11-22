@@ -3984,6 +3984,27 @@ class TestDBClass(unittest.TestCase):
                              Decimal('1.5'), date(2026, 11, 21)))
         self.assertEqual(p.name, b'w' + raw)
 
+    def test_hstore_with_raw_bytes_as_text(self):
+        query = self.db.query
+        # with SQL_ASCII, the server sends text without conversion
+        query('set client_encoding=sql_ascii')
+        query('create type test_pair_type as (a text, b text)')
+        self.addCleanup(query, 'drop type test_pair_type')
+        typ = self.db.dbtypes['test_pair_type']
+        # chr(228) is non-ASCII in all server encodings
+        raw = query('select chr(228)').singlescalar()
+        self.assertIsInstance(raw, bytes)
+        h = pg.Hstore({b'k' + raw: b'v', 'x': 'y z'})
+        expected = b'k' + raw + b'=>v,x=>"y z"'
+        f = self.db.query_formatted
+        # the raw bytes were sent with backslash escapes before
+        self.assertEqual(f('select %s::text', (h,), ('text',)).singlescalar(),
+                         expected)
+        self.assertEqual(f('select (%s::text[])[1]', ([h],), ('text[]',)
+                           ).singlescalar(), expected)
+        self.assertEqual(f('select (%s::test_pair_type).a', ((h, 'z'),),
+                           (typ,)).singlescalar(), expected)
+
     def test_write_back_undecodable_text(self):
         self.require_hstore()
         query = self.db.query
@@ -5112,6 +5133,18 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query(
             '%s', ([pg.Hstore({b'k': b'a,b'})],), ('hstore[]',))
         self.assertEqual(params, [b'{"k=>\\"a,b\\""}'])
+
+    def test_adapt_query_typed_hstore_with_raw_bytes_as_text(self):
+        format_query = self.adapter.format_query
+        h = pg.Hstore({b'k\xfc': b'v', 'x': 'y z'})
+        # text parameters are passed on and converted by the C extension
+        params = format_query('%s', (h,), ('text',))[1]
+        self.assertEqual(params, [h])
+        # the raw bytes were converted with backslash escapes before
+        params = format_query('%s', ([h, 'a'],), ('text[]',))[1]
+        self.assertEqual(params, [b'{"k\xfc=>v,x=>\\"y z\\"",a}'])
+        params = format_query('%s', ([h],), ('record[]',))[1]
+        self.assertEqual(params, [b'{"k\xfc=>v,x=>\\"y z\\""}'])
 
     def test_adapt_query_inline_with_raw_bytes(self):
         format_query = self.adapter.format_query

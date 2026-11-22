@@ -83,6 +83,13 @@ class Hstore(dict):
         return join_text([join_text([q(k), q(v)], '=>', encoding)
                           for k, v in self.items()], ',', encoding)
 
+    def _pg_text(self, codec: str) -> str | bytes:
+        """Create the hstore literal for the given Python codec.
+
+        This is used by the C extension for values that are sent as text.
+        """
+        return self._literal(lambda: codec)
+
 
 class Json:
     """Wrapper class for marking Json values."""
@@ -432,6 +439,16 @@ class Adapter:
         """Join parts of a literal, as bytes if any of the parts is bytes."""
         return join_text(parts, sep, self._encoding, start, end)
 
+    def _to_text(self, v: Any) -> str | bytes:
+        """Convert a value to text, like the C extension does.
+
+        Hstore values are converted to their literal, as bytes if they
+        contain raw text given as bytes, all other values with str().
+        """
+        if isinstance(v, Hstore):
+            return v._literal(self._encoding)
+        return str(v)
+
     _re_array_quote_bytes = regex(rb'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
     _re_record_quote_bytes = regex(rb'[(),"\\]')
     _re_escape_bytes = regex(rb'(["\\])')
@@ -489,7 +506,7 @@ class Adapter:
     def _adapt_text_array(self, v: Any) -> str | bytes:
         """Adapt a text type array parameter."""
         return self._adapt_array(
-            v, lambda v: self._quote_array_element(str(v)))
+            v, lambda v: self._quote_array_element(self._to_text(v)))
 
     _adapt_date_array = _adapt_text_array
 
@@ -553,7 +570,7 @@ class Adapter:
                 v = self._adapt_record(
                     v, elem_type or self.guess_simple_type(v))
             else:
-                v = str(v)
+                v = self._to_text(v)
             return self._quote_array_element(v)
         return self._adapt_array(v, adapt)
 
@@ -570,7 +587,7 @@ class Adapter:
                 v = ''
             else:
                 if not isinstance(v, (str, bytes)):
-                    v = str(v)
+                    v = self._to_text(v)
                 v = self._quote_record_field(v)
             value.append(v)
         return self._join(value, ',', '(', ')')

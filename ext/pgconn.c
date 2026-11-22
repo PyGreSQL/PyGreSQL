@@ -455,16 +455,9 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
                 *p = NULL;
                 continue;
             }
-            if (PyBytes_Check(obj) || PyUnicode_Check(obj)) {
-                Py_INCREF(obj);
-            }
-            else if (!(obj = PyObject_Str(obj))) {
-                PyErr_SetString(
-                    PyExc_TypeError,
-                    "Query parameter has no string representation");
-            }
             /* like the query, encode with the client encoding and check for
                NUL characters, since parameters are passed as C strings */
+            obj = get_encoded_value(obj, encoding);
             bytes_obj = obj ? get_encoded_arg(obj, encoding, NULL) : NULL;
             Py_XDECREF(obj);
             if (!bytes_obj) {
@@ -1047,7 +1040,7 @@ _inserttable_append_bytea(struct CharBuffer *buf, PyObject *item)
 static int
 _inserttable_append_value(struct CharBuffer *buf, PyObject *item, int encoding)
 {
-    PyObject *str_obj, *bytes_obj;
+    PyObject *bytes_obj;
     char *s, *end;
     Py_ssize_t len;
     int ret = 0;
@@ -1062,19 +1055,9 @@ _inserttable_append_value(struct CharBuffer *buf, PyObject *item, int encoding)
     if (bytea_type && PyObject_TypeCheck(item, (PyTypeObject *)bytea_type))
         return _inserttable_append_bytea(buf, item);
 
-    if (PyBytes_Check(item)) {
-        bytes_obj = Py_NewRef(item);
-    }
-    else {
-        /* other objects are converted with str(), like query parameters */
-        str_obj = PyUnicode_Check(item) ? Py_NewRef(item) : PyObject_Str(item);
-        if (!str_obj)
-            return -1; /* pass the error */
-        bytes_obj = get_encoded_string(str_obj, encoding);
-        Py_DECREF(str_obj);
-        if (!bytes_obj)
-            return -1; /* pass the UnicodeEncodeError */
-    }
+    /* other values are converted like query parameters */
+    if (!(bytes_obj = get_encoded_value(item, encoding)))
+        return -1; /* pass the error */
 
     if (PyBytes_AsStringAndSize(bytes_obj, &s, &len) < 0) {
         Py_DECREF(bytes_obj);

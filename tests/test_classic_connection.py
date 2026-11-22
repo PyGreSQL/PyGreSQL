@@ -1434,6 +1434,79 @@ class TestStringsSentToServer(unittest.TestCase):
             query('select $1::text', [S('wärme')]).singlescalar(), 'wärme')
         self.assertRaises(
             UnicodeEncodeError, query, 'select $1::text', [S('мир')])
+        # raw bytes in hstore values are passed unchanged,
+        # and the other parts are encoded with the client encoding
+        h = pg.Hstore({b'k\xe4': b'v', 'x': 'ö'})
+        self.assertEqual(
+            query('select $1::text', [h]).singlescalar(), 'kä=>v,x=>ö')
+        self.assertRaises(UnicodeEncodeError, query, 'select $1::text',
+                          [pg.Hstore({b'k': b'v', 'x': 'мир'})])
+
+    def test_query_with_hstore_params_with_raw_bytes(self):
+        query = self.c.query
+        # with SQL_ASCII, the server sends text without conversion
+        query('set client_encoding=sql_ascii')
+        # chr(228) is non-ASCII in all server encodings
+        raw = query('select chr(228)').singlescalar()
+        self.assertIsInstance(raw, bytes)
+        h = pg.Hstore({b'k' + raw: b'v' + raw, 'x': 'y z'})
+        expected = b'k' + raw + b'=>v' + raw + b',x=>"y z"'
+        q = "select $1::text, $1 = 'k' || chr(228) || '=>v' || chr(228)" \
+            " || ',x=>\"y z\"'"
+        # the raw bytes were sent with backslash escapes before
+        self.assertEqual(query(q, [h]).getresult(), [(expected, True)])
+        self.c.prepare('q', q)
+        self.assertEqual(
+            self.c.query_prepared('q', [h]).getresult(), [(expected, True)])
+        self.assertEqual(
+            self.c.send_query(q, [h]).getresult(), [(expected, True)])
+
+        class MyHstore(pg.Hstore):
+            pass
+
+        self.assertEqual(
+            query(q, [MyHstore(h)]).getresult(), [(expected, True)])
+        # hstore values without bytes are sent as before
+        self.assertEqual(query('select $1::text', [
+            pg.Hstore({'a': '1', 'b': None})]).singlescalar(), 'a=>1,b=>NULL')
+        # non-ASCII text cannot be encoded without a specific encoding
+        self.assertRaises(UnicodeEncodeError, query, 'select $1::text',
+                          [pg.Hstore({b'k': b'v', 'x': 'ä'})])
+        self.assertRaises(UnicodeEncodeError, query, 'select $1::text',
+                          [pg.Hstore({'x': 'ä'})])
+        # NUL characters cannot be sent
+        self.assertRaises(ValueError, query, 'select $1::text',
+                          [pg.Hstore({b'k': b'a\0b'})])
+        self.assertRaises(ValueError, query, 'select $1::text',
+                          [pg.Hstore({'k': 'a\0b'})])
+
+        class BadHstore(pg.Hstore):
+            def _pg_text(self, codec: str) -> Any:
+                return 42
+
+        with self.assertRaises(TypeError) as cm:
+            query('select $1::text', [BadHstore()])
+        self.assertIn('must be str or bytes', str(cm.exception))
+        self.assertEqual(query('select 1').singlescalar(), 1)
+
+    def test_query_with_params_failing_to_convert(self):
+        query = self.c.query
+
+        class S:
+            def __str__(self):
+                raise ZeroDivisionError
+
+        class N:
+            def __str__(self):
+                return 42
+
+        # the error was replaced with a generic TypeError before
+        self.assertRaises(ZeroDivisionError, query, 'select $1', [S()])
+        self.assertRaises(ZeroDivisionError, self.c.send_query,
+                          'select $1', [S()])
+        # the message of Python's own error depends on the version
+        self.assertRaises(TypeError, query, 'select $1', [N()])
+        self.assertEqual(query('select 1').singlescalar(), 1)
 
     def test_prepare_latin1(self):
         self.set_latin1()
@@ -3639,6 +3712,42 @@ class TestInserttable(unittest.TestCase):
         self.c.query("truncate table test")
         self.assert_failed(
             UnicodeEncodeError, [('a',), (pg.Hstore({'€': '1'}),)], ['t'])
+        # raw bytes in hstore values are passed unchanged,
+        # and the other parts are encoded with the client encoding
+        h = pg.Hstore({b'k\xe4': b'v', 'x': 'ö'})
+        self.c.inserttable('test', [(h,)], ['t'])
+        self.assertEqual(
+            self.c.query('select t from test').getresult(), [('kä=>v,x=>ö',)])
+        self.c.query("truncate table test")
+        self.assert_failed(UnicodeEncodeError, [
+            ('a',), (pg.Hstore({b'k': b'v', 'x': '€'}),)], ['t'])
+
+    def test_inserttable_hstore_with_raw_bytes(self):
+        c = self.c
+        # with SQL_ASCII, the server sends text without conversion
+        c.query("set client_encoding=sql_ascii")
+        # chr(228) is non-ASCII in all server encodings
+        raw = c.query('select chr(228)').singlescalar()
+        self.assertIsInstance(raw, bytes)
+
+        class MyHstore(pg.Hstore):
+            pass
+
+        h = pg.Hstore({b'k' + raw: b'v' + raw, 'x': 'y z'})
+        expected = b'k' + raw + b'=>v' + raw + b',x=>"y z"'
+        # the raw bytes were sent with backslash escapes before
+        c.inserttable('test', [(h,), (MyHstore(h),)], ['t'])
+        self.assertEqual(c.query(
+            "select t, t = 'k' || chr(228) || '=>v' || chr(228)"
+            " || ',x=>\"y z\"' from test").getresult(), [(expected, True)] * 2)
+        c.query("truncate table test")
+        # non-ASCII text cannot be encoded without a specific encoding
+        self.assert_failed(UnicodeEncodeError, [
+            ('a',), (pg.Hstore({b'k': b'v', 'x': 'ä'}),)], ['t'])
+        # NUL characters cannot be sent
+        self.assert_failed(ValueError, [
+            ('a',), (pg.Hstore({b'k': b'a\0b'}),)], ['t'],
+            'must not contain NUL characters')
 
     def assert_ready(self):
         """Check that the connection is ready for the next command."""

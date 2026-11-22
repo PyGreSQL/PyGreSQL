@@ -220,6 +220,32 @@ class TestConnectionRefCounts(RefCountTestCase):
                 "do $$ begin raise warning 'Bilbo was here!'; end $$"),
             hook)
 
+    def test_query_params_and_inserttable_values(self):
+        # values converted to text must not leak or lose references
+        self.c.query('create temporary table test_values (t text)')
+        values = (b'raw', 'text', 1.5, pg.Hstore({'k': 'v'}),
+                  pg.Hstore({b'k': b'v', 'x': 'y'}))
+        for value in values:
+            self.assert_refcount_unchanged(
+                partial(self.c.query, 'select $1::text', [value]), value)
+            self.assert_refcount_unchanged(
+                partial(self.c.inserttable, 'test_values', [(value,)]),
+                value)
+        # also not when the conversion fails
+        self.c.query('set client_encoding=sql_ascii')
+        for value in ('ä', pg.Hstore({b'k': b'v', 'x': 'ä'}),
+                      pg.Hstore({b'k': b'\0'})):
+            def query(v: Any = value) -> None:
+                with suppress(ValueError):  # also UnicodeEncodeError
+                    self.c.query('select $1::text', [v])
+
+            def inserttable(v: Any = value) -> None:
+                with suppress(ValueError):  # also UnicodeEncodeError
+                    self.c.inserttable('test_values', [(v,)])
+
+            self.assert_refcount_unchanged(query, value)
+            self.assert_refcount_unchanged(inserttable, value)
+
     def test_source_pgcnx(self):
         source = self.c.source()
         self.assertIs(source.pgcnx, self.c)

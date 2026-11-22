@@ -59,11 +59,13 @@ Version 6.3.0 (unreleased)
     with the type OID of the array elements.
   - Parameters given as `bytes` for a known type other than bytea are now
     passed unchanged as raw text in the client encoding, also as elements of
-    arrays, fields of records and keys and values of hstore values. This way,
-    text returned as `bytes` because it could not be decoded (e.g. with the
-    client encoding SQL_ASCII) can be written back. Before, the Python
-    representation of the bytes was sent, errors were raised, or `b'f'` was
-    adapted as true for boolean parameters.
+    arrays, fields of records and keys and values of hstore values, also
+    when hstore values are passed for text parameters, or directly to
+    `Connection.query()` or `inserttable()`. This way, text returned as
+    `bytes` because it could not be decoded (e.g. with the client encoding
+    SQL_ASCII) can be written back. Before, the Python representation of the
+    bytes was sent, errors were raised, or `b'f'` was adapted as true for
+    boolean parameters.
   - Fields of record parameters containing a closing parenthesis are now
     quoted. Before, they caused a syntax error.
   - The new `Connection.encoding` attribute contains the Python codec name
@@ -190,6 +192,15 @@ Version 6.3.0 (unreleased)
     `Hstore()`. The server rejected such values, or stored their Python
     representation in text columns. Floats and booleans are not affected,
     since their `str()` and `repr()` are the same.
+  - Values wrapped with `Hstore()` that are passed as query parameters or to
+    `inserttable()` are now converted to their literal with the client
+    encoding, so that keys and values given as `bytes` are passed unchanged
+    as raw text, like in `DB` methods. A `__str__()` method of a subclass
+    is not used for this, since it creates a human readable representation.
+  - Errors raised when converting a query parameter to a string are now
+    passed on, like in `inserttable()`. Before, all errors, including
+    `KeyboardInterrupt` and `MemoryError`, were replaced with a generic
+    `TypeError` saying that the parameter has no string representation.
   - The `escape_literal()` and `escape_identifier()` methods crashed for
     bytes containing invalid multibyte characters, they now raise a
     `DataError`. The escape methods of a connection that had been closed

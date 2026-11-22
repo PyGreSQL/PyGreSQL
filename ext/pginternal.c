@@ -353,6 +353,43 @@ get_field_number(const PGresult *res, PyObject *name, int encoding,
     return num;
 }
 
+/* Get a value that is sent to the server as text, such as a query parameter
+   or a value for inserttable(), as a new reference to a bytes object.
+   Bytes are passed unchanged as raw text in the client encoding, and str is
+   encoded with the client encoding (UnicodeEncodeError if impossible).
+   Hstore values are converted to their literal with _pg_text(), which may
+   contain raw text given as bytes, and all other objects are converted with
+   str(). Errors in the conversion are passed. NUL characters are not checked
+   here. */
+PyObject *
+get_encoded_value(PyObject *obj, int encoding)
+{
+    PyObject *str_obj, *bytes_obj;
+
+    if (PyBytes_Check(obj))
+        return Py_NewRef(obj);
+    if (PyUnicode_Check(obj))
+        return get_encoded_string(obj, encoding);
+    if (hstore_type && PyObject_TypeCheck(obj, (PyTypeObject *)hstore_type))
+        str_obj = PyObject_CallMethod(obj, "_pg_text", "s",
+                                      get_codec_name(encoding));
+    else
+        str_obj = PyObject_Str(obj);
+    if (!str_obj)
+        return NULL; /* pass the error */
+    if (PyBytes_Check(str_obj))
+        return str_obj;
+    if (!PyUnicode_Check(str_obj)) {
+        PyErr_Format(PyExc_TypeError, "Text of %s must be str or bytes",
+                     Py_TYPE(obj)->tp_name);
+        Py_DECREF(str_obj);
+        return NULL;
+    }
+    bytes_obj = get_encoded_string(str_obj, encoding);
+    Py_DECREF(str_obj);
+    return bytes_obj; /* or pass the UnicodeEncodeError */
+}
+
 PyObject *
 get_encoded_string(PyObject *unicode_obj, int encoding)
 {

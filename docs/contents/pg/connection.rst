@@ -72,6 +72,12 @@ must be supplied separately as a tuple.  The values are substituted by
 the database in such a way that they don't need to be escaped, making this
 an effective way to pass arbitrary or unknown data without worrying about
 SQL injection or syntax errors.
+``None`` is passed as NULL. Strings are encoded with the client encoding,
+bytes are passed unchanged as the text representation of the value in the
+client encoding. Values wrapped with :func:`Hstore` are converted to hstore
+literals, in which keys and values given as bytes are also passed unchanged.
+All other objects are converted to strings with ``str()`` and then also
+encoded with the client encoding.
 
 If you don't pass any parameters, the command string can also include
 multiple SQL commands (separated by semicolons). You will only get the
@@ -563,8 +569,9 @@ of the :mod:`ipaddress` module, and values wrapped with :func:`Json`
 or :func:`Hstore`.
 Strings are encoded with the client encoding, bytes are passed unchanged
 as the text representation of the value in the client encoding.
-Other objects are converted to strings with ``str()``, like query
-parameters, and then also encoded with the client encoding.
+Other objects are converted like query parameters (see
+:meth:`Connection.query`), i.e. to hstore literals or with ``str()``,
+and then also encoded with the client encoding.
 The values must not contain NUL characters, which PostgreSQL does not
 support in text. Binary data for columns of type ``bytea`` must be
 wrapped with :func:`Bytea`; it is then sent in the hex format of bytea
