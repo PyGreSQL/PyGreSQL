@@ -150,6 +150,8 @@ Version 6.3.0 (unreleased)
     `Connection.inserttable()` and the copy methods did not support quoted
     parts (#47). A name with an empty part or an unterminated quote now
     raises a `ValueError`.
+  - `DbTypes.reset_typecast()` now also resets the typecast for arrays of
+    the given type. Before, the arrays were still cast with the old function.
 
 - Changes in the `pgdb` module:
 

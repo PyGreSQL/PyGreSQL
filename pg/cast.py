@@ -406,6 +406,7 @@ class Typecasts(dict):
                 typ = [typ]
             for t in typ:
                 self.pop(t, None)
+                self.pop(f'_{t}', None)
 
     @classmethod
     def get_default(cls, typ: str) -> Any:

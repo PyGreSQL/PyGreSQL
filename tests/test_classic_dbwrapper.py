@@ -4341,8 +4341,16 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(
             dbtypes.typecast('Impossible', 'circle'),
             'Squared Circle: Impossible')
+        r = self.db.query(
+            "select array['<(0,0),1>'::circle]").getresult()[0][0]
+        if pg.get_array():
+            self.assertEqual(r, ['Squared Circle: <(0,0),1>'])
         dbtypes.reset_typecast('circle')
         self.assertIsNone(dbtypes.get_typecast('circle'))
+        r = self.db.query(
+            "select array['<(0,0),1>'::circle]").getresult()[0][0]
+        if pg.get_array():  # array cast must also be reset
+            self.assertEqual(r, ['<(0,0),1>'])
 
     def test_get_set_type_cast(self):
         get_typecast = pg.get_typecast
