@@ -229,6 +229,10 @@ Version 6.3.0 (unreleased)
     and the type of ``columns`` is checked in this case as well.
   - Calling `dir()` on connections, large objects and source objects
     leaked references.
+  - The query object returned by `describe_prepared()` had an uninitialized
+    flag for asynchronous queries, so that it could be handled like one.
+    Query objects also released the reference to the connection twice
+    when running out of memory.
 
 - Modernization and build:
 

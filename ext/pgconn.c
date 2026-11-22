@@ -415,8 +415,11 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
     if (result && (status = PQresultStatus(result)) != PGRES_TUPLES_OK)
         return _conn_non_query_result(status, result, self->cnx);
 
-    if (!(query_obj = PyObject_New(queryObject, &queryType)))
+    if (!(query_obj = PyObject_New(queryObject, &queryType))) {
+        if (result)
+            PQclear(result);
         return PyErr_NoMemory();
+    }
 
     /* stores result and returns object */
     Py_XINCREF(self);
@@ -435,8 +438,8 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
         query_obj->num_fields = PQnfields(result);
         query_obj->col_types = get_col_types(result, query_obj->num_fields);
         if (!query_obj->col_types) {
+            /* this also clears the result and releases the connection */
             Py_DECREF(query_obj);
-            Py_DECREF(self);
             return NULL;
         }
     }
@@ -569,20 +572,22 @@ conn_describe_prepared(connObject *self, PyObject *args)
     Py_DECREF(name_obj);
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
         queryObject *query_obj = PyObject_New(queryObject, &queryType);
-        if (!query_obj)
+        if (!query_obj) {
+            PQclear(result);
             return PyErr_NoMemory();
+        }
         Py_XINCREF(self);
         query_obj->pgcnx = self;
         query_obj->result = result;
+        query_obj->async = 0;
         query_obj->encoding = encoding;
         query_obj->current_row = 0;
         query_obj->max_row = PQntuples(result);
         query_obj->num_fields = PQnfields(result);
         query_obj->col_types = get_col_types(result, query_obj->num_fields);
         if (!query_obj->col_types) {
-            PQclear(result);
+            /* this also clears the result and releases the connection */
             Py_DECREF(query_obj);
-            Py_DECREF(self);
             return NULL;
         }
         return (PyObject *)query_obj;
