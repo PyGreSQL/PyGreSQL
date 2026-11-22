@@ -2565,6 +2565,21 @@ class TestAsyncQueries(unittest.TestCase):
         with suppress(pg.InternalError):  # if closed in the test
             self.c.close()
 
+    def test_parameter_errors(self):
+        c = self.c
+        for method in ('query', 'send_query', 'query_prepared'):
+            with self.subTest(method=method):
+                func = getattr(c, method)
+                with self.assertRaisesRegex(
+                        TypeError, rf'^Method {method}\(\) expects a string'):
+                    func(1)
+                with self.assertRaisesRegex(
+                        TypeError, rf'^Method {method}\(\) expects a seq'):
+                    func('select $1', 1)
+                with self.assertRaisesRegex(
+                        TypeError, rf'^Method {method}\(\) expects a seq'):
+                    func('select $1', None)
+
     def test_result_methods_move_to_next_result(self):
         send_query = self.c.send_query
         sql = 'select 1 as a; select 2 as a'

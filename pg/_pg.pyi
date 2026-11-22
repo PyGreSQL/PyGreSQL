@@ -256,8 +256,7 @@ class Connection:
         """Create a new source object for this connection."""
         ...
 
-    def query(self, cmd: str | bytes, args: Sequence | None = None, /
-              ) -> Query:
+    def query(self, cmd: str | bytes, args: Sequence = ..., /) -> Query:
         """Create a new query object for this connection.
 
         Note that if the command is something other than DQL, this method
@@ -265,13 +264,16 @@ class Connection:
         """
         ...
 
-    def send_query(self, cmd: str | bytes, args: Sequence | None = None, /
-                   ) -> Query:
-        """Create a new asynchronous query object for this connection."""
+    def send_query(self, cmd: str | bytes, args: Sequence = ..., /) -> Query:
+        """Create a new asynchronous query object for this connection.
+
+        Note that the result methods of the query can then also return
+        an int, str or None, as described in the documentation.
+        """
         ...
 
     def query_prepared(self, name: str | bytes,
-                       args: Sequence | None = None, /) -> Query:
+                       args: Sequence = ..., /) -> Query:
         """Execute a prepared statement."""
         ...
 

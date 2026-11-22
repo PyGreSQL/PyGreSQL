@@ -324,6 +324,23 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
     PGresult *result;
     char *query;
     int encoding, status, nparms = 0;
+    const char *usage_str, *usage_seq;
+
+    if (prepared) {
+        usage_str =
+            "Method query_prepared() expects a string as first argument";
+        usage_seq =
+            "Method query_prepared() expects a sequence as second argument";
+    }
+    else if (async) {
+        usage_str = "Method send_query() expects a string as first argument";
+        usage_seq =
+            "Method send_query() expects a sequence as second argument";
+    }
+    else {
+        usage_str = "Method query() expects a string as first argument";
+        usage_seq = "Method query() expects a sequence as second argument";
+    }
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -338,9 +355,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
     if ((encoding = get_client_encoding(self)) < 0)
         return NULL;
 
-    if (!(query_str_obj = get_encoded_arg(
-              query_str_obj, encoding,
-              "Method query() expects a string as first argument")))
+    if (!(query_str_obj = get_encoded_arg(query_str_obj, encoding, usage_str)))
         return NULL;
     query = PyBytes_AS_STRING(query_str_obj);
 
@@ -349,8 +364,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
      * caller passes no arguments to db.query(), and historic behaviour was
      * to call PQexec() in that case, which can execute multiple commands. */
     if (param_obj) {
-        PyObject *seq_obj = PySequence_Fast(
-            param_obj, "Method query() expects a sequence as second argument");
+        PyObject *seq_obj = PySequence_Fast(param_obj, usage_seq);
 
         /* use a tuple with own references to the parameters, since a list
          * could be changed while the parameters are converted to strings */
