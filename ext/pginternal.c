@@ -1538,6 +1538,21 @@ set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result)
     set_error_msg_and_state(type, msg, encoding, sqlstate);
 }
 
+/* Set database error from a result only. This is used for results of
+   asynchronous queries that have been moved from the connection, since
+   the last error message of the connection may belong to another command
+   then. */
+void
+set_result_error(const PGresult *result, int encoding)
+{
+    char *sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
+    /* errors without SQLSTATE come from libpq, e.g. for a lost connection */
+    PyObject *type = sqlstate ? get_error_type(sqlstate) : OperationalError;
+
+    set_error_msg_and_state(type, PQresultErrorMessage(result), encoding,
+                            sqlstate);
+}
+
 /* Get SSL attributes and values as a dictionary. */
 PyObject *
 get_ssl_attributes(PGconn *cnx)

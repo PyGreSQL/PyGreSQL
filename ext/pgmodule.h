@@ -93,6 +93,8 @@ typedef struct {
     PyObject *notice_receiver; /* current notice receiver */
     PQnoticeReceiver default_notice_receiver; /* receiver of libpq */
     int encoding; /* last checked client encoding */
+    struct _queryObject *async_query; /* borrowed, async query with results
+                                         still pending on the connection */
 } connObject;
 
 #define is_connObject(v) (PyType(v) == &connType)
@@ -122,15 +124,30 @@ typedef struct {
 
 #define is_noticeObject(v) (PyType(v) == &noticeType)
 
-typedef struct {
+/* States of asynchronous queries (normal queries have state 0) */
+#define ASYNC_INITIAL 1     /* no result has been fetched yet */
+#define ASYNC_UNDELIVERED 2 /* the current result has been fetched for an
+                               accessor, but not returned by a result method */
+#define ASYNC_DELIVERED 3   /* the current result has been returned */
+#define ASYNC_DONE 4        /* all results have been returned */
+
+typedef struct _queryObject {
     PyObject_HEAD connObject *pgcnx; /* parent connection object */
     PGresult *result;                /* result content */
-    int async;                       /* flag for asynchronous queries */
+    int async;                       /* state of asynchronous queries */
     int encoding;                    /* client encoding */
     int current_row;                 /* currently selected row */
     int max_row;                     /* number of rows in the result */
     int num_fields;                  /* number of fields in each row */
     int *col_types;                  /* PyGreSQL column types */
+    PyObject *value;     /* undelivered value of a non-query result */
+    PGresult **pending;  /* results moved from the connection */
+    int num_pending;     /* number of moved results */
+    int next_pending;    /* index of the next moved result */
+    int detached;        /* the pending results have been moved */
+    int fetching;        /* a result is being fetched from the connection */
+    int in_use;          /* the current result is being converted */
+    int copy;            /* the current result is a COPY result */
 } queryObject;
 
 #define is_queryObject(v) (PyType(v) == &queryType)
@@ -148,5 +165,13 @@ int
 _check_cnx_obj(connObject *self);
 PyObject *
 _conn_non_query_result(int status, PGresult *result, PGconn *cnx);
+int
+_conn_prepare_command(connObject *self);
+PyObject *
+_conn_new_query(connObject *self, PGresult *result, int encoding, int async);
+
+/* Cross-object helpers exported by pgquery.c */
+int
+_query_detach(queryObject *self);
 
 #endif /* PYGRE_SQL_PGMODULE_H */

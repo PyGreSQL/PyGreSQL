@@ -65,6 +65,10 @@ _check_lo_obj(largeObject *self, int level)
         }
     }
 
+    /* the methods (not the attributes) execute commands */
+    if (level && _conn_prepare_command(self->pgcnx) < 0)
+        return 0;
+
     return 1;
 }
 

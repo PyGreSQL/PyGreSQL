@@ -22,6 +22,7 @@ from __future__ import annotations
 import sys
 import unittest
 from collections.abc import Callable
+from contextlib import suppress
 from decimal import Decimal
 from functools import partial
 from typing import Any
@@ -144,6 +145,42 @@ class TestConnectionRefCounts(RefCountTestCase):
     def test_query_iter(self):
         q = self.c.query('select 1')
         self.assert_refcount_unchanged(lambda: iter(q), q)
+
+    def test_async_query_iter(self):
+        q = self.c.send_query('select 1; select 2')
+        self.assert_refcount_unchanged(lambda: iter(q), q)
+        q.getresult()
+        self.assert_refcount_unchanged(lambda: iter(q), q)
+
+    def test_async_query_pgcnx(self):
+        c = self.c
+
+        def run_async_queries() -> None:
+            q = c.send_query('select 1; select 2')  # deleted unfetched
+            q = c.send_query('select 1; select 2')
+            q.getresult()  # pending results are moved by the next query
+            q = c.send_query('select 1/0')
+            with suppress(pg.DataError):
+                q.getresult()
+            q = c.send_query('select 1')
+            len(q)
+            q.getresult()
+            q.getresult()
+
+        self.assert_refcount_unchanged(run_async_queries, c)
+
+    def test_async_query_values(self):
+        c = self.c
+
+        def get_value() -> Any:
+            q = c.send_query('set datestyle to iso')
+            len(q)  # value is kept until returned
+            value = q.getresult()
+            q.getresult()
+            return value
+
+        self.assertEqual(get_value(), '')
+        self.assert_refcount_unchanged(get_value, '')
 
     def test_query_null_values(self):
         q = self.c.query('select null')

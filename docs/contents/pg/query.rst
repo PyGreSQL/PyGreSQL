@@ -44,7 +44,8 @@ in the result, and access row tuples using their index directly on
 the :class:`Query` object.
 
 When the :class:`Query` object was returned by :meth:`Connection.send_query`,
-other return values are also possible, as documented there.
+this method moves to the next result, and other return values are also
+possible, as documented there.
 
 dictresult/dictiter -- get query values as dictionaries
 -------------------------------------------------------

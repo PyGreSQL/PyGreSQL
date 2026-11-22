@@ -86,44 +86,71 @@ send_query - executes a SQL command string asynchronously
     :rtype: :class:`Query`
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
-    :raises ValueError: empty SQL query or lost connection
-    :raises pg.ProgrammingError: error in query
+    :raises ValueError: lost connection
 
 This method is much the same as :meth:`Connection.query`, except that it
-returns without waiting for the query to complete. The database connection
-cannot be used for other operations until the query completes, but the
-application can do other things, including executing queries using other
+returns without waiting for the query to complete. The application can do
+other things in the meantime, including executing queries using other
 database connections. The application can call ``select()`` using the
 ``fileno``  obtained by the connection's :meth:`Connection.fileno` method
 to determine when the query has results to return.
 
 This method always returns a :class:`Query` object. This object differs
 from the :class:`Query` object returned by :meth:`Connection.query` in a
-few ways. Most importantly, when :meth:`Connection.send_query` is used, the
-application must call one of the result-returning methods such as
-:meth:`Query.getresult` or :meth:`Query.dictresult` until it either raises
-an exception or returns ``None``.
+few ways. Most importantly, the results of all statements are returned,
+one after the other, and errors in the query (such as an empty query) are
+only raised when the result of the failing statement is fetched.
 
-Otherwise, the database connection will be left in an unusable state.
+The methods that return the whole result, i.e. :meth:`Query.getresult`,
+:meth:`Query.dictresult`, :meth:`Query.namedresult`,
+:meth:`Query.scalarresult` and the corresponding iterator methods, move to
+the next result and return it. They return ``None`` when all results have
+been returned, and the application should call them until they return
+``None`` or raise an exception. Otherwise, the connection stays busy until
+another command is executed (see below). The iterators returned by these
+methods only iterate over the result that was current when they were
+created.
 
 In cases when :meth:`Connection.query` would return something other than
-a :class:`Query` object, that result will be returned by calling one of
-the result-returning methods on the :class:`Query` object returned by
-:meth:`Connection.send_query`. There's one important difference in these
-result codes: if :meth:`Connection.query` returns `None`, the result-returning
-methods will return an empty string (`''`). It's still necessary to call a
-result-returning method until it returns `None`.
+a :class:`Query` object, that result will be returned by these methods.
+There's one important difference in these result codes: if
+:meth:`Connection.query` returns ``None``, these methods will return an
+empty string (``''``) instead, since ``None`` marks the end of the results.
 
-:meth:`Query.listfields`, :meth:`Query.fieldname` and :meth:`Query.fieldnum`
-only work after a call to a result-returning method with a non-``None`` return
-value. Calling ``len()`` on a :class:`Query` object returns the number of rows
-of the previous result-returning method.
+All other methods and operations, i.e. getting single rows with
+:meth:`Query.one`, :meth:`Query.single` and their variants, iterating over
+the query, getting rows by index, :func:`len` and the methods that return
+information about the fields, access the current result without moving to
+the next result, like they do for queries returned by
+:meth:`Connection.query`. When no result has been fetched yet, they fetch
+the first result, which will then also be returned by the next call of one
+of the methods returning the whole result. When the current result is not
+a query result, there are no fields and no rows.
 
-If multiple semi-colon-delimited statements are passed to
-:meth:`Connection.query`, only the results of the last statement are returned
-in the :class:`Query` object. With :meth:`Connection.send_query`, all results
-are returned. Each result set will be returned by a separate call to
-:meth:`Query.getresult()` or other result-returning methods.
+When another command is executed on the connection, e.g. with
+:meth:`Connection.query` or :meth:`Connection.send_query`, before all
+results have been fetched, the remaining results are fetched and kept in
+the query object, so that they can still be returned afterwards. Note that
+this waits for the asynchronous query to complete. If the connection is
+closed or reset before all results have been fetched, these results are
+lost and trying to fetch them raises an error.
+
+If a statement is a COPY command, an empty string is returned as its
+result. Before the next result can be fetched, the data must be sent
+using :meth:`Connection.putline` and :meth:`Connection.endcopy`, or
+received using :meth:`Connection.getline` until it returns ``None``.
+The COPY must also be completed before another command can be executed
+on the connection, otherwise a :exc:`pg.InterfaceError` is raised.
+
+A query object and its connection must not be used concurrently by
+different threads. If a query object is used again while its results are
+being fetched or converted, e.g. by another thread or by a cast hook or
+notice receiver, a :exc:`pg.InterfaceError` is raised.
+
+.. versionchanged:: 6.3
+    The row accessors, :func:`len` and iteration do not move to the next
+    result any more, and results are not discarded any more when another
+    command is executed on the connection.
 
 .. versionadded:: 5.2
 
@@ -131,15 +158,15 @@ Examples::
 
     name = input("Name? ")
     query = con.send_query("select phone from employees where name=$1",
-                          (name,))
+                           (name,))
     phone = query.getresult()
     query.getresult()  # to close the query
 
     # Run two queries in one round trip:
     # (Note that you cannot use a union here
     # when the result sets have different row types.)
-    query = con.send_query("select a,b,c from x where d=e;
-                          "select e,f from y where g")
+    query = con.send_query("select a,b,c from x where d=e;"
+                           " select e,f from y where g")
     result_x = query.dictresult()
     result_y = query.dictresult()
     query.dictresult()  # to close the query

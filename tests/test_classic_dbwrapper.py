@@ -77,8 +77,21 @@ class TestDBClassInit(unittest.TestCase):
         query = db.send_query('select 1')
         del db
         gc.collect()
-        self.assertIsNone(query.getresult())
-        self.assertIsNone(query.getresult())
+        # the connection has been closed, so the results are lost
+        self.assertRaises(TypeError, query.getresult)
+        self.assertRaises(TypeError, query.getresult)
+
+    def test_async_query_with_type_lookup(self):
+        db = DB()  # new instance, so the date type is not yet cached
+        try:
+            query = db.send_query("select '2020-12-31'::date; select 2")
+            # the type lookup runs a query, which must not discard the
+            # pending second result of the asynchronous query
+            self.assertEqual(query.getresult(), [(date(2020, 12, 31),)])
+            self.assertEqual(query.getresult(), [(2,)])
+            self.assertIsNone(query.getresult())
+        finally:
+            db.close()
 
 
 class TestDBClassBasic(unittest.TestCase):

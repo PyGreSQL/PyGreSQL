@@ -59,6 +59,27 @@ Version 6.3.0 (unreleased)
     binary data, so that any bytes can be inserted into bytea columns.
     Plain `bytes` are still passed unchanged as raw text. Before, binary
     data had to be escaped by hand, e.g. with `escape_bytea()`.
+  - Asynchronous queries created with `send_query()` have been fixed and
+    are now tested thoroughly (#41). The methods returning a whole result
+    move to the next result as before, but getting rows with `one()`,
+    `single()` and their variants, getting rows by index, `len()` and
+    iteration now access the current result like for other queries.
+    Before, they moved to the next result, so that rows and results could
+    get lost, and the methods returning named tuples did not move on (thanks
+    to Justin Pryzby for pointing out the inconsistency of indexing). The
+    iterators returned by `dictiter()`, `namediter()` and `scalariter()`
+    are now bound to the result that was current when they were created.
+  - Results of asynchronous queries that have not been fetched yet are now
+    kept in the query object when another command is executed on the
+    connection. Before, they were discarded, which also happened when
+    `DB` needed to look up a type while the results were fetched, and
+    `send_query()` raised an error while results were pending. Fetching
+    results after the connection has been closed or reset now raises an
+    error instead of returning None, and a query that returned all its
+    results no longer takes the results of a later query.
+  - Using an asynchronous query or its connection again while results are
+    fetched or converted, e.g. from another thread, a cast hook or a notice
+    receiver, now raises an `InterfaceError`. Before, this could crash.
 
 - Changes in the `pgdb` module:
 

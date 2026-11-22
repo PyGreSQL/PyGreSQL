@@ -1809,8 +1809,8 @@ class TestFakeServer(unittest.TestCase):
         query = connection.send_query("select 1")
         # this crashed before when more than one result followed the error
         self.assertRaises(pg.ProgrammingError, query.getresult)
-        # the remaining results have been consumed, the query is invalid
-        self.assertRaises(TypeError, query.getresult)
+        # the remaining results have been consumed, the query is done
+        self.assertIsNone(query.getresult())
         self.assertEqual(connection.transaction(), pg.TRANS_IDLE)
 
 
@@ -2553,6 +2553,516 @@ class TestQueryOneSingleScalar(unittest.TestCase):
         self.assertIsInstance(r, Iterable)
         r = list(r)
         self.assertEqual(r, [1, 3])
+
+
+class TestAsyncQueries(unittest.TestCase):
+    """Test asynchronous queries created with send_query()."""
+
+    def setUp(self):
+        self.c = connect()
+
+    def tearDown(self):
+        with suppress(pg.InternalError):  # if closed in the test
+            self.c.close()
+
+    def test_result_methods_move_to_next_result(self):
+        send_query = self.c.send_query
+        sql = 'select 1 as a; select 2 as a'
+        for method, r1, r2 in (
+                ('getresult', [(1,)], [(2,)]),
+                ('dictresult', [{'a': 1}], [{'a': 2}]),
+                ('namedresult', [(1,)], [(2,)]),
+                ('scalarresult', [1], [2]),
+                ('dictiter', [{'a': 1}], [{'a': 2}]),
+                ('namediter', [(1,)], [(2,)]),
+                ('scalariter', [1], [2])):
+            with self.subTest(method=method):
+                q = send_query(sql)
+                get = getattr(q, method)
+                self.assertEqual(list(get()), r1)
+                self.assertEqual(self.c.transaction(), pg.TRANS_ACTIVE)
+                self.assertEqual(list(get()), r2)
+                self.assertEqual(self.c.transaction(), pg.TRANS_ACTIVE)
+                self.assertIsNone(get())
+                self.assertEqual(self.c.transaction(), pg.TRANS_IDLE)
+                self.assertIsNone(get())
+
+    def test_iterators_are_bound_to_their_result(self):
+        q = self.c.send_query('select 1 as a; select 2 as b')
+        it = q.dictiter()
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertEqual(list(it), [{'a': 1}])
+        self.assertIsNone(q.getresult())
+        q = self.c.send_query('select 1 as a; select 2 as b')
+        it1 = q.namediter()
+        it2 = q.namediter()
+        self.assertEqual(next(it1)._fields, ('a',))
+        self.assertEqual(next(it2)._fields, ('b',))
+        self.assertIsNone(q.scalariter())
+
+    def test_get_item_reads_current_result(self):
+        q = self.c.send_query('select 1 union all select 2; select 3')
+        self.assertEqual(q[0], (1,))
+        self.assertEqual(q[0], (1,))
+        self.assertEqual(q[1], (2,))
+        self.assertEqual(q[-1], (2,))
+        self.assertRaises(IndexError, q.__getitem__, 2)
+        # the first result is still returned by the next result method
+        self.assertEqual(q.getresult(), [(1,), (2,)])
+        self.assertEqual(q[0], (1,))
+        self.assertEqual(q.getresult(), [(3,)])
+        self.assertEqual(q[0], (3,))
+        self.assertIsNone(q.getresult())
+        self.assertRaises(IndexError, q.__getitem__, 0)
+
+    def test_len_and_iteration_read_current_result(self):
+        q = self.c.send_query('select 1 union all select 2; select 3')
+        self.assertEqual(len(q), 2)
+        self.assertEqual(list(q), [(1,), (2,)])
+        self.assertEqual(list(q), [(1,), (2,)])
+        self.assertEqual(list(iter(q)), [(1,), (2,)])
+        self.assertEqual(q.getresult(), [(1,), (2,)])
+        self.assertEqual(q.getresult(), [(3,)])
+        self.assertEqual(len(q), 1)
+        self.assertEqual([row for row in q], [(3,)])
+        self.assertIsNone(q.getresult())
+        self.assertEqual(len(q), 0)
+        self.assertEqual(list(q), [])
+        q = self.c.send_query('select 1')
+        self.assertEqual(next(q), (1,))
+        self.assertRaises(StopIteration, next, q)
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertIsNone(q.getresult())
+
+    def test_one_methods_read_current_result(self):
+        sql = 'select 1 as a union all select 2; select 3 as a'
+        for method, r1, r2, r3 in (
+                ('one', (1,), (2,), (3,)),
+                ('onedict', {'a': 1}, {'a': 2}, {'a': 3}),
+                ('onenamed', (1,), (2,), (3,)),
+                ('onescalar', 1, 2, 3)):
+            with self.subTest(method=method):
+                q = self.c.send_query(sql)
+                one = getattr(q, method)
+                self.assertEqual(one(), r1)
+                self.assertEqual(one(), r2)
+                self.assertIsNone(one())
+                self.assertEqual(q.getresult(), [(1,), (2,)])
+                self.assertIsNone(one())  # rows have been read
+                self.assertEqual(q.getresult(), [(3,)])
+                self.assertIsNone(one())  # like after query().getresult()
+                self.assertIsNone(q.getresult())
+                self.assertIsNone(one())
+                q = self.c.send_query('select 3 as a')
+                one = getattr(q, method)
+                self.assertEqual(one(), r3)
+                self.assertIsNone(one())
+                self.assertEqual(q.getresult(), [(3,)])
+                self.assertIsNone(q.getresult())
+
+    def test_single_methods_read_current_result(self):
+        sql = 'select 1 as a union all select 2; select 3 as a'
+        for method, r in (
+                ('single', (3,)), ('singledict', {'a': 3}),
+                ('singlenamed', (3,)), ('singlescalar', 3)):
+            with self.subTest(method=method):
+                q = self.c.send_query(sql)
+                single = getattr(q, method)
+                self.assertRaises(pg.MultipleResultsError, single)
+                self.assertRaises(pg.MultipleResultsError, single)
+                self.assertEqual(q.getresult(), [(1,), (2,)])
+                self.assertEqual(q.getresult(), [(3,)])
+                self.assertEqual(single(), r)
+                self.assertEqual(single(), r)
+                self.assertIsNone(q.getresult())
+                self.assertRaises(pg.NoResultError, single)
+
+    def test_non_query_results(self):
+        c = self.c
+        c.query('create temp table test_async (n int)')
+        c.query('insert into test_async values (1), (2)')
+        q = c.send_query(
+            'update test_async set n = n + 1;'
+            ' set datestyle to iso; select 1 as a')
+        self.assertEqual(len(q), 0)  # current result is not a query result
+        self.assertRaises(IndexError, q.__getitem__, 0)
+        self.assertIsNone(q.one())
+        self.assertEqual(list(q), [])
+        self.assertEqual(q.listfields(), ())
+        self.assertEqual(q.namedresult(), '2')
+        self.assertEqual(q.namedresult(), '')
+        self.assertEqual(q.namedresult(), [(1,)])
+        self.assertIsNone(q.namedresult())
+        q = c.send_query('update test_async set n = n + 1; select 1 as a')
+        for method in ('dictiter', 'namediter', 'scalariter'):
+            with self.subTest(method=method):
+                q = c.send_query(
+                    'update test_async set n = n + 1; select 1 as a')
+                get = getattr(q, method)
+                self.assertEqual(get(), '2')
+                self.assertEqual(len(list(get())), 1)
+                self.assertIsNone(get())
+                self.assertEqual(c.transaction(), pg.TRANS_IDLE)
+
+    def test_no_empty_result_after_last_result(self):
+        q = self.c.send_query('select where false')
+        self.assertEqual(q.namedresult(), [])
+        self.assertIsNone(q.namedresult())
+        self.assertIsNone(q.getresult())
+        self.assertIsNone(q.getresult())
+
+    def test_finished_query_does_not_take_results_of_next_query(self):
+        q1 = self.c.send_query('select 1')
+        self.assertEqual(q1.getresult(), [(1,)])
+        self.assertIsNone(q1.getresult())
+        q2 = self.c.send_query('select 2')
+        self.assertIsNone(q1.getresult())
+        self.assertEqual(q2.getresult(), [(2,)])
+        self.assertIsNone(q2.getresult())
+
+    def test_results_are_kept_when_connection_is_used(self):
+        c = self.c
+        q = c.send_query('select 1; select 2')
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertEqual(c.query('select 3').getresult(), [(3,)])
+        self.assertEqual(c.transaction(), pg.TRANS_IDLE)
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+        # also when another asynchronous query is sent
+        q1 = c.send_query('select 1; select 2')
+        q2 = c.send_query('select 3')
+        self.assertEqual(q2.getresult(), [(3,)])
+        self.assertEqual(q1.getresult(), [(1,)])
+        self.assertIsNone(q2.getresult())
+        self.assertEqual(q1.getresult(), [(2,)])
+        self.assertIsNone(q1.getresult())
+        # or when other commands are executed
+        q = c.send_query('select 1')
+        c.prepare('test_async', 'select 2')
+        self.assertEqual(c.query_prepared('test_async').getresult(), [(2,)])
+        self.assertEqual(
+            c.describe_prepared('test_async').listfields(), ('?column?',))
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertIsNone(q.getresult())
+
+    def test_errors_are_kept_when_connection_is_used(self):
+        q = self.c.send_query('select 1; select 1/0; select 3')
+        self.assertEqual(self.c.query('select 2').getresult(), [(2,)])
+        self.assertEqual(q.getresult(), [(1,)])
+        with self.assertRaises(pg.DataError) as cm:
+            q.getresult()
+        self.assertIn('division by zero', str(cm.exception))
+        self.assertEqual(cm.exception.sqlstate, '22012')
+        self.assertIsNone(q.getresult())
+
+    def test_kept_results_are_available_after_close(self):
+        q = self.c.send_query('select 1; select 2')
+        self.c.query('select 3')
+        self.c.close()
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+
+    def test_pending_results_are_lost_after_close(self):
+        q = self.c.send_query('select 1; select 2')
+        self.assertEqual(q.getresult(), [(1,)])
+        self.c.close()
+        self.assertEqual(q.listfields(), ('?column?',))  # current result
+        self.assertRaises(TypeError, q.getresult)
+        self.assertRaises(TypeError, q.getresult)
+        q = self.c = connect()
+        q = self.c.send_query('select 1')
+        self.c.close()
+        self.assertRaises(TypeError, len, q)
+
+    def test_pending_results_are_lost_after_reset(self):
+        q = self.c.send_query('select 1')
+        self.c.reset()
+        self.assertRaises(pg.OperationalError, q.getresult)
+        self.assertEqual(self.c.query('select 2').getresult(), [(2,)])
+
+    def test_results_of_deleted_query_are_discarded(self):
+        q = self.c.send_query('select 1')
+        del q
+        q = self.c.send_query('select 2')
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+
+    def test_errors(self):
+        q = self.c.send_query('select 1; select 1/0; select 3')
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertRaises(pg.DataError, q.getresult)
+        self.assertEqual(self.c.transaction(), pg.TRANS_IDLE)
+        self.assertIsNone(q.getresult())
+        q = self.c.send_query('select 1/0')
+        self.assertRaises(pg.DataError, len, q)
+        self.assertIsNone(q.getresult())
+        q = self.c.send_query('')
+        self.assertRaises(ValueError, q.getresult)
+        self.assertIsNone(q.getresult())
+
+    def test_fetching_in_notice_receiver(self):
+        c = self.c
+        c.query('set client_min_messages=notice')
+        q = c.send_query("do $$ begin raise notice 'test'; end $$; select 1")
+        errors: list[Exception] = []
+
+        def receiver(_notice):
+            try:
+                q.getresult()
+            except Exception as e:
+                errors.append(e)
+            try:
+                c.query('select 2')
+            except Exception as e:
+                errors.append(e)
+
+        c.set_notice_receiver(receiver)
+        self.assertEqual(q.getresult(), '')
+        self.assertEqual(len(errors), 2)
+        for error in errors:
+            self.assertIsInstance(error, pg.InterfaceError)
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertIsNone(q.getresult())
+
+    def test_fetching_in_cast_hook(self):
+        c = self.c
+        errors: list[Exception] = []
+
+        def hook(value, _pgtype):
+            if not errors:
+                try:
+                    q.getresult()
+                except Exception as e:
+                    errors.append(e)
+            return value
+
+        c.set_cast_hook(hook)
+        q = c.send_query("select '(1,2)'::point from generate_series(1, 3);"
+                         " select '(3,4)'::point, 1")
+        self.assertEqual(q.getresult(), [('(1,2)',)] * 3)
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], pg.InterfaceError)
+        self.assertEqual(q.getresult(), [('(3,4)', 1)])
+        self.assertIsNone(q.getresult())
+
+    def test_using_sync_query_in_cast_hook(self):
+        c = self.c
+        q = c.query("select '(1,2)'::point, n from generate_series(1, 3) n")
+        inner: list[bool] = []
+
+        def hook(value, _pgtype):
+            if not inner:
+                inner.append(True)
+                try:
+                    q.getresult()  # moves the current row to the end
+                finally:
+                    inner.clear()
+            return value
+
+        c.set_cast_hook(hook)
+        rows = [('(1,2)', n) for n in range(1, 4)]
+        self.assertEqual(q.getresult(), rows)
+        self.assertEqual(q.dictresult(), [{'point': r[0], 'n': r[1]}
+                                          for r in rows])
+        self.assertEqual(q.scalarresult(), ['(1,2)'] * 3)
+        self.assertEqual(q[1], rows[1])
+
+    def test_fetching_in_other_thread(self):
+        c = self.c
+        converting = threading.Event()
+        done = threading.Event()
+        errors: list[Exception] = []
+
+        def hook(value, _pgtype):
+            if not converting.is_set():
+                converting.set()
+                done.wait(5)
+            return value
+
+        def fetch():
+            converting.wait(5)
+            try:
+                q.getresult()
+            except Exception as e:
+                errors.append(e)
+            finally:
+                done.set()
+
+        c.set_cast_hook(hook)
+        q = c.send_query("select '(1,2)'::point; select 2")
+        thread = threading.Thread(target=fetch)
+        thread.start()
+        try:
+            self.assertEqual(q.getresult(), [('(1,2)',)])
+        finally:
+            done.set()
+            thread.join(5)
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], pg.InterfaceError)
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+
+    def test_using_connection_in_notice_receiver_while_moving_results(self):
+        c = self.c
+        c.query('set client_min_messages=notice')
+        q = c.send_query(
+            "select 1; do $$ begin raise notice 'test'; end $$; select 2")
+        errors: list[Exception] = []
+
+        def receiver(_notice):
+            for func in (c.close, c.reset, lambda: c.query('select 3'),
+                         lambda: c.send_query('select 4')):
+                try:
+                    func()
+                except Exception as e:
+                    errors.append(e)
+
+        c.set_notice_receiver(receiver)
+        self.assertEqual(c.query('select 5').getresult(), [(5,)])
+        self.assertEqual(len(errors), 4)
+        for error in errors:
+            self.assertIsInstance(error, pg.InterfaceError)
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertEqual(q.getresult(), '')
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+
+    def test_copy_must_be_completed_before_other_commands(self):
+        c = self.c
+        c.query('create temp table test_async (n int primary key)')
+        q = c.send_query(
+            'select 1; copy test_async from stdin;'
+            ' select count(*) from test_async')
+        self.assertRaises(pg.InterfaceError, c.query, 'select 2')
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertEqual(q.getresult(), '')
+        self.assertRaises(pg.InterfaceError, c.query, 'select 2')
+        self.assertRaises(pg.InterfaceError, c.send_query, 'select 2')
+        c.putline('1\n')
+        c.endcopy()
+        self.assertEqual(c.query('select 2').getresult(), [(2,)])
+        self.assertEqual(q.getresult(), '1')
+        self.assertEqual(q.getresult(), [(1,)])
+        self.assertIsNone(q.getresult())
+
+    def test_results_are_kept_when_connection_is_used_otherwise(self):
+        c = self.c
+        c.query('create temp table test_async (n int)')
+        q = c.send_query('select 1; select 2')
+        c.inserttable('test_async', [(1,)])
+        self.assertEqual(q.getresult(), [(1,)])
+        q2 = c.send_query('select 3')
+        src = c.source()
+        src.execute('select 4')
+        self.assertEqual(src.fetch(1), [('4',)])
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+        c.query('begin')  # needed for large objects
+        lo = c.locreate(pg.INV_READ | pg.INV_WRITE)
+        q = c.send_query('select 5')
+        lo.open(pg.INV_WRITE)  # executes a command
+        lo.write(b'test')
+        lo.close()
+        lo.unlink()
+        c.query('rollback')
+        self.assertEqual(q2.getresult(), [(3,)])
+        self.assertIsNone(q2.getresult())
+        self.assertEqual(q.getresult(), [(5,)])
+        self.assertIsNone(q.getresult())
+
+    def test_current_result_is_kept_after_reset(self):
+        q = self.c.send_query('select 1 as a; select 2')
+        self.assertEqual(q.listfields(), ('a',))
+        self.c.reset()
+        self.assertEqual(q.getresult(), [(1,)])  # fetched by listfields()
+        self.assertRaises(pg.OperationalError, q.getresult)
+        q = self.c.send_query('select 1; select 2')
+        self.c.query('select 3')
+        self.c.reset()
+        self.assertEqual(q.getresult(), [(1,)])  # kept in the query
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+
+    def test_field_methods(self):
+        q = self.c.send_query('select 1 as a, 2 as b; set datestyle to iso')
+        self.assertEqual(q.listfields(), ('a', 'b'))
+        self.assertEqual(q.fieldname(1), 'b')
+        self.assertEqual(q.fieldnum('b'), 1)
+        self.assertEqual(q.fieldinfo('a'), ('a', 23, 4, -1))
+        self.assertIn('a', str(q))
+        self.assertEqual(q.getresult(), [(1, 2)])
+        self.assertEqual(q.getresult(), '')
+        for _i in range(2):
+            self.assertEqual(q.listfields(), ())
+            self.assertRaises(ValueError, q.fieldname, 0)
+            self.assertRaises(ValueError, q.fieldnum, 'a')
+            self.assertEqual(q.fieldinfo(), ())
+            self.assertEqual(str(q), '(nothing selected)')
+            self.assertEqual(len(q), 0)
+            self.assertIsNone(q.getresult())
+
+    def test_zero_columns(self):
+        for method in ('scalarresult', 'scalariter'):
+            with self.subTest(method=method):
+                q = self.c.send_query('select; select 1')
+                self.assertRaises(pg.ProgrammingError, getattr(q, method))
+                self.assertEqual(list(getattr(q, method)()), [1])
+                self.assertIsNone(getattr(q, method)())
+
+    def test_copy(self):
+        c = self.c
+        c.query('create temp table test_async (n int primary key)')
+        q = c.send_query(
+            'copy test_async from stdin; select count(*) from test_async')
+        self.assertEqual(q.getresult(), '')
+        c.putline('1\n')
+        c.putline('2\n')
+        c.endcopy()
+        self.assertEqual(q.getresult(), '2')
+        self.assertEqual(q.getresult(), [(2,)])
+        self.assertIsNone(q.getresult())
+        q = c.send_query('copy test_async from stdin')
+        self.assertEqual(q.getresult(), '')
+        c.putline('1\n')
+        c.endcopy()
+        self.assertRaises(pg.IntegrityError, q.getresult)
+        self.assertIsNone(q.getresult())
+        q = c.send_query('copy test_async to stdout')
+        self.assertEqual(q.getresult(), '')
+        self.assertEqual(c.getline(), '1')
+        self.assertEqual(c.getline(), '2')
+        self.assertIsNone(c.getline())
+        self.assertIsNone(q.getresult())
+        self.assertEqual(c.transaction(), pg.TRANS_IDLE)
+
+    def test_date_format_after_set_datestyle(self):
+        c = self.c
+        q = c.send_query("set datestyle to german")
+        self.assertEqual(q.getresult(), '')
+        self.assertIsNone(q.getresult())
+        self.assertEqual(c.date_format(), '%d.%m.%Y')
+        q = c.send_query("set datestyle to iso")
+        self.assertEqual(q.getresult(), '')
+        # depending on the server version, the new datestyle may only be
+        # known after the last result, but the cache must not be stale
+        c.date_format()
+        self.assertIsNone(q.getresult())
+        self.assertEqual(c.date_format(), '%Y-%m-%d')
+
+    def test_non_blocking_mode(self):
+        c = self.c
+        c.set_non_blocking(True)
+        try:
+            self.assertIs(c.is_non_blocking(), True)
+            q = c.send_query('select 1; select 2')
+            self.assertEqual(q.getresult(), [(1,)])
+            self.assertEqual(q.getresult(), [(2,)])
+            self.assertIsNone(q.getresult())
+            self.assertEqual(c.query('select 3').getresult(), [(3,)])
+        finally:
+            c.set_non_blocking(False)
+        self.assertIs(c.is_non_blocking(), False)
 
 
 class TestInserttable(unittest.TestCase):

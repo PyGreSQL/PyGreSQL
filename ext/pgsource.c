@@ -180,6 +180,11 @@ source_execute(sourceObject *self, PyObject *sql)
     self->num_fields = 0;
     self->encoding = encoding;
 
+    if (_conn_prepare_command(self->pgcnx) < 0) {
+        Py_DECREF(tmp_obj);
+        return NULL;
+    }
+
     /* gets result */
     Py_BEGIN_ALLOW_THREADS
     self->result = PQexec(self->pgcnx->cnx, query);
