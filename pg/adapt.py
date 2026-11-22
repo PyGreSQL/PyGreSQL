@@ -16,8 +16,13 @@ from uuid import UUID
 
 from .attrs import AttrDict
 from .cast import Typecasts
-from .core import InterfaceError, ProgrammingError
-from .helpers import format_text, join_text, quote_if_unqualified
+from .core import InterfaceError
+from .helpers import (
+    format_text,
+    join_text,
+    quote_name,
+    type_lookup_condition,
+)
 
 if TYPE_CHECKING:
     from .db import DB
@@ -256,15 +261,14 @@ class DbTypes(dict):
         self._db = weakref.proxy(db)
         self._regtypes = False
         self._typecasts = Typecasts()
-        self._typecasts.get_attnames = self.get_attnames  # type: ignore[assignment, method-assign]
+        self._typecasts.get_attnames = self._get_attnames  # type: ignore[assignment, method-assign]
         self._typecasts.get_base = self._get_base  # type: ignore[method-assign]
         self._typecasts.connection = self._db.db
         self._query_pg_type = (
-            "SELECT oid, typname, oid::pg_catalog.regtype,"
-            " typlen, typtype, typcategory, typdelim, typrelid, typelem,"
-            " typbasetype"
-            " FROM pg_catalog.pg_type"
-            " WHERE oid OPERATOR(pg_catalog.=) {}::pg_catalog.regtype")
+            "SELECT t.oid, t.typname, t.oid::pg_catalog.regtype,"
+            " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid,"
+            " t.typelem, t.typbasetype"
+            " FROM pg_catalog.pg_type t WHERE {}")
 
     def add(self, oid: int, pgtype: str, regtype: str,
             typlen: int, typtype: str, category: str, delim: str, relid: int,
@@ -311,18 +315,20 @@ class DbTypes(dict):
         typ._get_attnames = self.get_attnames  # type: ignore[assignment]
         return typ
 
-    def __missing__(self, key: int | str) -> DbType:
+    def __missing__(self, key: int | str | bytes) -> DbType:
         """Get the type info from the database if it is not cached."""
         try:
-            cmd = self._query_pg_type.format(quote_if_unqualified('$1', key))
-            res = self._db.query(cmd, (key,)).getresult()
-        except ProgrammingError:
+            condition, params = type_lookup_condition(key)
+        except ValueError:
             res = None
+        else:
+            cmd = self._query_pg_type.format(condition)
+            res = self._db.query(cmd, params).getresult()
         if not res:
-            raise KeyError(f'Type {key} could not be found')
+            raise KeyError(f'Type {key!r} could not be found')
         res = res[0]
         typ = self.add(*res)
-        self[typ.oid] = self[typ.pgtype] = typ
+        self[typ.oid] = self[typ.pgtype] = self[key] = typ
         return typ
 
     def get(self, key: int | str,  # type: ignore[override]
@@ -333,8 +339,16 @@ class DbTypes(dict):
         except KeyError:
             return default
 
+    def _get_attnames(self, typ: Any) -> AttrDict | None:
+        """Get the fields of a composite type given by its internal name."""
+        if isinstance(typ, str) and not isinstance(typ, DbType):
+            typ = quote_name(typ)  # take the name literally
+        return self.get_attnames(typ)
+
     def _get_base(self, typ: str) -> str | None:
         """Get the name of the base type if the given type is a domain."""
+        if not isinstance(typ, DbType):
+            typ = quote_name(typ)  # take the name literally
         db_type = self.get(typ)
         base = db_type.base if db_type else None
         return base.pgtype if base else None

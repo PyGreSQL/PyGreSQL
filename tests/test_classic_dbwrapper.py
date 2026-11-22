@@ -4391,6 +4391,59 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(
                 r.getresult()[0][0], r'{"(1,\"a, b\",\"{2,3}\")","(4,,)"}')
 
+    def test_db_types_lookup(self):
+        query = self.db.query
+        query('create domain pg_temp."Test $2 Type" as int')
+        dbtypes = self.db.dbtypes
+        int4 = dbtypes[23]
+        self.assertEqual(int4.pgtype, 'int4')
+        for name in ('int4', '"int4"', 'pg_catalog.int4',
+                     'pg_catalog."int4"'):
+            self.assertIs(dbtypes[name], int4, name)
+        typ = dbtypes['Test $2 Type']
+        self.assertEqual(typ.pgtype, 'Test $2 Type')
+        self.assertIs(dbtypes['"Test $2 Type"'], typ)
+        self.assertIs(dbtypes['pg_temp."Test $2 Type"'], typ)
+        self.assertIs(dbtypes['pg_temp.Test $2 Type'], typ)
+        # names can also be passed as raw bytes
+        self.assertIs(dbtypes[b'Test $2 Type'], typ)
+        self.assertIs(dbtypes[b'pg_catalog.int4'], int4)
+        # names are taken literally, they are not SQL type names
+        for name in ('INT4', 'integer', 'int[]', 'pg_catalog.INT4',
+                     'PG_CATALOG.int4', 'pg_catalog.int4[]', 'public.int4'):
+            self.assertIsNone(dbtypes.get(name), name)
+
+    def test_db_types_failing_lookup_in_transaction(self):
+        query = self.db.query
+        dbtypes = self.db.dbtypes
+        # failing lookups must not abort the current transaction
+        self.db.begin()
+        try:
+            for name in ('pg_temp.int4', 'test_no_such_type',
+                         'pg_catalog.no_such_type', 'no_such_schema.int4',
+                         'a.b.c', 'int[', '"int4', '', "it's", 'a$1',
+                         b'a.b.c', b"it's", 0, 999999999, -1, 2 ** 32,
+                         2 ** 64):
+                self.assertIsNone(dbtypes.get(name), name)
+                self.assertRaises(KeyError, dbtypes.__getitem__, name)
+            for key in None, True, 1.5:
+                self.assertRaises(TypeError, dbtypes.get, key)
+            self.assertEqual(query('select 1').getresult(), [(1,)])
+        finally:
+            self.db.rollback()
+
+    def test_db_types_internal_names_are_literal(self):
+        # the names of the element types of arrays, which are used to look
+        # up typecasts, must be taken literally, not as qualified names
+        self.db.query('create domain pg_temp."pg_catalog.bool" as int')
+        r = self.db.query(
+            'select array[2]::pg_temp."pg_catalog.bool"[]').getresult()[0][0]
+        self.assertEqual(r, [2])  # always cast in Python
+        typ = self.db.dbtypes['"pg_catalog.bool"']
+        self.assertEqual(typ.base.oid, 23)
+        self.assertEqual(self.db.dbtypes.typecast('2', typ), 2)
+        self.assertEqual(self.db.dbtypes.typecast('2', typ.base), 2)
+
     def test_db_types_info(self):
         dbtypes = self.db.dbtypes
         self.assertIsInstance(dbtypes, dict)

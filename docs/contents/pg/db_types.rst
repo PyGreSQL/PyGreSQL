@@ -11,6 +11,21 @@ The :class:`DbTypes` object is essentially a dictionary mapping PostgreSQL
 internal type names and type OIDs to PyGreSQL "type names" (which are also
 returned by :meth:`DB.get_attnames` as dictionary values).
 
+Types are looked up in the database when they are not yet cached. Type names
+are taken literally, like the parts of table names (see :ref:`table_names`):
+they are the internal names in the ``pg_type`` catalog such as ``int4`` or
+``_int4``, not SQL type names such as ``integer`` or ``int[]``. They can be
+enclosed in double quotes and qualified with a schema name, e.g.
+``pg_catalog.int4``. Names without a schema are looked up in the search path,
+and ``pg_temp`` stands for the temporary schema of the session. Names can
+also be passed as bytes in the client encoding. Looking up a type that does
+not exist never aborts the current transaction. Note that the *types*
+parameter of :meth:`DB.prepare` takes SQL type names instead.
+
+.. versionchanged:: 6.3
+    Before, qualified type names were parsed as SQL type names, and looking up
+    a type that did not exist aborted the current transaction.
+
 These type names are strings which are equal to either the simple PyGreSQL
 names or to the more fine-grained registered PostgreSQL type names if these
 have been enabled with :meth:`DB.use_regtypes`. Type names are strings that

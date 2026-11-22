@@ -16,12 +16,12 @@ from uuid import UUID as Uuid  # noqa: N811
 from pg.cast import cast_cidr, cast_inet
 from pg.core import Connection as Cnx
 from pg.core import (
-    ProgrammingError,
     cast_array,
     cast_hstore,
     cast_record,
     unescape_bytea,
 )
+from pg.helpers import quote_name, type_lookup_condition
 
 from .typecode import TypeCode
 
@@ -130,6 +130,8 @@ def cast_time(value: str) -> time:
 
 
 _re_timezone = regex('(.*)([+-].*)')
+_re_placeholder = regex(r'\$(\d)')
+_re_placeholder_bytes = regex(rb'\$(\d)')
 
 
 def cast_timetz(value: str) -> time:
@@ -525,42 +527,53 @@ class TypeCache(dict):
         self._escape_string = cnx.escape_string
         self._src = cnx.source()
         self._typecasts = LocalTypecasts()
-        self._typecasts.get_fields = self.get_fields  # type: ignore[assignment, method-assign]
+        self._typecasts.get_fields = self._get_fields  # type: ignore[assignment, method-assign]
         self._typecasts.get_base = self._get_base  # type: ignore[method-assign]
         self._typecasts.cnx = cnx
         self._query_pg_type = (
-            "SELECT oid, typname,"
-            " typlen, typtype, typcategory, typdelim, typrelid, typbasetype"
-            " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) {}")
+            "SELECT t.oid, t.typname, t.typlen, t.typtype, t.typcategory,"
+            " t.typdelim, t.typrelid, t.typbasetype"
+            " FROM pg_catalog.pg_type t WHERE {}")
 
-    def __missing__(self, key: int | str) -> TypeCode:
+    def __missing__(self, key: int | str | bytes) -> TypeCode:
         """Get the type info from the database if it is not cached."""
-        oid: int | str
-        if isinstance(key, int):
-            oid = key
-        else:
-            if '.' not in key and '"' not in key:
-                key = f'"{key}"'
-            oid = f"'{self._escape_string(key)}'::pg_catalog.regtype"
         try:
-            self._src.execute(self._query_pg_type.format(oid))
-        except ProgrammingError:
+            condition, params = type_lookup_condition(key)
+        except ValueError:
             res = None
         else:
+            # the source object does not support parameters
+            cmd = self._query_pg_type.format(condition)
+            if isinstance(key, bytes):  # raw name in the client encoding
+                raw_values = [b"'" + self._escape_string(param) + b"'"
+                              for param in params if isinstance(param, bytes)]
+                self._src.execute(_re_placeholder_bytes.sub(
+                    lambda m: raw_values[int(m.group(1)) - 1],
+                    cmd.encode('ascii')))
+            else:
+                values = [str(param) if isinstance(param, int)
+                          else f"'{self._escape_string(param)}'"
+                          for param in params if not isinstance(param, bytes)]
+                self._src.execute(_re_placeholder.sub(
+                    lambda m: values[int(m.group(1)) - 1], cmd))
             res = self._src.fetch(1)
         if not res:
-            raise KeyError(f'Type {key} could not be found')
+            raise KeyError(f'Type {key!r} could not be found')
         r = res[0]
-        delim, relid, base = r[5], int(r[6]), None
-        if r[3] == 'd' and int(r[7]):
-            # domains are handled like their base types
-            base = self[int(r[7])]
-            base = base.base or base  # resolve domains over domains
-            delim, relid = base.delim, base.relid
-        type_code = TypeCode.create(
-            int(r[0]), r[1], int(r[2]), r[3], r[4], delim, relid, base)
+        oid = int(r[0])
+        if oid in self:  # already cached under another name
+            type_code = self[oid]
+        else:
+            delim, relid, base = r[5], int(r[6]), None
+            if r[3] == 'd' and int(r[7]):
+                # domains are handled like their base types
+                base = self[int(r[7])]
+                base = base.base or base  # resolve domains over domains
+                delim, relid = base.delim, base.relid
+            type_code = TypeCode.create(
+                oid, r[1], int(r[2]), r[3], r[4], delim, relid, base)
         # noinspection PyUnresolvedReferences
-        self[type_code.oid] = self[str(type_code)] = type_code
+        self[type_code.oid] = self[str(type_code)] = self[key] = type_code
         return type_code
 
     def get(self, key: int | str,  # type: ignore[override]
@@ -571,8 +584,16 @@ class TypeCache(dict):
         except KeyError:
             return default
 
+    def _get_fields(self, typ: str | TypeCode) -> list[FieldInfo] | None:
+        """Get the fields of a composite type given by its internal name."""
+        if not isinstance(typ, TypeCode):
+            typ = quote_name(typ)  # take the name literally
+        return self.get_fields(typ)
+
     def _get_base(self, typ: str) -> str | None:
         """Get the name of the base type if the given type is a domain."""
+        if not isinstance(typ, TypeCode):
+            typ = quote_name(typ)  # take the name literally
         type_code = self.get(typ)
         base = type_code.base if type_code else None
         return str(base) if base else None

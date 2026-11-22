@@ -162,6 +162,15 @@ Version 6.3.0 (unreleased)
     still used for elements of arrays and fields of composite types.
   - `DbTypes.reset_typecast()` now also resets the typecast for arrays of
     the given type. Before, the arrays were still cast with the old function.
+  - Looking up a type in `DbTypes` that does not exist, e.g. with
+    `DbTypes.get()`, no longer aborts the current transaction. Type names
+    are now taken literally like the parts of table names, also when they
+    are qualified with a schema name or enclosed in double quotes, and can
+    also be passed as bytes. Before, qualified type names were parsed as SQL
+    type names, so that e.g. ``'pg_catalog.int4[]'`` was found and
+    ``'PG_CATALOG.INT4'`` meant ``pg_catalog.int4``, but names in double
+    quotes were not found. Keys that are neither names nor OIDs, like None,
+    now raise a `TypeError` instead of returning None.
   - `DbTypes.typecast()` now also casts values when the type is passed as a
     type object, as returned by `DB.get_attnames()`. Before, the value was
     returned unchanged.
@@ -202,6 +211,14 @@ Version 6.3.0 (unreleased)
     now cast like their base types, unless a typecast has been set for the
     domain. Before, they were returned as strings. The type codes in the
     `TypeCache` have a new attribute ``base`` with the base type of domains.
+  - Looking up a type in the `TypeCache` that does not exist no longer
+    aborts the current transaction. This also happened when a query returned
+    an array of a composite type that is not in the search path. Type names
+    are now taken literally like in the `pg` module, also when they are
+    qualified with a schema name or enclosed in double quotes, and can also
+    be passed as bytes. Before, such type names were parsed as SQL type
+    names, and invalid names could raise an error. Keys that are neither
+    names nor OIDs, like None, now raise a `TypeError`.
 
 - Fixes in the C extension:
 

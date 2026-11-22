@@ -405,6 +405,68 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_type_cache_lookup(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute('create domain pg_temp."Test $2 Type" as int')
+            type_cache = con.type_cache
+            int4 = type_cache[23]
+            self.assertEqual(int4, 'int4')
+            for name in ('int4', '"int4"', 'pg_catalog.int4',
+                         'pg_catalog."int4"'):
+                self.assertIs(type_cache[name], int4, name)
+            typ = type_cache['Test $2 Type']
+            self.assertEqual(typ, 'Test $2 Type')
+            self.assertIs(type_cache['"Test $2 Type"'], typ)
+            self.assertIs(type_cache['pg_temp."Test $2 Type"'], typ)
+            self.assertIs(type_cache['pg_temp.Test $2 Type'], typ)
+            # names can also be passed as raw bytes
+            self.assertIs(type_cache[b'Test $2 Type'], typ)
+            self.assertIs(type_cache[b'pg_catalog.int4'], int4)
+            # names are taken literally, they are not SQL type names
+            for name in ('INT4', 'integer', 'int[]', 'pg_catalog.INT4',
+                         'PG_CATALOG.int4', 'pg_catalog.int4[]',
+                         'public.int4'):
+                self.assertIsNone(type_cache.get(name), name)
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_failing_lookup_in_transaction(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            type_cache = con.type_cache
+            # failing lookups must not abort the current transaction
+            for name in ('pg_temp.int4', 'test_no_such_type',
+                         'no_such_schema.int4', 'a.b.c', 'int[', '"int4', '',
+                         "it's", "a'$1", b"a'$1", b'a.b.c', 0, 999999999,
+                         -1, 2 ** 32, 2 ** 64):
+                self.assertIsNone(type_cache.get(name), name)
+            for key in None, True, 1.5:
+                self.assertRaises(TypeError, type_cache.get, key)
+            cur.execute('select 1')
+            self.assertEqual(cur.fetchone()[0], 1)
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_internal_names_are_literal(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            # the names of the element types of arrays, which are used to
+            # look up typecasts, must be taken literally
+            cur.execute('create domain pg_temp."pg_catalog.bool" as int')
+            cur.execute('select array[2]::pg_temp."pg_catalog.bool"[]')
+            self.assertEqual(cur.fetchone()[0], [2])
+            typ = con.type_cache['"pg_catalog.bool"']
+            self.assertEqual(typ.base, 'int4')
+            cur.close()
+        finally:
+            con.close()
+
     def test_type_cache_with_domains(self):
         con = self._connect()
         try:

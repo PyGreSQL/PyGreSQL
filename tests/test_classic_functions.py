@@ -1090,6 +1090,62 @@ class TestSplitQualifiedName(unittest.TestCase):
                           str(cm.exception))
 
 
+class TestTypeLookupCondition(unittest.TestCase):
+    """Test the helper function for looking up types in pg_type."""
+
+    def test_lookup_by_oid(self):
+        from pg.helpers import type_lookup_condition as lookup
+        condition, params = lookup(23)
+        self.assertEqual(condition, 't.oid OPERATOR(pg_catalog.=) $1')
+        self.assertEqual(params, [23])
+
+    def test_lookup_by_name(self):
+        from pg.helpers import type_lookup_condition as lookup
+        condition, params = lookup('My Type')
+        self.assertIn('t.typname OPERATOR(pg_catalog.=) $1', condition)
+        self.assertIn('pg_type_is_visible', condition)
+        self.assertNotIn('$2', condition)
+        self.assertEqual(params, ['My Type'])
+        self.assertEqual(lookup('"My.Type"')[1], ['My.Type'])
+
+    def test_lookup_by_qualified_name(self):
+        from pg.helpers import type_lookup_condition as lookup
+        condition, params = lookup('s."My.Type"')
+        self.assertIn('n.nspname OPERATOR(pg_catalog.=) $1', condition)
+        self.assertIn('t.typname OPERATOR(pg_catalog.=) $2', condition)
+        self.assertIn('pg_my_temp_schema', condition)
+        self.assertNotIn('regtype', condition)
+        self.assertEqual(params, ['s', 'My.Type'])
+
+    def test_lookup_by_raw_name(self):
+        from pg.helpers import type_lookup_condition as lookup
+        self.assertEqual(lookup(b'My Type')[1], [b'My Type'])
+        self.assertEqual(lookup('s."T\xe4st"'.encode('latin-1'))[1],
+                         [b's', b'T\xe4st'])
+
+    def test_lookup_by_invalid_name(self):
+        from pg.helpers import type_lookup_condition as lookup
+        for name in '', 'a..b', '"a', 'a.b.c', b'', b'a.b.c':
+            self.assertRaises(ValueError, lookup, name)
+
+    def test_lookup_by_invalid_oid(self):
+        from pg.helpers import type_lookup_condition as lookup
+        self.assertEqual(lookup(0xffffffff)[1], [0xffffffff])
+        for oid in -1, 2 ** 32, 2 ** 64:
+            self.assertRaises(ValueError, lookup, oid)
+
+    def test_lookup_by_invalid_key(self):
+        from pg.helpers import type_lookup_condition as lookup
+        for key in None, True, False, 1.5, ('int4',):
+            self.assertRaises(TypeError, lookup, key)
+
+    def test_quote_name(self):
+        from pg.helpers import quote_name
+        from pg.helpers import split_qualified_name as split
+        for name in 't', 's.t', '"t"', 'a""b', 'a.b."c"':
+            self.assertEqual(split(quote_name(name)), [name])
+
+
 class TestConfigFunctions(unittest.TestCase):
     """Test the functions for changing default settings.
 

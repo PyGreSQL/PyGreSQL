@@ -21,7 +21,6 @@ __all__ = [
     'join_text',
     'namediter',
     'namednext',
-    'quote_if_unqualified',
     'scalariter'
 ]
 
@@ -69,19 +68,6 @@ def join_text(parts: Sequence[str | bytes], sep: str,
     return start.encode() + sep.encode().join(
         part if isinstance(part, bytes) else part.encode(codec)
         for part in parts) + end.encode()
-
-
-def quote_if_unqualified(param: str, name: int | str) -> str:
-    """Quote parameter representing a qualified name.
-
-    Puts a quote_ident() call around the given parameter unless
-    the name contains a dot, in which case the name is ambiguous
-    (could be a qualified name or just a name with a dot in it)
-    and must be quoted manually by the caller.
-    """
-    if isinstance(name, str) and '.' not in name:
-        return f'quote_ident({param})'
-    return param
 
 
 def split_qualified_name(name: str) -> list[str]:
@@ -181,6 +167,56 @@ class RowCache:
 
 
 # Helper functions used by the query object
+
+def quote_name(name: str) -> str:
+    """Quote a name so that split_qualified_name() takes it literally."""
+    return '"' + name.replace('"', '""') + '"'
+
+
+def type_lookup_condition(key: int | str | bytes
+                          ) -> tuple[str, Sequence[int | str | bytes]]:
+    """Get a condition for looking up a type in pg_type by OID or name.
+
+    Returns the condition for the pg_type table aliased as t, with the
+    placeholders $1 and $2, and the list of the values for these.
+
+    Integer keys are type OIDs. Names are split like table names with
+    split_qualified_name(), so that parts are taken literally. Names
+    without a schema are looked up in the search path, the schema pg_temp
+    means the temporary schema of the session. Since the name is not
+    parsed by the server, the lookup cannot raise an error there, which
+    would abort the current transaction. Names given as bytes are raw
+    names in the client encoding.
+
+    Invalid names and OIDs out of range raise a ValueError, keys of other
+    types raise a TypeError.
+    """
+    if isinstance(key, int) and not isinstance(key, bool):
+        if not 0 <= key <= 0xffffffff:
+            raise ValueError(f'Invalid type OID {key!r}')
+        return 't.oid OPERATOR(pg_catalog.=) $1', [key]
+    parts: Sequence[str | bytes]
+    if isinstance(key, str):
+        parts = split_qualified_name(key)
+    elif isinstance(key, bytes):
+        # quotes and dots are ASCII, so the raw name can be split this way
+        parts = [part.encode('latin-1') for part in
+                 split_qualified_name(key.decode('latin-1'))]
+    else:
+        raise TypeError(f'Invalid type key {key!r}')
+    if len(parts) == 1:
+        return ('t.typname OPERATOR(pg_catalog.=) $1::pg_catalog.name'
+                ' AND pg_catalog.pg_type_is_visible(t.oid)'), parts
+    if len(parts) == 2:
+        return ("t.typnamespace OPERATOR(pg_catalog.=) CASE"
+                " WHEN $1::pg_catalog.name OPERATOR(pg_catalog.=) 'pg_temp'"
+                " THEN pg_catalog.pg_my_temp_schema()"
+                " ELSE (SELECT n.oid FROM pg_catalog.pg_namespace n"
+                " WHERE n.nspname OPERATOR(pg_catalog.=) $1::pg_catalog.name)"
+                " END AND t.typname OPERATOR(pg_catalog.=) $2::pg_catalog.name"
+                ), parts
+    raise ValueError(f'Invalid type name {key!r}')
+
 
 def dictiter(q: Query) -> Iterator[dict[str, Any]]:
     """Get query result as an iterator of dictionaries."""
