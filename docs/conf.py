@@ -25,7 +25,10 @@ language = 'en'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.autodoc']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx']
+
+# link references to Python names to the Python documentation
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
@@ -39,34 +42,24 @@ exclude_patterns += [
     'community/homes.rst']
 
 # ignore certain warnings
-# (references to some of the Python names do not resolve correctly)
+# (pseudo types and some names that are not documented as targets)
 nitpicky = True
 nitpick_ignore = [
     ('py:' + t, n) for t, names in {
         'attr': ('arraysize', 'error', 'sqlstate', 'DatabaseError.sqlstate'),
-        'class': ('bool', 'bytes', 'callable', 'callables', 'class',
-                  'dict', 'float', 'function', 'int', 'iterable',
-                  'list', 'object', 'set', 'str', 'tuple',
-                  'False', 'True', 'None',
-                  'namedtuple', 'namedtuples',
-                  'decimal.Decimal',
-                  'bytes/str', 'list of namedtuples', 'tuple of callables',
-                  'first field', 'type of first field',
-                  'Notice', 'DATETIME', 'path-like object'),
+        'class': ('callable', 'callables', 'class', 'function', 'iterable',
+                  'False', 'namedtuple', 'namedtuples',
+                  'bytes/str', 'first field', 'path-like object',
+                  'Notice', 'DATETIME'),
         'data': ('defbase', 'defhost', 'defopt', 'defpasswd', 'defport',
                  'defuser'),
-        'exc': ('Exception', 'IndexError', 'IOError', 'KeyError',
-                'MemoryError', 'SyntaxError', 'TypeError', 'ValueError',
-                'pg.DatabaseError', 'pg.InterfaceError', 'pg.InternalError',
+        'exc': ('pg.DatabaseError', 'pg.InterfaceError', 'pg.InternalError',
                 'pg.InvalidResultError',
                 'pg.MultipleResultsError', 'pg.NoResultError',
                 'pg.OperationalError', 'pg.ProgrammingError'),
-        'func': ('len', 'json.dumps', 'json.loads', 'os.fsencode'),
-        'meth': ('datetime.strptime',
-                 'cur.execute',
+        'meth': ('cur.execute',
                  'DB.close', 'DB.connection_handler', 'DB.get_regtypes',
                  'DB.inserttable', 'DB.reopen'),
-        'obj': ('False', 'True', 'None')
     }.items() for n in names]
 
 

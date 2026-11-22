@@ -446,8 +446,8 @@ and the setting is also cached internally.  You will need the date format
 when you want to manually typecast dates and timestamps coming from the
 database instead of using the built-in typecast functions.  The date format
 returned by this method can be directly used with date formatting functions
-such as :meth:`datetime.strptime`.  It is derived from the current setting
-of the database parameter ``DateStyle``.
+such as :meth:`datetime.strptime <datetime.datetime.strptime>`.  It is
+derived from the current setting of the database parameter ``DateStyle``.
 
 .. versionadded:: 5.0
 
