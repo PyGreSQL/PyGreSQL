@@ -47,6 +47,10 @@ Version 6.3.0 (unreleased)
     and `query_formatted()`. Before, the arrays were sent as Python lists
     converted to strings.
   - `UUID` objects can now also be passed as inline parameters.
+  - Objects of the `ipaddress` module can now also be passed as inline
+    parameters, also as elements of arrays and records (#43). Addresses and
+    interfaces are adapted as ``inet``, networks as ``cidr``, as in
+    psycopg 3. Before, this raised an `InterfaceError`.
   - The `DbType` objects for array types have a new attribute ``elem``
     with the type OID of the array elements.
   - Parameters given as `bytes` for a known type other than bytea are now
@@ -107,6 +111,10 @@ Version 6.3.0 (unreleased)
     `TypeCache.get_fields()` are now typed named tuples.
   - Plain `bytes` parameters are now adapted as `bytea`, like values wrapped
     with `Binary()`. Before, they were not properly quoted.
+  - Objects of the `ipaddress` module can now be passed as parameters, also
+    as elements of lists and tuples (#43). Addresses and interfaces are
+    adapted as ``inet``, networks as ``cidr``, as in psycopg 3. Before, this
+    raised an `InterfaceError`.
   - Keys and values of hstore parameters containing tabs, newlines or other
     whitespace besides spaces are now quoted. Before, they caused a syntax
     error, or such whitespace at the start or end was silently stripped.

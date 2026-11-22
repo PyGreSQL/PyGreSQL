@@ -6,6 +6,14 @@ import gc
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
+from ipaddress import (
+    IPv4Address,
+    IPv4Interface,
+    IPv4Network,
+    IPv6Address,
+    IPv6Interface,
+    IPv6Network,
+)
 from typing import Any, ClassVar
 from uuid import UUID as Uuid  # noqa: N811
 
@@ -807,6 +815,57 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             con.close()
         self.assertIsInstance(result, Uuid)
         self.assertEqual(result, d)
+
+    def test_network_types(self):
+        values: list[tuple[Any, str]] = [
+            (IPv4Address('192.168.0.1'), 'inet'),
+            (IPv6Address('2001:db8::1'), 'inet'),
+            (IPv4Interface('192.168.0.1/24'), 'inet'),
+            (IPv6Interface('2001:db8::1/64'), 'inet'),
+            (IPv4Network('192.168.0.0/24'), 'cidr'),
+            (IPv6Network('2001:db8::/32'), 'cidr')]
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            for value, typ in values:
+                with self.subTest(value=value):
+                    cur.execute(
+                        "select %s, pg_typeof(%s)::text", (value, value))
+                    self.assertEqual(cur.fetchone(), (str(value), typ))
+            a = IPv4Address('192.168.0.1')
+            i = IPv6Interface('2001:db8::1/64')
+            n = IPv4Network('192.168.0.0/24')
+            cur.execute(
+                "select %s, pg_typeof(%s)::text, %s::text",
+                ([a, i, n, None], [[n, None]], (a, n)))
+            self.assertEqual(cur.fetchone(), (
+                ['192.168.0.1', '2001:db8::1/64', '192.168.0.0/24', None],
+                'cidr[]', '(192.168.0.1,192.168.0.0/24)'))
+            # the scope id of an IPv6 address may contain quotes
+            self.assertRaises(
+                pgdb.DataError, cur.execute,
+                "select %s", (IPv6Address("fe80::1%it's"),))
+        finally:
+            con.close()
+
+    def test_insert_network_types(self):
+        table = self.table_prefix + 'booze'
+        a = IPv4Address('192.168.0.1')
+        i = IPv6Interface('2001:db8::1/64')
+        n = IPv6Network('2001:db8::/32')
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute(f"create table {table}"
+                        " (i inet, c cidr, ia inet[], ca cidr[])")
+            cur.execute(f"insert into {table} values (%s, %s, %s, %s)",
+                        (i, n, [a, i, None], [n]))
+            cur.execute(f"select * from {table} where i = %s", (i,))
+            self.assertEqual(cur.fetchone(), (
+                '2001:db8::1/64', '2001:db8::/32',
+                ['192.168.0.1', '2001:db8::1/64', None], ['2001:db8::/32']))
+        finally:
+            con.close()
 
     def test_insert_array(self):
         values: list[tuple[Any, Any]] = [

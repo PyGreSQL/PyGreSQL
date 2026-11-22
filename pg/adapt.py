@@ -6,6 +6,7 @@ import weakref
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from json import dumps as jsonencode
 from math import isinf, isnan
 from re import compile as regex
@@ -728,6 +729,12 @@ class Adapter:
             return f"'{value}'::hstore"
         if isinstance(value, UUID):
             return f"'{value}'::uuid"
+        if isinstance(value, (IPv4Address, IPv6Address)):  # or interface
+            value = self.db.escape_string(str(value))
+            return f"'{value}'::inet"
+        if isinstance(value, (IPv4Network, IPv6Network)):
+            value = self.db.escape_string(str(value))
+            return f"'{value}'::cidr"
         pg_repr = getattr(value, '__pg_repr__', None)
         if not pg_repr:
             raise InterfaceError(

@@ -22,7 +22,14 @@ from contextlib import suppress
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from io import StringIO
-from ipaddress import IPv4Address
+from ipaddress import (
+    IPv4Address,
+    IPv4Interface,
+    IPv4Network,
+    IPv6Address,
+    IPv6Interface,
+    IPv6Network,
+)
 from operator import itemgetter
 from time import strftime
 from typing import Any, ClassVar, List  # noqa: UP035
@@ -4293,6 +4300,70 @@ class TestDBClass(unittest.TestCase):
         r = self.db.query_formatted('select %s::text', (u,), inline=True)
         self.assertEqual(r.getresult()[0][0], str(u))
 
+    def test_network_types(self):
+        values: list[tuple[Any, str]] = [
+            (IPv4Address('192.168.0.1'), 'inet'),
+            (IPv6Address('2001:db8::1'), 'inet'),
+            (IPv4Interface('192.168.0.1/24'), 'inet'),
+            (IPv6Interface('2001:db8::1/64'), 'inet'),
+            (IPv4Network('192.168.0.0/24'), 'cidr'),
+            (IPv6Network('2001:db8::/32'), 'cidr')]
+        query = self.db.query
+        query_formatted = self.db.query_formatted
+        for value, typ in values:
+            with self.subTest(value=value):
+                text = str(value)
+                r = query(f'select $1::{typ}', (value,)).getresult()[0][0]
+                self.assertEqual(r, text)
+                for inline in (False, True):
+                    r = query_formatted(
+                        f'select %s::{typ}', (value,), inline=inline)
+                    self.assertEqual(r.getresult()[0][0], text)
+                r = query_formatted(
+                    'select %s, pg_typeof(%s)::text', (value, value),
+                    inline=True)
+                self.assertEqual(r.getresult()[0], (text, typ))
+
+    def test_network_type_arrays(self):
+        a = IPv4Address('192.168.0.1')
+        i = IPv6Interface('2001:db8::1/64')
+        n = IPv4Network('192.168.0.0/24')
+        expected = '{192.168.0.1,2001:db8::1/64,192.168.0.0/24,NULL}'
+        for inline in (False, True):
+            r = self.db.query_formatted(
+                'select %s::inet[]::text', ([a, i, n, None],), inline=inline)
+            self.assertEqual(r.getresult()[0][0], expected)
+        r = self.db.query_formatted(
+            'select %s::text, pg_typeof(%s)::text',
+            ([a, i, n, None], [[n, None]]), inline=True)
+        self.assertEqual(r.getresult()[0], (expected, 'cidr[]'))
+        r = self.db.query_formatted(
+            'select %s::text', ((a, n),), inline=True)
+        self.assertEqual(r.getresult()[0][0], '(192.168.0.1,192.168.0.0/24)')
+
+    def test_insert_get_network_types(self):
+        self.create_table(
+            'network_test',
+            'n smallint primary key, i inet, c cidr, ia inet[], ca cidr[]')
+        a = IPv4Address('192.168.0.1')
+        i = IPv6Interface('2001:db8::1/64')
+        n = IPv6Network('2001:db8::/32')
+        r = self.db.insert(
+            'network_test', n=1, i=i, c=n, ia=[a, i, None], ca=[n, None])
+        self.assertEqual(r['i'], '2001:db8::1/64')
+        self.assertEqual(r['c'], '2001:db8::/32')
+        r = self.db.get('network_test', 1)
+        self.assertEqual(r['i'], '2001:db8::1/64')
+        self.assertEqual(r['c'], '2001:db8::/32')
+        if pg.get_array():
+            self.assertEqual(r['ia'], ['192.168.0.1', '2001:db8::1/64', None])
+            self.assertEqual(r['ca'], ['2001:db8::/32', None])
+        r = self.db.update('network_test', n=1, i=a, ia=[n])
+        self.assertEqual(r['i'], '192.168.0.1')
+        r = self.db.query(
+            'select ia::text from network_test where i=$1', (a,))
+        self.assertEqual(r.getresult(), [('{2001:db8::/32}',)])
+
     def test_insert_get_array_of_unknown_type(self):
         query = self.db.query
         query("create type test_mood as enum ('sad', 'ok', 'happy')")
@@ -4813,6 +4884,25 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['12345678-1234-5678-1234-567812345678'])
 
+    def test_adapt_query_untyped_with_network(self):
+        format_query = self.adapter.format_query
+        a = IPv4Address('192.168.0.1')
+        n = IPv6Network('2001:db8::/32')
+        sql, params = format_query("select %s, %s, %s", (a, n, [a, n, None]))
+        self.assertEqual(sql, "select $1, $2, $3")
+        self.assertEqual(params, [a, n, '{192.168.0.1,2001:db8::/32,null}'])
+
+    def test_adapt_query_typed_with_network(self):
+        format_query = self.adapter.format_query
+        a = IPv4Interface('192.168.0.1/24')
+        n = IPv4Network('192.168.0.0/24')
+        sql, params = format_query(
+            "select %s, %s, %s, %s", (a, n, [a, None], [[n]]),
+            ('inet', 'cidr', 'inet[]', '_cidr'))
+        self.assertEqual(sql, "select $1, $2, $3, $4")
+        self.assertEqual(params, [
+            a, n, '{192.168.0.1/24,null}', '{{192.168.0.0/24}}'])
+
     def test_adapt_query_typed_with_array_type_names(self):
         format_query = self.adapter.format_query
         values: Any = [[[1, 2], [3, None]], ['a', 'b c'], [True, None]]
@@ -5095,6 +5185,33 @@ class TestDBClassAdapter(unittest.TestCase):
             "select %s, %s, %s", (value, [value], (value, 1)), inline=True)
         u = "'00000000-0000-0000-0000-000000000001'::uuid"
         self.assertEqual(sql, f"select {u}, ARRAY[{u}], ({u},1)")
+        self.assertEqual(params, [])
+
+    def test_adapt_query_inline_list_with_network(self):
+        format_query = self.adapter.format_query
+        values = (
+            IPv4Address('192.168.0.1'), IPv6Address('2001:db8::1'),
+            IPv4Interface('192.168.0.1/24'), IPv6Interface('2001:db8::1/64'),
+            IPv4Network('192.168.0.0/24'), IPv6Network('2001:db8::/32'))
+        sql, params = format_query(
+            "select %s, %s, %s, %s, %s, %s", values, inline=True)
+        self.assertEqual(
+            sql, "select '192.168.0.1'::inet, '2001:db8::1'::inet,"
+            " '192.168.0.1/24'::inet, '2001:db8::1/64'::inet,"
+            " '192.168.0.0/24'::cidr, '2001:db8::/32'::cidr")
+        self.assertEqual(params, [])
+        a, n = values[0], values[4]
+        sql, params = format_query(
+            "select %s, %s", ([[a, None], [n, a]], (a, 1)), inline=True)
+        self.assertEqual(
+            sql, "select ARRAY[['192.168.0.1'::inet,NULL],"
+            "['192.168.0.0/24'::cidr,'192.168.0.1'::inet]],"
+            " ('192.168.0.1'::inet,1)")
+        self.assertEqual(params, [])
+        # the scope id of an IPv6 address may contain quotes
+        sql, params = format_query(
+            "select %s", (IPv6Address("fe80::1%it's"),), inline=True)
+        self.assertEqual(sql, "select 'fe80::1%it''s'::inet")
         self.assertEqual(params, [])
 
     def test_adapt_query_inline_list_with_bytes(self):

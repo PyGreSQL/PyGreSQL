@@ -37,6 +37,7 @@ interval                           datetime.timedelta
 hstore                             dict
 json, jsonb                        list or dict
 uuid                               uuid.UUID
+inet, cidr                         str
 array                              list [#array]_
 record                             tuple
 ================================== ==================
@@ -52,6 +53,14 @@ record                             tuple
        and gets lost in the conversion to the Python list. If you need that
        information, you can request it separately with the `array_lower()`
        function provided by PostgreSQL.
+
+Values of the network address types ``inet`` and ``cidr`` are returned as
+strings. As parameters, you can also pass objects of the ``ipaddress``
+module, also as elements of lists and tuples: addresses and interfaces are
+adapted as ``inet``, networks as ``cidr``.
+
+.. versionchanged:: 6.3
+    Objects of the ``ipaddress`` module can be passed as inline parameters.
 
 Text encoding
 -------------
@@ -247,8 +256,8 @@ Also note that the query gives the value back as Python lists again.  This
 is achieved by the typecasting mechanism explained in the next section.
 
 The elements of the lists are adapted like single values, so they can
-also be values wrapped with :func:`Json`, UUIDs, or tuples for arrays of
-composite types.
+also be values wrapped with :func:`Json`, UUIDs, IP addresses, or tuples
+for arrays of composite types.
 
 Tuples are adapted as PostgreSQL composite types.  If you use inline
 parameters, they can also be used with the ``IN`` syntax.

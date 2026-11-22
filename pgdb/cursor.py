@@ -12,6 +12,7 @@ from collections.abc import (
 )
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from math import isinf, isnan
 from typing import TYPE_CHECKING, Any, AnyStr, NamedTuple
 from uuid import UUID as Uuid  # noqa: N811
@@ -112,6 +113,10 @@ class Cursor:
                 return f"'{value}'::interval"
             case Uuid():
                 return f"'{value}'::uuid"
+            case IPv4Address() | IPv6Address():  # or interface
+                return f"'{self._escape_text(str(value))}'::inet"
+            case IPv4Network() | IPv6Network():
+                return f"'{self._escape_text(str(value))}'::cidr"
             case list():
                 # Quote value as an ARRAY constructor. This is better than
                 # using an array literal because it carries the information
