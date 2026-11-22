@@ -1602,6 +1602,19 @@ class TestDBClass(unittest.TestCase):
         s.pop('n')
         self.assertRaises(KeyError, get, table, s)
 
+    def test_get_with_keyname(self):
+        get = self.db.get
+        table = 'get_keyname_test_table'
+        self.create_table(table, 'a int, b int, t text',
+                          values=[(1, 1, 'x'), (1, 2, 'y')])
+        self.assertRaises(pg.ProgrammingError, get, table, (1, 2))
+        self.assertEqual(get(table, (1, 2), ('a', 'b'))['t'], 'y')
+        self.assertEqual(get(table, [1, 2], ['a', 'b'])['t'], 'y')
+        self.assertEqual(get(table, dict(a=1, b=1), ['a', 'b'])['t'], 'x')
+        self.assertRaises(KeyError, get, table, dict(a=1), ('a', 'b'))
+        self.assertRaises(TypeError, get, table, 1, 1)
+        self.assertRaises(TypeError, get, table, (1, 2), (1, 2))
+
     def test_get_with_composite_key(self):
         get = self.db.get
         table = 'get_test_table_1'
@@ -1897,6 +1910,45 @@ class TestDBClass(unittest.TestCase):
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 'u')
 
+    def test_update_with_keyname(self):
+        update = self.db.update
+        query = self.db.query
+        table = 'update_keyname_test_table'
+        self.create_table(
+            table, 'id int primary key, email text unique, name text',
+            values=[(1, 'a@x', 'A'), (2, 'b@x', 'B')])
+        q = f'select * from "{table}" order by id'
+        r = update(table, dict(email='b@x', name='C'), 'email')
+        self.assertEqual(r, dict(id=2, email='b@x', name='C'))
+        # the primary key can be updated when using another key
+        r = update(table, dict(email='a@x', id=3), keyname='email')
+        self.assertEqual(r, dict(id=3, email='a@x', name='A'))
+        self.assertEqual(
+            query(q).getresult(), [(2, 'b@x', 'C'), (3, 'a@x', 'A')])
+        # the key columns are not updated
+        r = update(table, dict(id=2, email='c@x'), ['id', 'email'])
+        self.assertEqual(r, dict(id=2, email='c@x'))
+        self.assertEqual(
+            query(q).getresult(), [(2, 'b@x', 'C'), (3, 'a@x', 'A')])
+        # keyword arguments are merged into the row
+        r = update(table, None, 'email', email='b@x', name='D')
+        self.assertEqual(r, dict(id=2, email='b@x', name='D'))
+        self.assertRaises(KeyError, update, table, dict(id=2), 'email')
+        self.assertRaises(TypeError, update, table, dict(id=2), 2)
+
+    def test_update_with_keyname_without_primary_key(self):
+        update = self.db.update
+        table = 'update_keyname_test_table_2'
+        self.create_table(table, 'a int, b int, t text',
+                          values=[(1, 1, 'x'), (1, 2, 'y')])
+        self.assertRaises(
+            pg.ProgrammingError, update, table, dict(a=1, b=2, t='z'))
+        r = update(table, dict(a=1, b=2, t='z'), ('a', 'b'))
+        self.assertEqual(r, dict(a=1, b=2, t='z'))
+        self.assertEqual(self.db.query(
+            f'select t from "{table}" order by b').getresult(),
+            [('x',), ('z',)])
+
     def test_update_with_composite_key(self):
         update = self.db.update
         query = self.db.query
@@ -2059,6 +2111,52 @@ class TestDBClass(unittest.TestCase):
         self.assertIs(r, s)
         r = query(q).getresult()
         self.assertEqual(r, [(1, 'x2'), (2, 'y3')])
+
+    def test_upsert_with_keyname(self):
+        upsert = self.db.upsert
+        query = self.db.query
+        table = 'upsert_keyname_test_table'
+        self.create_table(
+            table, 'id serial primary key, email text unique, name text')
+        q = f'select * from "{table}" order by id'
+        r = upsert(table, dict(email='a@x', name='A'), 'email')
+        self.assertEqual(r, dict(id=1, email='a@x', name='A'))
+        r = upsert(table, dict(email='a@x', name='B'), keyname='email')
+        self.assertEqual(r, dict(id=1, email='a@x', name='B'))
+        r = upsert(table, dict(email='b@x', name='C'), ['email'])
+        self.assertEqual(r, dict(id=3, email='b@x', name='C'))
+        self.assertEqual(
+            query(q).getresult(), [(1, 'a@x', 'B'), (3, 'b@x', 'C')])
+        # update rules are still given as keyword arguments
+        r = upsert(table, dict(email='a@x', name='D'), 'email',
+                   name="included.name || excluded.name")
+        self.assertEqual(r, dict(id=1, email='a@x', name='BD'))
+        # do nothing, the row is fetched with the keyname
+        r = upsert(table, dict(email='b@x', name='E'), 'email', name=False)
+        self.assertEqual(r, dict(id=3, email='b@x', name='C'))
+        self.assertEqual(
+            query(q).getresult(), [(1, 'a@x', 'BD'), (3, 'b@x', 'C')])
+        # no unique index matches the keyname
+        self.assertRaises(
+            pg.ProgrammingError, upsert, table, dict(name='A'), 'name')
+        self.assertRaises(TypeError, upsert, table, dict(name='A'), 1)
+
+    def test_upsert_with_keyname_without_primary_key(self):
+        upsert = self.db.upsert
+        query = self.db.query
+        table = 'upsert_keyname_test_table_2'
+        self.create_table(table, 'a int, b int, t text, unique (a, b)')
+        q = f'select * from "{table}" order by a, b'
+        self.assertRaises(
+            pg.ProgrammingError, upsert, table, dict(a=1, b=1, t='x'))
+        r = upsert(table, dict(a=1, b=1, t='x'), ('a', 'b'))
+        self.assertEqual(r, dict(a=1, b=1, t='x'))
+        r = upsert(table, dict(a=1, b=2, t='y'), ('a', 'b'))
+        self.assertEqual(r, dict(a=1, b=2, t='y'))
+        r = upsert(table, dict(a=1, b=1, t='z'), ('b', 'a'))
+        self.assertEqual(r, dict(a=1, b=1, t='z'))
+        self.assertEqual(
+            query(q).getresult(), [(1, 1, 'z'), (1, 2, 'y')])
 
     def test_upsert_with_composite_key(self):
         upsert = self.db.upsert
@@ -2242,6 +2340,26 @@ class TestDBClass(unittest.TestCase):
         r.update(m=3, u='z', oid='invalid')
         s = delete(table, r)
         self.assertEqual(s, 0)
+
+    def test_delete_with_keyname(self):
+        delete = self.db.delete
+        query = self.db.query
+        table = 'delete_keyname_test_table'
+        self.create_table(table, 'a int, b int, t text',
+                          values=[(1, 1, 'x'), (1, 2, 'y'), (2, 1, 'z')])
+        q = f'select t from "{table}" order by t'
+        self.assertRaises(pg.ProgrammingError, delete, table, dict(a=1, b=1))
+        self.assertRaises(KeyError, delete, table, dict(a=1), ('a', 'b'))
+        self.assertRaises(TypeError, delete, table, dict(a=1), 1)
+        self.assertEqual(delete(table, dict(a=1, b=2), ('a', 'b')), 1)
+        self.assertEqual(delete(table, dict(a=1, b=2), ('a', 'b')), 0)
+        self.assertEqual(query(q).getresult(), [('x',), ('z',)])
+        self.assertEqual(delete(table, None, 't', t='z'), 1)
+        self.assertEqual(query(q).getresult(), [('x',)])
+        # the keyname should identify a unique row
+        query(f'insert into "{table}" values (1, 3, \'y\')')
+        self.assertEqual(delete(table, dict(a=1), keyname='a'), 2)
+        self.assertEqual(query(q).getresult(), [])
 
     def test_delete_with_composite_key(self):
         query = self.db.query

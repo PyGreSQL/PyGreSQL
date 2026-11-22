@@ -327,7 +327,8 @@ get -- get a row from a database table or view
 
     :param str table: name of table or view
     :param row: either a dictionary or the value to be looked up
-    :param str keyname: name of field to use as key (optional)
+    :param keyname: name of the key column, or a tuple of names (optional)
+    :type keyname: str or tuple
     :returns: A dictionary - the keys are the attribute names,
       the values are the row values.
     :raises pg.ProgrammingError: table has no primary key or missing privilege
@@ -335,8 +336,8 @@ get -- get a row from a database table or view
 
 This method is the basic mechanism to get a single row.  It assumes
 that the *keyname* specifies a unique row.  It must be the name of a
-single column or a tuple of column names.  If *keyname* is not specified,
-then the primary key for the table is used.
+single column or a tuple or list of column names.  If *keyname* is not
+specified, then the primary key for the table is used.
 
 If *row* is a dictionary, then the value for the key is taken from it.
 Otherwise, the row must be a single value or a tuple of values
@@ -375,42 +376,60 @@ array type column by passing it as a Python list.
 update -- update a row in a database table
 ------------------------------------------
 
-.. method:: DB.update(table, [row], [col=val, ...])
+.. method:: DB.update(table, [row], [keyname], [col=val, ...])
 
     Update a row in a database table
 
     :param str table: name of table
     :param dict row: optional dictionary of values
+    :param keyname: name of the key column, or a tuple of names (optional)
+    :type keyname: str or tuple
     :param col: optional keyword arguments for updating the dictionary
     :returns: the new row in the database
     :rtype: dict
     :raises pg.ProgrammingError: table has no primary key or missing privilege
     :raises KeyError: missing key value for the row
 
-Similar to insert, but updates an existing row.  The update is based on
-the primary key of the table.
+Similar to insert, but updates an existing row.  The row to be updated is
+specified by the values of the key columns.  Like in :meth:`DB.get`, the
+*keyname* can be the name of a single column or a tuple or list of column
+names.  If *keyname* is not specified, then the primary key of the table is
+used.  All other columns in the dictionary are updated, so you can also
+update the primary key if you specify another unique key as *keyname*.
+
+Note that the *keyname* must identify a unique row, otherwise all rows with
+the given key values will be updated.  If no row with the given key values
+exists, nothing is updated and the dictionary is returned unchanged.
 
 The dictionary is then modified to reflect any changes caused by the
 update due to triggers, rules, default values, etc.
 
 Like insert, the dictionary is optional and updates will be performed
-on the fields in the keywords.  The values of the primary key must be
-passed either in the dictionary or as keywords.
+on the fields in the keywords.  The values of the key columns must be
+passed either in the dictionary or as keywords.  Since keyword arguments
+are column values, a column named ``keyname`` can only be updated by passing
+it in the dictionary.
+
+.. versionchanged:: 6.3
+    The optional *keyname* argument has been added.
 
 
 upsert -- insert a row with conflict resolution
 -----------------------------------------------
 
-.. method:: DB.upsert(table, [row], [col=val, ...])
+.. method:: DB.upsert(table, [row], [keyname], [col=val, ...])
 
     Insert a row into a database table with conflict resolution
 
     :param str table: name of table
     :param dict row: optional dictionary of values
+    :param keyname: name of the key column, or a tuple of names (optional)
+    :type keyname: str or tuple
     :param col: optional keyword arguments for specifying the update
     :returns: the new row in the database
     :rtype: dict
-    :raises pg.ProgrammingError: table has no primary key or missing privilege
+    :raises pg.ProgrammingError: table has no primary key, no unique index
+        matches the keyname, or missing privilege
 
 This method inserts a row into a table, but instead of raising a
 ProgrammingError exception in case of violating a constraint or unique index,
@@ -419,6 +438,14 @@ single atomic operation on the database, so race conditions can be avoided.
 
 Like the insert method, the first parameter is the name of the table and the
 second parameter can be used to pass the values to be inserted as a dictionary.
+
+By default, a conflict means that a row with the same primary key already
+exists.  You can also pass the name of a column or a tuple or list of column
+names as *keyname*, which must have a unique index or constraint.  Then, a
+conflict means that a row with the same values in these columns already
+exists.  This way, you can also use tables without primary key.  The columns
+in *keyname* are not updated, but all other columns can be updated, including
+the primary key.
 
 Unlike the insert und update statement, keyword parameters are not used to
 modify the dictionary, but to specify which columns shall be updated in case
@@ -446,12 +473,18 @@ has been proposed for insertion by writing ``excluded.`` as table prefix.
 The dictionary is modified in any case to reflect the values in the database
 after the operation has completed.
 
+Since the keyword arguments specify the update, no update rule can be given
+for a column named ``keyname`` (or ``table`` or ``row``).
+
 .. note::
 
     The method uses the PostgreSQL "upsert" feature
     (``INSERT ... ON CONFLICT``).
 
 .. versionadded:: 5.0
+
+.. versionchanged:: 6.3
+    The optional *keyname* argument has been added.
 
 query -- execute a SQL command string
 -------------------------------------
@@ -728,26 +761,36 @@ If the dictionary is not supplied a new one is created.
 delete -- delete a row from a database table
 --------------------------------------------
 
-.. method:: DB.delete(table, [row], [col=val, ...])
+.. method:: DB.delete(table, [row], [keyname], [col=val, ...])
 
     Delete a row from a database table
 
     :param str table: name of table
     :param dict row: optional dictionary of values
+    :param keyname: name of the key column, or a tuple of names (optional)
+    :type keyname: str or tuple
     :param col: optional keyword arguments for updating the dictionary
     :rtype: None
     :raises pg.ProgrammingError: table has no primary key,
         row is still referenced or missing privilege
     :raises KeyError: missing key value for the row
 
-This method deletes the row from a table.  It deletes based on the
-primary key of the table.
+This method deletes the row from a table.  The row to be deleted is
+specified by the values of the key columns, which can be passed in the
+dictionary or as keywords.  Like in :meth:`DB.get`, the *keyname* can be the
+name of a single column or a tuple or list of column names.  If *keyname* is
+not specified, then the primary key of the table is used.  Note that the
+*keyname* must identify a unique row, otherwise all rows with the given key
+values will be deleted.
 
 The return value is the number of deleted rows (i.e. 0 if the row did not
 exist and 1 if the row was deleted).
 
 Note that if the row cannot be deleted because e.g. it is still referenced
 by another table, this method will raise a ProgrammingError.
+
+.. versionchanged:: 6.3
+    The optional *keyname* argument has been added.
 
 truncate -- quickly empty database tables
 -----------------------------------------

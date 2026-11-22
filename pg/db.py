@@ -796,8 +796,28 @@ class DB:
             privileges[table, privilege] = ret  # cache it
         return ret
 
+    def _get_keynames(self, table: str, keyname: str | Sequence[str] | None
+                      ) -> tuple[str, ...]:
+        """Get the names of the key columns for the given keyname.
+
+        The keyname can be the name of a single column or a sequence of
+        column names. If it is not specified, the primary key is used.
+        """
+        if not keyname:
+            try:
+                return self.pkeys(table)
+            except KeyError as e:  # the table has no primary key
+                raise prg_error(f'Table {table} has no primary key') from e
+        if isinstance(keyname, str):
+            return (keyname,)
+        if not isinstance(keyname, Sequence) or not all(
+                isinstance(k, str) for k in keyname):
+            raise TypeError(
+                'The keyname must be a column name or a sequence of names')
+        return tuple(keyname)
+
     def get(self, table: str, row: Any,
-            keyname: str | tuple[str, ...] | None = None) -> dict[str, Any]:
+            keyname: str | Sequence[str] | None = None) -> dict[str, Any]:
         """Get a row from a database table or view.
 
         This method is the basic mechanism to get a single row.  It assumes
@@ -814,13 +834,7 @@ class DB:
         if table.endswith('*'):  # hint for descendant tables can be ignored
             table = table[:-1].rstrip()
         attnames = self.get_attnames(table)
-        if keyname and isinstance(keyname, str):
-            keyname = (keyname,)
-        if not keyname:
-            try:  # if keyname is not specified, try using the primary key
-                keyname = self.pkeys(table)
-            except KeyError as e:  # the table has no primary key
-                raise prg_error(f'Table {table} has no primary key') from e
+        keyname = self._get_keynames(table, keyname)
         if isinstance(row, dict):
             # check whether all key columns have values
             if not set(keyname).issubset(row):
@@ -894,12 +908,18 @@ class DB:
             row.update(res[0])
         return row
 
-    def update(self, table: str, row: dict[str, Any] | None = None, **kw : Any
+    def update(self, table: str, row: dict[str, Any] | None = None,
+               keyname: str | Sequence[str] | None = None, **kw : Any
                ) -> dict[str, Any]:
         """Update an existing row in a database table.
 
-        Similar to insert, but updates an existing row.  The update is based
-        on the primary key of the table.
+        Similar to insert, but updates an existing row.  The row to update
+        is specified by the values of the key columns in the dictionary.
+        Like in get(), the keyname can be the name of a single column or a
+        sequence of column names, and must identify a unique row.  If the
+        keyname is not specified, then the primary key of the table is used.
+        All other columns in the dictionary are updated, so you can also
+        update the primary key if you specify another keyname.
 
         The dictionary is then modified to reflect any changes caused by the
         update due to triggers, rules, default values, etc.
@@ -911,14 +931,11 @@ class DB:
         if row is None:
             row = {}
         row.update(kw)
-        try:
-            keynames = self.pkeys(table)
-        except KeyError as e:  # the table has no primary key
-            raise prg_error(f'Table {table} has no primary key') from e
+        keynames = self._get_keynames(table, keyname)
         keyset = set(keynames)
         # check whether all key columns have values
         if not keyset.issubset(row):
-            raise KeyError('Missing value for primary key in row')
+            raise KeyError('Missing value in row for the key')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
@@ -942,7 +959,8 @@ class DB:
             row.update(res[0])
         return row
 
-    def upsert(self, table: str, row: dict[str, Any] | None = None, **kw: Any
+    def upsert(self, table: str, row: dict[str, Any] | None = None,
+               keyname: str | Sequence[str] | None = None, **kw: Any
                ) -> dict[str, Any]:
         """Insert a row into a database table with conflict resolution.
 
@@ -951,6 +969,9 @@ class DB:
         already exists, an update will be executed instead.  This will be
         performed as a single atomic operation on the database, so race
         conditions can be avoided.
+
+        Instead of the primary key, you can also pass the column or the
+        sequence of columns of another unique key as keyname.
 
         Like the insert method, the first parameter is the name of the
         table and the second parameter can be used to pass the values to
@@ -1002,10 +1023,7 @@ class DB:
                 name_list.append(col(n))
                 value_list.append(adapt(row[n], attnames[n]))
         names, values = ', '.join(name_list), ', '.join(value_list)
-        try:
-            keynames = self.pkeys(table)
-        except KeyError as e:
-            raise prg_error(f'Table {table} has no primary key') from e
+        keynames = self._get_keynames(table, keyname)
         target = ', '.join(col(k) for k in keynames)
         update = []
         keyset = set(keynames)
@@ -1029,7 +1047,7 @@ class DB:
         if res:  # may be empty with "do nothing"
             row.update(res[0])
         else:
-            self.get(table, row)
+            self.get(table, row, keynames)
         return row
 
     def clear(self, table: str, row: dict[str, Any] | None = None
@@ -1055,12 +1073,16 @@ class DB:
                 row[n] = ''
         return row
 
-    def delete(self, table: str, row: dict[str, Any] | None = None, **kw: Any
+    def delete(self, table: str, row: dict[str, Any] | None = None,
+               keyname: str | Sequence[str] | None = None, **kw: Any
                ) -> int:
         """Delete an existing row in a database table.
 
-        This method deletes the row from a table.  It deletes based on the
-        primary key of the table.
+        This method deletes the row from a table.  The row is specified by
+        the values of the key columns in the dictionary.  Like in get(), the
+        keyname can be the name of a single column or a sequence of column
+        names, and must identify a unique row.  If the keyname is not
+        specified, then the primary key of the table is used.
 
         The return value is the number of deleted rows (i.e. 0 if the row
         did not exist and 1 if the row was deleted).
@@ -1074,13 +1096,10 @@ class DB:
         if row is None:
             row = {}
         row.update(kw)
-        try:
-            keynames = self.pkeys(table)
-        except KeyError as e:  # the table has no primary key
-            raise prg_error(f'Table {table} has no primary key') from e
+        keynames = self._get_keynames(table, keyname)
         # check whether all key columns have values
         if not set(keynames).issubset(row):
-            raise KeyError('Missing value for primary key in row')
+            raise KeyError('Missing value in row for the key')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier

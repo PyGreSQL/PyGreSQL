@@ -132,6 +132,13 @@ Version 6.3.0 (unreleased)
     `DB.get()` returned it under the key ``oid(table)``, e.g.
     ``oid(pg_namespace)``. The *with_oid* parameter of `DB.get_attnames()`
     is ignored.
+  - `DB.update()`, `DB.delete()` and `DB.upsert()` have a new optional
+    parameter *keyname* like `DB.get()`, with the name of the key column or
+    a tuple of names, so that these methods can also be used for tables
+    without primary key (#56, thanks to Justin Pryzby for the suggestion).
+    For `DB.upsert()`, it specifies the conflict target. If another unique
+    key is used as *keyname*, `DB.update()` and `DB.upsert()` can also
+    update the primary key. Before, this was only possible with OIDs.
 
 - Changes in the `pgdb` module:
 
