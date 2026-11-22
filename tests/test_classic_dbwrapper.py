@@ -4449,6 +4449,8 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(dbtypes, dict)
         self.assertNotIn('int4', dbtypes)
         self.assertIs(dbtypes.get_typecast('int4'), int)
+        self.assertEqual(dbtypes.typecast('42', 'int4'), 42)
+        self.assertEqual(dbtypes.typecast('42', dbtypes['int4']), 42)
         dbtypes.set_typecast('int4', float)
         self.assertIs(dbtypes.get_typecast('int4'), float)
         dbtypes.reset_typecast('int4')

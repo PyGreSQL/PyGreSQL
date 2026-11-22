@@ -162,6 +162,9 @@ Version 6.3.0 (unreleased)
     still used for elements of arrays and fields of composite types.
   - `DbTypes.reset_typecast()` now also resets the typecast for arrays of
     the given type. Before, the arrays were still cast with the old function.
+  - `DbTypes.typecast()` now also casts values when the type is passed as a
+    type object, as returned by `DB.get_attnames()`. Before, the value was
+    returned unchanged.
 
 - Changes in the `pgdb` module:
 

@@ -366,7 +366,9 @@ class DbTypes(dict):
         if value is None:
             # for NULL values, no typecast is necessary
             return None
-        if not isinstance(typ, DbType):
+        if isinstance(typ, DbType):
+            typ = typ.pgtype  # the string itself is the simple name
+        else:
             db_type = self.get(typ)
             if db_type:
                 typ = db_type.pgtype
