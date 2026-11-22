@@ -90,9 +90,14 @@ Version 6.3.0 (unreleased)
     and the escape methods. On a closed connection, `Source.putdata()` and
     `Source.getdata()` now raise an `OperationalError` like the other
     methods instead of an `IOError`.
+  - `DB.close()` and `DB.reopen()` keep the cast hook of the connection
+    if it cannot be closed, e.g. because it is busy.
 
 - Changes in the `pgdb` module:
 
+  - `Connection.commit()` and `Connection.rollback()` no longer mark the
+    transaction as ended when the command could not be sent, e.g. because
+    the connection is busy.
   - The items of `Cursor.description` and the results of
     `TypeCache.get_fields()` are now typed named tuples.
   - Plain `bytes` parameters are now adapted as `bytea`, like values wrapped

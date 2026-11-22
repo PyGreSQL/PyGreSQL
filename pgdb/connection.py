@@ -109,26 +109,30 @@ class Connection:
         if not self._cnx:
             raise op_error("Connection has been closed")
         if self._tnx:
-            self._tnx = False
             try:
                 self._cnx.source().execute("COMMIT")
             except DatabaseError:
+                self._tnx = False  # the transaction has ended anyway
                 raise  # database provides error message
             except Exception as e:
+                # the command has not been sent, e.g. the connection is busy
                 raise op_error("Can't commit transaction") from e
+            self._tnx = False
 
     def rollback(self) -> None:
         """Roll back to the start of any pending transaction."""
         if not self._cnx:
             raise op_error("Connection has been closed")
         if self._tnx:
-            self._tnx = False
             try:
                 self._cnx.source().execute("ROLLBACK")
             except DatabaseError:
+                self._tnx = False  # the transaction has ended anyway
                 raise  # database provides error message
             except Exception as e:
+                # the command has not been sent, e.g. the connection is busy
                 raise op_error("Can't rollback transaction") from e
+            self._tnx = False
 
     def cursor(self) -> Cursor:
         """Return a new cursor object using the connection."""

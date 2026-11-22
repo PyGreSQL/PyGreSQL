@@ -1415,6 +1415,39 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         con2.close()
         con1.close()
 
+    def test_commit_and_rollback_busy_connection(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create temp table test_busy (n int)")
+            con.commit()
+            cur.execute("insert into test_busy values (1)")
+            errors: list[Exception] = []
+
+            def receiver(_notice):
+                for func in (con.commit, con.rollback):
+                    try:
+                        func()
+                    except Exception as e:
+                        errors.append(e)
+
+            cnx = con._cnx
+            assert cnx is not None
+            cnx.query('set client_min_messages=notice')
+            cnx.set_notice_receiver(receiver)
+            cur.execute("do $$ begin raise notice 'busy'; end $$")
+            cnx.set_notice_receiver(None)
+            self.assertEqual(len(errors), 2)
+            for error in errors:
+                self.assertIsInstance(error, pgdb.OperationalError)
+                self.assertIsInstance(error.__cause__, pgdb.InterfaceError)
+            # the transaction has not been marked as ended
+            con.rollback()
+            cur.execute("select count(*) from test_busy")
+            self.assertEqual(cur.fetchone(), (0,))
+        finally:
+            con.close()
+
     def test_autocommit(self):
         table = self.table_prefix + 'booze'
         con1 = self._connect()

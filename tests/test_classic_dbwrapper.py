@@ -303,6 +303,33 @@ class TestDBClassBasic(unittest.TestCase):
         self.db.query("select 1+1")
         self.db.close()
 
+    def test_close_and_reopen_busy_connection(self):
+        db = self.db
+        con = db.db
+        assert con is not None
+        hook = con.get_cast_hook()
+        self.assertIsNotNone(hook)
+        db.query('create temp table test_busy (n int)')
+        errors: list[Exception] = []
+
+        def rows():
+            for func in (db.close, db.reopen):
+                try:
+                    func()
+                except Exception as e:
+                    errors.append(e)
+            yield 1,
+
+        self.assertEqual(db.inserttable('test_busy', rows()), 1)
+        self.assertEqual(len(errors), 2)
+        for error in errors:
+            self.assertIsInstance(error, pg.InterfaceError)
+        # the connection is still open and has kept its cast hook
+        self.assertIs(db.db, con)
+        self.assertIs(con.get_cast_hook(), hook)
+        self.assertEqual(db.query("select '2020-01-02'::date").getresult(),
+                         [(date(2020, 1, 2),)])
+
     def test_existing_connection(self):
         db = pg.DB(self.db.db)
         self.assertIsNotNone(db.db)

@@ -247,10 +247,16 @@ class DB:
         """Close the database connection."""
         # Wraps shared library function so we can track state.
         db = self._valid_db
-        with suppress(TypeError):  # when already closed
-            db.set_cast_hook(None)
+        try:
+            set_cast_hook = db.set_cast_hook
+        except TypeError:  # when already closed
+            set_cast_hook = None
         if self._closeable:
+            # if this fails, e.g. when the connection is busy,
+            # the connection must still be usable with the cast hook
             db.close()
+        if set_cast_hook:
+            set_cast_hook(None)
         self.db = None
 
     def reset(self) -> None:
@@ -272,8 +278,16 @@ class DB:
             args, kw = self._db_args
             db = connect(*args, **kw)
             if self.db:
-                self.db.set_cast_hook(None)
-                self.db.close()
+                old_db = self.db
+                set_cast_hook = old_db.set_cast_hook
+                try:
+                    # keep the old connection with its cast hook if this
+                    # fails, e.g. when the connection is busy
+                    old_db.close()
+                except BaseException:
+                    db.close()
+                    raise
+                set_cast_hook(None)
             db.set_cast_hook(self.dbtypes.typecast)
             self.db = db
         else:
