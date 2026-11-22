@@ -344,10 +344,6 @@ corresponding to the passed *keyname* or primary key.  The fetched row
 from the table will be returned as a new dictionary or used to replace
 the existing values if the row was passed as a dictionary.
 
-The OID is also put into the dictionary if the table has one, but
-in order to allow the caller to work with multiple tables, it is
-munged as ``oid(table)`` using the actual name of the table.
-
 Note that since PyGreSQL 5.0 this will return the value of an array
 type column as a Python list by default.
 
@@ -392,17 +388,14 @@ update -- update a row in a database table
     :raises KeyError: missing key value for the row
 
 Similar to insert, but updates an existing row.  The update is based on
-the primary key of the table or the OID value as munged by :meth:`DB.get`
-or passed as keyword.  The OID will take precedence if provided, so that it
-is possible to update the primary key itself.
+the primary key of the table.
 
 The dictionary is then modified to reflect any changes caused by the
 update due to triggers, rules, default values, etc.
 
 Like insert, the dictionary is optional and updates will be performed
-on the fields in the keywords.  There must be an OID or primary key either
-specified using the ``'oid'`` keyword or in the dictionary, in which case the
-OID must be munged.
+on the fields in the keywords.  The values of the primary key must be
+passed either in the dictionary or as keywords.
 
 
 upsert -- insert a row with conflict resolution
@@ -748,8 +741,7 @@ delete -- delete a row from a database table
     :raises KeyError: missing key value for the row
 
 This method deletes the row from a table.  It deletes based on the
-primary key of the table or the OID value as munged by :meth:`DB.get`
-or passed as keyword.  The OID will take precedence if provided.
+primary key of the table.
 
 The return value is the number of deleted rows (i.e. 0 if the row did not
 exist and 1 if the row was deleted).

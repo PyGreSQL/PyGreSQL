@@ -322,7 +322,7 @@ class DbTypes(dict):
                 return None
         if not typ.relid:
             return None
-        return self._db.get_attnames(typ.relid, with_oid=False)
+        return self._db.get_attnames(typ.relid)
 
     def get_typecast(self, typ: Any) -> Callable | None:
         """Get the typecast function for the given database type."""

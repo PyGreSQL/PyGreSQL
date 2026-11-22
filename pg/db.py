@@ -28,7 +28,7 @@ from .core import (
     unescape_bytea,
 )
 from .error import db_error, int_error, prg_error
-from .helpers import namediter, oid_key, quote_if_unqualified
+from .helpers import namediter, quote_if_unqualified
 from .notify import NotificationHandler
 
 if TYPE_CHECKING:
@@ -718,6 +718,9 @@ class DB:
 
         By default, only a limited number of simple types will be returned.
         You can get the registered types after calling use_regtypes(True).
+
+        The with_oid parameter is ignored, since tables with OIDs are not
+        supported by PostgreSQL any more.
         """
         attnames = self._attnames
         if flush:
@@ -727,8 +730,6 @@ class DB:
             names = attnames[table]
         except KeyError:  # cache miss, check the database
             cmd = "a.attnum OPERATOR(pg_catalog.>) 0"
-            if with_oid:
-                cmd = f"({cmd} OR a.attname OPERATOR(pg_catalog.=) 'oid')"
             cmd = self._query_attnames.format(
                 quote_if_unqualified('$1', table), cmd)
             res = self._valid_db.query(cmd, (table,)).getresult()
@@ -809,39 +810,22 @@ class DB:
         corresponding to the passed keyname or primary key.  The fetched row
         from the table will be returned as a new dictionary or used to replace
         the existing values when row was passed as a dictionary.
-
-        The OID is also put into the dictionary if the table has one, but
-        in order to allow the caller to work with multiple tables, it is
-        munged as "oid(table)" using the actual name of the table.
         """
         if table.endswith('*'):  # hint for descendant tables can be ignored
             table = table[:-1].rstrip()
         attnames = self.get_attnames(table)
-        qoid = oid_key(table) if 'oid' in attnames else None
         if keyname and isinstance(keyname, str):
             keyname = (keyname,)
-        if qoid and isinstance(row, dict) and qoid in row and 'oid' not in row:
-            row['oid'] = row[qoid]
         if not keyname:
             try:  # if keyname is not specified, try using the primary key
                 keyname = self.pkeys(table)
             except KeyError as e:  # the table has no primary key
-                # try using the oid instead
-                if qoid and isinstance(row, dict) and 'oid' in row:
-                    keyname = ('oid',)
-                else:
-                    raise prg_error(
-                        f'Table {table} has no primary key') from e
-            else:  # the table has a primary key
-                # check whether all key columns have values
-                if isinstance(row, dict) and not set(keyname).issubset(row):
-                    # try using the oid instead
-                    if qoid and 'oid' in row:
-                        keyname = ('oid',)
-                    else:
-                        raise KeyError(
-                            'Missing value in row for specified keyname')
-        if not isinstance(row, dict):
+                raise prg_error(f'Table {table} has no primary key') from e
+        if isinstance(row, dict):
+            # check whether all key columns have values
+            if not set(keyname).issubset(row):
+                raise KeyError('Missing value in row for specified keyname')
+        else:
             if not isinstance(row, (tuple, list)):
                 row = [row]
             if len(keyname) != len(row):
@@ -851,16 +835,11 @@ class DB:
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
-        what = 'oid, *' if qoid else '*'
         where = ' AND '.join(
             f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
             for k in keyname)
-        if 'oid' in row:
-            if qoid:
-                row[qoid] = row['oid']
-            del row['oid']
         t = self._escape_qualified_name(table)
-        cmd = f'SELECT {what} FROM {t} WHERE {where} LIMIT 1'  # noqa: S608
+        cmd = f'SELECT * FROM {t} WHERE {where} LIMIT 1'  # noqa: S608
         self._do_debug(cmd, params)
         query = self._valid_db.query(cmd, params)
         res = query.dictresult()
@@ -870,10 +849,7 @@ class DB:
             raise db_error(
                 f'No such record in {table}\nwhere {where}\nwith '
                 + self._list_params(params))
-        for n, value in res[0].items():
-            if qoid and n == 'oid':
-                n = qoid
-            row[n] = value
+        row.update(res[0])
         return row
 
     def insert(self, table: str, row: dict[str, Any] | None = None, **kw: Any
@@ -895,11 +871,8 @@ class DB:
         if row is None:
             row = {}
         row.update(kw)
-        if 'oid' in row:
-            del row['oid']  # do not insert oid
         attnames = self.get_attnames(table)
         generated = self.get_generated(table)
-        qoid = oid_key(table) if 'oid' in attnames else None
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
@@ -911,18 +884,14 @@ class DB:
         if not name_list:
             raise prg_error('No column found that can be inserted')
         names, values = ', '.join(name_list), ', '.join(value_list)
-        ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
         cmd = (f'INSERT INTO {t} ({names})'  # noqa: S608
-               f' VALUES ({values}) RETURNING {ret}')
+               f' VALUES ({values}) RETURNING *')
         self._do_debug(cmd, params)
         query = self._valid_db.query(cmd, params)
         res = query.dictresult()
         if res:  # this should always be true
-            for n, value in res[0].items():
-                if qoid and n == 'oid':
-                    n = qoid
-                row[n] = value
+            row.update(res[0])
         return row
 
     def update(self, table: str, row: dict[str, Any] | None = None, **kw : Any
@@ -930,9 +899,7 @@ class DB:
         """Update an existing row in a database table.
 
         Similar to insert, but updates an existing row.  The update is based
-        on the primary key of the table or the OID value as munged by get()
-        or passed as keyword.  The OID will take precedence if provided, so
-        that it is possible to update the primary key itself.
+        on the primary key of the table.
 
         The dictionary is then modified to reflect any changes caused by the
         update due to triggers, rules, default values, etc.
@@ -941,36 +908,23 @@ class DB:
             table = table[:-1].rstrip()  # need parent table name
         attnames = self.get_attnames(table)
         generated = self.get_generated(table)
-        qoid = oid_key(table) if 'oid' in attnames else None
         if row is None:
             row = {}
-        elif 'oid' in row:
-            del row['oid']  # only accept oid key from named args for safety
         row.update(kw)
-        if qoid and qoid in row and 'oid' not in row:
-            row['oid'] = row[qoid]
-        if qoid and 'oid' in row:  # try using the oid
-            keynames: tuple[str, ...] = ('oid',)
-            keyset = set(keynames)
-        else:  # try using the primary key
-            try:
-                keynames = self.pkeys(table)
-            except KeyError as e:  # the table has no primary key
-                raise prg_error(f'Table {table} has no primary key') from e
-            keyset = set(keynames)
-            # check whether all key columns have values
-            if not keyset.issubset(row):
-                raise KeyError('Missing value for primary key in row')
+        try:
+            keynames = self.pkeys(table)
+        except KeyError as e:  # the table has no primary key
+            raise prg_error(f'Table {table} has no primary key') from e
+        keyset = set(keynames)
+        # check whether all key columns have values
+        if not keyset.issubset(row):
+            raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
         where = ' AND '.join(
             f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
             for k in keynames)
-        if 'oid' in row:
-            if qoid:
-                row[qoid] = row['oid']
-            del row['oid']
         values_list = []
         for n in attnames:
             if n in row and n not in keyset and n not in generated:
@@ -978,18 +932,14 @@ class DB:
         if not values_list:
             return row
         values = ', '.join(values_list)
-        ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
         cmd = (f'UPDATE {t} SET {values}'  # noqa: S608
-               f' WHERE {where} RETURNING {ret}')
+               f' WHERE {where} RETURNING *')
         self._do_debug(cmd, params)
         query = self._valid_db.query(cmd, params)
         res = query.dictresult()
         if res:  # may be empty when row does not exist
-            for n, value in res[0].items():
-                if qoid and n == 'oid':
-                    n = qoid
-                row[n] = value
+            row.update(res[0])
         return row
 
     def upsert(self, table: str, row: dict[str, Any] | None = None, **kw: Any
@@ -1041,12 +991,8 @@ class DB:
             table = table[:-1].rstrip()
         if row is None:
             row = {}
-        if 'oid' in row:
-            del row['oid']  # do not insert oid
-        kw.pop('oid', None)  # do not update oid
         attnames = self.get_attnames(table)
         generated = self.get_generated(table)
-        qoid = oid_key(table) if 'oid' in attnames else None
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
@@ -1063,7 +1009,6 @@ class DB:
         target = ', '.join(col(k) for k in keynames)
         update = []
         keyset = set(keynames)
-        keyset.add('oid')
         for n in attnames:
             if n not in keyset and n not in generated:
                 value = kw.get(n, n in row)
@@ -1074,19 +1019,15 @@ class DB:
         if not values:
             return row
         do = 'update set ' + ', '.join(update) if update else 'nothing'
-        ret = 'oid, *' if qoid else '*'
         t = self._escape_qualified_name(table)
         cmd = (f'INSERT INTO {t} AS included ({names})'  # noqa: S608
                f' VALUES ({values})'
-               f' ON CONFLICT ({target}) DO {do} RETURNING {ret}')
+               f' ON CONFLICT ({target}) DO {do} RETURNING *')
         self._do_debug(cmd, params)
         query = self._valid_db.query(cmd, params)
         res = query.dictresult()
         if res:  # may be empty with "do nothing"
-            for n, value in res[0].items():
-                if qoid and n == 'oid':
-                    n = qoid
-                row[n] = value
+            row.update(res[0])
         else:
             self.get(table, row)
         return row
@@ -1105,8 +1046,6 @@ class DB:
             row = {}  # empty if argument is not present
         attnames = self.get_attnames(table)
         for n, t in attnames.items():
-            if n == 'oid':
-                continue
             t = t.simple
             if t in DbTypes._num_types:
                 row[n] = 0
@@ -1121,8 +1060,7 @@ class DB:
         """Delete an existing row in a database table.
 
         This method deletes the row from a table.  It deletes based on the
-        primary key of the table or the OID value as munged by get() or
-        passed as keyword.  The OID will take precedence if provided.
+        primary key of the table.
 
         The return value is the number of deleted rows (i.e. 0 if the row
         did not exist and 1 if the row was deleted).
@@ -1133,34 +1071,22 @@ class DB:
         if table.endswith('*'):  # hint for descendant tables can be ignored
             table = table[:-1].rstrip()
         attnames = self.get_attnames(table)
-        qoid = oid_key(table) if 'oid' in attnames else None
         if row is None:
             row = {}
-        elif 'oid' in row:
-            del row['oid']  # only accept oid key from named args for safety
         row.update(kw)
-        if qoid and qoid in row and 'oid' not in row:
-            row['oid'] = row[qoid]
-        if qoid and 'oid' in row:  # try using the oid
-            keynames: tuple[str, ...] = ('oid',)
-        else:  # try using the primary key
-            try:
-                keynames = self.pkeys(table)
-            except KeyError as e:  # the table has no primary key
-                raise prg_error(f'Table {table} has no primary key') from e
-            # check whether all key columns have values
-            if not set(keynames).issubset(row):
-                raise KeyError('Missing value for primary key in row')
+        try:
+            keynames = self.pkeys(table)
+        except KeyError as e:  # the table has no primary key
+            raise prg_error(f'Table {table} has no primary key') from e
+        # check whether all key columns have values
+        if not set(keynames).issubset(row):
+            raise KeyError('Missing value for primary key in row')
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier
         where = ' AND '.join(
             f'{col(k)} OPERATOR(pg_catalog.=) {adapt(row[k], attnames[k])}'
             for k in keynames)
-        if 'oid' in row:
-            if qoid:
-                row[qoid] = row['oid']
-            del row['oid']
         t = self._escape_qualified_name(table)
         cmd = f'DELETE FROM {t} WHERE {where}'  # noqa: S608
         self._do_debug(cmd, params)

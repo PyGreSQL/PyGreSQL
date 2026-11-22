@@ -21,7 +21,6 @@ __all__ = [
     'join_text',
     'namediter',
     'namednext',
-    'oid_key',
     'quote_if_unqualified',
     'scalariter'
 ]
@@ -83,10 +82,6 @@ def quote_if_unqualified(param: str, name: int | str) -> str:
     if isinstance(name, str) and '.' not in name:
         return f'quote_ident({param})'
     return param
-
-def oid_key(table: str) -> str:
-    """Build oid key from a table name."""
-    return f'oid({table})'
 
 class QuoteDict(dict):
     """Dictionary with auto quoting of its items.

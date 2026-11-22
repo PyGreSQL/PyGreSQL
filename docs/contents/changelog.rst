@@ -124,6 +124,14 @@ Version 6.3.0 (unreleased)
     when they cannot be inferred from the context (#76, thanks to Justin
     Pryzby for the suggestion). The connection method takes type OIDs,
     `DB.prepare()` also takes type names like ``'int'`` or ``'text[]'``.
+  - The remaining support for tables with OIDs has been removed from the
+    `DB` wrapper, since PostgreSQL 12 and newer do not support them any
+    more. `DB.get()`, `insert()`, `update()`, `upsert()` and `delete()` no
+    longer handle ``oid`` and ``oid(table)`` keys specially; an ``oid``
+    column, as in the system catalogs, is now a normal column. Before,
+    `DB.get()` returned it under the key ``oid(table)``, e.g.
+    ``oid(pg_namespace)``. The *with_oid* parameter of `DB.get_attnames()`
+    is ignored.
 
 - Changes in the `pgdb` module:
 

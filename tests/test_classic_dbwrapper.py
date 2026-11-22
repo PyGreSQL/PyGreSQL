@@ -387,12 +387,10 @@ class TestDBClass(unittest.TestCase):
     cls_set_up = False
 
     regtypes = None
-    supports_oids = False
 
     @classmethod
     def setUpClass(cls):
         db = DB()
-        cls.supports_oids = db.server_version < 120000
         db.query("drop table if exists test cascade")
         db.query("create table test ("
                  "i2 smallint, i4 integer, i8 bigint,"
@@ -428,7 +426,7 @@ class TestDBClass(unittest.TestCase):
         self.db.close()
 
     def create_table(self, table, definition,
-                    temporary=True, oids=None, values=None):
+                    temporary=True, values=None):
         query = self.db.query
         if '"' not in table or '.' in table:
             table = f'"{table}"'
@@ -440,14 +438,7 @@ class TestDBClass(unittest.TestCase):
         as_query = definition.startswith(('as ', 'AS '))
         if not as_query and not definition.startswith('('):
             definition = f'({definition})'
-        with_oids = 'with oids' if oids else (
-            'without oids' if self.supports_oids else '')
-        cmd_parts = ['create', temporary, table]
-        if as_query:
-            cmd_parts.extend([with_oids, definition])
-        else:
-            cmd_parts.extend([definition, with_oids])
-        cmd = ' '.join(cmd_parts)
+        cmd = ' '.join(['create', temporary, table, definition])
         query(cmd)
         if values:
             for params in values:
@@ -812,28 +803,15 @@ class TestDBClass(unittest.TestCase):
         table = 'test hello world'
         values = [(2, "World!"), (1, "Hello")]
         self.create_table(table, "n smallint, t varchar",
-                         temporary=True, oids=False, values=values)
+                         temporary=True, values=values)
         r = self.db.query(f'select t from "{table}" order by n').getresult()
         r = ', '.join(row[0] for row in r)
         self.assertEqual(r, "Hello, World!")
-
-    def test_create_table_with_oids(self):
-        if not self.supports_oids:
-            self.skipTest("database does not support tables with oids")
-        table = 'test hello world'
-        values = [(2, "World!"), (1, "Hello")]
-        self.create_table(table, "n smallint, t varchar",
-                         temporary=True, oids=True, values=values)
-        r = self.db.query(f'select t from "{table}" order by n').getresult()
-        r = ', '.join(row[0] for row in r)
-        self.assertEqual(r, "Hello, World!")
-        r = self.db.query(f'select oid from "{table}" limit 1').getresult()
-        self.assertIsInstance(r[0][0], int)
 
     def test_query(self):
         query = self.db.query
         table = 'test_table'
-        self.create_table(table, "n integer", oids=False)
+        self.create_table(table, "n integer")
         q = "insert into test_table values (1)"
         r = query(q)
         self.assertIsInstance(r, str)
@@ -864,40 +842,6 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r, str)
         self.assertEqual(r, '5')
 
-    def test_query_with_oids(self):
-        if not self.supports_oids:
-            self.skipTest("database does not support tables with oids")
-        query = self.db.query
-        table = 'test_table'
-        self.create_table(table, "n integer", oids=True)
-        q = "insert into test_table values (1)"
-        r = query(q)
-        self.assertIsInstance(r, int)
-        q = "insert into test_table select 2"
-        r = query(q)
-        self.assertIsInstance(r, int)
-        oid = r
-        q = "select oid from test_table where n=2"
-        r = query(q).getresult()
-        self.assertEqual(len(r), 1)
-        r = r[0]
-        self.assertEqual(len(r), 1)
-        r = r[0]
-        self.assertEqual(r, oid)
-        q = "insert into test_table select 3 union select 4 union select 5"
-        r = query(q)
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, '3')
-        q = "update test_table set n=4 where n<5"
-        r = query(q)
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, '4')
-        # noinspection SqlWithoutWhere
-        q = "delete from test_table"
-        r = query(q)
-        self.assertIsInstance(r, str)
-        self.assertEqual(r, '5')
-
     def test_multiple_queries(self):
         self.assertEqual(self.db.query(
             "create temporary table test_multi (n integer);"
@@ -906,7 +850,7 @@ class TestDBClass(unittest.TestCase):
 
     def test_query_with_params(self):
         query = self.db.query
-        self.create_table('test_table', 'n1 integer, n2 integer', oids=False)
+        self.create_table('test_table', 'n1 integer, n2 integer')
         q = "insert into test_table values ($1, $2)"
         r = query(q, (1, 2))
         self.assertEqual(r, '1')
@@ -1658,72 +1602,6 @@ class TestDBClass(unittest.TestCase):
         s.pop('n')
         self.assertRaises(KeyError, get, table, s)
 
-    def test_get_with_oids(self):
-        if not self.supports_oids:
-            self.skipTest("database does not support tables with oids")
-        get = self.db.get
-        query = self.db.query
-        table = 'get_with_oid_test_table'
-        self.create_table(table, 'n integer, t text', oids=True,
-                         values=enumerate('xyz', start=1))
-        self.assertRaises(pg.ProgrammingError, get, table, 2)
-        self.assertRaises(KeyError, get, table, {}, 'oid')
-        r = get(table, 2, 'n')
-        qoid = f'oid({table})'
-        self.assertIn(qoid, r)
-        oid = r[qoid]
-        self.assertIsInstance(oid, int)
-        result = {'t': 'y', 'n': 2, qoid: oid}
-        self.assertEqual(r, result)
-        r = get(table, oid, 'oid')
-        self.assertEqual(r, result)
-        r = get(table, dict(oid=oid))
-        self.assertEqual(r, result)
-        r = get(table, dict(oid=oid), 'oid')
-        self.assertEqual(r, result)
-        r = get(table, {qoid: oid})
-        self.assertEqual(r, result)
-        r = get(table, {qoid: oid}, 'oid')
-        self.assertEqual(r, result)
-        self.assertEqual(get(table + '*', 2, 'n'), r)
-        self.assertEqual(get(table + ' *', 2, 'n'), r)
-        self.assertEqual(get(table, oid, 'oid')['t'], 'y')
-        self.assertEqual(get(table, 1, 'n')['t'], 'x')
-        self.assertEqual(get(table, 3, 'n')['t'], 'z')
-        self.assertEqual(get(table, 2, 'n')['t'], 'y')
-        self.assertRaises(pg.DatabaseError, get, table, 4, 'n')
-        r['n'] = 3
-        self.assertEqual(get(table, r, 'n')['t'], 'z')
-        self.assertEqual(get(table, 1, 'n')['t'], 'x')
-        self.assertEqual(get(table, r, 'oid')['t'], 'z')
-        query(f'alter table "{table}" alter n set not null')
-        query(f'alter table "{table}" add primary key (n)')
-        self.assertEqual(get(table, 3)['t'], 'z')
-        self.assertEqual(get(table, 1)['t'], 'x')
-        self.assertEqual(get(table, 2)['t'], 'y')
-        r['n'] = 1
-        self.assertEqual(get(table, r)['t'], 'x')
-        r['n'] = 3
-        self.assertEqual(get(table, r)['t'], 'z')
-        r['n'] = 2
-        self.assertEqual(get(table, r)['t'], 'y')
-        r = get(table, oid, 'oid')
-        self.assertEqual(r, result)
-        r = get(table, dict(oid=oid))
-        self.assertEqual(r, result)
-        r = get(table, dict(oid=oid), 'oid')
-        self.assertEqual(r, result)
-        r = get(table, {qoid: oid})
-        self.assertEqual(r, result)
-        r = get(table, {qoid: oid}, 'oid')
-        self.assertEqual(r, result)
-        r = get(table, dict(oid=oid, n=1))
-        self.assertEqual(r['n'], 1)
-        self.assertNotEqual(r[qoid], oid)
-        r = get(table, dict(oid=oid, t='z'), 't')
-        self.assertEqual(r['n'], 3)
-        self.assertNotEqual(r[qoid], oid)
-
     def test_get_with_composite_key(self):
         get = self.db.get
         table = 'get_test_table_1'
@@ -1768,6 +1646,16 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['Prime!'], 17)
         self.assertEqual(r['much space'], 1001)
         self.assertEqual(r['Questions?'], 'No!')
+
+    def test_get_with_oid_column(self):
+        # the oid is a normal column since PostgreSQL 12
+        self.assertIn('oid', self.db.get_attnames('pg_namespace'))
+        r = self.db.get('pg_namespace', 'public', 'nspname')
+        self.assertEqual(r['nspname'], 'public')
+        self.assertIsInstance(r['oid'], int)
+        self.assertNotIn('oid(pg_namespace)', r)
+        self.assertEqual(
+            self.db.get('pg_namespace', r['oid'], 'oid')['nspname'], 'public')
 
     def test_get_from_view(self):
         self.db.query('delete from test where i4=14')
@@ -1905,76 +1793,6 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(data, expect)
             query(f'truncate table "{table}"')
 
-    def test_insert_with_oids(self):
-        if not self.supports_oids:
-            self.skipTest("database does not support tables with oids")
-        insert = self.db.insert
-        query = self.db.query
-        self.create_table('test_table', 'n int', oids=True)
-        self.assertRaises(pg.ProgrammingError, insert, 'test_table', m=1)
-        r = insert('test_table', n=1)
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 1)
-        self.assertNotIn('oid', r)
-        qoid = 'oid(test_table)'
-        self.assertIn(qoid, r)
-        oid = r[qoid]
-        self.assertEqual(sorted(r.keys()), ['n', qoid])
-        r = insert('test_table', n=2, oid=oid)
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 2)
-        self.assertIn(qoid, r)
-        self.assertNotEqual(r[qoid], oid)
-        self.assertNotIn('oid', r)
-        r = insert('test_table', None, n=3)
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 3)
-        s = r
-        r = insert('test_table', r)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 3)
-        r = insert('test_table *', r)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 3)
-        r = insert('test_table', r, n=4)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 4)
-        self.assertNotIn('oid', r)
-        self.assertIn(qoid, r)
-        oid = r[qoid]
-        r = insert('test_table', r, n=5, oid=oid)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 5)
-        self.assertIn(qoid, r)
-        self.assertNotEqual(r[qoid], oid)
-        self.assertNotIn('oid', r)
-        r['oid'] = oid = r[qoid]
-        r = insert('test_table', r, n=6)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 6)
-        self.assertIn(qoid, r)
-        self.assertNotEqual(r[qoid], oid)
-        self.assertNotIn('oid', r)
-        q = 'select n from test_table order by 1 limit 9'
-        r = ' '.join(str(row[0]) for row in query(q).getresult())
-        self.assertEqual(r, '1 2 3 3 3 4 5 6')
-        query("truncate table test_table")
-        query("alter table test_table add unique (n)")
-        r = insert('test_table', dict(n=7))
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 7)
-        self.assertRaises(pg.IntegrityError, insert, 'test_table', r)
-        r['n'] = 6
-        self.assertRaises(pg.IntegrityError, insert, 'test_table', r, n=7)
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 7)
-        r['n'] = 6
-        r = insert('test_table', r)
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 6)
-        r = ' '.join(str(row[0]) for row in query(q).getresult())
-        self.assertEqual(r, '6 7')
-
     def test_insert_with_quoted_names(self):
         insert = self.db.insert
         query = self.db.query
@@ -2063,93 +1881,13 @@ class TestDBClass(unittest.TestCase):
         r = query(q).getresult()[0][0]
         self.assertEqual(r, 'u')
 
-    def test_update_with_oids(self):
-        if not self.supports_oids:
-            self.skipTest("database does not support tables with oids")
-        update = self.db.update
-        get = self.db.get
-        query = self.db.query
-        self.create_table('test_table', 'n int', oids=True, values=[1])
-        s = get('test_table', 1, 'n')
-        self.assertIsInstance(s, dict)
-        self.assertEqual(s['n'], 1)
-        s['n'] = 2
-        r = update('test_table', s)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 2)
-        qoid = 'oid(test_table)'
-        self.assertIn(qoid, r)
-        self.assertNotIn('oid', r)
-        self.assertEqual(sorted(r.keys()), ['n', qoid])
-        r['n'] = 3
-        oid = r.pop(qoid)
-        r = update('test_table', r, oid=oid)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 3)
-        r.pop(qoid)
-        self.assertRaises(pg.ProgrammingError, update, 'test_table', r)
-        s = get('test_table', 3, 'n')
-        self.assertIsInstance(s, dict)
-        self.assertEqual(s['n'], 3)
-        s.pop('n')
-        r = update('test_table', s)
-        oid = r.pop(qoid)
-        self.assertEqual(r, {})
-        q = "select n from test_table limit 2"
-        r = query(q).getresult()
-        self.assertEqual(r, [(3,)])
-        query("insert into test_table values (1)")
-        self.assertRaises(pg.ProgrammingError,
-                          update, 'test_table', dict(oid=oid, n=4))
-        r = update('test_table', dict(n=4), oid=oid)
-        self.assertEqual(r['n'], 4)
-        r = update('test_table *', dict(n=5), oid=oid)
-        self.assertEqual(r['n'], 5)
-        query("alter table test_table add column m int")
-        query("alter table test_table add primary key (n)")
-        self.assertIn('m', self.db.get_attnames('test_table', flush=True))
-        self.assertEqual('n', self.db.pkey('test_table', flush=True))
-        s = dict(n=1, m=4)
-        r = update('test_table', s)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 1)
-        self.assertEqual(r['m'], 4)
-        s = dict(m=7)
-        r = update('test_table', s, n=5)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 5)
-        self.assertEqual(r['m'], 7)
-        q = "select n, m from test_table order by 1 limit 3"
-        r = query(q).getresult()
-        self.assertEqual(r, [(1, 4), (5, 7)])
-        s = dict(m=9, oid=oid)
-        self.assertRaises(KeyError, update, 'test_table', s)
-        r = update('test_table', s, oid=oid)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 5)
-        self.assertEqual(r['m'], 9)
-        s = dict(n=1, m=3, oid=oid)
-        r = update('test_table', s)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 1)
-        self.assertEqual(r['m'], 3)
-        r = query(q).getresult()
-        self.assertEqual(r, [(1, 3), (5, 9)])
-        s.update(n=4, m=7)
-        r = update('test_table', s, oid=oid)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 4)
-        self.assertEqual(r['m'], 7)
-        r = query(q).getresult()
-        self.assertEqual(r, [(1, 3), (4, 7)])
-
-    def test_update_without_oid(self):
+    def test_update_without_primary_key(self):
         update = self.db.update
         query = self.db.query
         self.assertRaises(pg.ProgrammingError, update,
                           'test', i2=2, i4=4, i8=8)
         table = 'update_test_table'
-        self.create_table(table, 'n integer primary key, t text', oids=False,
+        self.create_table(table, 'n integer primary key, t text',
                          values=enumerate('xyz', start=1))
         r = self.db.get(table, 2)
         r['t'] = 'u'
@@ -2311,7 +2049,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(r['t'], 'x2')
         r = query(q).getresult()
         self.assertEqual(r, [(1, 'x2'), (2, 'y3')])
-        # not existing columns and oid parameter should be ignored
+        # not existing columns should be ignored
         s = dict(m=3, u='z')
         r = upsert(table, s, oid='invalid')
         self.assertIs(r, s)
@@ -2321,87 +2059,6 @@ class TestDBClass(unittest.TestCase):
         self.assertIs(r, s)
         r = query(q).getresult()
         self.assertEqual(r, [(1, 'x2'), (2, 'y3')])
-
-    def test_upsert_with_oids(self):
-        if not self.supports_oids:
-            self.skipTest("database does not support tables with oids")
-        upsert = self.db.upsert
-        get = self.db.get
-        query = self.db.query
-        self.create_table('test_table', 'n int', oids=True, values=[1])
-        self.assertRaises(pg.ProgrammingError,
-                          upsert, 'test_table', dict(n=2))
-        r: Any = get('test_table', 1, 'n')
-        self.assertIsInstance(r, dict)
-        self.assertEqual(r['n'], 1)
-        qoid = 'oid(test_table)'
-        self.assertIn(qoid, r)
-        self.assertNotIn('oid', r)
-        oid = r[qoid]
-        self.assertRaises(pg.ProgrammingError,
-                          upsert, 'test_table', dict(n=2, oid=oid))
-        query("alter table test_table add column m int")
-        query("alter table test_table add primary key (n)")
-        self.assertIn('m', self.db.get_attnames('test_table', flush=True))
-        self.assertEqual('n', self.db.pkey('test_table', flush=True))
-        s = dict(n=2)
-        r = upsert('test_table', s)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 2)
-        self.assertIsNone(r['m'])
-        q = query("select n, m from test_table order by n limit 3")
-        self.assertEqual(q.getresult(), [(1, None), (2, None)])
-        r['oid'] = oid
-        r = upsert('test_table', r)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 2)
-        self.assertIsNone(r['m'])
-        self.assertIn(qoid, r)
-        self.assertNotIn('oid', r)
-        self.assertNotEqual(r[qoid], oid)
-        r['m'] = 7
-        r = upsert('test_table', r)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 2)
-        self.assertEqual(r['m'], 7)
-        r.update(n=1, m=3)
-        r = upsert('test_table', r)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 1)
-        self.assertEqual(r['m'], 3)
-        q = query("select n, m from test_table order by n limit 3")
-        self.assertEqual(q.getresult(), [(1, 3), (2, 7)])
-        r = upsert('test_table', r, oid='invalid')
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 1)
-        self.assertEqual(r['m'], 3)
-        r['m'] = 5
-        r = upsert('test_table', r, m=False)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 1)
-        self.assertEqual(r['m'], 3)
-        r['m'] = 5
-        r = upsert('test_table', r, m=True)
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 1)
-        self.assertEqual(r['m'], 5)
-        r.update(n=2, m=1)
-        r = upsert('test_table', r, m='included.m')
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 2)
-        self.assertEqual(r['m'], 7)
-        r['m'] = 9
-        r = upsert('test_table', r, m='excluded.m')
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 2)
-        self.assertEqual(r['m'], 9)
-        r['m'] = 8
-        r = upsert('test_table *', r, m='included.m + 1')
-        self.assertIs(r, s)
-        self.assertEqual(r['n'], 2)
-        self.assertEqual(r['m'], 10)
-        q = query("select n, m from test_table order by n limit 3")
-        self.assertEqual(q.getresult(), [(1, 5), (2, 10)])
 
     def test_upsert_with_composite_key(self):
         upsert = self.db.upsert
@@ -2560,7 +2217,7 @@ class TestDBClass(unittest.TestCase):
                           'test', dict(i2=2, i4=4, i8=8))
         table = 'delete_test_table'
         self.create_table(table, 'n integer primary key, t text',
-                         oids=False, values=enumerate('xyz', start=1))
+                          values=enumerate('xyz', start=1))
         self.assertRaises(pg.DatabaseError, self.db.get, table, 4)
         r: Any = self.db.get(table, 1)
         s: Any = delete(table, r)
@@ -2581,106 +2238,10 @@ class TestDBClass(unittest.TestCase):
         s = delete(table, r)
         self.assertEqual(s, 0)
         self.assertRaises(pg.DatabaseError, self.db.get, table, 2)
-        # not existing columns and oid parameter should be ignored
+        # not existing columns should be ignored
         r.update(m=3, u='z', oid='invalid')
         s = delete(table, r)
         self.assertEqual(s, 0)
-
-    def test_delete_with_oids(self):
-        if not self.supports_oids:
-            self.skipTest("database does not support tables with oids")
-        delete = self.db.delete
-        get = self.db.get
-        query = self.db.query
-        self.create_table('test_table', 'n int', oids=True, values=range(1, 7))
-        r: Any = dict(n=3)
-        self.assertRaises(pg.ProgrammingError, delete, 'test_table', r)
-        s: Any = get('test_table', 1, 'n')
-        qoid = 'oid(test_table)'
-        self.assertIn(qoid, s)
-        r = delete('test_table', s)
-        self.assertEqual(r, 1)
-        r = delete('test_table', s)
-        self.assertEqual(r, 0)
-        q = "select min(n),count(n) from test_table"
-        self.assertEqual(query(q).getresult()[0], (2, 5))
-        oid = get('test_table', 2, 'n')[qoid]
-        s = dict(oid=oid, n=2)
-        self.assertRaises(pg.ProgrammingError, delete, 'test_table', s)
-        r = delete('test_table', None, oid=oid)
-        self.assertEqual(r, 1)
-        r = delete('test_table', None, oid=oid)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (3, 4))
-        s = dict(oid=oid, n=2)
-        oid = get('test_table', 3, 'n')[qoid]
-        self.assertRaises(pg.ProgrammingError, delete, 'test_table', s)
-        r = delete('test_table', s, oid=oid)
-        self.assertEqual(r, 1)
-        r = delete('test_table', s, oid=oid)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (4, 3))
-        s = get('test_table', 4, 'n')
-        r = delete('test_table *', s)
-        self.assertEqual(r, 1)
-        r = delete('test_table *', s)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (5, 2))
-        oid = get('test_table', 5, 'n')[qoid]
-        s = {qoid: oid, 'm': 4}
-        r = delete('test_table', s, m=6)
-        self.assertEqual(r, 1)
-        r = delete('test_table *', s)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (6, 1))
-        query("alter table test_table add column m int")
-        query("alter table test_table add primary key (n)")
-        self.assertIn('m', self.db.get_attnames('test_table', flush=True))
-        self.assertEqual('n', self.db.pkey('test_table', flush=True))
-        for i in range(5):
-            query(f"insert into test_table values ({i + 1}, {i + 2})")
-        s = dict(m=2)
-        self.assertRaises(KeyError, delete, 'test_table', s)
-        s = dict(m=2, oid=oid)
-        self.assertRaises(KeyError, delete, 'test_table', s)
-        r = delete('test_table', dict(m=2), oid=oid)
-        self.assertEqual(r, 0)
-        oid = get('test_table', 1, 'n')[qoid]
-        s = dict(oid=oid)
-        self.assertRaises(KeyError, delete, 'test_table', s)
-        r = delete('test_table', s, oid=oid)
-        self.assertEqual(r, 1)
-        r = delete('test_table', s, oid=oid)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (2, 5))
-        s = get('test_table', 2, 'n')
-        del s['n']
-        r = delete('test_table', s)
-        self.assertEqual(r, 1)
-        r = delete('test_table', s)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (3, 4))
-        r = delete('test_table', n=3)
-        self.assertEqual(r, 1)
-        r = delete('test_table', n=3)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (4, 3))
-        r = delete('test_table', None, n=4)
-        self.assertEqual(r, 1)
-        r = delete('test_table', None, n=4)
-        self.assertEqual(r, 0)
-        self.assertEqual(query(q).getresult()[0], (5, 2))
-        s = dict(n=6)
-        r = delete('test_table', s, n=5)
-        self.assertEqual(r, 1)
-        r = delete('test_table', s, n=5)
-        self.assertEqual(r, 0)
-        s = get('test_table', 6, 'n')
-        self.assertEqual(s['n'], 6)
-        s['n'] = 7
-        r = delete('test_table', s)
-        self.assertEqual(r, 1)
-        self.assertEqual(query(q).getresult()[0], (None, 0))
 
     def test_delete_with_composite_key(self):
         query = self.db.query
@@ -3895,7 +3456,7 @@ class TestDBClass(unittest.TestCase):
         self.addCleanup(query, 'drop type test_person_type')
         self.create_table('test_person',
                          'id serial primary key, person test_person_type',
-                         oids=False, temporary=False)
+                         temporary=False)
         attnames = self.db.get_attnames('test_person')
         self.assertEqual(len(attnames), 2)
         self.assertIn('id', attnames)
@@ -5485,12 +5046,10 @@ class TestSchemas(unittest.TestCase):
     """Test correct handling of schemas (namespaces)."""
 
     cls_set_up = False
-    with_oids = ""
 
     @classmethod
     def setUpClass(cls):
         db = DB()
-        cls.with_oids = "with oids" if db.server_version < 120000 else ""
         query = db.query
         for num_schema in range(5):
             if num_schema:
@@ -5507,9 +5066,9 @@ class TestSchemas(unittest.TestCase):
                 schema = "public"
                 query(f"drop table if exists {schema}.t")
                 query(f"drop table if exists {schema}.t{num_schema}")
-            query(f"create table {schema}.t {cls.with_oids}"
+            query(f"create table {schema}.t"
                   f" as select 1 as n, {num_schema} as d")
-            query(f"create table {schema}.t{num_schema} {cls.with_oids}"
+            query(f"create table {schema}.t{num_schema}"
                   f" as select 1 as n, {num_schema} as d")
         db.close()
         cls.cls_set_up = True
@@ -5548,18 +5107,14 @@ class TestSchemas(unittest.TestCase):
         get_attnames = self.db.get_attnames
         query = self.db.query
         result = {'d': 'int', 'n': 'int'}
-        if self.with_oids:
-            result['oid'] = 'int'
         r = get_attnames("t")
         self.assertEqual(r, result)
         r = get_attnames("s4.t4")
         self.assertEqual(r, result)
         query("drop table if exists s3.t3m")
         self.addCleanup(query, "drop table s3.t3m")
-        query(f"create table s3.t3m {self.with_oids} as select 1 as m")
+        query("create table s3.t3m as select 1 as m")
         result_m = {'m': 'int'}
-        if self.with_oids:
-            result_m['oid'] = 'int'
         r = get_attnames("s3.t3m")
         self.assertEqual(r, result_m)
         query("set search_path to s1,s3")
@@ -5591,27 +5146,6 @@ class TestSchemas(unittest.TestCase):
         self.assertRaises(PrgError, get, "t4", 1, 'n')
         self.assertEqual(get("t", 1, 'n')['d'], 1)
         self.assertEqual(get("s4.t4", 1, 'n')['d'], 4)
-
-    def test_munging(self):
-        get = self.db.get
-        query = self.db.query
-        r = get("t", 1, 'n')
-        if self.with_oids:
-            self.assertIn('oid(t)', r)
-        else:
-            self.assertNotIn('oid(t)', r)
-        query("set search_path to s2")
-        r = get("t2", 1, 'n')
-        if self.with_oids:
-            self.assertIn('oid(t2)', r)
-        else:
-            self.assertNotIn('oid(t2)', r)
-        query("set search_path to s3")
-        r = get("t", 1, 'n')
-        if self.with_oids:
-            self.assertIn('oid(t)', r)
-        else:
-            self.assertNotIn('oid(t)', r)
 
     def test_query_information_schema(self):
         q = "column_name"
