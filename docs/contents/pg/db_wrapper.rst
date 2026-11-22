@@ -572,6 +572,14 @@ The parameters must be passed as a tuple, list or dict.  You can also pass a
 corresponding tuple, list or dict of database types in order to format the
 parameters properly in case there is ambiguity.
 
+The types can be given as simple PyGreSQL type names like ``'int'``,
+``'bytea'`` or ``'int[]'``, as PostgreSQL type names like ``'int4'`` or
+``'_int4'``, or as the type objects returned by :meth:`DB.get_attnames` or
+found in :attr:`DB.dbtypes`. Other type names, including the names of
+domains, are not looked up in the database and the parameters are adapted
+as text, so that ``bytes`` are passed as raw text. For a domain, pass the
+name of its base type or its type object instead.
+
 If you set *inline* to True, the parameters will be sent to the database
 embedded in the SQL command, otherwise they will be sent separately.
 

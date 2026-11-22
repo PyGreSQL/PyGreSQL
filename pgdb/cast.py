@@ -478,6 +478,12 @@ class LocalTypecasts(Typecasts):
                     field_names = [field.name for field in fields]
                     cast = self.create_record_cast(typ, field_names, casts)
                     self[typ] = cast
+                else:
+                    base = self.get_base(typ)
+                    if base:
+                        # domains are cast like their base types, unless a
+                        # cast has been set for the domain (not cached here)
+                        cast = self[base]
         return cast
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
@@ -488,6 +494,15 @@ class LocalTypecasts(Typecasts):
         using the type cache of the connection.
         """
         return []
+
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def get_base(self, typ: str) -> str | None:
+        """Return the name of the base type if the given type is a domain.
+
+        This method will be replaced with a method that looks up the base
+        type using the type cache of the connection.
+        """
+        return None
 
 
 class FieldInfo(NamedTuple):
@@ -511,10 +526,11 @@ class TypeCache(dict):
         self._src = cnx.source()
         self._typecasts = LocalTypecasts()
         self._typecasts.get_fields = self.get_fields  # type: ignore[assignment, method-assign]
+        self._typecasts.get_base = self._get_base  # type: ignore[method-assign]
         self._typecasts.cnx = cnx
         self._query_pg_type = (
             "SELECT oid, typname,"
-            " typlen, typtype, typcategory, typdelim, typrelid"
+            " typlen, typtype, typcategory, typdelim, typrelid, typbasetype"
             " FROM pg_catalog.pg_type WHERE oid OPERATOR(pg_catalog.=) {}")
 
     def __missing__(self, key: int | str) -> TypeCode:
@@ -535,8 +551,14 @@ class TypeCache(dict):
         if not res:
             raise KeyError(f'Type {key} could not be found')
         r = res[0]
+        delim, relid, base = r[5], int(r[6]), None
+        if r[3] == 'd' and int(r[7]):
+            # domains are handled like their base types
+            base = self[int(r[7])]
+            base = base.base or base  # resolve domains over domains
+            delim, relid = base.delim, base.relid
         type_code = TypeCode.create(
-            int(r[0]), r[1], int(r[2]), r[3], r[4], r[5], int(r[6]))
+            int(r[0]), r[1], int(r[2]), r[3], r[4], delim, relid, base)
         # noinspection PyUnresolvedReferences
         self[type_code.oid] = self[str(type_code)] = type_code
         return type_code
@@ -548,6 +570,12 @@ class TypeCache(dict):
             return self[key]
         except KeyError:
             return default
+
+    def _get_base(self, typ: str) -> str | None:
+        """Get the name of the base type if the given type is a domain."""
+        type_code = self.get(typ)
+        base = type_code.base if type_code else None
+        return str(base) if base else None
 
     def get_fields(self, typ: int | str | TypeCode) -> list[FieldInfo] | None:
         """Get the names and types of the fields of composite types."""

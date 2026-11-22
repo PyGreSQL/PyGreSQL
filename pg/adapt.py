@@ -212,7 +212,10 @@ class DbType(str):
         delim: delimiter for array types
         relid: corresponding table for composite types
         elem: the type OID of the elements for array types
+        base: the base type for domains, None for other types
         attnames: attributes for composite types
+
+    Domains take simple, delim, relid and elem from their base type.
     """
 
     oid: int
@@ -225,6 +228,7 @@ class DbType(str):
     delim: str
     relid: int
     elem: int
+    base: DbType | None = None
 
     _get_attnames: Callable[[DbType], AttrDict]
 
@@ -253,20 +257,29 @@ class DbTypes(dict):
         self._regtypes = False
         self._typecasts = Typecasts()
         self._typecasts.get_attnames = self.get_attnames  # type: ignore[assignment, method-assign]
+        self._typecasts.get_base = self._get_base  # type: ignore[method-assign]
         self._typecasts.connection = self._db.db
         self._query_pg_type = (
             "SELECT oid, typname, oid::pg_catalog.regtype,"
-            " typlen, typtype, typcategory, typdelim, typrelid, typelem"
+            " typlen, typtype, typcategory, typdelim, typrelid, typelem,"
+            " typbasetype"
             " FROM pg_catalog.pg_type"
             " WHERE oid OPERATOR(pg_catalog.=) {}::pg_catalog.regtype")
 
     def add(self, oid: int, pgtype: str, regtype: str,
             typlen: int, typtype: str, category: str, delim: str, relid: int,
-            elem: int = 0) -> DbType:
+            elem: int = 0, basetype: int = 0) -> DbType:
         """Create a PostgreSQL type name with additional info."""
         if oid in self:
             return self[oid]
-        if relid:
+        base = None
+        if typtype == 'd' and basetype:
+            # domains are handled like their base types
+            base = self[basetype]
+            base = base.base or base  # resolve domains over domains
+            simple = base.simple
+            delim, relid, elem = base.delim, base.relid, base.elem
+        elif relid:
             simple = 'record'
         else:
             simple = _simpletypes[pgtype]
@@ -274,10 +287,15 @@ class DbTypes(dict):
                 if category != 'A' or not elem:
                     simple = 'text'  # not an array, only named like one
                 elif simple == 'text[]':
-                    # check for arrays of composite types
+                    # check for arrays of composite types and domains
                     elem_type = self.get(elem)
-                    if elem_type and elem_type.relid:
-                        simple = 'record[]'
+                    if elem_type:
+                        if elem_type.relid:
+                            simple = 'record[]'
+                        elif elem_type.base and elem_type.base.elem == 0:
+                            # arrays of domains over arrays are not
+                            # multidimensional arrays, keep them as text
+                            simple = _simpletypes[f'_{elem_type.base.pgtype}']
         typ = DbType(regtype if self._regtypes else simple)
         typ.oid = oid
         typ.simple = simple
@@ -289,6 +307,7 @@ class DbTypes(dict):
         typ.delim = delim
         typ.relid = relid
         typ.elem = elem
+        typ.base = base
         typ._get_attnames = self.get_attnames  # type: ignore[assignment]
         return typ
 
@@ -313,6 +332,12 @@ class DbTypes(dict):
             return self[key]
         except KeyError:
             return default
+
+    def _get_base(self, typ: str) -> str | None:
+        """Get the name of the base type if the given type is a domain."""
+        db_type = self.get(typ)
+        base = db_type.base if db_type else None
+        return base.pgtype if base else None
 
     def get_attnames(self, typ: Any) -> AttrDict | None:
         """Get names and types of the fields of a composite type."""

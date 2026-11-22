@@ -405,6 +405,68 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_type_cache_with_domains(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute('create domain pg_temp.test_dint as int')
+            cur.execute('create domain pg_temp.test_dbytea as bytea')
+            cur.execute('create domain pg_temp.test_ddbytea'
+                        ' as pg_temp.test_dbytea')
+            cur.execute('create domain pg_temp.test_dints as int[]')
+            cur.execute('create type pg_temp.test_rtype as'
+                        ' (i pg_temp.test_dint, b pg_temp.test_ddbytea,'
+                        ' a pg_temp.test_dints)')
+            type_cache = con.type_cache
+            dint = type_cache['test_dint']
+            self.assertEqual(dint, 'test_dint')
+            self.assertEqual(dint.type, 'd')  # domain
+            self.assertEqual(dint.category, 'N')  # numeric
+            self.assertIs(dint.base, type_cache['int4'])
+            self.assertIs(type_cache['test_ddbytea'].base,
+                          type_cache['bytea'])  # fully resolved
+            self.assertIsNone(type_cache['int4'].base)
+            fields = type_cache.get_fields('test_rtype')
+            self.assertEqual(fields, [('i', 'test_dint'),
+                                      ('b', 'test_ddbytea'),
+                                      ('a', 'test_dints')])
+            # domains are cast like their base types
+            self.assertIs(type_cache.get_typecast('test_dint'), int)
+            self.assertEqual(type_cache.typecast('42', 'test_dint'), 42)
+            cmd = ("select 42::pg_temp.test_dint,"
+                   " row(42, 'A\\101\\000'::bytea, '{1,2}')"
+                   "::pg_temp.test_rtype, '{1,2}'::pg_temp.test_dint[],"
+                   " array['\\x00ff'::pg_temp.test_dbytea]")
+            cur.execute(cmd)
+            # the description reports the base type for domain values
+            self.assertEqual(cur.description[0].type_code, 'int4')
+            self.assertEqual(cur.description[1].type_code, 'test_rtype')
+            self.assertEqual(cur.description[2].type_code, '_test_dint')
+            row = cur.fetchone()
+            self.assertEqual(row[0], 42)
+            self.assertEqual(row[1], (42, b'AA\x00', [1, 2]))
+            self.assertIsInstance(row[1].b, bytes)
+            self.assertEqual(row[2], [1, 2])
+            self.assertEqual(row[3], [b'\x00\xff'])
+            # unless a typecast has been set for the domain, which is used
+            # for elements of arrays and fields of records
+            type_cache.set_typecast('test_dint', lambda v: f'<{v}>')
+            type_cache.reset_typecast('test_rtype')  # cached field casts
+            self.assertEqual(type_cache.typecast('42', 'test_dint'), '<42>')
+            cur.execute(cmd)
+            row = cur.fetchone()
+            self.assertEqual(row[0], 42)
+            self.assertEqual(row[1].i, '<42>')
+            self.assertEqual(row[2], ['<1>', '<2>'])
+            type_cache.reset_typecast(['test_dint', 'test_rtype'])
+            cur.execute(cmd)
+            row = cur.fetchone()
+            self.assertEqual(row[1].i, 42)
+            self.assertEqual(row[2], [1, 2])
+            cur.close()
+        finally:
+            con.close()
+
     def test_type_cache_typecast(self):
         con = self._connect()
         try:

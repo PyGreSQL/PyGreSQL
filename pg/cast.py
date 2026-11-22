@@ -357,6 +357,12 @@ class Typecasts(dict):
                 casts = [self[v.pgtype] for v in attnames.values()]
                 cast = self.create_record_cast(typ, attnames, casts)
                 self[typ] = cast
+            else:
+                base = self.get_base(typ)
+                if base:
+                    # domains are cast like their base types, unless a
+                    # cast has been set for the domain (not cached here)
+                    cast = self[base]
         return cast
 
     @staticmethod
@@ -438,6 +444,14 @@ class Typecasts(dict):
         This method will be replaced with the get_attnames() method of DbTypes.
         """
         return AttrDict()
+
+    # noinspection PyMethodMayBeStatic,PyUnusedLocal
+    def get_base(self, typ: str) -> str | None:
+        """Return the name of the base type if the given type is a domain.
+
+        This method will be replaced with a method of DbTypes.
+        """
+        return None
 
     # noinspection PyMethodMayBeStatic
     def dateformat(self) -> str:

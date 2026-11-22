@@ -118,7 +118,7 @@ class DB:
             "SELECT a.attname,"
             " t.oid, t.typname, t.oid::pg_catalog.regtype,"
             " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid,"
-            " t.typelem"
+            " t.typelem, t.typbasetype"
             " FROM pg_catalog.pg_attribute a"
             " JOIN pg_catalog.pg_type t"
             " ON t.oid OPERATOR(pg_catalog.=) a.atttypid"

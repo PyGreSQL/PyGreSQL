@@ -1382,6 +1382,39 @@ class TestDBClass(unittest.TestCase):
             n='int', alpha='int', beta='bool',
             gamma='text', tau='text', v='text'))
 
+    def test_get_attnames_with_domains(self):
+        query = self.db.query
+        query('create domain pg_temp.test_dint as int')
+        query('create domain pg_temp.test_dbytea as bytea')
+        query('create domain pg_temp.test_ddbytea as pg_temp.test_dbytea')
+        query('create domain pg_temp.test_dints as int[]')
+        self.create_table(
+            'test_table', 'i pg_temp.test_dint, b pg_temp.test_dbytea,'
+            ' bb pg_temp.test_ddbytea, a pg_temp.test_dints')
+        use_regtypes = self.db.use_regtypes
+        regtypes = use_regtypes()
+        use_regtypes(False)
+        try:
+            r = self.db.get_attnames('test_table')
+            self.assertEqual(r, dict(i='int', b='bytea', bb='bytea',
+                                     a='int[]'))
+            use_regtypes(True)
+            r = self.db.get_attnames('test_table')
+            self.assertEqual(r, dict(i='test_dint', b='test_dbytea',
+                                     bb='test_ddbytea', a='test_dints'))
+        finally:
+            use_regtypes(regtypes)
+        self.assertEqual(r['i'].typtype, 'd')
+        self.assertEqual(r['i'].simple, 'int')
+        self.assertEqual(r['i'].base, 'integer')
+        self.assertEqual(r['i'].base.oid, 23)
+        self.assertEqual(r['b'].base.oid, 17)
+        self.assertIs(r['bb'].base, r['b'].base)  # fully resolved
+        self.assertEqual(r['a'].simple, 'int[]')
+        self.assertEqual(r['a'].elem, 23)
+        self.assertIsNone(r['a'].base.base)
+        self.assertIsNone(self.db.get_attnames('test')['i4'].base)
+
     def test_get_attnames_is_cached(self):
         get_attnames = self.db.get_attnames
         int_type = 'integer' if self.regtypes else 'int'
@@ -3710,6 +3743,100 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(p.data, person[1])
         self.assertIsInstance(p.data, dict)
 
+    def test_insert_get_with_domains(self):
+        query = self.db.query
+        query('create domain pg_temp.test_dint as int')
+        query('create domain pg_temp.test_dbytea as bytea')
+        query('create domain pg_temp.test_ddbytea as pg_temp.test_dbytea')
+        query('create domain pg_temp.test_dints as int[]')
+        self.create_table(
+            'test_table', 'n int primary key, i pg_temp.test_dint,'
+            ' b pg_temp.test_dbytea, bb pg_temp.test_ddbytea,'
+            ' a pg_temp.test_dints')
+        # check the stored values as text, independent of the cast options
+        def stored():
+            return self.db.query(
+                "select i::text, encode(b, 'hex'), encode(bb, 'hex'),"
+                " array_to_string(a, ',') from test_table").getresult()
+        data = b'A\\101\x00\xff'
+        r = self.db.insert('test_table', n=1, i=42, b=data, bb=data,
+                           a=[1, 2])
+        self.assertEqual(r['i'], 42)
+        self.assertEqual(stored(), [
+            ('42', '415c31303100ff', '415c31303100ff', '1,2')])
+        r = self.db.update('test_table', n=1, b=b'\\x', bb=b'', a=[3])
+        self.assertEqual(stored(), [('42', '5c78', '', '3')])
+        if pg.get_array() and not pg.get_bytea_escaped():
+            r = self.db.get('test_table', 1)
+            self.assertEqual(r, dict(n=1, i=42, b=b'\\x', bb=b'', a=[3]))
+
+    def test_arrays_of_domains(self):
+        query = self.db.query
+        query('create domain pg_temp.test_dint as int')
+        query('create domain pg_temp.test_dbool as bool')
+        query('create domain pg_temp.test_dbytea as bytea')
+        query('create domain pg_temp.test_djson as jsonb')
+        self.create_table(
+            'test_table', 'n int primary key, ai pg_temp.test_dint[],'
+            ' ab pg_temp.test_dbool[], ay pg_temp.test_dbytea[],'
+            ' aj pg_temp.test_djson[]')
+        regtypes = self.db.use_regtypes()
+        self.db.use_regtypes(False)
+        self.addCleanup(self.db.use_regtypes, regtypes)
+        self.assertEqual(self.db.get_attnames('test_table'), dict(
+            n='int', ai='int[]', ab='bool[]', ay='bytea[]', aj='json[]'))
+
+        def stored():
+            return self.db.query(
+                "select array_to_string(ai, ','), array_to_string(ab, ','),"
+                " array_to_string(array(select encode(b, 'hex')"
+                " from unnest(ay) b), ','), array_to_string(aj, ';')"
+                " from test_table").getresult()[0]
+
+        value = dict(n=1, ai=[1, 2], ab=[True, False],
+                     ay=[b'A\\101\x00\xff', b''],
+                     aj=[{'a': 1}, pg.Json([1, 2])])
+        self.db.insert('test_table', value)
+        self.assertEqual(stored(), (
+            '1,2', 't,f', '415c31303100ff,', '{"a": 1};[1, 2]'))
+        if pg.get_array() and not pg.get_bytea_escaped() and pg.get_bool():
+            r = self.db.get('test_table', 1)
+            self.assertEqual(r['ai'], [1, 2])
+            self.assertEqual(r['ab'], [True, False])
+            self.assertEqual(r['ay'], [b'A\\101\x00\xff', b''])
+            if pg.get_jsondecode():
+                self.assertEqual(r['aj'], [{'a': 1}, [1, 2]])
+
+    def test_record_with_domains(self):
+        query = self.db.query
+        query('create domain pg_temp.test_dint as int')
+        query('create domain pg_temp.test_dbytea as bytea')
+        query('create domain pg_temp.test_dints as int[]')
+        query('create type pg_temp.test_rtype as (i pg_temp.test_dint,'
+              ' b pg_temp.test_dbytea, a pg_temp.test_dints)')
+        query('create domain pg_temp.test_drtype as pg_temp.test_rtype')
+        self.create_table(
+            'test_table', 'n int primary key, r pg_temp.test_rtype,'
+            ' dr pg_temp.test_drtype')
+        regtypes = self.db.use_regtypes()
+        self.db.use_regtypes(False)
+        self.addCleanup(self.db.use_regtypes, regtypes)
+        attnames = self.db.get_attnames('test_table')
+        self.assertEqual(attnames['r'].attnames,
+                         dict(i='int', b='bytea', a='int[]'))
+        self.assertEqual(attnames['dr'].simple, 'record')
+        self.assertEqual(attnames['dr'].attnames,
+                         dict(i='int', b='bytea', a='int[]'))
+        value = (42, b'A\\101\x00\xff', [1, 2])
+        r = self.db.insert('test_table', n=1, r=value, dr=value)
+        self.assertEqual(r['r'], value)
+        self.assertEqual(r['dr'], value)
+        r = query('select r, dr from test_table').getresult()[0]
+        self.assertEqual(r, (value, value))
+        self.assertIsInstance(r[0].i, int)
+        self.assertIsInstance(r[0].b, bytes)
+        self.assertIsInstance(r[0].a, list)
+
     # noinspection PyUnresolvedReferences
     def test_record_literal(self):
         query = self.db.query
@@ -4351,6 +4478,45 @@ class TestDBClass(unittest.TestCase):
             "select array['<(0,0),1>'::circle]").getresult()[0][0]
         if pg.get_array():  # array cast must also be reset
             self.assertEqual(r, ['<(0,0),1>'])
+
+    def test_db_types_typecast_with_domains(self):
+        query = self.db.query
+        query('create domain pg_temp.test_dint as int')
+        query('create domain pg_temp.test_ddint as pg_temp.test_dint')
+        query('create type pg_temp.test_rtype as'
+              ' (i pg_temp.test_dint, a pg_temp.test_dint[])')
+        dbtypes = self.db.dbtypes
+        self.assertEqual(dbtypes['test_dint'].base.oid, 23)
+        # domains are cast like their base types
+        self.assertIs(dbtypes.get_typecast('test_dint'), int)
+        self.assertIs(dbtypes.get_typecast('test_ddint'), int)
+        self.assertEqual(dbtypes.typecast('42', 'test_dint'), 42)
+        cmd = ("select 1::pg_temp.test_dint, '{2}'::pg_temp.test_dint[],"
+               " row(3, '{4}')::pg_temp.test_rtype")
+        r = query(cmd).getresult()[0]
+        self.assertEqual(r[0], 1)
+        self.assertEqual(r[2], (3, [4]))
+        if pg.get_array():
+            self.assertEqual(r[1], [2])
+        # unless a typecast has been set for the domain, which is used
+        # for elements of arrays and fields of records, but not for
+        # values, since PostgreSQL returns them with the base type
+        dbtypes.set_typecast('test_dint', lambda v: f'<{v}>')
+        self.assertEqual(dbtypes.typecast('42', 'test_dint'), '<42>')
+        self.assertIs(dbtypes.get_typecast('test_ddint'), int)
+        dbtypes.reset_typecast('test_rtype')  # cached with field casts
+        r = query(cmd).getresult()[0]
+        self.assertEqual(r[0], 1)
+        self.assertEqual(r[2][0], '<3>')
+        if pg.get_array():
+            self.assertEqual(r[1], ['<2>'])
+            self.assertEqual(r[2][1], ['<4>'])
+        dbtypes.reset_typecast(['test_dint', 'test_rtype'])
+        self.assertIs(dbtypes.get_typecast('test_dint'), int)
+        r = query(cmd).getresult()[0]
+        self.assertEqual(r[2][0], 3)
+        if pg.get_array():
+            self.assertEqual(r[1], [2])
 
     def test_get_set_type_cast(self):
         get_typecast = pg.get_typecast

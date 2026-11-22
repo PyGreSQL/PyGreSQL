@@ -25,6 +25,17 @@ associated PostgreSQL type in the following attributes:
         - *category*  -- ``'A'`` = Array, ``'B'`` = Boolean, ...
         - *delim*  -- delimiter to be used when parsing arrays
         - *relid*  -- the table OID for composite types
+        - *base*  -- the base type code for domains, None for other types
+
+Domains take the attributes *delim* and *relid* from their base type,
+resolved through domains over domains. Values of domain types are cast like
+values of their base types. A typecast set for the name of a domain is used
+for elements of arrays and fields of composite types with that domain type,
+but not for values of columns, since PostgreSQL reports these with the base
+type, which is also the type code in :attr:`Cursor.description`.
+
+.. versionchanged:: 6.3
+    The *base* attribute has been added.
 
 For details, see the PostgreSQL documentation on `pg_type
 <http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.
@@ -63,6 +74,12 @@ Python object into which the PostgreSQL type shall be casted.  If the function
 takes another parameter named *connection*, then the current database
 connection will also be passed to the typecast function.  This may sometimes
 be necessary to look up certain database settings.
+
+Typecast functions for composite types are cached together with the typecast
+functions for their fields. If you change the typecast function for a type
+that is used in fields of composite types after values of these composite
+types have been cast, also reset the typecast functions for the composite
+types with :meth:`TypeCache.reset_typecast`.
 
 .. method:: TypeCache.reset_typecast([typ])
 

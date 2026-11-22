@@ -150,6 +150,16 @@ Version 6.3.0 (unreleased)
     `Connection.inserttable()` and the copy methods did not support quoted
     parts (#47). A name with an empty part or an unterminated quote now
     raises a `ValueError`.
+  - Domain types are now handled like their base types, also for arrays of
+    domains and for fields of composite types. `DB.get_attnames()` returns
+    the simple type name of the base type (e.g. ``bytea`` or ``int[]``
+    instead of ``text``), and `DbType` objects have a new attribute
+    ``base`` with the base type. Before, bytes for domains
+    over bytea were sent as raw text, which corrupted backslashes and raised
+    a `ValueError` for NUL bytes, lists for domains over arrays caused a
+    `DataError`, and elements of arrays and fields of composite types with
+    domain types were returned as strings. A typecast set for a domain is
+    still used for elements of arrays and fields of composite types.
   - `DbTypes.reset_typecast()` now also resets the typecast for arrays of
     the given type. Before, the arrays were still cast with the old function.
 
@@ -185,6 +195,10 @@ Version 6.3.0 (unreleased)
     database name and the other values are now always quoted. Before,
     values with quotes or backslashes but without spaces broke the
     connection info string (#77, thanks to Zhenghua Lyu for the report).
+  - Elements of arrays and fields of composite types with domain types are
+    now cast like their base types, unless a typecast has been set for the
+    domain. Before, they were returned as strings. The type codes in the
+    `TypeCache` have a new attribute ``base`` with the base type of domains.
 
 - Fixes in the C extension:
 

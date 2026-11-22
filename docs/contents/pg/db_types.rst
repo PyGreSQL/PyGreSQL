@@ -27,11 +27,29 @@ type that can be inspected using the following attributes:
         - *delim* -- delimiter for array types
         - *relid* -- corresponding table for composite types
         - *elem* -- the type OID of the elements for array types
+        - *base* -- the base type for domains, None for other types
         - *attnames* -- attributes for composite types
+
+Domains are handled like their base types: their *simple* name and the
+attributes *delim*, *relid*, *elem* and *attnames* are those of the base
+type, which is available as *base* (resolved through domains over domains).
+The other attributes describe the domain itself. Arrays of domains have the
+simple name of arrays of the base type. Values of domain types are cast like
+values of their base types. A typecast set for the name of a domain is used
+for elements of arrays and fields of composite types with that domain type,
+but not for values of columns, since PostgreSQL reports these with the base
+type.
+
+Arrays of domains over array types are not multidimensional arrays, but
+arrays with arrays as elements. They have the simple name ``text[]``, and
+their values must be passed as PostgreSQL array literals in strings.
 
 .. versionchanged:: 6.3
     The *elem* attribute has been added. Arrays of composite types now
     have the simple PyGreSQL type name ``record[]`` instead of ``text``.
+    The *base* attribute has been added. Domains and arrays of domains now
+    have the simple PyGreSQL type name of their base type instead of
+    ``text``.
 
 For details, see the PostgreSQL documentation on `pg_type
 <http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.
@@ -69,6 +87,12 @@ Python object into which the PostgreSQL type shall be casted.  If the function
 takes another parameter named *connection*, then the current database
 connection will also be passed to the typecast function.  This may sometimes
 be necessary to look up certain database settings.
+
+Typecast functions for composite types are cached together with the typecast
+functions for their fields. If you change the typecast function for a type
+that is used in fields of composite types after values of these composite
+types have been cast, also reset the typecast functions for the composite
+types with :meth:`DbTypes.reset_typecast`.
 
 .. method:: DbTypes.reset_typecast([typ])
 
