@@ -27,8 +27,16 @@ from collections import namedtuple
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from decimal import Decimal
+from ipaddress import (
+    IPv4Address,
+    IPv4Network,
+    IPv6Address,
+    IPv6Interface,
+    IPv6Network,
+)
 from typing import Any
 from unittest import mock
+from uuid import UUID
 
 import pg  # the module under test
 
@@ -3521,14 +3529,116 @@ class TestInserttable(unittest.TestCase):
             def __str__(self):
                 return s
 
+        class T:
+            def __str__(self):
+                return s
+
+            def __repr__(self):
+                return 'wrong'
+
         s = '1\'2"3\b4\f5\n6\r7\t8\b9\\0'
         s1 = s.encode('ascii')
         s2 = S()
         s3 = I()
-        data = [(t,) for t in (s, s1, s2, s3)]
+        s4 = T()
+        data = [(t,) for t in (s, s1, s2, s3, s4)]
         self.c.inserttable('test', data, ['t'])
         self.assertEqual(
-            self.c.query('select t from test').getresult(), [(s,)] * 4)
+            self.c.query('select t from test').getresult(), [(s,)] * 5)
+
+    other_values = (
+        Decimal('-1.25'), Decimal('NaN'),
+        UUID(int=1), IPv4Address('1.2.3.4'), IPv6Address('::1'),
+        IPv4Network('10.0.0.0/8'), IPv6Interface('fe80::1/64'),
+        pg.Json({'a': [1, 'ä', None]}), pg.Json('{"b": 2}'),
+        pg.Hstore({'a': '1', 'b c': None, 'd': 'x"y'}),
+        1.5, -0.0, float('inf'), True, False)
+
+    def test_inserttable_other_values_as_str(self):
+        # objects other than str, bytes and Bytea are converted with str()
+        values = self.other_values
+        self.c.inserttable('test', [(v,) for v in values], ['t'])
+        self.assertEqual(
+            self.c.query('select t from test').getresult(),
+            [(str(v),) for v in values])
+
+    def test_inserttable_other_values_in_typed_columns(self):
+        c = self.c
+        c.query("create temporary table other ("
+                "n numeric, u uuid, i inet, c cidr, j json, jb jsonb,"
+                " f real, b boolean)")
+        uuid = UUID('12345678-1234-5678-1234-567812345678')
+        rows = [
+            (Decimal('1.25'), uuid, IPv4Address('1.2.3.4'),
+             IPv4Network('10.0.0.0/8'), pg.Json({'a': [1, None]}),
+             pg.Json({'b': 'c'}), 1.5, True),
+            (Decimal('-0.001'), UUID(int=1), IPv6Interface('fe80::1/64'),
+             IPv6Network('2001:db8::/32'), pg.Json([1, 'x']),
+             pg.Json('{"d": 2}'), -0.0, False)]
+        self.assertEqual(c.inserttable('other', rows), 2)
+        self.assertEqual(c.query(
+            "select n, u, i, c, j, jb, f, b from other order by n desc"
+        ).getresult(), [
+            (Decimal('1.25'), str(uuid), '1.2.3.4', '10.0.0.0/8',
+             {'a': [1, None]}, {'b': 'c'}, 1.5, True),
+            (Decimal('-0.001'), '00000000-0000-0000-0000-000000000001',
+             'fe80::1/64', '2001:db8::/32', [1, 'x'], {'d': 2}, 0.0, False)])
+
+    def test_inserttable_hstore_values(self):
+        c = self.c
+        try:
+            c.query("select 'k=>v'::hstore")
+        except pg.DatabaseError:
+            try:
+                c.query("create extension hstore")
+            except pg.DatabaseError:
+                self.skipTest("hstore extension not enabled")
+        c.query("create temporary table other (n int, h hstore)")
+        d = {'k': 'v', '2=b': 'value = 2', '4"c': 'value " 4',
+             'hello, world': '"hi!"', 'None': None, 'NULL': 'NULL',
+             'empty': '', 'back\\': '\\slash', 'tab\tkey': 'line\nbreak'}
+        rows = [(1, pg.Hstore(d)), (2, pg.Hstore({})), (3, None)]
+        self.assertEqual(c.inserttable('other', rows), 3)
+        self.assertEqual(c.query(
+            "select n, h = $1::hstore, h = ''::hstore, h is null"
+            " from other order by n", (pg.Hstore(d),)).getresult(),
+            [(1, True, False, False), (2, False, True, False),
+             (3, None, None, True)])
+        # check independently of the parameter, which also uses str()
+        self.assertEqual([pg.cast_hstore(h) for h, in c.query(
+            "select h from other where h is not null order by n"
+        ).getresult()], [d, {}])
+
+    def test_inserttable_other_values_with_sql_ascii(self):
+        self.c.query("set client_encoding=sql_ascii")
+        # the str() of these objects is ASCII and can be sent
+        values = (Decimal('1.5'), UUID(int=1), IPv6Address('::1'),
+                  pg.Json({'a': 'ä'}), pg.Hstore({'a': 'b'}), 1.5, True)
+        self.c.inserttable('test', [(v,) for v in values], ['t'])
+        self.assertEqual(
+            self.c.query('select t from test').getresult(),
+            [(str(v),) for v in values])
+        self.c.query("truncate table test")
+        # non-ASCII text cannot be encoded without a specific encoding
+        for value in (pg.Json('"ä"'), pg.Hstore({'ä': '1'})):
+            self.assert_failed(
+                UnicodeEncodeError, [('a',), (value,)], ['t'])
+
+    def test_inserttable_other_values_with_latin1(self):
+        try:
+            self.c.query("set client_encoding=latin1")
+            self.c.query("select '¥'")
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support latin1")
+        # the str() of other objects is encoded with the client encoding
+        values = (pg.Json('"äöü"'), pg.Hstore({'käse': 'brot'}))
+        self.c.inserttable('test', [(v,) for v in values], ['t'])
+        self.assertEqual(
+            self.c.query('select t from test').getresult(),
+            [(str(v),) for v in values])
+        self.c.query("truncate table test")
+        self.assert_failed(
+            UnicodeEncodeError, [('a',), (pg.Hstore({'€': '1'}),)], ['t'])
 
     def assert_ready(self):
         """Check that the connection is ready for the next command."""
@@ -3593,9 +3703,22 @@ class TestInserttable(unittest.TestCase):
             def __repr__(self):
                 return '\udc80'  # lone surrogate, cannot be encoded
 
+        class T:
+            def __str__(self):
+                raise ZeroDivisionError
+
+            def __repr__(self):
+                return 'wrong'
+
+        class N:
+            def __str__(self):
+                return 42
+
         self.assert_failed(ZeroDivisionError, [(1,), (I(2),)], ['i4'])
         self.assert_failed(ZeroDivisionError, [('a',), (R(),)], ['t'])
         self.assert_failed(UnicodeEncodeError, [('a',), (S(),)], ['t'])
+        self.assert_failed(ZeroDivisionError, [('a',), (T(),)], ['t'])
+        self.assert_failed(TypeError, [('a',), (N(),)], ['t'])
 
     def test_inserttable_with_nul_characters(self):
         message = 'must not contain NUL characters'
@@ -3668,7 +3791,7 @@ class TestInserttable(unittest.TestCase):
                          ' ("cölumn" text, "zähler" int)')
         except (pg.DataError, pg.NotSupportedError):
             self.skipTest("database does not support latin1")
-        # table and column names and the repr of other objects
+        # table and column names and the str of other objects
         # must also be encoded with the client encoding
         self.c.inserttable('täble', [('käse',), (['käse'],)], ['cölumn'])
         self.assertEqual(

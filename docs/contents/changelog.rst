@@ -172,15 +172,24 @@ Version 6.3.0 (unreleased)
     Strings that could not be encoded in the client encoding released a
     reference too much. Values containing NUL characters were silently
     truncated and now raise a `ValueError`, as do table and column names
-    containing NUL characters. The table name and the `repr()` of other
-    objects are now encoded with the client encoding instead of UTF-8, like
-    the column names and string values. With the client encoding SQL_ASCII,
-    non-ASCII characters in these now raise a `UnicodeEncodeError`. The
-    table name can now also be passed as bytes, like the column names. Error
-    messages are now decoded with the client encoding instead of UTF-8.
-    After an error, the COPY operation is now always aborted (also when the
-    iteration raised an error), and the connection is idle again after the
-    method returns, so that `send_query()` can be used directly afterwards.
+    containing NUL characters. The table name and the string representation
+    of other objects are now encoded with the client encoding instead of
+    UTF-8, like the column names and string values. With the client
+    encoding SQL_ASCII, non-ASCII characters in these now raise a
+    `UnicodeEncodeError`. The table name can now also be passed as bytes,
+    like the column names. Error messages are now decoded with the client
+    encoding instead of UTF-8. After an error, the COPY operation is now
+    always aborted (also when the iteration raised an error), and the
+    connection is idle again after the method returns, so that `send_query()`
+    can be used directly afterwards.
+  - The `inserttable()` method now converts all values other than strings,
+    bytes and `Bytea()` with `str()`, like query parameters (#120). Before,
+    only integers, dates and times were converted with `str()`, and all
+    other objects with `repr()`, which is not a valid literal for objects
+    like `Decimal`, `UUID`, those of the `ipaddress` module, `Json()` and
+    `Hstore()`. The server rejected such values, or stored their Python
+    representation in text columns. Floats and booleans are not affected,
+    since their `str()` and `repr()` are the same.
   - The `escape_literal()` and `escape_identifier()` methods crashed for
     bytes containing invalid multibyte characters, they now raise a
     `DataError`. The escape methods of a connection that had been closed

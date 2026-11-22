@@ -12,9 +12,6 @@
 #include "pginternal.h"
 #include "pgmodule.h"
 
-/* Needs to be after Python.h */
-#include "datetime.h"
-
 /* Deallocate connection object. */
 static void
 conn_dealloc(connObject *self)
@@ -1069,14 +1066,8 @@ _inserttable_append_value(struct CharBuffer *buf, PyObject *item, int encoding)
         bytes_obj = Py_NewRef(item);
     }
     else {
-        if (PyUnicode_Check(item))
-            str_obj = Py_NewRef(item);
-        else if (PyLong_Check(item) || PyDate_Check(item) ||
-                 PyDateTime_Check(item) || PyTime_Check(item) ||
-                 PyDelta_Check(item))
-            str_obj = PyObject_Str(item);
-        else
-            str_obj = PyObject_Repr(item);
+        /* other objects are converted with str(), like query parameters */
+        str_obj = PyUnicode_Check(item) ? Py_NewRef(item) : PyObject_Str(item);
         if (!str_obj)
             return -1; /* pass the error */
         bytes_obj = get_encoded_string(str_obj, encoding);
@@ -1232,11 +1223,6 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 
     if ((encoding = get_client_encoding(self)) < 0)
         goto cleanup;
-
-    /* import datetime C API (this is not compatible with subinterpreters) */
-    PyDateTime_IMPORT;
-    if (!PyDateTimeAPI)
-        goto cleanup; /* pass the error */
 
     /* pre-allocate some memory for the query buffer */
     if (!init_char_buffer(&buffer, 4096)) {

@@ -555,12 +555,16 @@ This method allows to *quickly* insert large blocks of data in a table.
 Internally, it uses the COPY command of the PostgreSQL database.
 The method takes an iterable of row values which must be tuples or lists
 of the same size, containing the values for each inserted row.
-These may contain string, integer, long or double (real) values as well as
-date, time, datetime or timedelta objects.
+These may contain strings, bytes, ``None`` for NULL values, and any other
+objects whose string representation is a valid input for the column type,
+such as integers, floats, booleans, :class:`decimal.Decimal`,
+:class:`uuid.UUID`, date, time, datetime and timedelta objects, objects
+of the :mod:`ipaddress` module, and values wrapped with :func:`Json`
+or :func:`Hstore`.
 Strings are encoded with the client encoding, bytes are passed unchanged
 as the text representation of the value in the client encoding.
-Other objects are converted to strings with ``str()`` (integers, dates
-and times) or ``repr()`` and then also encoded with the client encoding.
+Other objects are converted to strings with ``str()``, like query
+parameters, and then also encoded with the client encoding.
 The values must not contain NUL characters, which PostgreSQL does not
 support in text. Binary data for columns of type ``bytea`` must be
 wrapped with :func:`Bytea`; it is then sent in the hex format of bytea
