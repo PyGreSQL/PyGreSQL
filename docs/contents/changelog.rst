@@ -80,9 +80,16 @@ Version 6.3.0 (unreleased)
   - `DB.send_query()` now accepts the parameters as separate arguments like
     `DB.query()`, in addition to a single list or tuple, and it now also
     prints the query when debugging is enabled.
-  - Using an asynchronous query or its connection again while results are
-    fetched or converted, e.g. from another thread, a cast hook or a notice
-    receiver, now raises an `InterfaceError`. Before, this could crash.
+  - Using a connection while one of its commands is running now raises an
+    `InterfaceError` (#115), e.g. from another thread, a notice receiver or
+    the iterable passed to `inserttable()`. The same applies to asynchronous
+    queries while their results are fetched or converted, e.g. from a cast
+    hook. Before, this could hang or crash. `cancel()` can still be called
+    from another thread, and a notice receiver can still use the methods
+    that only return local information like `transaction()`, `parameter()`
+    and the escape methods. On a closed connection, `Source.putdata()` and
+    `Source.getdata()` now raise an `OperationalError` like the other
+    methods instead of an `IOError`.
 
 - Changes in the `pgdb` module:
 

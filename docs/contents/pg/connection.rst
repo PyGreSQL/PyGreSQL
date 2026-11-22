@@ -16,6 +16,21 @@ significant parameters in function calls.
     Some other methods give access to large objects.
     Refer to the PostgreSQL user manual for more information about these.
 
+A connection must not be used concurrently by different threads. While a
+command is running on the connection, trying to run another command on it
+or to close or reset it raises a :exc:`pg.InterfaceError`, e.g. when this
+is done by another thread or by a notice receiver. The only method that
+may be called by another thread while a command is running is
+:meth:`Connection.cancel`. Code that is called back while a command is
+running in the same thread, i.e. a notice receiver or the iterable passed
+to :meth:`Connection.inserttable`, may also use the methods that only
+return local information, such as :meth:`Connection.transaction`,
+:meth:`Connection.parameter` and the escape methods.
+
+.. versionchanged:: 6.3
+    Using a connection while one of its commands is running raises an
+    error instead of hanging or crashing.
+
 query -- execute a SQL command string
 -------------------------------------
 
@@ -662,8 +677,9 @@ propagated to the code that caused the notice, so they are passed to
 
 The receiver is called in the middle of a libpq operation on the
 connection, e.g. while a query is running. Therefore it must not run
-queries or other commands on the connection, and must not close it.
-It may set another notice receiver, though.
+queries or other commands on the connection, and must not close it;
+trying this raises a :exc:`pg.InterfaceError`. It may set another notice
+receiver, though.
 
 If you set the notice receiver to ``None``, the default notice receiver
 of libpq is restored, which prints the messages to ``sys.stderr``.
@@ -673,8 +689,9 @@ To ignore all notices, set a receiver that does nothing instead.
 
 .. versionchanged:: 6.3
     The notice can be used after the receiver has returned, exceptions
-    raised by the receiver are reported as unraisable, and setting the
-    receiver to ``None`` restores the default receiver.
+    raised by the receiver are reported as unraisable, setting the
+    receiver to ``None`` restores the default receiver, and using the
+    connection in the receiver raises an error instead of hanging.
 
 putline -- write a line to the server socket
 --------------------------------------------

@@ -39,7 +39,9 @@ large_str(largeObject *self)
     return PyUnicode_FromString(str);
 }
 
-/* Check validity of large object. */
+/* Check validity of large object. If a level is given, the connection is
+   also prepared for a command and marked as busy, and the caller must call
+   _conn_end() after the large object function has been executed. */
 static int
 _check_lo_obj(largeObject *self, int level)
 {
@@ -66,8 +68,14 @@ _check_lo_obj(largeObject *self, int level)
     }
 
     /* the methods (not the attributes) execute commands */
-    if (level && _conn_prepare_command(self->pgcnx) < 0)
-        return 0;
+    if (level) {
+        if (!_conn_begin(self->pgcnx))
+            return 0;
+        if (_conn_prepare_command(self->pgcnx) < 0) {
+            _conn_end(self->pgcnx);
+            return 0;
+        }
+    }
 
     return 1;
 }
@@ -151,7 +159,9 @@ large_open(largeObject *self, PyObject *args)
     }
 
     /* opens large object */
-    if ((fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode)) == -1) {
+    fd = lo_open(self->pgcnx->cnx, self->lo_oid, mode);
+    _conn_end(self->pgcnx);
+    if (fd == -1) {
         PyErr_SetString(PyExc_IOError, "Can't open large object");
         return NULL;
     }
@@ -168,13 +178,17 @@ static char large_close__doc__[] =
 static PyObject *
 large_close(largeObject *self, PyObject *Py_UNUSED(noargs))
 {
+    int ret;
+
     /* checks validity */
     if (!_check_lo_obj(self, CHECK_OPEN)) {
         return NULL;
     }
 
     /* closes large object */
-    if (lo_close(self->pgcnx->cnx, self->lo_fd)) {
+    ret = lo_close(self->pgcnx->cnx, self->lo_fd);
+    _conn_end(self->pgcnx);
+    if (ret) {
         PyErr_SetString(PyExc_IOError, "Error while closing large object fd");
         return NULL;
     }
@@ -208,19 +222,23 @@ large_read(largeObject *self, PyObject *args)
         return NULL;
     }
 
+    /* allocate buffer */
+    if (!(buffer = PyBytes_FromStringAndSize((char *)NULL, size)))
+        return NULL;
+
     /* checks validity */
     if (!_check_lo_obj(self, CHECK_OPEN)) {
+        Py_DECREF(buffer);
         return NULL;
     }
 
-    /* allocate buffer and runs read */
-    buffer = PyBytes_FromStringAndSize((char *)NULL, size);
-
-    if ((size = lo_read(self->pgcnx->cnx, self->lo_fd,
-                        PyBytes_AS_STRING((PyBytesObject *)(buffer)),
-                        (size_t)size)) == -1) {
+    /* runs read */
+    size = lo_read(self->pgcnx->cnx, self->lo_fd, PyBytes_AS_STRING(buffer),
+                   (size_t)size);
+    _conn_end(self->pgcnx);
+    if (size == -1) {
         PyErr_SetString(PyExc_IOError, "Error while reading");
-        Py_XDECREF(buffer);
+        Py_DECREF(buffer);
         return NULL;
     }
 
@@ -254,8 +272,9 @@ large_write(largeObject *self, PyObject *args)
     }
 
     /* sends query */
-    if ((size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer,
-                         (size_t)bufsize)) != bufsize) {
+    size = lo_write(self->pgcnx->cnx, self->lo_fd, buffer, (size_t)bufsize);
+    _conn_end(self->pgcnx);
+    if (size != bufsize) {
         PyErr_SetString(PyExc_IOError, "Buffer truncated during write");
         return NULL;
     }
@@ -289,8 +308,9 @@ large_seek(largeObject *self, PyObject *args)
     }
 
     /* sends query */
-    if ((ret = lo_lseek(self->pgcnx->cnx, self->lo_fd, offset, whence)) ==
-        -1) {
+    ret = lo_lseek(self->pgcnx->cnx, self->lo_fd, offset, whence);
+    _conn_end(self->pgcnx);
+    if (ret == -1) {
         PyErr_SetString(PyExc_IOError, "Error while moving cursor");
         return NULL;
     }
@@ -316,19 +336,22 @@ large_size(largeObject *self, PyObject *Py_UNUSED(noargs))
 
     /* gets current position */
     if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1) {
+        _conn_end(self->pgcnx);
         PyErr_SetString(PyExc_IOError, "Error while getting current position");
         return NULL;
     }
 
     /* gets end position */
     if ((end = lo_lseek(self->pgcnx->cnx, self->lo_fd, 0, SEEK_END)) == -1) {
+        _conn_end(self->pgcnx);
         PyErr_SetString(PyExc_IOError, "Error while getting end position");
         return NULL;
     }
 
     /* move back to start position */
-    if ((start = lo_lseek(self->pgcnx->cnx, self->lo_fd, start, SEEK_SET)) ==
-        -1) {
+    start = lo_lseek(self->pgcnx->cnx, self->lo_fd, start, SEEK_SET);
+    _conn_end(self->pgcnx);
+    if (start == -1) {
         PyErr_SetString(PyExc_IOError,
                         "Error while moving back to first position");
         return NULL;
@@ -354,7 +377,9 @@ large_tell(largeObject *self, PyObject *Py_UNUSED(noargs))
     }
 
     /* gets current position */
-    if ((start = lo_tell(self->pgcnx->cnx, self->lo_fd)) == -1) {
+    start = lo_tell(self->pgcnx->cnx, self->lo_fd);
+    _conn_end(self->pgcnx);
+    if (start == -1) {
         PyErr_SetString(PyExc_IOError, "Error while getting position");
         return NULL;
     }
@@ -374,19 +399,21 @@ large_export(largeObject *self, PyObject *args)
     PyObject *name_obj;
     int ret;
 
-    /* checks validity */
-    if (!_check_lo_obj(self, CHECK_CLOSE)) {
+    /* gets arguments (a local file name, encoded like by os.fsencode) */
+    if (!PyArg_ParseTuple(args, "O&", PyUnicode_FSConverter, &name_obj)) {
         return NULL;
     }
 
-    /* gets arguments (a local file name, encoded like by os.fsencode) */
-    if (!PyArg_ParseTuple(args, "O&", PyUnicode_FSConverter, &name_obj)) {
+    /* checks validity */
+    if (!_check_lo_obj(self, CHECK_CLOSE)) {
+        Py_DECREF(name_obj);
         return NULL;
     }
 
     /* runs command */
     ret =
         lo_export(self->pgcnx->cnx, self->lo_oid, PyBytes_AS_STRING(name_obj));
+    _conn_end(self->pgcnx);
     Py_DECREF(name_obj);
     if (ret != 1) {
         PyErr_SetString(PyExc_IOError, "Error while exporting large object");
@@ -404,13 +431,17 @@ static char large_unlink__doc__[] =
 static PyObject *
 large_unlink(largeObject *self, PyObject *Py_UNUSED(noargs))
 {
+    int ret;
+
     /* checks validity */
     if (!_check_lo_obj(self, CHECK_CLOSE)) {
         return NULL;
     }
 
     /* deletes the object, invalidate it on success */
-    if (lo_unlink(self->pgcnx->cnx, self->lo_oid) != 1) {
+    ret = lo_unlink(self->pgcnx->cnx, self->lo_oid);
+    _conn_end(self->pgcnx);
+    if (ret != 1) {
         PyErr_SetString(PyExc_IOError, "Error while unlinking large object");
         return NULL;
     }

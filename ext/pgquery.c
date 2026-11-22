@@ -25,7 +25,10 @@
    While the query is the pending query of the connection, the results are
    fetched from the connection. Before another command is executed on the
    connection, the remaining results are moved into the query object, so
-   that they are not discarded and can still be returned (detached). */
+   that they are not discarded and can still be returned (detached).
+
+   While results are fetched from the connection, the connection is busy,
+   so that it cannot be used otherwise meanwhile. */
 
 /* Clear the current result of the query. */
 static void
@@ -84,7 +87,8 @@ _is_copy_status(ExecStatusType status)
    another command. Return 0 on success or -1 with an exception set.
    A COPY can only be completed using the connection, so when a COPY result
    is reached, the query stays the pending query of the connection, and an
-   error is raised, since the other command would abort the COPY. */
+   error is raised, since the other command would abort the COPY.
+   Must be called while the connection is busy. */
 int
 _query_detach(queryObject *self)
 {
@@ -93,16 +97,6 @@ _query_detach(queryObject *self)
     PGresult *result;
     int copy = 0;
 
-    if (self->fetching) {
-        set_error_msg(InterfaceError,
-                      "The results of the pending asynchronous query"
-                      " are being fetched");
-        return -1;
-    }
-
-    /* the query stays the pending query while the results are fetched,
-       so that the connection cannot be used otherwise meanwhile */
-    self->fetching = 1;
     while (cnx) {
         Py_BEGIN_ALLOW_THREADS
         result = PQgetResult(cnx);
@@ -124,7 +118,6 @@ _query_detach(queryObject *self)
                                                  sizeof(*pending));
             if (!pending) {
                 PQclear(result);
-                self->fetching = 0;
                 PyErr_NoMemory();
                 return -1;
             }
@@ -134,7 +127,6 @@ _query_detach(queryObject *self)
         if (copy)
             break;
     }
-    self->fetching = 0;
     /* the results may have changed the datestyle */
     cnx_obj->date_format = date_format;
 
@@ -152,7 +144,10 @@ _query_detach(queryObject *self)
 
 /* Mark an asynchronous query as done. If it is still the pending query of
    the connection (e.g. after an error), consume the remaining results on
-   the connection, except for a COPY result. */
+   the connection, except for a COPY result. This is only called by
+   _query_fetch() after checking that the connection is not busy; the check
+   here is only defensive (the results would then be discarded before the
+   next command, like for a deleted query). */
 static void
 _query_finish(queryObject *self)
 {
@@ -162,18 +157,21 @@ _query_finish(queryObject *self)
         PGconn *cnx = cnx_obj->cnx;
         PGresult *result;
 
-        /* stay the pending query until the results have been consumed */
-        self->fetching = 1;
-        Py_BEGIN_ALLOW_THREADS
-        while ((result = PQgetResult(cnx))) {
-            ExecStatusType status = PQresultStatus(result);
+        if (cnx && !cnx_obj->busy) {
+            /* stay the pending query until the results have been consumed
+               (like _conn_begin(), but without raising an error) */
+            cnx_obj->busy = 1;
+            Py_BEGIN_ALLOW_THREADS
+            while ((result = PQgetResult(cnx))) {
+                ExecStatusType status = PQresultStatus(result);
 
-            PQclear(result);
-            if (_is_copy_status(status))
-                break;
+                PQclear(result);
+                if (_is_copy_status(status))
+                    break;
+            }
+            Py_END_ALLOW_THREADS
+            _conn_end(cnx_obj);
         }
-        Py_END_ALLOW_THREADS
-        self->fetching = 0;
         cnx_obj->async_query = NULL;
     }
     _query_clear_pending(self);
@@ -194,9 +192,8 @@ _query_fetch(queryObject *self)
     ExecStatusType status;
     int moved = 0; /* whether the result has been moved from the connection */
 
-    if (self->fetching) {
-        set_error_msg(InterfaceError,
-                      "The results of this query are already being fetched");
+    if (cnx_obj->async_query == self && cnx_obj->busy) {
+        set_error_msg(InterfaceError, "The connection is busy");
         return NULL;
     }
     if (self->in_use) {
@@ -219,11 +216,13 @@ _query_fetch(queryObject *self)
     else if (cnx_obj->async_query == self) {
         PGconn *cnx = cnx_obj->cnx;
 
-        self->fetching = 1;
+        /* like _conn_begin(), the busy flag has already been checked above,
+           also for the moved results, which may still be added to */
+        cnx_obj->busy = 1;
         Py_BEGIN_ALLOW_THREADS
         result = PQgetResult(cnx);
         Py_END_ALLOW_THREADS
-        self->fetching = 0;
+        _conn_end(cnx_obj);
         /* the result may have changed the datestyle */
         cnx_obj->date_format = date_format;
     }

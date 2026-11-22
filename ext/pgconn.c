@@ -166,6 +166,35 @@ _check_cnx_obj(connObject *self)
     return 1;
 }
 
+/* Mark the connection as busy before libpq functions that communicate with
+   the server are called. While the connection is busy, it must not be used
+   for other commands, neither by other threads (libpq is called with the
+   GIL released), nor by Python code called back by libpq (the notice
+   receiver), since libpq is not re-entrant. Return 1 on success, or 0 with
+   an exception set if the connection is already busy or has been closed.
+   Every successful call must be followed by a call to _conn_end(). */
+int
+_conn_begin(connObject *self)
+{
+    if (self->busy) {
+        set_error_msg(InterfaceError, "The connection is busy");
+        return 0;
+    }
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return 0;
+    }
+    self->busy = 1;
+    return 1;
+}
+
+/* Mark the connection as not busy any more. */
+void
+_conn_end(connObject *self)
+{
+    self->busy = 0;
+}
+
 /* Create source object. */
 static char conn_source__doc__[] =
     "source() -- create a new source object for this connection";
@@ -241,12 +270,20 @@ _conn_non_query_result(int status, PGresult *result, PGconn *cnx)
 
 /* Prepare the connection for a new command. If an asynchronous query still
    has pending results, they are moved into the query object, so that they
-   are not discarded by libpq. Return 0 on success or -1 with an exception. */
+   are not discarded by libpq. Must be called while the connection is busy.
+   Return 0 on success or -1 with an exception. */
 int
 _conn_prepare_command(connObject *self)
 {
-    if (self->async_query)
-        return _query_detach(self->async_query);
+    if (self->async_query) {
+        /* the query must not be deallocated while its results are moved
+           with the GIL released, it is only a borrowed reference */
+        PyObject *query = Py_NewRef((PyObject *)self->async_query);
+        int rc = _query_detach(self->async_query);
+
+        Py_DECREF(query);
+        return rc;
+    }
 
     if (self->cnx && PQtransactionStatus(self->cnx) == PQTRANS_ACTIVE) {
         /* The asynchronous query has been deleted before all results have
@@ -297,7 +334,6 @@ _conn_new_query(connObject *self, PGresult *result, int encoding, int async)
     query_obj->num_pending = 0;
     query_obj->next_pending = 0;
     query_obj->detached = 0;
-    query_obj->fetching = 0;
     query_obj->in_use = 0;
     query_obj->copy = 0;
     if (result) {
@@ -451,7 +487,12 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
 
         /* prepare the connection after the parameters have been converted,
            since this may have run Python code using the connection */
-        if (_conn_prepare_command(self) < 0) {
+        if (!_conn_begin(self)) {
+            status = -1;
+            result = NULL;
+        }
+        else if (_conn_prepare_command(self) < 0) {
+            _conn_end(self);
             status = -1;
             result = NULL;
         }
@@ -471,6 +512,7 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
                 status = result != NULL;
             }
             Py_END_ALLOW_THREADS
+            _conn_end(self);
         }
 
         PyMem_Free((void *)parms);
@@ -480,7 +522,12 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
         }
         PyMem_Free(str);
     }
+    else if (!_conn_begin(self)) {
+        status = -1;
+        result = NULL;
+    }
     else if (_conn_prepare_command(self) < 0) {
+        _conn_end(self);
         status = -1;
         result = NULL;
     }
@@ -497,13 +544,14 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
             status = result != NULL;
         }
         Py_END_ALLOW_THREADS
+        _conn_end(self);
     }
 
     /* we don't need the query and its params any more */
     Py_DECREF(query_str_obj);
     Py_XDECREF(param_obj);
 
-    if (status < 0) /* the connection could not be prepared */
+    if (status < 0) /* the connection is busy or could not be prepared */
         return NULL;
 
     /* checks result validity */
@@ -594,7 +642,13 @@ conn_prepare(connObject *self, PyObject *args)
         return NULL;
     }
 
+    if (!_conn_begin(self)) {
+        Py_DECREF(name_obj);
+        Py_DECREF(query_obj);
+        return NULL;
+    }
     if (_conn_prepare_command(self) < 0) {
+        _conn_end(self);
         Py_DECREF(name_obj);
         Py_DECREF(query_obj);
         return NULL;
@@ -605,6 +659,7 @@ conn_prepare(connObject *self, PyObject *args)
     result = PQprepare(self->cnx, PyBytes_AS_STRING(name_obj),
                        PyBytes_AS_STRING(query_obj), 0, NULL);
     Py_END_ALLOW_THREADS
+    _conn_end(self);
     Py_DECREF(name_obj);
     Py_DECREF(query_obj);
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
@@ -647,7 +702,12 @@ conn_describe_prepared(connObject *self, PyObject *args)
     if (!(name_obj = get_encoded_arg(name_obj, encoding, usage)))
         return NULL;
 
+    if (!_conn_begin(self)) {
+        Py_DECREF(name_obj);
+        return NULL;
+    }
     if (_conn_prepare_command(self) < 0) {
+        _conn_end(self);
         Py_DECREF(name_obj);
         return NULL;
     }
@@ -656,6 +716,7 @@ conn_describe_prepared(connObject *self, PyObject *args)
     Py_BEGIN_ALLOW_THREADS
     result = PQdescribePrepared(self->cnx, PyBytes_AS_STRING(name_obj));
     Py_END_ALLOW_THREADS
+    _conn_end(self);
     Py_DECREF(name_obj);
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK)
         return _conn_new_query(self, result, encoding, 0);
@@ -739,9 +800,14 @@ conn_putline(connObject *self, PyObject *args)
         return NULL;
     }
 
+    if (!_conn_begin(self)) {
+        Py_DECREF(line_obj);
+        return NULL;
+    }
     /* send line to backend (the size is passed, so NUL bytes are sent) */
     ret = PQputCopyData(self->cnx, PyBytes_AS_STRING(line_obj),
                         (int)PyBytes_GET_SIZE(line_obj));
+    _conn_end(self);
     Py_DECREF(line_obj);
     if (ret != 1) {
         set_error_text(
@@ -764,22 +830,27 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     char *line = NULL;
     PyObject *str = NULL;
-    int ret;
+    int ret, finished = 0;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
+    if (!_conn_begin(self))
+        return NULL;
     /* get line synchronously */
     ret = PQgetCopyData(self->cnx, &line, 0);
+    if (ret == -1) /* end of copy, consume the final results */
+        finished = _conn_finish_copy(self);
+    _conn_end(self);
 
     /* check result */
     if (ret <= 0) {
         if (line != NULL)
             PQfreemem(line);
-        if (ret == -1) { /* end of copy, consume the final results */
-            if (_conn_finish_copy(self) < 0)
+        if (ret == -1) {
+            if (finished < 0)
                 return NULL;
             Py_RETURN_NONE;
         }
@@ -816,9 +887,12 @@ conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
         return NULL;
     }
 
+    if (!_conn_begin(self))
+        return NULL;
     /* end direct copy */
     ret = PQputCopyEnd(self->cnx, NULL);
     if (ret != 1) {
+        _conn_end(self);
         set_error_text(PyExc_IOError,
                        ret == -1 ? NULL
                                  : "Termination message cannot be queued,"
@@ -827,7 +901,9 @@ conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
         return NULL;
     }
     /* consume the final results, raising an error if the COPY failed */
-    if (_conn_finish_copy(self) < 0)
+    ret = _conn_finish_copy(self);
+    _conn_end(self);
+    if (ret < 0)
         return NULL;
     Py_RETURN_NONE;
 }
@@ -839,7 +915,7 @@ static char conn_set_non_blocking__doc__[] =
 static PyObject *
 conn_set_non_blocking(connObject *self, PyObject *args)
 {
-    int non_blocking;
+    int non_blocking, ret;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -853,7 +929,12 @@ conn_set_non_blocking(connObject *self, PyObject *args)
         return NULL;
     }
 
-    if (PQsetnonblocking(self->cnx, non_blocking) < 0) {
+    if (!_conn_begin(self))
+        return NULL;
+    /* this may flush the output buffer when switching to blocking mode */
+    ret = PQsetnonblocking(self->cnx, non_blocking);
+    _conn_end(self);
+    if (ret < 0) {
         set_error_text(PyExc_IOError, NULL, self->cnx);
         return NULL;
     }
@@ -1077,7 +1158,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     PGresult *result;
     struct CharBuffer buffer = {0};
     const char *errormsg = NULL; /* reason for aborting the copy */
-    int freeze = 0, encoding;
+    int freeze = 0, encoding, busy = 0;
     PyObject *table, *rows, *columns = NULL;
     PyObject *iter_row = NULL, *cols = NULL, *row = NULL;
     PyObject *ret = NULL;
@@ -1192,6 +1273,10 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         goto cleanup;
     }
 
+    /* the connection stays busy until the end of the copy operation,
+       since converting the rows may run Python code */
+    if (!(busy = _conn_begin(self)))
+        goto cleanup;
     if (_conn_prepare_command(self) < 0)
         goto cleanup;
 
@@ -1307,6 +1392,8 @@ cleanup:
         PQputCopyEnd(self->cnx, errormsg);
         _inserttable_drain(self);
     }
+    if (busy)
+        _conn_end(self);
     PyMem_Free(buffer.data);
     Py_XDECREF(row);
     Py_XDECREF(cols);
@@ -1679,9 +1766,14 @@ conn_locreate(connObject *self, PyObject *args)
     }
 
     /* creates large object */
-    if (_conn_prepare_command(self) < 0)
+    if (!_conn_begin(self))
         return NULL;
+    if (_conn_prepare_command(self) < 0) {
+        _conn_end(self);
+        return NULL;
+    }
     lo_oid = lo_creat(self->cnx, mode);
+    _conn_end(self);
     if (lo_oid == 0) {
         set_error_msg(OperationalError, "Can't create large object");
         return NULL;
@@ -1742,13 +1834,19 @@ conn_loimport(connObject *self, PyObject *args)
         return NULL;
     }
 
+    if (!_conn_begin(self)) {
+        Py_DECREF(name_obj);
+        return NULL;
+    }
     if (_conn_prepare_command(self) < 0) {
+        _conn_end(self);
         Py_DECREF(name_obj);
         return NULL;
     }
 
     /* imports file and checks result */
     lo_oid = lo_import(self->cnx, PyBytes_AS_STRING(name_obj));
+    _conn_end(self);
     Py_DECREF(name_obj);
     if (lo_oid == 0) {
         set_error_msg(OperationalError, "Can't create large object");
@@ -1772,15 +1870,16 @@ conn_reset(connObject *self, PyObject *Py_UNUSED(noargs))
         return NULL;
     }
 
-    if (self->async_query && self->async_query->fetching) {
-        set_error_msg(InterfaceError, "The connection is busy");
+    if (!_conn_begin(self))
         return NULL;
-    }
     /* the results of a pending asynchronous query are discarded */
     self->async_query = NULL;
 
-    /* resets the connection */
+    /* resets the connection (with the GIL held, since other threads could
+       otherwise access data of the connection that is freed by the reset,
+       e.g. with parameter(), which does not check the busy flag) */
     PQreset(self->cnx);
+    _conn_end(self);
     Py_RETURN_NONE;
 }
 
@@ -1870,9 +1969,12 @@ conn_poll(connObject *self, PyObject *Py_UNUSED(noargs))
         return NULL;
     }
 
+    if (!_conn_begin(self))
+        return NULL;
     Py_BEGIN_ALLOW_THREADS
     rc = PQconnectPoll(self->cnx);
     Py_END_ALLOW_THREADS
+    _conn_end(self);
 
     if (rc == PGRES_POLLING_FAILED) {
         set_error(InternalError, "Polling failed", self->cnx, NULL);
@@ -1938,24 +2040,29 @@ static char conn_close__doc__[] =
 static PyObject *
 conn_close(connObject *self, PyObject *Py_UNUSED(noargs))
 {
+    PGconn *cnx;
+
     /* connection object cannot already be closed */
     if (!self->cnx) {
         set_error_msg(InternalError, "Connection already closed");
         return NULL;
     }
 
-    if (self->async_query && self->async_query->fetching) {
+    if (self->busy) {
         set_error_msg(InterfaceError, "The connection is busy");
         return NULL;
     }
     /* the results of a pending asynchronous query are discarded */
     self->async_query = NULL;
 
+    /* the connection is marked as closed before the GIL is released,
+       so that it cannot be used by other threads while it is closed */
+    cnx = self->cnx;
+    self->cnx = NULL;
     Py_BEGIN_ALLOW_THREADS
-    PQfinish(self->cnx);
+    PQfinish(cnx);
     Py_END_ALLOW_THREADS
 
-    self->cnx = NULL;
     /* the notice receiver will not be called any more, but the cast hook
        may still be needed to get the results of queries */
     Py_CLEAR(self->notice_receiver);
@@ -1976,10 +2083,14 @@ conn_get_notify(connObject *self, PyObject *Py_UNUSED(noargs))
         return NULL;
     }
 
-    /* checks for NOTIFY messages */
+    if (!_conn_begin(self))
+        return NULL;
+    /* checks for NOTIFY messages (this may also call the notice receiver) */
     PQconsumeInput(self->cnx);
+    notify = PQnotifies(self->cnx);
+    _conn_end(self);
 
-    if (!(notify = PQnotifies(self->cnx))) {
+    if (!notify) {
         Py_RETURN_NONE;
     }
     else {

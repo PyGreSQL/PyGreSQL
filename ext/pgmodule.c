@@ -241,6 +241,7 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     conn_obj->default_notice_receiver = NULL;
     conn_obj->encoding = -1;
     conn_obj->async_query = NULL;
+    conn_obj->busy = 0;
     PyObject_GC_Track(conn_obj);
 
     if (pghost) {

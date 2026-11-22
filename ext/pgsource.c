@@ -170,7 +170,18 @@ source_execute(sourceObject *self, PyObject *sql)
         return NULL;
     query = PyBytes_AS_STRING(tmp_obj);
 
-    /* frees previous result */
+    if (!_conn_begin(self->pgcnx)) {
+        Py_DECREF(tmp_obj);
+        return NULL;
+    }
+    if (_conn_prepare_command(self->pgcnx) < 0) {
+        _conn_end(self->pgcnx);
+        Py_DECREF(tmp_obj);
+        return NULL;
+    }
+
+    /* frees previous result (only now, since it may still be needed for
+       a copy operation if the command cannot be executed) */
     if (self->result) {
         PQclear(self->result);
         self->result = NULL;
@@ -180,15 +191,11 @@ source_execute(sourceObject *self, PyObject *sql)
     self->num_fields = 0;
     self->encoding = encoding;
 
-    if (_conn_prepare_command(self->pgcnx) < 0) {
-        Py_DECREF(tmp_obj);
-        return NULL;
-    }
-
     /* gets result */
     Py_BEGIN_ALLOW_THREADS
     self->result = PQexec(self->pgcnx->cnx, query);
     Py_END_ALLOW_THREADS
+    _conn_end(self->pgcnx);
 
     /* we don't need the auxiliary string any more */
     Py_DECREF(tmp_obj);
@@ -433,7 +440,7 @@ source_moveprev(sourceObject *self, PyObject *Py_UNUSED(noargs))
    the remaining statements of the query, so that the connection becomes
    idle again. If the query continues with another copy operation, this
    becomes the current result, so that it can be run with putdata() or
-   getdata() as well. */
+   getdata() as well. Must be called while the connection is busy. */
 static PyObject *
 _source_end_copy(sourceObject *self, const char *errormsg)
 {
@@ -559,8 +566,13 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
 
     /* checks validity */
-    if (!_check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
+    if (!_check_source_obj(self, CHECK_CNX) || !_conn_begin(self->pgcnx)) {
+        Py_XDECREF(tmp_obj);
+        return NULL;
+    }
+    if (!_check_source_obj(self, CHECK_RESULT) ||
         PQresultStatus(self->result) != PGRES_COPY_IN) {
+        _conn_end(self->pgcnx);
         PyErr_SetString(PyExc_IOError,
                         "Connection is invalid or not in copy_in state");
         Py_XDECREF(tmp_obj);
@@ -584,6 +596,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     else { /* copy is done */
         ret = _source_end_copy(self, errormsg);
     }
+    _conn_end(self->pgcnx);
 
     Py_XDECREF(tmp_obj); /* only now, since errormsg may point into it */
 
@@ -612,24 +625,29 @@ source_getdata(sourceObject *self, PyObject *args)
     }
 
     /* checks validity */
-    if (!_check_source_obj(self, CHECK_CNX | CHECK_RESULT) ||
+    if (!_check_source_obj(self, CHECK_CNX) || !_conn_begin(self->pgcnx))
+        return NULL;
+    if (!_check_source_obj(self, CHECK_RESULT) ||
         PQresultStatus(self->result) != PGRES_COPY_OUT) {
+        _conn_end(self->pgcnx);
         PyErr_SetString(PyExc_IOError,
                         "Connection is invalid or not in copy_out state");
         return NULL;
     }
-
     nbytes = PQgetCopyData(self->pgcnx->cnx, &buffer, 0);
+    if (nbytes == -1) { /* copy is done */
+        ret = _source_end_copy(self, NULL);
+        _conn_end(self->pgcnx);
+        return ret; /* number of rows */
+    }
+    _conn_end(self->pgcnx);
 
     if (!nbytes || nbytes < -1) { /* an error occurred */
         set_error_text(PyExc_IOError, NULL, self->pgcnx->cnx);
         return NULL;
     }
 
-    if (nbytes == -1) { /* copy is done */
-        ret = _source_end_copy(self, NULL);
-    }
-    else if (!decode) { /* a row has been returned */
+    if (!decode) { /* a row has been returned */
         ret = PyBytes_FromStringAndSize(buffer, nbytes);
         PQfreemem(buffer);
     }

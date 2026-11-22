@@ -4401,6 +4401,209 @@ class TestNotificatons(unittest.TestCase):
         self.assertEqual(received, ['Bilbo wär hier!'])
 
 
+class TestBusyConnection(unittest.TestCase):
+    """Test using a connection while one of its commands is running."""
+
+    notice_query = "do $$ begin raise notice 'busy'; end $$; select 1"
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query('set client_min_messages=notice')
+
+    def tearDown(self):
+        self.doCleanups()
+        with suppress(pg.InternalError):  # already closed
+            self.c.close()
+
+    def assert_busy(self, funcs: Sequence[Callable[[], Any]]) -> None:
+        """Assert that the functions are called in a notice receiver."""
+        errors: list[Exception | None] = []
+
+        def receiver(_notice):
+            for func in funcs:
+                try:
+                    func()
+                except Exception as e:
+                    errors.append(e)
+                else:
+                    errors.append(None)
+
+        self.c.set_notice_receiver(receiver)
+        try:
+            self.assertEqual(
+                self.c.query(self.notice_query).getresult(), [(1,)])
+        finally:
+            self.c.set_notice_receiver(None)
+        # the receiver is called once for the single notice
+        self.assertEqual(len(errors), len(funcs))
+        for error in errors:
+            self.assertIsInstance(error, pg.InterfaceError)
+            self.assertEqual(str(error), 'The connection is busy')
+
+    def test_commands_in_notice_receiver(self):
+        c = self.c
+        self.assert_busy([
+            lambda: c.query('select 2'),
+            lambda: c.query('select $1', (2,)),
+            lambda: c.send_query('select 2'),
+            lambda: c.prepare('busy', 'select 2'),
+            lambda: c.query_prepared('busy'),
+            lambda: c.describe_prepared('busy'),
+            lambda: c.inserttable('busy', [(2,)]),
+            lambda: c.putline('2\n'),
+            c.getline, c.endcopy,
+            lambda: c.set_non_blocking(True),
+            lambda: c.locreate(pg.INV_READ),
+            lambda: c.loimport(__file__),
+            c.getnotify, c.poll, c.reset, c.close,
+            lambda: c.source().execute('select 2')])
+        # the connection can be used normally afterwards
+        self.assertEqual(c.query('select 3').getresult(), [(3,)])
+        self.assertFalse(c.is_non_blocking())
+        self.assertEqual(c.transaction(), pg.TRANS_IDLE)
+
+    def test_local_functions_in_notice_receiver(self):
+        c = self.c
+        results: list[Any] = []
+
+        def receiver(_notice):
+            results.extend((
+                c.transaction(), c.parameter('server_version'),
+                c.escape_literal("it's"), c.escape_identifier('a b'),
+                c.escape_string("it's"), c.escape_bytea(b'\x00'),
+                c.date_format(), c.is_non_blocking(), c.status,
+                c.get_notice_receiver() is receiver))
+
+        c.set_notice_receiver(receiver)
+        self.assertEqual(c.query(self.notice_query).getresult(), [(1,)])
+        self.assertEqual(len(results), 10)
+        self.assertEqual(results[0], pg.TRANS_ACTIVE)
+        self.assertEqual(results[1], c.parameter('server_version'))
+        self.assertEqual(results[2], "'it''s'")
+        self.assertEqual(results[3], '"a b"')
+        self.assertEqual(results[4], "it''s")
+        self.assertIsInstance(results[5], bytes)
+        self.assertIsInstance(results[6], str)
+        self.assertIs(results[7], False)
+        self.assertEqual(results[8], 1)
+        self.assertIs(results[9], True)
+
+    def test_large_object_in_notice_receiver(self):
+        c = self.c
+        c.query('begin')
+        self.addCleanup(c.query, 'rollback')
+        obj = c.locreate(pg.INV_READ | pg.INV_WRITE)
+        obj.open(pg.INV_WRITE)
+        obj.write(b'test')
+        self.assert_busy([
+            lambda: obj.read(1), lambda: obj.write(b'x'),
+            lambda: obj.seek(0, pg.SEEK_SET), obj.size, obj.tell, obj.close])
+        self.assertEqual(obj.tell(), 4)
+        self.assertEqual(obj.size(), 4)
+        obj.close()
+        self.assert_busy([
+            lambda: obj.open(pg.INV_READ),
+            lambda: obj.export(os.devnull), obj.unlink])
+        obj.open(pg.INV_READ)
+        self.assertEqual(obj.read(10), b'test')
+        obj.close()
+        obj.unlink()
+
+    def test_source_copy_in_notice_receiver(self):
+        c = self.c
+        # the notices are raised by the copy commands themselves,
+        # since another query would abort the copy
+        c.query("create function pg_temp.busy(n int) returns int as $$"
+                " begin raise notice 'busy'; return n; end"
+                " $$ language plpgsql")
+        c.query('create temp table test_busy'
+                ' (n int check (pg_temp.busy(n) = n))')
+        source = c.source()
+        errors: list[Exception] = []
+
+        def receiver(_notice):
+            for func in (lambda: source.putdata('2\n'), source.getdata,
+                         lambda: source.execute('select 2')):
+                try:
+                    func()
+                except Exception as e:
+                    errors.append(e)
+
+        c.set_notice_receiver(receiver)
+        self.assertEqual(source.execute('copy test_busy from stdin'), -1)
+        source.putdata('1\n')
+        source.putdata('2\n')
+        self.assertEqual(source.putdata(None), 2)
+        self.assertEqual(len(errors), 6)
+        # with several rows, notices are also received during getdata(),
+        # and the rejected commands must not abort the copy operation
+        self.assertEqual(
+            source.execute('copy (select pg_temp.busy(n)'
+                           ' from generate_series(1, 3) n) to stdout'), -1)
+        self.assertEqual(source.getdata(), b'1\n')
+        self.assertEqual(source.getdata(), b'2\n')
+        self.assertEqual(source.getdata(), b'3\n')
+        self.assertEqual(source.getdata(), 3)
+        self.assertEqual(len(errors), 15)
+        for error in errors:
+            self.assertIsInstance(error, pg.InterfaceError)
+        self.assertEqual(c.query('select n from test_busy order by n')
+                         .getresult(), [(1,), (2,)])
+
+    def test_connection_in_inserttable_rows(self):
+        c = self.c
+        c.query('create temp table test_busy (n int)')
+        errors: list[Exception] = []
+
+        def rows():
+            yield 1,
+            for func in (lambda: c.query('select 1'), c.close, c.reset):
+                try:
+                    func()
+                except Exception as e:
+                    errors.append(e)
+            yield 2,
+
+        self.assertEqual(c.inserttable('test_busy', rows()), 2)
+        self.assertEqual(len(errors), 3)
+        for error in errors:
+            self.assertIsInstance(error, pg.InterfaceError)
+        self.assertEqual(c.query('select n from test_busy order by n')
+                         .getresult(), [(1,), (2,)])
+
+    def test_connection_in_other_thread(self):
+        c = self.c
+        running = threading.Event()
+        checked = threading.Event()
+        results: list[Any] = []
+
+        def receiver(_notice):
+            # the query is running and waits until the checks are done
+            running.set()
+            checked.wait(5)
+
+        def run_query():
+            try:
+                results.append(c.query(self.notice_query).getresult())
+            except Exception as e:
+                results.append(e)
+
+        c.set_notice_receiver(receiver)
+        thread = threading.Thread(target=run_query)
+        thread.start()
+        try:
+            self.assertTrue(running.wait(5))
+            for func in (c.close, c.reset, lambda: c.query('select 2'),
+                         lambda: c.send_query('select 2'), c.getnotify):
+                self.assertRaises(pg.InterfaceError, func)
+            self.assertEqual(c.transaction(), pg.TRANS_ACTIVE)
+        finally:
+            checked.set()
+            thread.join(5)
+        self.assertEqual(results, [[(1,)]])
+        self.assertEqual(c.query('select 3').getresult(), [(3,)])
+
+
 class TestConfigFunctions(unittest.TestCase):
     """Test the functions for changing default settings.
 

@@ -93,6 +93,7 @@ typedef struct {
     PyObject *notice_receiver; /* current notice receiver */
     PQnoticeReceiver default_notice_receiver; /* receiver of libpq */
     int encoding; /* last checked client encoding */
+    int busy;     /* libpq is communicating with the server */
     struct _queryObject *async_query; /* borrowed, async query with results
                                          still pending on the connection */
 } connObject;
@@ -145,7 +146,6 @@ typedef struct _queryObject {
     int num_pending;     /* number of moved results */
     int next_pending;    /* index of the next moved result */
     int detached;        /* the pending results have been moved */
-    int fetching;        /* a result is being fetched from the connection */
     int in_use;          /* the current result is being converted */
     int copy;            /* the current result is a COPY result */
 } queryObject;
@@ -163,6 +163,10 @@ typedef struct {
 /* Cross-object helpers exported by pgconn.c */
 int
 _check_cnx_obj(connObject *self);
+int
+_conn_begin(connObject *self);
+void
+_conn_end(connObject *self);
 PyObject *
 _conn_non_query_result(int status, PGresult *result, PGconn *cnx);
 int
