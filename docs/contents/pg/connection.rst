@@ -258,7 +258,7 @@ the context.
 prepare -- create a prepared statement
 --------------------------------------
 
-.. method:: Connection.prepare(name, command)
+.. method:: Connection.prepare(name, command, [types])
 
     Create a prepared statement
 
@@ -266,10 +266,13 @@ prepare -- create a prepared statement
     :type name: str or bytes
     :param command: SQL command
     :type command: str or bytes
+    :param types: optional OIDs of the parameter types
+    :type types: list or tuple of int or None
     :rtype: None
     :raises TypeError: bad argument types, or wrong number of arguments
     :raises TypeError: invalid connection
     :raises ValueError: name or command contains NUL characters
+    :raises ValueError: invalid type OID
     :raises pg.ProgrammingError: error in query or duplicate query
 
 This method creates a prepared statement with the specified name for the
@@ -284,7 +287,24 @@ The SQL command may optionally contain positional parameters of the form
 must then later be passed to the :meth:`Connection.query_prepared` method
 separately as a tuple.
 
+The server infers the types of the parameters from the context. If this is
+not possible or not what you want, you can pass the types of the parameters
+as a list or tuple of type OIDs with the *types* argument, which can also be
+passed as a keyword argument. Types given as ``None`` or 0, and types of
+parameters beyond the length of the list, are still inferred by the server.
+If you pass more types than the command has parameters, the statement
+expects that many values when it is executed. For instance, the following statement adds two integers::
+
+    con.prepare('add', "select $1 + $2", [23, 23])
+
+The OID of a type can be found in the ``pg_type`` system catalog, e.g. with
+a query like ``select 'int'::regtype::oid``. :meth:`DB.prepare` also accepts
+type names.
+
 .. versionadded:: 5.1
+
+.. versionchanged:: 6.3
+    The optional *types* argument has been added.
 
 describe_prepared -- describe a prepared statement
 --------------------------------------------------

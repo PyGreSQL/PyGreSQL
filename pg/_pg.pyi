@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
 from os import PathLike
-from typing import Any, TypeAlias, TypeVar, final, overload
+from typing import Any, SupportsIndex, TypeAlias, TypeVar, final, overload
 
 # stub-only helpers (private, so that they are not checked by stubtest)
 _AnyStr = TypeVar('_AnyStr', str, bytes, str | bytes)
@@ -277,7 +277,9 @@ class Connection:
         """Execute a prepared statement."""
         ...
 
-    def prepare(self, name: str | bytes, cmd: str | bytes, /) -> None:
+    def prepare(self, name: str | bytes, cmd: str | bytes, /,
+                types: Sequence[SupportsIndex | None] | None = None
+                ) -> None:
         """Create a prepared statement."""
         ...
 

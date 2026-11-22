@@ -644,19 +644,108 @@ conn_query_prepared(connObject *self, PyObject *args)
     return _conn_query(self, args, 1, 0);
 }
 
+/* Get the parameter types for prepare() from a sequence of type OIDs, where
+   None or 0 means the type shall be inferred by the server. On success, set
+   *types to a new array (NULL if no types are given) that must be freed with
+   PyMem_Free() and *ntypes to its size, and return 0. Otherwise, return -1
+   with an exception set. */
+static int
+_conn_get_param_types(PyObject *types_obj, Oid **types, int *ntypes)
+{
+    PyObject *seq_obj;
+    Py_ssize_t i, n;
+    Oid *oids;
+
+    *types = NULL;
+    *ntypes = 0;
+    if (!types_obj || types_obj == Py_None)
+        return 0;
+    if (PyUnicode_Check(types_obj) || PyBytes_Check(types_obj) ||
+        PyByteArray_Check(types_obj) || PyMemoryView_Check(types_obj) ||
+        !PySequence_Check(types_obj)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "Method prepare() expects the types as a sequence"
+                        " of OIDs");
+        return -1;
+    }
+    /* use a tuple, since a list could be changed by __index__ */
+    if (!(seq_obj = PySequence_Tuple(types_obj)))
+        return -1;
+    n = PyTuple_GET_SIZE(seq_obj);
+    if (!n) {
+        Py_DECREF(seq_obj);
+        return 0;
+    }
+    if (n > INT_MAX) {
+        Py_DECREF(seq_obj);
+        PyErr_SetString(PyExc_ValueError, "Too many parameter types");
+        return -1;
+    }
+    if (!(oids = (Oid *)PyMem_Malloc((size_t)n * sizeof(*oids)))) {
+        Py_DECREF(seq_obj);
+        PyErr_NoMemory();
+        return -1;
+    }
+    for (i = 0; i < n; ++i) {
+        PyObject *obj = PyTuple_GET_ITEM(seq_obj, i);
+        Oid oid = 0;
+
+        if (obj != Py_None) {
+            PyObject *int_obj;
+            int overflow;
+            long long value;
+
+            if (!PyIndex_Check(obj) || PyBool_Check(obj)) {
+                PyErr_Format(PyExc_TypeError,
+                             "Parameter type must be given as an int OID,"
+                             " not %.200s",
+                             Py_TYPE(obj)->tp_name);
+                goto error;
+            }
+            if (!(int_obj = PyNumber_Index(obj)))
+                goto error;
+            value = PyLong_AsLongLongAndOverflow(int_obj, &overflow);
+            Py_DECREF(int_obj);
+            if (value == -1 && PyErr_Occurred())
+                goto error;
+            if (overflow || value < 0 || value > (long long)UINT_MAX) {
+                PyErr_Format(PyExc_ValueError,
+                             "Invalid parameter type OID: %R", obj);
+                goto error;
+            }
+            oid = (Oid)value;
+        }
+        oids[i] = oid;
+    }
+    Py_DECREF(seq_obj);
+    *types = oids;
+    *ntypes = (int)n;
+    return 0;
+
+error:
+    Py_DECREF(seq_obj);
+    PyMem_Free(oids);
+    return -1;
+}
+
 /* Create prepared statement. */
 static char conn_prepare__doc__[] =
-    "prepare(name, sql) -- create a prepared statement\n\n"
+    "prepare(name, sql, [types]) -- create a prepared statement\n\n"
     "You must pass the name (string) of the prepared statement and the\n"
-    "SQL (string) request for later execution.\n";
+    "SQL (string) request for later execution. You can also pass a sequence\n"
+    "with the type OIDs of the parameters, where None or 0 means that the\n"
+    "type shall be inferred by the server.\n";
 
 static PyObject *
-conn_prepare(connObject *self, PyObject *args)
+conn_prepare(connObject *self, PyObject *args, PyObject *kwds)
 {
-    static const char usage[] = "Method prepare() takes two string arguments";
-    PyObject *name_obj, *query_obj;
+    static const char usage[] =
+        "Method prepare() expects the name and the command as strings";
+    static char *kwlist[] = {"", "", "types", NULL};
+    PyObject *name_obj, *query_obj, *types_obj = NULL;
     PGresult *result;
-    int encoding;
+    Oid *types;
+    int encoding, ntypes;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -664,40 +753,48 @@ conn_prepare(connObject *self, PyObject *args)
     }
 
     /* reads args */
-    if (!PyArg_ParseTuple(args, "OO", &name_obj, &query_obj)) {
-        PyErr_SetString(PyExc_TypeError, usage);
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|O:prepare", kwlist,
+                                     &name_obj, &query_obj, &types_obj)) {
         return NULL;
     }
     if ((encoding = get_client_encoding(self)) < 0)
         return NULL;
-    /* encode like query() and query_prepared() */
-    if (!(name_obj = get_encoded_arg(name_obj, encoding, usage)))
+    if (_conn_get_param_types(types_obj, &types, &ntypes) < 0)
         return NULL;
+    /* encode like query() and query_prepared() */
+    if (!(name_obj = get_encoded_arg(name_obj, encoding, usage))) {
+        PyMem_Free(types);
+        return NULL;
+    }
     if (!(query_obj = get_encoded_arg(query_obj, encoding, usage))) {
         Py_DECREF(name_obj);
+        PyMem_Free(types);
         return NULL;
     }
 
     if (!_conn_begin(self)) {
         Py_DECREF(name_obj);
         Py_DECREF(query_obj);
+        PyMem_Free(types);
         return NULL;
     }
     if (_conn_prepare_command(self) < 0) {
         _conn_end(self);
         Py_DECREF(name_obj);
         Py_DECREF(query_obj);
+        PyMem_Free(types);
         return NULL;
     }
 
     /* create prepared statement */
     Py_BEGIN_ALLOW_THREADS
     result = PQprepare(self->cnx, PyBytes_AS_STRING(name_obj),
-                       PyBytes_AS_STRING(query_obj), 0, NULL);
+                       PyBytes_AS_STRING(query_obj), ntypes, types);
     Py_END_ALLOW_THREADS
     _conn_end(self);
     Py_DECREF(name_obj);
     Py_DECREF(query_obj);
+    PyMem_Free(types);
     if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
         PQclear(result);
         Py_RETURN_NONE; /* success */
@@ -2162,7 +2259,8 @@ static struct PyMethodDef conn_methods[] = {
      conn_send_query__doc__},
     {"query_prepared", (PyCFunction)conn_query_prepared, METH_VARARGS,
      conn_query_prepared__doc__},
-    {"prepare", (PyCFunction)conn_prepare, METH_VARARGS, conn_prepare__doc__},
+    {"prepare", (PyCFunction)(void (*)(void))conn_prepare,
+     METH_VARARGS | METH_KEYWORDS, conn_prepare__doc__},
     {"describe_prepared", (PyCFunction)conn_describe_prepared, METH_VARARGS,
      conn_describe_prepared__doc__},
     {"poll", (PyCFunction)conn_poll, METH_NOARGS, conn_poll__doc__},

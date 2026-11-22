@@ -119,6 +119,11 @@ Version 6.3.0 (unreleased)
     methods instead of an `IOError`.
   - `DB.close()` and `DB.reopen()` keep the cast hook of the connection
     if it cannot be closed, e.g. because it is busy.
+  - `Connection.prepare()` and `DB.prepare()` have a new optional parameter
+    *types* with the types of the parameters of the prepared statement, for
+    when they cannot be inferred from the context (#76, thanks to Justin
+    Pryzby for the suggestion). The connection method takes type OIDs,
+    `DB.prepare()` also takes type names like ``'int'`` or ``'text[]'``.
 
 - Changes in the `pgdb` module:
 

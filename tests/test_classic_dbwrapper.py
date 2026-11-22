@@ -1019,6 +1019,83 @@ class TestDBClass(unittest.TestCase):
         self.assertIsNone(p('', "select null"))
         self.assertIsNone(p(None, "select null"))
 
+    def test_prepare_with_types(self):
+        p, f = self.db.prepare, self.db.query_prepared
+        q = 'select pg_typeof($1)::text, pg_typeof($2)::text'
+        p('q1', q, [20, 25])
+        self.assertEqual(f('q1', 1, 2).getresult(), [('bigint', 'text')])
+        p('q2', q, ['int', 'text[]'])
+        self.assertEqual(
+            f('q2', 1, '{2}').getresult(), [('integer', 'text[]')])
+        p('q3', q, types=(b'int2', 'pg_catalog.varchar(10)'))
+        self.assertEqual(
+            f('q3', 1, 2).getresult(), [('smallint', 'character varying')])
+        p(None, q, ('int8', 'int'))
+        self.assertEqual(f(None, 1, 2).getresult(), [('bigint', 'integer')])
+        # types given as None or 0 or not given are inferred
+        q = 'select $1, $2'
+        p('q4', q, [None, 'numeric'])
+        self.assertEqual(f('q4', 1, 2).getresult(), [('1', Decimal(2))])
+        p('q5', q, [0, 'int2'])
+        self.assertEqual(f('q5', 1, '3').getresult(), [('1', 3)])
+        p('q6', q, ['date'])
+        self.assertEqual(
+            f('q6', '2026-11-22', 2).getresult(), [(date(2026, 11, 22), '2')])
+        p('q7', q, [])
+        self.assertEqual(f('q7', 1, 2).getresult(), [('1', '2')])
+        p('q8', q, None)
+        self.assertEqual(f('q8', 1, 2).getresult(), [('1', '2')])
+
+    def test_prepare_with_db_types(self):
+        p, f = self.db.prepare, self.db.query_prepared
+        # the exact OID of a DbType is used, not its name, which can be
+        # the simple type name 'int' or the registered name 'bigint'
+        typ = self.db.dbtypes['int8']
+        self.assertEqual(typ.simple, 'int')
+        p('q', 'select pg_typeof($1)::text, $1', [typ])
+        self.assertEqual(f('q', 2**40).getresult(), [('bigint', 2**40)])
+
+    def test_prepare_with_attnames(self):
+        table = 'test_prepare_attnames'
+        self.create_table(table, 'a int8, b text[], c date')
+        types = self.db.get_attnames(table)
+        q = 'select pg_typeof($1)::text, pg_typeof($2)::text, $3'
+        self.db.prepare('q', q, [types['a'], types['b'], types['c']])
+        self.assertEqual(
+            self.db.query_prepared('q', 1, '{x}', '2026-11-22').getresult(),
+            [('bigint', 'text[]', date(2026, 11, 22))])
+
+    def test_prepare_with_qualified_and_quoted_type_names(self):
+        q = 'select pg_typeof($1)::text, pg_typeof($2)::text'
+        self.db.prepare('q', q, ['pg_catalog.int4', '"char"'])
+        self.assertEqual(
+            self.db.query_prepared('q', 1, 'x').getresult(),
+            [('integer', '"char"')])
+
+    def test_prepare_with_many_type_names(self):
+        # the distinct type names are looked up only once
+        types = ['int', 'text'] * 1000
+        self.db.prepare('q', 'select $1, $2', types)
+        self.assertEqual(
+            self.db.query_prepared('q', *range(2000)).getresult(),
+            [(0, '1')])
+
+    def test_prepare_with_invalid_types(self):
+        p = self.db.prepare
+        self.assertRaises(TypeError, p, 'q', 'select $1', 'int')
+        self.assertRaises(TypeError, p, 'q', 'select $1', b'int')
+        self.assertRaises(TypeError, p, 'q', 'select $1', bytearray(b'i'))
+        self.assertRaises(TypeError, p, 'q', 'select $1', 23)
+        self.assertRaises(TypeError, p, 'q', 'select $1', {'int'})
+        self.assertRaises(TypeError, p, 'q', 'select $1', [1.0])
+        self.assertRaises(ValueError, p, 'q', 'select $1', [-1])
+        self.assertRaises(
+            pg.ProgrammingError, p, 'q', 'select $1', ['no_such_type'])
+        self.assertRaises(
+            pg.ProgrammingError, p, 'q', 'select $1', ['int', 'bad type'])
+        self.assertRaises(
+            pg.OperationalError, self.db.describe_prepared, 'q')
+
     def test_query_prepared_without_params(self):
         f = self.db.query_prepared
         self.assertRaises(pg.OperationalError, f, 'q')

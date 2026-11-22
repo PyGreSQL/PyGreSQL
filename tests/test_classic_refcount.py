@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import sys
 import unittest
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import suppress
 from decimal import Decimal
 from functools import partial
@@ -265,6 +265,23 @@ class TestConnectionRefCounts(RefCountTestCase):
                 self.c.query('select $1, $2', [value, 'a\0b'])
 
         self.assert_refcount_unchanged(query, value)
+
+    def test_prepare_types(self):
+        # parameter types must not leak or lose references
+        class Oid:
+            def __index__(self) -> int:
+                return 23
+
+        oid = Oid()
+
+        def prepare(types: Sequence) -> None:
+            with suppress(TypeError):
+                self.c.prepare('', 'select $1, $2', types)
+
+        self.assert_refcount_unchanged(partial(prepare, [oid]), oid)
+        self.assert_refcount_unchanged(partial(prepare, [oid, 'x']), oid)
+        types = (oid, 25)
+        self.assert_refcount_unchanged(partial(prepare, types), types)
 
     def test_source_pgcnx(self):
         source = self.c.source()

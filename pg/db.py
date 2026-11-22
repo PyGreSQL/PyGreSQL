@@ -16,7 +16,7 @@ from typing import (
 )
 
 from . import Connection, connect
-from .adapt import Adapter, DbTypes
+from .adapt import Adapter, DbType, DbTypes
 from .attrs import AttrDict
 from .core import (
     InternalError,
@@ -533,7 +533,9 @@ class DB:
         self._do_debug('EXECUTE', name)
         return db.query_prepared(name)
 
-    def prepare(self, name: str | bytes, command: str | bytes) -> None:
+    def prepare(self, name: str | bytes, command: str | bytes,
+                types: Sequence[int | str | bytes | None] | None = None
+                ) -> None:
         """Create a prepared SQL statement.
 
         This creates a prepared statement for the given command with the
@@ -545,11 +547,44 @@ class DB:
         defined in the current database session. We recommend always using
         named queries, since unnamed queries have a limited lifetime and
         can be automatically replaced or destroyed by various operations.
+
+        You can also pass a sequence with the types of the parameters, given
+        as type OIDs or type names like 'int' or 'text[]'.  Types given as
+        None or 0 and types of further parameters are inferred by the server.
         """
         if name is None:
             name = ''
-        self._do_debug('prepare', name, command)
-        self._valid_db.prepare(name, command)
+        if types is None:
+            self._do_debug('prepare', name, command)
+            self._valid_db.prepare(name, command)
+        else:
+            oids = self._get_type_oids(types)
+            self._do_debug('prepare', name, command, oids)
+            self._valid_db.prepare(name, command, oids)
+
+    def _get_type_oids(self, types: Sequence[int | str | bytes | None]
+                       ) -> list[int | None]:
+        """Get the OIDs for a sequence of types given as OIDs or names."""
+        if isinstance(types, (str, bytes, bytearray, memoryview)
+                      ) or not isinstance(types, Sequence):
+            raise TypeError('The types must be passed as a sequence')
+        oids: list[Any] = list(types)
+        names: dict[str | bytes, int] = {}  # distinct names to look up
+        for i, typ in enumerate(oids):
+            if isinstance(typ, DbType):  # use the exact OID
+                oids[i] = typ.oid
+            elif isinstance(typ, (str, bytes)):
+                names.setdefault(typ, len(names))
+        if names:
+            cmd = 'SELECT ' + ', '.join(
+                f'${n}::pg_catalog.regtype::pg_catalog.oid'
+                for n in range(1, len(names) + 1))
+            res = self._valid_db.query(cmd, list(names)).getresult()[0]
+            for i, typ in enumerate(oids):
+                if isinstance(typ, (str, bytes)) and not isinstance(
+                        typ, DbType):
+                    oids[i] = res[names[typ]]
+        return oids
 
     def describe_prepared(self, name: str | bytes | None = None) -> Query:
         """Describe a prepared SQL statement.

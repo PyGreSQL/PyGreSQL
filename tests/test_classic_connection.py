@@ -2206,6 +2206,107 @@ class TestPreparedQueries(unittest.TestCase):
             self.c.query("select n, b from bin order by n").getresult(),
             [(1, data), (2, b''), (3, None), (4, b'AB')])
 
+    def test_prepare_with_types(self):
+        prepare, query = self.c.prepare, self.c.query_prepared
+        q = 'select pg_typeof($1)::text, $1'
+        self.assertIsNone(prepare('q1', q, [20]))
+        self.assertEqual(query('q1', ['42']).getresult(), [('bigint', 42)])
+        self.assertIsNone(prepare('q2', q, types=(25,)))
+        self.assertEqual(query('q2', [42]).getresult(), [('text', '42')])
+        # types given as None or 0 or not given are inferred
+        q = 'select $1, $2'
+        for types in (None, (), [None], [0], [None, None], [0, 0]):
+            prepare('q', q, types)
+            self.assertEqual(query('q', ['1', '2']).getresult(), [('1', '2')])
+            self.c.query('deallocate q')
+        prepare('q3', q, [None, 1700])
+        self.assertEqual(
+            query('q3', ['1', '2']).getresult(), [('1', Decimal(2))])
+        prepare('q4', q, [21])
+        self.assertEqual(query('q4', ['1', '2']).getresult(), [(1, '2')])
+        # the types are used for the parameter values
+        prepare('q5', "select $1 || '!'", [1042])
+        self.assertEqual(query('q5', ['a  ']).getresult(), [('a!',)])
+
+    def test_prepare_with_types_resolving_ambiguity(self):
+        prepare, query = self.c.prepare, self.c.query_prepared
+        q = "select $1 is not distinct from $2"
+        self.assertRaises(pg.ProgrammingError, prepare, 'q', 'select $1 + $2')
+        prepare('q', 'select $1 + $2', [23, 23])
+        self.assertEqual(query('q', [1, 2]).getresult(), [(3,)])
+        prepare('q2', q, [1009, 1009])
+        self.assertEqual(
+            query('q2', ['{a,b}', '{a,b}']).getresult(), [(True,)])
+
+    def test_prepare_with_unknown_type(self):
+        self.assertRaises(
+            pg.InternalError, self.c.prepare, 'q', 'select $1', [999999])
+        # the connection can still be used
+        self.assertEqual(self.c.query('select 1').getresult(), [(1,)])
+
+    def test_prepare_with_invalid_types(self):
+        prepare = self.c.prepare
+        no_seqs: list[Any] = [
+            'int', b'int', bytearray(b'\x17'), memoryview(b'\x17'),
+            23, {23}, {23: 23}, iter([23])]
+        for types in no_seqs:
+            with self.assertRaises(TypeError) as cm:
+                prepare('q', 'select $1', types)
+            self.assertIn('sequence', str(cm.exception))
+        no_oids: list[Any] = [['int'], [b'23'], [1.0], [True], [[23]]]
+        for types in no_oids:
+            with self.assertRaises(TypeError) as cm:
+                prepare('q', 'select $1', types)
+            self.assertIn('int OID', str(cm.exception))
+        for oids in ([-1], [2**32], [2**64]):
+            with self.assertRaises(ValueError) as cm_value:
+                prepare('q', 'select $1', oids)
+            self.assertIn(
+                'Invalid parameter type OID', str(cm_value.exception))
+        self.assertRaises(TypeError, prepare, 'q', 'select 1', [], None)
+        self.assertRaises(TypeError, prepare, 'q', 'select 1', typ=[])
+        self.assertRaises(
+            TypeError, prepare, name='q', cmd='select 1', types=[])
+        # nothing has been prepared
+        self.assertRaises(
+            pg.OperationalError, self.c.describe_prepared, 'q')
+
+    def test_prepare_with_more_types_than_params(self):
+        self.c.prepare('q', 'select $1', [23, 25])
+        self.assertEqual(
+            self.c.query_prepared('q', [1, 2]).getresult(), [(1,)])
+        self.assertRaises(pg.DatabaseError, self.c.query_prepared, 'q', [1])
+
+    def test_prepare_with_types_changed_by_index(self):
+        types: list[Any] = []
+
+        class Oid:
+            def __index__(self) -> int:
+                types.clear()  # must not crash
+                return 23
+
+        types.extend([Oid()] + [object() for _ in range(1000)])
+        self.assertRaises(TypeError, self.c.prepare, 'q', 'select $1', types)
+        types.extend([Oid(), 25])
+        self.c.prepare('q', 'select $1, $2', types)
+        self.assertEqual(
+            self.c.query_prepared('q', [1, 2]).getresult(), [(1, '2')])
+
+    def test_prepare_with_types_on_closed_connection(self):
+        c = connect()
+        prepare = c.prepare
+        c.close()
+        self.assertRaises(TypeError, prepare, 'q', 'select $1', [23])
+
+    def test_prepare_with_index_types(self):
+        class Oid:
+            def __index__(self) -> int:
+                return 20
+
+        self.c.prepare('q', 'select pg_typeof($1)::text', [Oid()])
+        self.assertEqual(
+            self.c.query_prepared('q', ['1']).getresult(), [('bigint',)])
+
     def test_describe_non_existent_query(self):
         self.assertRaises(
             pg.OperationalError, self.c.describe_prepared, 'does-not-exist')

@@ -598,16 +598,20 @@ inline, and be properly sanitized (escaped, quoted).
 prepare -- create a prepared statement
 --------------------------------------
 
-.. method:: DB.prepare(name, command)
+.. method:: DB.prepare(name, command, [types])
 
     Create a prepared statement
 
-    :param str command: SQL command
     :param str name: name of the prepared statement
+    :param str command: SQL command
+    :param types: optional types of the parameters
+    :type types: list or tuple of str, int or None
     :rtype: None
     :raises TypeError: bad argument types, or wrong number of arguments
     :raises TypeError: invalid connection
-    :raises pg.ProgrammingError: error in query or duplicate query
+    :raises ValueError: invalid type OID
+    :raises pg.ProgrammingError: error in query or duplicate query,
+        or unknown type name
 
 This method creates a prepared statement with the specified name for later
 execution of the given command with the :meth:`DB.query_prepared` method.
@@ -623,8 +627,22 @@ The SQL command may optionally contain positional parameters of the form
 must then be passed to the :meth:`Connection.query_prepared` method
 as positional arguments.
 
+The server infers the types of the parameters from the context. If this
+is not possible or not what you want, you can pass the types of the
+parameters as a list or tuple with the *types* argument. The types can be
+given as type names like ``'int'``, ``'text[]'`` or ``'pg_catalog.date'``,
+as type OIDs, or as the type objects from the :class:`DbTypes` cache or
+returned by :meth:`DB.get_attnames`, for which the exact OID is used.
+Type names are looked up in the database like ``'int'::regtype``, so they
+are PostgreSQL type names (``'int'`` means ``integer``) and are resolved with
+the current search path. Modifiers like the length in ``varchar(10)`` are
+ignored. Types given as ``None`` or 0, and types of parameters beyond the
+length of the list, are still inferred by the server. If you pass more types
+than the command has parameters, the statement expects that many values.
+
 The functionality of this method is equivalent to that of the SQL ``PREPARE``
-command.
+command, where the *types* correspond to the data types that can be listed
+after the statement name.
 
 Example::
 
@@ -637,6 +655,11 @@ Example::
         phone = input("Phone? ")
         db.query_prepared('change phone', ein, phone)
 
+Example with types::
+
+    db.prepare('add', "select $1 + $2", ['int', 'int'])
+    db.query_prepared('add', 2, 3).getresult()  # [(5,)]
+
 .. note::
 
      We recommend always using named queries, since unnamed queries have a
@@ -644,6 +667,9 @@ Example::
      various operations on the database.
 
 .. versionadded:: 5.1
+
+.. versionchanged:: 6.3
+    The optional *types* argument has been added.
 
 describe_prepared -- describe a prepared statement
 --------------------------------------------------
