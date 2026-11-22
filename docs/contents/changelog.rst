@@ -178,6 +178,13 @@ Version 6.3.0 (unreleased)
     fields of composite types whose values have already been cast. Before,
     the casts for these composite types kept the old typecast functions for
     their fields until they were reset as well.
+  - `DB.delete_prepared()` now quotes the name of the prepared statement,
+    so that it is taken literally like in `DB.prepare()` and
+    `DB.query_prepared()`, and also accepts the name as bytes (#131).
+    Before, the name was inserted unchanged into the ``DEALLOCATE``
+    command, so that names with capital letters or spaces were not found,
+    the name ``'all'`` deleted all prepared statements, and other SQL could
+    be injected with the name.
 
 - Changes in the `pgdb` module:
 

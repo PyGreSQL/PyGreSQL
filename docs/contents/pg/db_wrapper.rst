@@ -765,14 +765,21 @@ delete_prepared -- delete a prepared statement
     :rtype: None
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
+    :raises ValueError: the name contains a NUL character
     :raises pg.OperationalError: prepared statement does not exist
 
 This method deallocates a previously prepared SQL statement with the given
-name, or deallocates all prepared statements if you do not specify a name.
-Note that prepared statements are always deallocated automatically when the
-current session ends.
+name, or deallocates all prepared statements if you do not specify a name
+or pass an empty name. The name is taken literally, as in :meth:`DB.prepare`,
+so it is case-sensitive and can contain spaces. It can also be passed as
+bytes. The unnamed statement cannot be deallocated, but it is replaced when
+you prepare another unnamed statement. Note that prepared statements are
+always deallocated automatically when the current session ends.
 
 .. versionadded:: 5.1
+
+.. versionchanged:: 6.3
+    The name is now quoted, and it can also be passed as bytes.
 
 clear -- clear row values in memory
 -----------------------------------

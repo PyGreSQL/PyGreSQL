@@ -603,7 +603,7 @@ class DB:
             name = ''
         return self._valid_db.describe_prepared(name)
 
-    def delete_prepared(self, name: str | None = None) -> Query:
+    def delete_prepared(self, name: str | bytes | None = None) -> None:
         """Delete a prepared SQL statement.
 
         This deallocates a previously prepared SQL statement with the given
@@ -611,11 +611,15 @@ class DB:
         name. Note that prepared statements are also deallocated automatically
         when the current session ends.
         """
+        cmd: str | bytes
         if not name:
-            name = 'ALL'
-        cmd = f"DEALLOCATE {name}"
+            cmd = 'DEALLOCATE ALL'
+        elif isinstance(name, bytes):
+            cmd = b'DEALLOCATE ' + self.escape_identifier(name)
+        else:
+            cmd = 'DEALLOCATE ' + self.escape_identifier(name)
         self._do_debug(cmd)
-        return self._valid_db.query(cmd)
+        self._valid_db.query(cmd)
 
     def pkey(self, table: str | int, composite: bool = False,
              flush: bool = False) -> str | tuple[str, ...]:

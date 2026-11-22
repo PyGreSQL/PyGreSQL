@@ -1128,6 +1128,30 @@ class TestDBClass(unittest.TestCase):
         self.assertRaises(e, f, 'q1')
         self.assertRaises(e, f, 'q2')
 
+    def test_delete_prepared_quotes_name(self):
+        f = self.db.delete_prepared
+        p = self.db.prepare
+        e = pg.OperationalError
+        names = ['MyQuery', 'my query', 'my "query"', "my 'query'",
+                 'all', 'q1; select 1']
+        for name in names:
+            p(name, "select 1")
+        p('myquery', "select 1")
+        p('q1', "select 1")
+        for name in names:
+            f(name)
+            self.assertRaises(e, f, name)
+        # the other statements have not been deleted
+        r = self.db.query(
+            'select name from pg_catalog.pg_prepared_statements'
+            ' order by name').getresult()
+        self.assertEqual(r, [('myquery',), ('q1',)])
+        p(b'MyBytes', "select 1")
+        f(b'MyBytes')
+        self.assertRaises(e, f, b'MyBytes')
+        self.assertRaises(ValueError, f, 'my\0query')
+        self.assertRaises(TypeError, f, 42)
+
     def test_pkey(self):
         query = self.db.query
         pkey = self.db.pkey
