@@ -229,6 +229,10 @@ def cast_interval(value: str) -> timedelta:
     # The output format depends on the server setting IntervalStyle, but it's
     # not necessary to consult this setting to parse it.  It's faster to just
     # check all possible formats, and there is no ambiguity here.
+    if value == 'infinity':  # possible since PostgreSQL 17
+        return timedelta.max
+    if value == '-infinity':
+        return timedelta.min
     m = _re_interval_iso_8601.match(value)
     if m:
         s = [v or '0' for v in m.groups()]

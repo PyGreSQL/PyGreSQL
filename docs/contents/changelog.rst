@@ -185,6 +185,9 @@ Version 6.3.0 (unreleased)
     command, so that names with capital letters or spaces were not found,
     the name ``'all'`` deleted all prepared statements, and other SQL could
     be injected with the name.
+  - The infinite intervals supported since PostgreSQL 17 are now returned
+    as ``timedelta.max`` and ``timedelta.min``, like infinite dates and
+    timestamps (#132). Before, they raised a `ValueError`.
 
 - Changes in the `pgdb` module:
 
@@ -234,6 +237,9 @@ Version 6.3.0 (unreleased)
     affect fields of composite types whose values have already been cast.
     Before, the casts for these composite types kept the old typecast
     functions for their fields until they were reset as well.
+  - The infinite intervals supported since PostgreSQL 17 are now returned
+    as ``timedelta.max`` and ``timedelta.min``, like infinite dates and
+    timestamps (#132). Before, they raised a `ValueError`.
 
 - Fixes in the C extension:
 

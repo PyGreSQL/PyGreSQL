@@ -961,6 +961,15 @@ class TestCastInterval(unittest.TestCase):
             for value in values:
                 self.assertEqual(cast_interval(value), interval)
 
+    def test_cast_infinite_interval(self):
+        from pg.cast import cast_interval
+        from pgdb.cast import cast_interval as pgdb_cast_interval
+        for cast in cast_interval, pgdb_cast_interval:
+            self.assertEqual(cast('infinity'), timedelta.max)
+            self.assertEqual(cast('-infinity'), timedelta.min)
+            self.assertRaises(ValueError, cast, '+infinity')
+            self.assertRaises(ValueError, cast, 'Infinity')
+
 
 class TestCastNetworkTypes(unittest.TestCase):
     """Test the typecast functions for network types."""

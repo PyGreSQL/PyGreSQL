@@ -4139,6 +4139,26 @@ class TestDBClass(unittest.TestCase):
             self.assertIsInstance(r, timedelta)
             self.assertEqual(r, d)
 
+    def test_infinite_interval(self):
+        if self.db.server_version < 170000:
+            self.skipTest("infinite intervals need PostgreSQL 17")
+        query = self.db.query
+        for intervalstyle in (
+                'sql_standard', 'postgres', 'postgres_verbose', 'iso_8601'):
+            self.db.set_parameter('intervalstyle', intervalstyle)
+            q = ("select 'infinity'::interval, '-infinity'::interval,"
+                 " array['infinity', '-infinity', '1 day']::interval[]")
+            r = query(q).getresult()[0]
+            self.assertEqual(r[0], timedelta.max)
+            self.assertEqual(r[1], timedelta.min)
+            self.assertEqual(
+                r[2], [timedelta.max, timedelta.min, timedelta(1)])
+        # the extreme values are passed as finite intervals
+        q = "select $1::interval, isfinite($1::interval)::int"
+        for d in timedelta.max, timedelta.min:
+            r = query(q, (d,)).getresult()[0]
+            self.assertEqual(r, (d, 1))
+
     def test_date_and_time_arrays(self):
         dt = (date(2016, 3, 14), time(15, 9, 26))
         q = "select ARRAY[$1::date], ARRAY[$2::time]"

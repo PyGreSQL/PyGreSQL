@@ -54,6 +54,17 @@ record                             tuple
        information, you can request it separately with the `array_lower()`
        function provided by PostgreSQL.
 
+The special values ``infinity`` and ``-infinity`` of the types ``date``,
+``timestamp``, ``timestamptz`` and ``interval`` (the latter since
+PostgreSQL 17) are returned as the ``max`` and ``min`` values of the
+corresponding Python types, e.g. ``timedelta.max`` and ``timedelta.min``
+for intervals.  Note that these values are passed as ordinary finite
+values when you use them as parameters.
+
+.. versionchanged:: 6.3
+    Infinite intervals are returned as ``timedelta.max`` and
+    ``timedelta.min`` instead of raising a ``ValueError``.
+
 Values of the network address types ``inet`` and ``cidr`` are returned as
 strings. As parameters, you can also pass objects of the ``ipaddress``
 module, also as elements of lists and tuples: addresses and interfaces are

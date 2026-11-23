@@ -861,6 +861,29 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_infinite_interval(self):
+        con = self._connect()
+        try:
+            cnx = con._cnx
+            assert cnx is not None
+            if cnx.server_version < 170000:
+                self.skipTest("infinite intervals need PostgreSQL 17")
+            cur = con.cursor()
+            cur.execute(
+                "select 'infinity'::interval, '-infinity'::interval,"
+                " array['infinity', '-infinity', '1 day']::interval[]")
+            row = cur.fetchone()
+            self.assertEqual(row, (
+                timedelta.max, timedelta.min,
+                [timedelta.max, timedelta.min, timedelta(1)]))
+            # the extreme values are passed as finite intervals
+            for d in timedelta.max, timedelta.min:
+                cur.execute(
+                    "select %s::interval, isfinite(%s::interval)", (d, d))
+                self.assertEqual(cur.fetchone(), (d, True))
+        finally:
+            con.close()
+
     def test_hstore(self):
         con = self._connect()
         cur = con.cursor()
