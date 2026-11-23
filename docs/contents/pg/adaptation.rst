@@ -26,7 +26,8 @@ PostgreSQL                          Python
 char, bpchar, name, text, varchar  str
 bool                               bool
 bytea                              bytes
-int2, int4, int8, oid, serial      int
+int2, int4, int8, serial           int
+oid, oid8                          int
 int2vector                         list of int
 float4, float8                     float
 numeric, money                     Decimal
@@ -64,6 +65,14 @@ values when you use them as parameters.
 .. versionchanged:: 6.3
     Infinite intervals are returned as ``timedelta.max`` and
     ``timedelta.min`` instead of raising a ``ValueError``.
+
+Values of the unsigned 64-bit type ``oid8`` (since PostgreSQL 19) are
+returned as ``int``. Pass values above the range of ``int8`` as
+parameters, but not inline, since PostgreSQL has no cast from
+``numeric`` to ``oid8``.
+
+.. versionchanged:: 6.3
+    Values of the type ``oid8`` are returned as ``int`` instead of ``str``.
 
 Values of the network address types ``inet`` and ``cidr`` are returned as
 strings. As parameters, you can also pass objects of the ``ipaddress``

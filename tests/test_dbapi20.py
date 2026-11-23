@@ -884,6 +884,37 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_oid8(self):
+        con = self._connect()
+        try:
+            cnx = con._cnx
+            assert cnx is not None
+            if cnx.server_version < 190000:
+                self.skipTest("the oid8 type needs PostgreSQL 19")
+            cur = con.cursor()
+            big = 2**64 - 1  # oid8 is unsigned
+            # integers are passed as literals, and PostgreSQL has no cast
+            # from numeric to oid8, so the big value is passed as a string
+            cur.execute(
+                "select %s::oid8, array[%s::oid8, 0::oid8],"
+                " array[[1, 2], [3, 4]]::oid8[], %s::oid8",
+                (str(big), str(big), 2**63 - 1))
+            self.assertEqual(cur.fetchone(), (
+                big, [big, 0], [[1, 2], [3, 4]], 2**63 - 1))
+            self.assertEqual(
+                [d.type_code for d in cur.description],
+                ['oid8', '_oid8', '_oid8', 'oid8'])
+            cur.execute('create type pg_temp.test_rtype'
+                        ' as (o oid8, a oid8[])')
+            cur.execute(
+                "select row(%s::oid8, array[1, %s::oid8])::pg_temp.test_rtype",
+                (str(big), str(big)))
+            r = cur.fetchone()[0]
+            self.assertEqual(r, (big, [1, big]))
+            self.assertIsInstance(r.o, int)
+        finally:
+            con.close()
+
     def test_hstore(self):
         con = self._connect()
         cur = con.cursor()

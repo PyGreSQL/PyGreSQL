@@ -132,7 +132,7 @@ class _SimpleTypes(dict):
                  'datetime', 'timedelta',  # these do not really exist
                  date, time, datetime, timedelta],
         'float': ['float4', 'float8', float],
-        'int': ['cid', 'int2', 'int4', 'int8', 'oid', 'xid', int],
+        'int': ['cid', 'int2', 'int4', 'int8', 'oid', 'oid8', 'xid', int],
         'hstore': [Hstore], 'json': ['jsonb', Json], 'uuid': [UUID],
         'num': ['numeric', Decimal], 'money': [],
         'text': ['bpchar', 'char', 'name', 'varchar', str]

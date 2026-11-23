@@ -188,6 +188,11 @@ Version 6.3.0 (unreleased)
   - The infinite intervals supported since PostgreSQL 17 are now returned
     as ``timedelta.max`` and ``timedelta.min``, like infinite dates and
     timestamps (#132). Before, they raised a `ValueError`.
+  - Values of the ``oid8`` type of PostgreSQL 19 are now returned as `int`,
+    also as elements of arrays and records (#135). Before, they were
+    returned as strings. Like the other integer types, they are now
+    converted in the C extension, so that custom typecasts for ``oid8``
+    only apply to fields of records.
   - `DB.get_tables()` now also returns partitioned tables, like ``\dt`` in
     psql (#136). Before, only their partitions were returned. The type
     letters for `DB.get_relations()` are now documented completely.
@@ -253,6 +258,9 @@ Version 6.3.0 (unreleased)
   - The infinite intervals supported since PostgreSQL 17 are now returned
     as ``timedelta.max`` and ``timedelta.min``, like infinite dates and
     timestamps (#132). Before, they raised a `ValueError`.
+  - Values of the ``oid8`` type of PostgreSQL 19 are now returned as `int`,
+    also as elements of arrays and records (#135). Before, they were
+    returned as strings.
 
 - Fixes in the C extension:
 

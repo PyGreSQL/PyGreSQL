@@ -311,6 +311,7 @@ class Typecasts(dict):
         'text': str, 'varchar': str, 'sql_identifier': str,
         'bool': cast_bool, 'bytea': unescape_bytea,
         'int2': int, 'int4': int, 'serial': int, 'int8': int, 'oid': int,
+        'oid8': int,
         'hstore': cast_hstore, 'json': jsondecode, 'jsonb': jsondecode,
         'float4': float, 'float8': float,
         'numeric': Decimal, 'money': cast_money,

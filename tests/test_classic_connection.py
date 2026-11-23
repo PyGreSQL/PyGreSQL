@@ -2411,6 +2411,20 @@ class TestQueryResultTypes(unittest.TestCase):
     def test_long(self):
         self.assert_proper_cast(0, 'bigint', int)
 
+    def test_oid8(self):
+        if self.c.server_version < 190000:
+            self.skipTest("the oid8 type needs PostgreSQL 19")
+        self.assert_proper_cast(0, 'oid8', int)
+        big = 2**64 - 1  # oid8 is unsigned
+        q = ("select $1::oid8, array[$1::oid8, 0::oid8],"
+             " array[[1, 2], [3, 4]]::oid8[]")
+        r = self.c.query(q, (big,))
+        self.assertEqual(
+            r.getresult(), [(big, [big, 0], [[1, 2], [3, 4]])])
+        # numbers are right-aligned when the result is printed
+        r = self.c.query("select 1::oid8 as a union all select 123")
+        self.assertEqual(str(r).splitlines()[2:4], ['  1', '123'])
+
     def test_float(self):
         self.assert_proper_cast(0, 'float', float)
         self.assert_proper_cast(0, 'real', float)

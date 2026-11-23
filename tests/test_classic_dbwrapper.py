@@ -3940,6 +3940,33 @@ class TestDBClass(unittest.TestCase):
         self.assertIsInstance(r[0].b, bytes)
         self.assertIsInstance(r[0].a, list)
 
+    def test_oid8(self):
+        if self.db.server_version < 190000:
+            self.skipTest("the oid8 type needs PostgreSQL 19")
+        query = self.db.query
+        query('create type pg_temp.test_rtype as (o oid8, a oid8[])')
+        self.create_table(
+            'test_table', 'n oid8 primary key, a oid8[],'
+            ' r pg_temp.test_rtype')
+        regtypes = self.db.use_regtypes()
+        self.db.use_regtypes(False)
+        self.addCleanup(self.db.use_regtypes, regtypes)
+        attnames = self.db.get_attnames('test_table')
+        self.assertEqual(attnames['n'], 'int')
+        self.assertEqual(attnames['a'], 'int[]')
+        self.assertEqual(attnames['r'].attnames, dict(o='int', a='int[]'))
+        big = 2**64 - 1  # oid8 is unsigned
+        value = (big, [0, big])
+        a = [big, 1] if pg.get_array() else f'{{{big},1}}'
+        r = self.db.insert('test_table', n=big, a=[big, 1], r=value)
+        self.assertEqual(r, dict(n=big, a=a, r=value))
+        r = self.db.get('test_table', big)
+        self.assertEqual(r, dict(n=big, a=a, r=value))
+        # the fields of records are cast by the DB wrapper
+        r = query('select r from test_table').getresult()[0][0]
+        self.assertEqual(r, value)
+        self.assertIsInstance(r.o, int)
+
     # noinspection PyUnresolvedReferences
     def test_record_literal(self):
         query = self.db.query

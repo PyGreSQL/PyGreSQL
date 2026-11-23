@@ -171,4 +171,9 @@
 #define INT8RANGEARRAYOID 3927
 #define CSTRINGARRAYOID 1263
 
+/* built-in types added in later PostgreSQL versions */
+
+#define OID8OID 6437      /* PostgreSQL 19 */
+#define OID8ARRAYOID 6442 /* PostgreSQL 19 */
+
 #endif /* PG_TYPE_D_H */

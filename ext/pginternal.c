@@ -423,6 +423,7 @@ get_type(Oid pgtype)
             break;
 
         case INT8OID:
+        case OID8OID:
             t = PYGRES_LONG;
             break;
 
@@ -472,6 +473,7 @@ get_type(Oid pgtype)
             break;
 
         case INT8ARRAYOID:
+        case OID8ARRAYOID:
             t = array_as_text ? PYGRES_TEXT : (PYGRES_LONG | PYGRES_ARRAY);
             break;
 
@@ -1675,6 +1677,7 @@ format_result(const PGresult *res, int encoding)
                         case FLOAT8OID:
                         case NUMERICOID:
                         case OIDOID:
+                        case OID8OID:
                         case XIDOID:
                         case CIDOID:
                         case CASHOID:
