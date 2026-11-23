@@ -2085,10 +2085,17 @@ conn_cancel(connObject *self, PyObject *Py_UNUSED(noargs))
 #else
     {
         char errbuf[256];
+        PGcancel *cancel;
+
+        /* older libpq versions do not check whether a cancel key has
+           been received, then the request would be sent without a key */
+        if (PQstatus(self->cnx) != CONNECTION_OK) {
+            set_error_msg(OperationalError, "Connection is not open");
+            return NULL;
+        }
         /* this returns NULL if the connection is not open (or out of
            memory), and the request is not encrypted */
-        PGcancel *cancel = PQgetCancel(self->cnx);
-
+        cancel = PQgetCancel(self->cnx);
         if (!cancel) {
             set_error_msg(OperationalError, "Connection is not open");
             return NULL;
