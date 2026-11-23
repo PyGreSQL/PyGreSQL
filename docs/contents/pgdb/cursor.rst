@@ -123,24 +123,54 @@ e.g. ``" ... WHERE name=%(name)s"``.
 callproc -- Call a stored procedure
 -----------------------------------
 
-.. method:: Cursor.callproc(self, procname, [parameters]):
+.. method:: Cursor.callproc(procname, [parameters])
 
-    Call a stored database procedure with the given name
+    Call a stored database function or procedure with the given name
 
-    :param str procname: the name of the database function
+    :param str procname: the name of the database function or procedure
     :param parameters: a sequence of parameters (can be empty or omitted)
+    :returns: the parameters, for procedures with replaced output values
+    :raises TypeError: the name is not a string
+    :raises ValueError: the name is invalid
+    :raises ProgrammingError: the output parameters cannot be determined
 
-This method calls a stored procedure (function) in the PostgreSQL database.
+This method calls a stored function or procedure in the PostgreSQL database.
+The name can be schema-qualified. It is split at dots, and its parts are
+taken literally (case is preserved), like table names.  Enclose a part in
+double quotes if it contains a dot, and write a double quote inside it twice.
 
-The sequence of parameters must contain one entry for each input argument
-that the function expects. The result of the call is the same as this input
-sequence; replacement of output and input/output parameters in the return
-value is currently not supported.
+Functions are called with ``SELECT``. The sequence of parameters must contain
+one entry for each input argument that the function expects, and it is
+returned unchanged.
 
-The function may also provide a result set as output. These can be requested
-through the standard fetch methods of the cursor.
+Procedures are called with ``CALL``. The sequence of parameters must contain
+one entry for each argument that the procedure expects, including its output
+arguments, for which you can pass ``None``. A copy of the parameters is
+returned, a tuple if the parameters were given as a tuple and a list
+otherwise, where the output and input/output parameters are replaced with the
+values returned by the procedure. If output parameters have been omitted
+because they have default values, their values can only be fetched from the
+cursor. If several procedures with the same name and number of arguments exist
+that have their output arguments at different positions, a
+:exc:`ProgrammingError` is raised. If a function and a procedure with the same
+name can both be called with the given number of parameters, it is called with
+``SELECT``, which fails if the database chooses the procedure. Procedures that
+commit or roll back transactions can only be called when the connection is in
+autocommit mode.
+
+To find out whether a function or a procedure must be called, the method
+looks up the name in the system catalog with an additional query.
+
+The function or procedure may also provide a result set as output. These can
+be requested through the standard fetch methods of the cursor. For procedures,
+this is the row with the values of the output parameters.
 
 .. versionadded:: 5.0
+
+.. versionchanged:: 6.3
+    Procedures are called with ``CALL``, and their output and input/output
+    parameters are replaced in a copy of the parameters. The name is split
+    into its parts like table names.
 
 fetchone -- fetch next row of the query result
 ----------------------------------------------

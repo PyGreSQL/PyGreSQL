@@ -261,6 +261,15 @@ Version 6.3.0 (unreleased)
   - Values of the ``oid8`` type of PostgreSQL 19 are now returned as `int`,
     also as elements of arrays and records (#135). Before, they were
     returned as strings.
+  - `Cursor.callproc()` now supports procedures (#137). They are called
+    with ``CALL``, and a copy of the parameters is returned where the
+    output and input/output parameters are replaced with the values
+    returned by the procedure. Before, procedures could not be called.
+    The name is now split into its parts like table names, so that
+    schema-qualified names work. Before, it was put in double quotes as a
+    whole, and a double quote or a percent sign in the name could break the
+    query. Names written like ``'schema"."func'`` to work around this now
+    raise a `ValueError`; write ``'schema.func'`` instead.
 
 - Fixes in the C extension:
 

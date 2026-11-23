@@ -161,6 +161,185 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         res = cur.fetchone()[0]
         self.assertEqual(res, 2)
 
+    def test_callproc_qualified_name(self):
+        con = self._connect()
+        cur = con.cursor()
+        params = ('ABC',)
+        res = cur.callproc('pg_catalog.lower', params)
+        self.assertIs(res, params)
+        self.assertEqual(cur.fetchone(), ('abc',))
+        # parts of the name are taken literally, also with special chars
+        cur.execute('create function pg_temp."My.%s\'""Func"(a int)'
+                    ' returns int language sql as $$ select a + 1 $$')
+        res = cur.callproc('pg_temp."My.%s\'""Func"', (1,))
+        self.assertEqual(res, (1,))
+        self.assertEqual(cur.fetchone(), (2,))
+        self.assertRaises(
+            pgdb.ProgrammingError, cur.callproc, 'pg_catalog.LOWER', params)
+        con.rollback()
+        self.assertRaises(TypeError, cur.callproc, b'lower', params)
+        self.assertRaises(ValueError, cur.callproc, 'pg_catalog..lower')
+        self.assertRaises(ValueError, cur.callproc, '"lower')
+
+    def test_callproc_procedure(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute('create procedure pg_temp.test_add(a int, inout b int)'
+                    ' language plpgsql as $$ begin b := a + b; end $$')
+        cur.execute('create procedure pg_temp.test_nop(a int)'
+                    ' language plpgsql as $$ begin end $$')
+        # the input/output parameter is replaced in a copy
+        params = (1, 2)
+        res = cur.callproc('pg_temp.test_add', params)
+        self.assertEqual(res, (1, 3))
+        self.assertEqual(params, (1, 2))
+        self.assertEqual(cur.description[0].name, 'b')
+        self.assertEqual(cur.rowcount, 1)
+        # the returned row can still be fetched
+        self.assertEqual(cur.fetchall(), [(3,)])
+        list_params = [1, 2]
+        res = cur.callproc('pg_temp.test_add', list_params)
+        self.assertEqual(res, [1, 3])
+        self.assertIsNot(res, list_params)
+        self.assertEqual(list_params, [1, 2])
+        # without output parameters, the procedure returns nothing
+        res = cur.callproc('pg_temp.test_nop', (1,))
+        self.assertEqual(res, (1,))
+        self.assertIsNone(cur.description)
+        # NULL values are returned as None
+        res = cur.callproc('pg_temp.test_add', (1, None))
+        self.assertEqual(res, (1, None))
+
+    def test_callproc_procedure_with_out_params(self):
+        con = self._connect()
+        cnx = con._cnx
+        assert cnx is not None
+        if cnx.server_version < 140000:
+            self.skipTest("OUT parameters of procedures need PostgreSQL 14")
+        cur = con.cursor()
+        cur.execute('create procedure pg_temp.test_out(a int, out b int,'
+                    ' inout c date, out d text)'
+                    ' language plpgsql as $$ begin'
+                    " b := a * 2; c := c + a; d := 'done'; end $$")
+        res = cur.callproc('pg_temp.test_out',
+                           (3, None, date(2026, 11, 20), None))
+        # the values are cast to the proper Python types
+        self.assertEqual(res, (3, 6, date(2026, 11, 23), 'done'))
+        self.assertEqual(cur.fetchone(), (6, date(2026, 11, 23), 'done'))
+
+    def test_callproc_procedure_with_defaults(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute('create procedure pg_temp.test_add(a int,'
+                    ' inout b int default 5)'
+                    ' language plpgsql as $$ begin b := a + b; end $$')
+        res = cur.callproc('pg_temp.test_add', (1, 2))
+        self.assertEqual(res, (1, 3))
+        # the value of an omitted parameter can only be fetched
+        res = cur.callproc('pg_temp.test_add', (1,))
+        self.assertEqual(res, (1,))
+        self.assertEqual(cur.fetchone(), (6,))
+
+    def test_callproc_overloaded_names(self):
+        con = self._connect()
+        cur = con.cursor()
+        # a function and a procedure with the same name
+        cur.execute('create function pg_temp.test_mix(a int) returns int'
+                    ' language sql as $$ select a * 2 $$')
+        cur.execute('create procedure pg_temp.test_mix(a int, inout b int)'
+                    ' language plpgsql as $$ begin b := a + b; end $$')
+        params = (2,)
+        self.assertIs(cur.callproc('pg_temp.test_mix', params), params)
+        self.assertEqual(cur.fetchone(), (4,))
+        self.assertEqual(cur.callproc('pg_temp.test_mix', (2, 3)), (2, 5))
+        # procedures with different output parameters
+        cur.execute('create procedure pg_temp.test_ovl(inout a int, b int)'
+                    ' language plpgsql as $$ begin a := a + b; end $$')
+        cur.execute('create procedure pg_temp.test_ovl(a text, inout b text)'
+                    ' language plpgsql as $$ begin b := a || b; end $$')
+        self.assertRaises(pgdb.ProgrammingError,
+                          cur.callproc, 'pg_temp.test_ovl', (1, 2))
+
+    def test_callproc_unqualified_procedure(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute('create schema test_callproc_schema')
+        cur.execute('set local search_path to test_callproc_schema, public')
+        cur.execute('create procedure "Test %s Proc"(inout a int)'
+                    ' language plpgsql as $$ begin a := a + 1; end $$')
+        self.assertEqual(cur.callproc('Test %s Proc', (1,)), (2,))
+        con.rollback()
+
+    def test_callproc_variadic_routines(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute('create procedure pg_temp.test_va(inout a int)'
+                    ' language plpgsql as $$ begin a := 0; end $$')
+        cur.execute('create function pg_temp.test_va(variadic a int[])'
+                    ' returns int language sql'
+                    ' as $$ select array_length(a, 1) $$')
+        # only the variadic function can be called with two parameters
+        params = (5, 6)
+        self.assertIs(cur.callproc('pg_temp.test_va', params), params)
+        self.assertEqual(cur.fetchone(), (2,))
+        # a variadic argument without default needs at least one value
+        cur.execute('create procedure pg_temp.test_vb()'
+                    ' language plpgsql as $$ begin end $$')
+        cur.execute('create function pg_temp.test_vb(variadic a int[])'
+                    ' returns int language sql'
+                    ' as $$ select array_length(a, 1) $$')
+        self.assertEqual(cur.callproc('pg_temp.test_vb', ()), ())
+        self.assertIsNone(cur.description)
+
+    def test_callproc_independent_of_global_options(self):
+        from pg import get_bool, set_bool
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute('create procedure pg_temp.test_ovl(inout a int)'
+                    ' language plpgsql as $$ begin a := 0; end $$')
+        cur.execute('create procedure pg_temp.test_ovl('
+                    'a int, inout b int, c int)'
+                    ' language plpgsql as $$ begin b := a + b + c; end $$')
+        use_bool = get_bool()
+        try:
+            for value in (False, True):
+                set_bool(value)
+                self.assertEqual(
+                    cur.callproc('pg_temp.test_ovl', (1, 2, 3)), (1, 6, 3))
+        finally:
+            set_bool(use_bool)
+
+    def test_callproc_errors(self):
+        con = self._connect()
+        cur = con.cursor()
+        self.assertRaises(pgdb.DataError, cur.callproc, 'low\0er', ('A',))
+        # a name that cannot be encoded in the client encoding
+        cnx = con._cnx
+        assert cnx is not None
+        error = (pgdb.ProgrammingError if cnx.encoding == 'utf-8'
+                 else pgdb.DataError)  # function not found or not encodable
+        self.assertRaises(error, cur.callproc, 'l中wer', ('A',))
+
+    def test_callproc_with_closed_connection(self):
+        con = self._connect()
+        cur = con.cursor()
+        con.close()
+        self.assertRaises(pgdb.OperationalError,
+                          cur.callproc, 'lower', ('A',))
+
+    def test_callproc_procedure_with_transaction_control(self):
+        con = self._connect()
+        cur = con.cursor()
+        cur.execute('create procedure pg_temp.test_commit(inout a int)'
+                    ' language plpgsql as $$ begin commit; a := a + 1; end $$')
+        con.commit()
+        # procedures with transaction control need autocommit
+        self.assertRaises(pgdb.InternalError,
+                          cur.callproc, 'pg_temp.test_commit', (1,))
+        con.rollback()
+        con.autocommit = True
+        self.assertEqual(cur.callproc('pg_temp.test_commit', (1,)), (2,))
+
     def test_cursor_type(self):
 
         class TestCursor(pgdb.Cursor):

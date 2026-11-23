@@ -26,7 +26,7 @@ from pg.core import (
     NotSupportedError,
 )
 from pg.core import Connection as Cnx
-from pg.error import db_error, error, if_error, op_error
+from pg.error import db_error, error, if_error, op_error, prg_error
 from pg.helpers import (
     QuoteDict,
     RowCache,
@@ -43,6 +43,13 @@ if TYPE_CHECKING:
     from .connection import Connection
 
 __all__ = ['Cursor', 'CursorDescription']
+
+# query for looking up a routine, needs a condition with placeholders
+_query_pg_proc = (
+    "SELECT p.prokind, p.pronargs, p.pronargdefaults,"
+    " p.provariadic OPERATOR(pg_catalog.<>) 0,"
+    " pg_catalog.array_to_string(p.proargmodes, '')"
+    " FROM pg_catalog.pg_proc p WHERE {}")
 
 
 class Cursor:
@@ -378,21 +385,132 @@ class Cursor:
 
     def callproc(self, procname: str, parameters: Sequence | None = None
                  ) -> Sequence | None:
-        """Call a stored database procedure with the given name.
+        """Call a stored database function or procedure with the given name.
 
-        The sequence of parameters must contain one entry for each input
-        argument that the procedure expects. The result of the call is the
-        same as this input sequence; replacement of output and input/output
-        parameters in the return value is currently not supported.
+        The name can be schema-qualified. It is split at dots, and its
+        parts are taken literally, like table names.
 
-        The procedure may also provide a result set as output. These can be
-        requested through the standard fetch methods of the cursor.
+        The sequence of parameters must contain one entry for each argument
+        that the function or procedure expects. For a function, these are
+        its input arguments, and the parameters are returned unchanged.
+        For a procedure, these are all its arguments, including output
+        arguments (pass None for them), and a copy of the parameters is
+        returned where output and input/output parameters are replaced
+        with the values returned by the procedure.
+
+        The function or procedure may also provide a result set as output.
+        This can be requested through the standard fetch methods.
         """
+        if not isinstance(procname, str):
+            raise TypeError("The procedure name must be a string")
+        parts = split_qualified_name(procname)
         n = len(parameters) if parameters else 0
-        s = ','.join(n * ['%s'])
-        query = f'select * from "{procname}"({s})'  # noqa: S608
+        is_procedure, outputs = self._get_routine(procname, parts, n)
+        cnx = self._cnx
+        # percent signs in the name must not be taken as placeholders
+        name = '.'.join(map(cnx.escape_identifier, parts)).replace('%', '%%')
+        args = ','.join(n * ['%s'])
+        if is_procedure:
+            query = f'call {name}({args})'
+        else:
+            query = f'select * from {name}({args})'  # noqa: S608
         self.execute(query, parameters)
-        return parameters
+        if not is_procedure or parameters is None:
+            return parameters
+        values = list(parameters)
+        if outputs and self._src.resulttype == RESULT_DQL:
+            row = self._src.fetch(1)
+            if row:
+                coltypes = self.coltypes
+                if coltypes is not None:
+                    typecast = self.type_cache.typecast
+                    row_values = [typecast(value, typ) for typ, value in
+                                  zip(coltypes, row[0], strict=True)]
+                    # values of output parameters with defaults that were
+                    # omitted can only be fetched from the cursor
+                    for pos, value in zip(outputs, row_values, strict=False):
+                        if pos < n:
+                            values[pos] = value
+                # the row can still be fetched from the cursor
+                self._src.movefirst()
+        return tuple(values) if isinstance(parameters, tuple) else values
+
+    def _get_routine(self, procname: str, parts: Sequence[str], n: int
+                     ) -> tuple[bool, list[int]]:
+        """Check whether the routine to be called is a procedure.
+
+        Returns whether it is a procedure that must be called with CALL,
+        and the positions of its output and input/output arguments.
+        Routines that cannot be called with n arguments are disregarded
+        if other routines with the same name can be called. If the name is
+        not found, it is assumed to be a function, so that the database
+        reports the error when calling it.
+        """
+        if len(parts) == 1:
+            condition = ('p.proname OPERATOR(pg_catalog.=)'
+                         ' %(name)s::pg_catalog.name'
+                         ' AND pg_catalog.pg_function_is_visible(p.oid)')
+            params = {'name': parts[0]}
+        else:
+            # the schema pg_temp means the temporary schema of the session;
+            # a database name in front of the schema is checked by the call
+            condition = (
+                "p.pronamespace OPERATOR(pg_catalog.=) CASE"
+                " WHEN %(schema)s::pg_catalog.name"
+                " OPERATOR(pg_catalog.=) 'pg_temp'"
+                " THEN pg_catalog.pg_my_temp_schema()"
+                " ELSE (SELECT n.oid FROM pg_catalog.pg_namespace n"
+                " WHERE n.nspname OPERATOR(pg_catalog.=)"
+                " %(schema)s::pg_catalog.name) END"
+                " AND p.proname OPERATOR(pg_catalog.=)"
+                " %(name)s::pg_catalog.name")
+            params = {'schema': parts[-2], 'name': parts[-1]}
+        # run the lookup with the source object, like the type cache,
+        # so that the values are not cast and errors are raised as usual
+        cmd = _query_pg_proc.format(condition)
+        sql: str | bytes = cmd
+        try:
+            sql = self._quoteparams(cmd, params)
+            self._src.execute(sql)
+            routines = self._src.fetch(-1)
+        except DatabaseError:
+            raise  # database provides error message
+        except UnicodeError as err:  # cannot encode the name
+            sql = self._decode_sql(sql)
+            raise error(f"Error in '{sql}': {err}", DataError) from err
+        except Error as err:
+            sql = self._decode_sql(sql)
+            raise if_error(f"Error in '{sql}': '{err}'") from err
+        except Exception as err:
+            sql = self._decode_sql(sql)
+            raise op_error(f"Internal error in '{sql}': {err}") from err
+        candidates = []
+        for kind, nargs_str, ndefaults_str, variadic, modes in routines:
+            is_procedure = kind == 'p'
+            nargs, ndefaults = int(nargs_str), int(ndefaults_str)
+            if is_procedure and modes:
+                # output arguments must also be passed to procedures
+                nargs = len(modes)
+            min_args = nargs - ndefaults
+            # a variadic argument without default needs at least one value
+            callable_with_n = min_args <= n and (
+                variadic == 't' or n <= nargs)
+            outputs = [i for i, mode in enumerate(modes or '')
+                       if mode in 'bo'] if is_procedure else []
+            candidates.append((callable_with_n, is_procedure, outputs))
+        if any(candidate[0] for candidate in candidates):
+            candidates = [candidate for candidate in candidates
+                          if candidate[0]]
+        if not candidates or not all(
+                is_procedure for _, is_procedure, _ in candidates):
+            # functions are called with SELECT as before
+            return False, []
+        outputs = candidates[0][2]
+        if any(candidate[2] != outputs for candidate in candidates[1:]):
+            raise prg_error(
+                f"Cannot determine the output parameters of procedure"
+                f" {procname!r} with {n} parameters")
+        return True, outputs
 
     # noinspection PyShadowingBuiltins
     def copy_from(self, stream: Any, table: str,
