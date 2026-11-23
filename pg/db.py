@@ -1025,7 +1025,9 @@ class DB:
         the database after the operation has completed.
 
         Note: The method uses the PostgreSQL "upsert" feature
-        (INSERT ... ON CONFLICT).
+        (INSERT ... ON CONFLICT). If no columns shall be updated, it uses
+        "DO SELECT" with PostgreSQL 19 or newer, so that the existing row
+        is returned by the same statement.
         """
         if table.endswith('*'):  # hint for descendant tables can be ignored
             table = table[:-1].rstrip()
@@ -1055,13 +1057,17 @@ class DB:
                     update.append(f'{col(n)} = {value}')
         if not values:
             return row
-        do = 'update set ' + ', '.join(update) if update else 'nothing'
+        db = self._valid_db
+        if update:
+            do = 'update set ' + ', '.join(update)
+        else:  # since PostgreSQL 19, the existing row can be selected
+            do = 'select' if db.server_version >= 190000 else 'nothing'
         t = self._escape_table(table)
         cmd = (f'INSERT INTO {t} AS included ({names})'  # noqa: S608
                f' VALUES ({values})'
                f' ON CONFLICT ({target}) DO {do} RETURNING *')
         self._do_debug(cmd, params)
-        query = self._valid_db.query(cmd, params)
+        query = db.query(cmd, params)
         res = query.dictresult()
         if res:  # may be empty with "do nothing"
             row.update(res[0])

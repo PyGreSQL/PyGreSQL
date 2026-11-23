@@ -2227,6 +2227,27 @@ class TestDBClass(unittest.TestCase):
         r = query(q).getresult()
         self.assertEqual(r, [(1, 'x2'), (2, 'y3')])
 
+    def test_upsert_without_update(self):
+        upsert = self.db.upsert
+        table = 'upsert_test_table'
+        self.create_table(table, 'n integer primary key, t text')
+        r = upsert(table, dict(n=1, t='x'), t=False)
+        self.assertEqual(r, dict(n=1, t='x'))
+        output: list[str] = []
+        self.db.debug = output.append
+        r = upsert(table, dict(n=1, t='y'), t=False)
+        self.assertEqual(r, dict(n=1, t='x'))
+        self.assertIn('INSERT INTO', output[0])
+        if self.db.server_version >= 190000:
+            # the existing row is returned by the same statement
+            self.assertIn(' DO select ', output[0])
+            self.assertEqual(len(output), 1)
+        else:
+            # the existing row must be fetched with a separate query
+            self.assertIn(' DO nothing ', output[0])
+            self.assertEqual(len(output), 2)
+            self.assertIn('SELECT', output[1])
+
     def test_upsert_with_keyname(self):
         upsert = self.db.upsert
         query = self.db.query

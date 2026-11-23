@@ -520,12 +520,18 @@ for a column named ``keyname`` (or ``table`` or ``row``).
 .. note::
 
     The method uses the PostgreSQL "upsert" feature
-    (``INSERT ... ON CONFLICT``).
+    (``INSERT ... ON CONFLICT``). If no columns shall be updated, it uses
+    ``ON CONFLICT DO SELECT`` with PostgreSQL 19 or newer, so that the
+    existing row is returned by the same statement. With older versions,
+    it uses ``ON CONFLICT DO NOTHING`` and reads the existing row with a
+    separate query.
 
 .. versionadded:: 5.0
 
 .. versionchanged:: 6.3
     The optional *keyname* argument has been added.
+    With PostgreSQL 19 or newer, ``ON CONFLICT DO SELECT`` is used if no
+    columns shall be updated.
 
 query -- execute a SQL command string
 -------------------------------------

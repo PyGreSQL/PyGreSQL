@@ -196,6 +196,11 @@ Version 6.3.0 (unreleased)
     were inserted unchanged into the SQL command, so that a kind containing
     a quote caused a syntax error or could inject other SQL, and kinds with
     more than one letter were silently truncated to their first letter.
+  - `DB.upsert()` with no columns to update now uses ``ON CONFLICT DO
+    SELECT`` with PostgreSQL 19 or newer (#134), so that an existing row
+    is returned by the same statement. Before, it was read with a separate
+    query, and could have been changed or deleted by another session in
+    between.
 
 - Changes in the `pgdb` module:
 
