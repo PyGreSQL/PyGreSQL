@@ -19,12 +19,13 @@ class TypeCode(str):
     delim: str
     relid: int
     base: TypeCode | None = None
+    elem: int = 0
 
     # noinspection PyShadowingBuiltins
     @classmethod
     def create(cls, oid: int, name: str, len: int, type: str, category: str,
-               delim: str, relid: int, base: TypeCode | None = None
-               ) -> TypeCode:
+               delim: str, relid: int, base: TypeCode | None = None,
+               elem: int = 0) -> TypeCode:
         """Create a type code for a PostgreSQL data type."""
         self = cls(name)
         self.oid = oid
@@ -34,4 +35,5 @@ class TypeCode(str):
         self.delim = delim
         self.relid = relid
         self.base = base
+        self.elem = elem
         return self

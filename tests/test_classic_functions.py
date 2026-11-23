@@ -1148,12 +1148,6 @@ class TestTypeLookupCondition(unittest.TestCase):
         for key in None, True, False, 1.5, ('int4',):
             self.assertRaises(TypeError, lookup, key)
 
-    def test_quote_name(self):
-        from pg.helpers import quote_name
-        from pg.helpers import split_qualified_name as split
-        for name in 't', 's.t', '"t"', 'a""b', 'a.b."c"':
-            self.assertEqual(split(quote_name(name)), [name])
-
 
 class TestConfigFunctions(unittest.TestCase):
     """Test the functions for changing default settings.

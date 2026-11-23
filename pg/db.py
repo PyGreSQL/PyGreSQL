@@ -298,8 +298,11 @@ class DB:
                 set_cast_hook(None)
             db.set_cast_hook(self.dbtypes.typecast)
             self.db = db
+            self.dbtypes._set_connection(db)
         else:
             self.db = self._db_args
+            # the cast hook has been removed when closing
+            self.db.set_cast_hook(self.dbtypes.typecast)
 
     def begin(self, mode: str | None = None) -> Query:
         """Begin a transaction."""
@@ -745,6 +748,8 @@ class DB:
         attnames = self._attnames
         if flush:
             attnames.clear()
+            # typecasts for composite types depend on their fields
+            self.dbtypes._clear_type_casts()
             self._do_debug('The attnames cache has been flushed')
         key = self._relation_key(table)
         try:  # cache lookup

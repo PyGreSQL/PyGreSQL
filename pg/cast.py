@@ -18,6 +18,7 @@ from ipaddress import (
     ip_interface,
     ip_network,
 )
+from keyword import iskeyword
 from re import compile as regex
 from typing import Any, ClassVar
 from uuid import UUID
@@ -338,6 +339,10 @@ class Typecasts(dict):
 
     connection: Connection | None = None  # set in connection specific instance
 
+    # incremented when the defaults change, so that connections can drop
+    # the typecasts they have derived from the old defaults
+    defaults_changed: ClassVar[int] = 0
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the typecasts."""
         super().__init__(*args, **kwargs)
@@ -368,10 +373,9 @@ class Typecasts(dict):
             cast = self._add_connection(cast)
             self[typ] = cast
         elif typ.startswith('_'):
-            base_cast = self[typ[1:]]
-            cast = self.create_array_cast(base_cast)
-            if base_cast:
-                self[typ] = cast
+            # array casts derived from the name are not cached,
+            # since the name might not be the name of an array type
+            cast = self.create_array_cast(self[typ[1:]])
         else:
             attnames = self.get_attnames(typ)
             if attnames:
@@ -379,12 +383,6 @@ class Typecasts(dict):
                 cast = self.create_record_cast(typ, attnames, casts)
                 self[typ] = cast
                 self._records.add(typ)
-            else:
-                base = self.get_base(typ)
-                if base:
-                    # domains are cast like their base types, unless a
-                    # cast has been set for the domain (not cached here)
-                    cast = self[base]
         return cast
 
     @staticmethod
@@ -450,6 +448,7 @@ class Typecasts(dict):
         if isinstance(typ, str):
             typ = [typ]
         defaults = cls.defaults
+        Typecasts.defaults_changed += 1
         if cast is None:
             for t in typ:
                 defaults.pop(t, None)
@@ -465,17 +464,11 @@ class Typecasts(dict):
     def get_attnames(self, typ: Any) -> AttrDict:
         """Return the fields for the given record type.
 
-        This method will be replaced with the get_attnames() method of DbTypes.
+        This method can be overridden in subclasses to support casting
+        composite types by name. Connections do not use it, since DbTypes
+        creates the typecasts for composite types from their type objects.
         """
         return AttrDict()
-
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_base(self, typ: str) -> str | None:
-        """Return the name of the base type if the given type is a domain.
-
-        This method will be replaced with a method of DbTypes.
-        """
-        return None
 
     # noinspection PyMethodMayBeStatic
     def dateformat(self) -> str:
@@ -485,21 +478,31 @@ class Typecasts(dict):
         """
         return '%Y-%m-%d'
 
-    def create_array_cast(self, basecast: Callable) -> Callable:
-        """Create an array typecast for the given base cast."""
+    def create_array_cast(self, basecast: Callable | None,
+                          delim: str = ',') -> Callable:
+        """Create an array typecast for the given base cast and delimiter."""
         cast_array = self['anyarray']
         # values that cannot be decoded are passed as bytes, keep them
         elemcast = None if basecast is str else basecast
 
-        def cast(v: Any) -> list:
-            return cast_array(v, elemcast)
+        if delim != ',':
+            delim_bytes = delim.encode('ascii')
+
+            def cast(v: Any) -> list:
+                return cast_array(v, elemcast, delim_bytes)
+        else:
+            def cast(v: Any) -> list:
+                return cast_array(v, elemcast)
         return cast
 
     def create_record_cast(self, name: str, fields: AttrDict,
-                           casts: list[Callable]) -> Callable:
+                           casts: Sequence[Callable | None]) -> Callable:
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
-        record = namedtuple(name, fields)  # type: ignore[misc]
+        if not name.isidentifier() or iskeyword(name):
+            name = 'Record'  # the type name cannot be used in Python
+        # field names that cannot be used in Python are renamed
+        record = namedtuple(name, fields, rename=True)  # type: ignore[misc]
         # values that cannot be decoded are passed as bytes, keep them
         fieldcasts = [None if c is str else c for c in casts]
 

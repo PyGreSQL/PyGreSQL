@@ -33,6 +33,7 @@ from ipaddress import (
 from operator import itemgetter
 from time import strftime
 from typing import Any, ClassVar, List  # noqa: UP035
+from unittest.mock import patch
 from uuid import UUID
 
 import pg  # the module under test
@@ -4721,6 +4722,202 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(self.db.dbtypes.typecast('2', typ), 2)
         self.assertEqual(self.db.dbtypes.typecast('2', typ.base), 2)
 
+    def test_db_types_outside_search_path(self):
+        # typecasts for composite types, domains and arrays must be created
+        # from the OIDs of the types, not from their names, since the types
+        # may not be in the search path or their names may be ambiguous
+        query = self.db.query
+        dbtypes = self.db.dbtypes
+
+        def get(what):
+            return query(f'select {what}').getresult()[0]
+
+        self.db.begin()
+        try:
+            query('create schema test_types_schema')
+            query('create type test_types_schema.t as (a int, b text)')
+            query('create domain test_types_schema.d as int')
+            query('create type test_types_schema.o'
+                  ' as (n test_types_schema.d, t test_types_schema.t)')
+            query('create table test_types_schema.r'
+                  ' (i int, t test_types_schema.t, ts test_types_schema.t[])')
+            query("insert into test_types_schema.r values"
+                  " (1, (2, 'b'), array[(3, 'c')]::test_types_schema.t[])")
+            r = get("(1, 'a')::test_types_schema.t")[0]
+            self.assertEqual(r, (1, 'a'))
+            self.assertEqual(r._fields, ('a', 'b'))
+            r = get("(4, (1, 'a'))::test_types_schema.o")[0]
+            self.assertEqual(r, (4, (1, 'a')))
+            self.assertEqual(r.t.b, 'a')
+            r = get('* from test_types_schema.r')
+            self.assertEqual(r[:2], (1, (2, 'b')))
+            r = get('r from test_types_schema.r r')[0]
+            self.assertEqual(r[:2], (1, (2, 'b')))
+            self.assertEqual(r.ts, [(3, 'c')])
+            self.assertEqual(
+                get("array[(1, 'a')]::test_types_schema.t[]")[0], [(1, 'a')])
+            self.assertEqual(get('array[3]::test_types_schema.d[]')[0], [3])
+            # a different type with the same name in the search path
+            query('create type pg_temp.t as (x text)')
+            self.assertEqual(get("row('z')::pg_temp.t")[0], ('z',))
+            self.assertEqual(get("(1, 'a')::test_types_schema.t")[0], (1, 'a'))
+            self.assertEqual(get("row('z')::pg_temp.t")[0]._fields, ('x',))
+            self.assertEqual(get(
+                "array[(1, 'a')]::test_types_schema.t[],"
+                " array[row('z')]::pg_temp.t[]"), ([(1, 'a')], [('z',)]))
+            # typecasts set for the name of a type are used for all types
+            # with that name and for fields and elements of that type
+            dbtypes.set_typecast('t', lambda v: f'T{v}')
+            try:
+                self.assertEqual(
+                    get("(4, (1, 'a'))::test_types_schema.o")[0],
+                    (4, 'T(1,a)'))
+                self.assertEqual(get("row('z')::pg_temp.t")[0], 'T(z)')
+            finally:
+                dbtypes.reset_typecast('t')
+            self.assertEqual(
+                get("(4, (1, 'a'))::test_types_schema.o")[0], (4, (1, 'a')))
+            # types without typecast must not be looked up again and again
+            query("create type test_types_schema.e as enum ('x', 'y')")
+            sql = ("select 'x'::test_types_schema.e,"
+                   " array['x', 'y']::test_types_schema.e[]"
+                   " from generate_series(1, 3)")
+            r = query(sql).getresult()
+            self.assertEqual(r[2], ('x', ['x', 'y']))
+            q = query(sql)
+            with patch.object(self.db, 'query', wraps=query) as mock_query:
+                self.assertEqual(q.getresult(), r)
+            mock_query.assert_not_called()
+        finally:
+            self.db.rollback()
+
+    def test_db_types_global_typecast_for_type_without_typecast(self):
+        # a global typecast set for a type without a typecast must be used
+        # by the connection even after values of that type have been cast
+        query = self.db.query
+        query("create type pg_temp.test_mood as enum ('happy')")
+        sql = ("select 'happy'::pg_temp.test_mood,"
+               " array['happy']::pg_temp.test_mood[]")
+        self.assertEqual(query(sql).getresult()[0], ('happy', ['happy']))
+        pg.set_typecast('test_mood', str.upper)
+        try:
+            self.assertEqual(query(sql).getresult()[0], ('HAPPY', ['HAPPY']))
+        finally:
+            pg.set_typecast('test_mood', None)
+
+    def test_db_types_records_with_invalid_python_names(self):
+        # composite types with names that cannot be used for named tuples
+        query = self.db.query
+        query('create type pg_temp.test_keywords as ("class" int, "_x" int)')
+        query('create type pg_temp."test type" as (a int)')
+        r = query('select (1, 2)::pg_temp.test_keywords').getresult()[0][0]
+        self.assertEqual(r, (1, 2))
+        self.assertEqual(type(r).__name__, 'test_keywords')
+        self.assertEqual(r._fields, ('_0', '_1'))
+        r = query('select row(1)::pg_temp."test type"').getresult()[0][0]
+        self.assertEqual(r, (1,))
+        self.assertEqual(type(r).__name__, 'Record')
+        self.assertEqual(r.a, 1)
+
+    def test_db_types_typecast_with_simple_type(self):
+        # type objects without OID are looked up by name
+        dbtypes = self.db.dbtypes
+        typ = self.db.adapter.simple_type('int4')
+        self.assertIs(dbtypes.get_typecast(typ), int)
+        self.assertEqual(dbtypes.typecast('42', typ), 42)
+
+    def test_db_types_array_of_records(self):
+        # the element type of arrays of anonymous records is a pseudo type
+        r = self.db.query("select array[(1, 'a'), (2, 'b')]").getresult()
+        self.assertEqual(r, [([('1', 'a'), ('2', 'b')],)])
+
+    def test_db_types_global_typecast_for_array_name(self):
+        # a global typecast set for the name of an array type is used
+        query = self.db.query
+        query("create type pg_temp.test_mood as enum ('happy')")
+        pg.set_typecast('_test_mood', str.upper)
+        try:
+            r = query("select array['happy']::pg_temp.test_mood[]")
+            self.assertEqual(r.getresult()[0][0], '{HAPPY}')
+        finally:
+            pg.set_typecast('_test_mood', None)
+
+    def test_db_types_after_reopen_with_existing_connection(self):
+        # the cast hook must be set again when reopening a DB object
+        # that wraps an existing connection after closing it
+        cnx = pg.connect(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
+        try:
+            db = pg.DB(cnx)
+            db.close()
+            db.reopen()
+            self.assertEqual(cnx.get_cast_hook(), db.dbtypes.typecast)
+            db.query('create type pg_temp.test_reopen as (a int)')
+            r = db.query('select row(1)::pg_temp.test_reopen').getresult()
+            self.assertEqual(r, [((1,),)])
+        finally:
+            cnx.close()
+
+    def test_db_types_array_with_other_delimiter(self):
+        # the elements of box arrays are separated by semicolons
+        r = self.db.query("select array['(1,1),(0,0)'::box,"
+                          " '(2,2),(1,1)'::box]").getresult()[0][0]
+        self.assertEqual(r, ['(1,1),(0,0)', '(2,2),(1,1)'])
+
+    def test_db_types_after_altering_composite_type(self):
+        # typecasts for composite types must use the current fields
+        # after flushing the attnames cache or resetting the typecasts
+        query = self.db.query
+        query('create type pg_temp.test_alter as (a int)')
+        sql = 'select row(1, 2)::pg_temp.test_alter'
+        query('alter type pg_temp.test_alter add attribute b int')
+        self.assertEqual(query(sql).getresult()[0][0], (1, 2))
+        query('alter type pg_temp.test_alter add attribute c int')
+        self.db.get_attnames('pg_temp.test_alter', flush=True)
+        sql = 'select row(1, 2, 3)::pg_temp.test_alter'
+        r = query(sql).getresult()[0][0]
+        self.assertEqual(r, (1, 2, 3))
+        self.assertEqual(r._fields, ('a', 'b', 'c'))
+
+    def test_db_types_after_reopen(self):
+        # typecasts bound to the connection must use the new connection
+        query = self.db.query
+        sql = "select row(date '2020-01-02')::pg_temp.test_reopen"
+        query('create type pg_temp.test_reopen as (d date)')
+        self.assertEqual(query(sql).getresult()[0][0], (date(2020, 1, 2),))
+        self.db.reopen()
+        query('create type pg_temp.test_reopen as (d date)')
+        self.assertEqual(query(sql).getresult()[0][0], (date(2020, 1, 2),))
+
+    def test_db_types_typecast_with_qualified_names(self):
+        # names are taken like the parts of table names
+        dbtypes = self.db.dbtypes
+        self.assertIs(dbtypes.get_typecast('pg_catalog.int4'), int)
+        self.assertIs(dbtypes.get_typecast('pg_catalog."int4"'), int)
+        self.assertEqual(dbtypes.typecast('42', 'pg_catalog.int4'), 42)
+        self.db.query('create domain pg_temp."pg_catalog.bool" as int')
+        cast = dbtypes.get_typecast('"pg_catalog.bool"')
+        self.assertIs(cast, int)
+        self.assertEqual(dbtypes.typecast('42', '"pg_catalog.bool"'), 42)
+
+    def test_db_types_with_underscore_names(self):
+        # only array types are cast as arrays, not types whose names only
+        # start with an underscore, and the element types of arrays are
+        # not derived from the names of the array types
+        query = self.db.query
+
+        def get(what):
+            return query(f'select {what}').getresult()[0]
+
+        query('create type pg_temp._q as (u int)')
+        query('create type pg_temp.q as (v int)')  # array type is _q_1
+        self.assertEqual(get('row(1)::pg_temp._q')[0], (1,))
+        r = get('array[row(2)]::pg_temp.q[], array[row(3)]::pg_temp._q[]')
+        self.assertEqual(r, ([(2,)], [(3,)]))
+        self.assertEqual(r[0][0]._fields, ('v',))
+        # these types have element types, but are not cast like arrays
+        self.assertEqual(get("'1 2'::oidvector, 'ab'::name, '(1,2)'::point"),
+                         ('1 2', 'ab', '(1,2)'))
+
     def test_db_types_info(self):
         dbtypes = self.db.dbtypes
         self.assertIsInstance(dbtypes, dict)
@@ -4795,7 +4992,7 @@ class TestDBClass(unittest.TestCase):
         dbtypes.set_typecast('circle', squared_circle)
         self.assertIs(dbtypes.get_typecast('circle'), squared_circle)
         r = self.db.query("select '0,0,1'::circle").getresult()[0][0]
-        self.assertIn('circle', dbtypes)
+        self.assertIn(718, dbtypes)
         self.assertEqual(r, 'Squared Circle: <(0,0),1>')
         self.assertEqual(
             dbtypes.typecast('Impossible', 'circle'),
@@ -4887,7 +5084,8 @@ class TestDBClass(unittest.TestCase):
         self.assertNotIn('circle', dbtypes)
         self.assertIs(get_typecast('circle'), squared_circle)
         r = self.db.query("select '0,0,1'::circle").getresult()[0][0]
-        self.assertIn('circle', dbtypes)
+        self.assertIn(718, dbtypes)  # cached by OID, not by bare name
+        self.assertNotIn('circle', dbtypes)
         self.assertEqual(r, 'Squared Circle: <(0,0),1>')
         set_typecast('circle', cast_circle)
         self.assertIs(get_typecast('circle'), cast_circle)

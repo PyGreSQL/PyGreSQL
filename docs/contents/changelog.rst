@@ -185,6 +185,32 @@ Version 6.3.0 (unreleased)
     fields of composite types whose values have already been cast. Before,
     the casts for these composite types kept the old typecast functions for
     their fields until they were reset as well.
+  - The typecasts for composite types, domains and arrays are now created
+    from the types of the fields, the base type and the element type as
+    looked up by their OIDs, unless a typecast has been set for the name of
+    the type. Before, these types were looked up by their names, which are
+    ambiguous: values of composite types with the same name in different
+    schemas could be cast with the fields of the wrong type (raising a
+    `ValueError`), arrays whose type name was not the name of the element
+    type with a leading underscore aborted the current transaction, and
+    composite types whose names start with an underscore were cast like
+    arrays. Types without a typecast, like enums outside the search path,
+    are no longer looked up again for every value. `DbTypes` no longer
+    caches types found by OID under their bare names, which could refer to
+    a different type in the search path. `DbTypes.get_typecast()` now also
+    accepts type objects and OIDs. Values of composite types whose names or
+    field names cannot be used in named tuples (e.g. ``class``) are now
+    returned as named tuples with the name ``Record`` or with renamed fields
+    (``_0``, ``_1``, ...). Before, they raised a `ValueError`. Type names
+    passed to `DbTypes.get_typecast()` and `DbTypes.typecast()` are taken
+    like the keys of `DbTypes`. Arrays of types with a delimiter other than
+    a comma, like ``box[]``, are now split correctly. `DB.get_attnames()`
+    with ``flush=True`` now also drops the typecasts for composite types,
+    so that they use the current fields. Before, the old typecasts raised
+    a `ValueError`. After `DB.reopen()`, typecasts are now bound to the new
+    connection. Before, typecasts that need the connection raised a
+    `TypeError`. A `DB` object wrapping an existing connection now casts
+    values again after `DB.close()` and `DB.reopen()`.
   - `DB.delete_prepared()` now quotes the name of the prepared statement,
     so that it is taken literally like in `DB.prepare()` and
     `DB.query_prepared()`, and also accepts the name as bytes (#131).
@@ -264,8 +290,7 @@ Version 6.3.0 (unreleased)
     domain. Before, they were returned as strings. The type codes in the
     `TypeCache` have a new attribute ``base`` with the base type of domains.
   - Looking up a type in the `TypeCache` that does not exist no longer
-    aborts the current transaction. This also happened when a query returned
-    an array of a composite type that is not in the search path. Type names
+    aborts the current transaction. Type names
     are now taken literally like in the `pg` module, also when they are
     qualified with a schema name or enclosed in double quotes, and can also
     be passed as bytes. Before, such type names were parsed as SQL type
@@ -290,6 +315,31 @@ Version 6.3.0 (unreleased)
     whole, and a double quote or a percent sign in the name could break the
     query. Names written like ``'schema"."func'`` to work around this now
     raise a `ValueError`; write ``'schema.func'`` instead.
+  - The typecasts for composite types, domains and arrays are now created
+    from the types of the fields, the base type and the element type as
+    looked up by their OIDs, unless a typecast has been set for the name of
+    the type, like in the `pg` module. Before, these types were looked up by
+    their names, which are ambiguous: arrays of composite types and domains
+    that are not in the search path aborted the current transaction, values
+    of composite types with the same name in different schemas could be
+    cast with the fields of the wrong type (raising a `ValueError`), and
+    composite types whose names start with an underscore were cast like
+    arrays. The `TypeCache` no longer caches types found by OID under their
+    bare names. The type codes have a new attribute ``elem`` with the OID
+    of the element type of arrays. `TypeCache.get_typecast()` and
+    `TypeCache.typecast()` now also accept OIDs. Values of composite types
+    whose names or field names cannot be used in named tuples are now
+    returned as named tuples with the name ``Record`` or with renamed
+    fields, like in the `pg` module. Before, they raised a `ValueError`.
+    Type names passed to `TypeCache.get_typecast()` and
+    `TypeCache.typecast()` are taken like the keys of the `TypeCache`.
+    Arrays of types with a delimiter other than a comma, like ``box[]``,
+    are now split correctly. `TypeCache.reset_typecast()` no longer stores
+    array casts derived from the name of the type, which were then also
+    used for other types with such a name, and when called without
+    arguments, typecasts that need the connection, like the one for dates,
+    no longer raise a `TypeError`. Global typecasts set for array types
+    with `set_typecast()` are now used, like in the `pg` module.
 
 - Fixes in the C extension:
 

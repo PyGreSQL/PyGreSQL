@@ -9,6 +9,7 @@ from decimal import Decimal as _Decimal
 from functools import partial
 from inspect import signature
 from json import loads as jsondecode
+from keyword import iskeyword
 from re import compile as regex
 from typing import Any, ClassVar, NamedTuple
 from uuid import UUID as Uuid  # noqa: N811
@@ -21,7 +22,7 @@ from pg.core import (
     cast_record,
     unescape_bytea,
 )
-from pg.helpers import quote_name, type_lookup_condition
+from pg.helpers import is_array_type, type_lookup_condition
 
 from .typecode import TypeCode
 
@@ -323,6 +324,10 @@ class Typecasts(dict):
 
     cnx: Cnx | None = None  # for local connection specific instances
 
+    # incremented when the global typecasts change, so that connections can
+    # drop the typecasts they have derived from the old global typecasts
+    defaults_changed: ClassVar[int] = 0
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the typecasts."""
         super().__init__(*args, **kwargs)
@@ -353,12 +358,9 @@ class Typecasts(dict):
             cast = self._add_connection(cast)
             self[typ] = cast
         elif typ.startswith('_'):
-            # create array cast
-            base_cast = self[typ[1:]]
-            cast = self.create_array_cast(base_cast)
-            if base_cast:
-                # store only if base type exists
-                self[typ] = cast
+            # create array cast, but do not cache it, since
+            # the name might not be the name of an array type
+            cast = self.create_array_cast(self[typ[1:]])
         return cast
 
     @staticmethod
@@ -403,42 +405,58 @@ class Typecasts(dict):
         When no type is specified, all typecasts will be reset.
         """
         self._drop_record_casts()
-        defaults = self.defaults
         if typ is None:
+            # the defaults will be fetched and bound again when needed
             self.clear()
-            self.update(defaults)
         else:
             if isinstance(typ, str):
                 typ = [typ]
-            for t in typ:
-                cast = defaults.get(t)
-                if cast:
-                    self[t] = self._add_connection(cast)
-                    t = f'_{t}'
-                    cast = defaults.get(t)
+            for name in typ:
+                for t in (name, f'_{name}'):
+                    cast = self._get_default(t)
                     if cast:
                         self[t] = self._add_connection(cast)
                     else:
                         self.pop(t, None)
-                else:
-                    self.pop(t, None)
-                    self.pop(f'_{t}', None)
 
-    def create_array_cast(self, basecast: Callable) -> Callable:
-        """Create an array typecast for the given base cast."""
+    def _get_default(self, typ: str) -> Callable | None:
+        """Get the default typecast that has been set for the given type.
+
+        Array casts are not derived from the names of the element types,
+        since the names might not be the names of array types.
+        """
+        defaults = self.defaults
+        if typ in defaults:
+            return defaults[typ]
+        if typ.startswith('_'):
+            return None
+        return defaults.get(typ)
+
+    def create_array_cast(self, basecast: Callable | None,
+                          delim: str = ',') -> Callable:
+        """Create an array typecast for the given base cast and delimiter."""
         cast_array = self['anyarray']
         # values that cannot be decoded are passed as bytes, keep them
         elemcast = None if basecast is str else basecast
 
-        def cast(v: Any) -> list:
-            return cast_array(v, elemcast)
+        if delim != ',':
+            delim_bytes = delim.encode('ascii')
+
+            def cast(v: Any) -> list:
+                return cast_array(v, elemcast, delim_bytes)
+        else:
+            def cast(v: Any) -> list:
+                return cast_array(v, elemcast)
         return cast
 
     def create_record_cast(self, name: str, fields: Sequence[str],
-                           casts: Sequence[str]) -> Callable:
+                           casts: Sequence[Callable | None]) -> Callable:
         """Create a named record typecast for the given fields and casts."""
         cast_record = self['record']
-        record = namedtuple(name, fields)  # type: ignore[misc]
+        if not name.isidentifier() or iskeyword(name):
+            name = 'Record'  # the type name cannot be used in Python
+        # field names that cannot be used in Python are renamed
+        record = namedtuple(name, fields, rename=True)  # type: ignore[misc]
         # values that cannot be decoded are passed as bytes, keep them
         fieldcasts = [None if c is str else c for c in casts]
 
@@ -463,6 +481,7 @@ def set_typecast(typ: str | Sequence[str], cast: Callable | None) -> None:
     is picked up by a running connection, call con.type_cache.reset_typecast().
     """
     _typecasts.set(typ, cast)
+    Typecasts.defaults_changed += 1
 
 
 def reset_typecast(typ: str | Sequence[str] | None = None) -> None:
@@ -474,6 +493,7 @@ def reset_typecast(typ: str | Sequence[str] | None = None) -> None:
     is picked up by a running connection, call con.type_cache.reset_typecast().
     """
     _typecasts.reset(typ)
+    Typecasts.defaults_changed += 1
 
 
 class LocalTypecasts(Typecasts):
@@ -485,50 +505,34 @@ class LocalTypecasts(Typecasts):
 
     def __missing__(self, typ: str) -> Callable | None:
         """Create a cast function if it is not cached."""
-        cast: Callable | None
-        if typ.startswith('_'):
-            base_cast = self[typ[1:]]
-            cast = self.create_array_cast(base_cast)
-            if base_cast:
-                self[typ] = cast
+        cast: Callable | None = self._get_default(typ)
+        if cast:
+            cast = self._add_connection(cast)
+            self[typ] = cast
+        elif typ.startswith('_'):
+            # create array cast, but do not cache it, since
+            # the name might not be the name of an array type
+            cast = self.create_array_cast(self[typ[1:]])
         else:
-            cast = self.defaults.get(typ)
-            if cast:
-                cast = self._add_connection(cast)
+            fields = self.get_fields(typ)
+            if fields:
+                casts = [self[field.type] for field in fields]
+                field_names = [field.name for field in fields]
+                cast = self.create_record_cast(typ, field_names, casts)
                 self[typ] = cast
-            else:
-                fields = self.get_fields(typ)
-                if fields:
-                    casts = [self[field.type] for field in fields]
-                    field_names = [field.name for field in fields]
-                    cast = self.create_record_cast(typ, field_names, casts)
-                    self[typ] = cast
-                    self._records.add(typ)
-                else:
-                    base = self.get_base(typ)
-                    if base:
-                        # domains are cast like their base types, unless a
-                        # cast has been set for the domain (not cached here)
-                        cast = self[base]
+                self._records.add(typ)
         return cast
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_fields(self, typ: str) -> list[FieldInfo]:
         """Return the fields for the given record type.
 
-        This method will be replaced with a method that looks up the fields
-        using the type cache of the connection.
+        This method can be overridden in subclasses to support casting
+        composite types by name. Connections do not use it, since the
+        TypeCache creates the typecasts for composite types from their
+        type codes.
         """
         return []
-
-    # noinspection PyMethodMayBeStatic,PyUnusedLocal
-    def get_base(self, typ: str) -> str | None:
-        """Return the name of the base type if the given type is a domain.
-
-        This method will be replaced with a method that looks up the base
-        type using the type cache of the connection.
-        """
-        return None
 
 
 class FieldInfo(NamedTuple):
@@ -551,12 +555,13 @@ class TypeCache(dict):
         self._escape_string = cnx.escape_string
         self._src = cnx.source()
         self._typecasts = LocalTypecasts()
-        self._typecasts.get_fields = self._get_fields  # type: ignore[assignment, method-assign]
-        self._typecasts.get_base = self._get_base  # type: ignore[method-assign]
         self._typecasts.cnx = cnx
+        # typecasts for type codes, cached by OID
+        self._type_casts: dict[int, Callable | None] = {}
+        self._defaults_changed = Typecasts.defaults_changed
         self._query_pg_type = (
             "SELECT t.oid, t.typname, t.typlen, t.typtype, t.typcategory,"
-            " t.typdelim, t.typrelid, t.typbasetype"
+            " t.typdelim, t.typrelid, t.typbasetype, t.typelem"
             " FROM pg_catalog.pg_type t WHERE {}")
 
     def __missing__(self, key: int | str | bytes) -> TypeCode:
@@ -588,16 +593,17 @@ class TypeCache(dict):
         if oid in self:  # already cached under another name
             type_code = self[oid]
         else:
-            delim, relid, base = r[5], int(r[6]), None
+            delim, relid, elem, base = r[5], int(r[6]), int(r[8]), None
             if r[3] == 'd' and int(r[7]):
                 # domains are handled like their base types
                 base = self[int(r[7])]
                 base = base.base or base  # resolve domains over domains
-                delim, relid = base.delim, base.relid
+                delim, relid, elem = base.delim, base.relid, base.elem
             type_code = TypeCode.create(
-                oid, r[1], int(r[2]), r[3], r[4], delim, relid, base)
-        # noinspection PyUnresolvedReferences
-        self[type_code.oid] = self[str(type_code)] = self[key] = type_code
+                oid, r[1], int(r[2]), r[3], r[4], delim, relid, base, elem)
+        # a type found by OID is not cached under its name, since this name
+        # could refer to a different type that comes first in the search path
+        self[type_code.oid] = self[key] = type_code
         return type_code
 
     def get(self, key: int | str,  # type: ignore[override]
@@ -607,20 +613,6 @@ class TypeCache(dict):
             return self[key]
         except KeyError:
             return default
-
-    def _get_fields(self, typ: str | TypeCode) -> list[FieldInfo] | None:
-        """Get the fields of a composite type given by its internal name."""
-        if not isinstance(typ, TypeCode):
-            typ = quote_name(typ)  # take the name literally
-        return self.get_fields(typ)
-
-    def _get_base(self, typ: str) -> str | None:
-        """Get the name of the base type if the given type is a domain."""
-        if not isinstance(typ, TypeCode):
-            typ = quote_name(typ)  # take the name literally
-        type_code = self.get(typ)
-        base = type_code.base if type_code else None
-        return str(base) if base else None
 
     def get_fields(self, typ: int | str | TypeCode) -> list[FieldInfo] | None:
         """Get the names and types of the fields of composite types."""
@@ -642,34 +634,105 @@ class TypeCache(dict):
         return [FieldInfo(name, self.get(int(oid)))
                 for name, oid in self._src.fetch(-1)]
 
-    def get_typecast(self, typ: str) -> Callable | None:
+    def _get_named_cast(self, typ: str) -> Callable | None:
+        """Get the typecast function set for the given type name.
+
+        Returns None if no typecast and no default has been set for it.
+        Typecasts for arrays are never derived from the name here.
+        """
+        typecasts = self._typecasts
+        if typ in typecasts:
+            return typecasts[typ]
+        cast = typecasts._get_default(typ)
+        return typecasts[typ] if cast else None  # bind and cache it
+
+    def _get_cast(self, typ: TypeCode) -> Callable | None:
+        """Get the typecast function for the given type code.
+
+        A typecast set for the name of the type is used first. Otherwise,
+        the typecast is created from the base type of domains, the fields
+        of composite types or the element type of arrays. These are
+        looked up by their OIDs, not by their names, which might be
+        ambiguous. The result is cached under the OID of the type until
+        typecasts are set or reset.
+        """
+        type_casts = self._type_casts
+        if self._defaults_changed != Typecasts.defaults_changed:
+            # the typecasts may depend on changed global typecasts
+            type_casts.clear()
+            self._defaults_changed = Typecasts.defaults_changed
+        oid = typ.oid
+        try:
+            return type_casts[oid]
+        except KeyError:
+            pass
+        cast = self._get_named_cast(str(typ)) or self._create_cast(typ)
+        type_casts[oid] = cast
+        return cast
+
+    def _create_cast(self, typ: TypeCode) -> Callable | None:
+        """Create a typecast function from the structure of the given type."""
+        if typ.base:
+            # domains are cast like their base types,
+            # unless a typecast has been set for the domain
+            return self._get_cast(typ.base)
+        typecasts = self._typecasts
+        if typ.relid:
+            fields = self.get_fields(typ)
+            if not fields:
+                return None
+            casts = [self._get_cast(field.type) if field.type else None
+                     for field in fields]
+            field_names = [field.name for field in fields]
+            return typecasts.create_record_cast(str(typ), field_names, casts)
+        if is_array_type(str(typ), typ.len, typ.elem):
+            elem_type = self.get(typ.elem)
+            if not elem_type:
+                return typecasts.create_array_cast(None)
+            return typecasts.create_array_cast(
+                self._get_cast(elem_type), elem_type.delim)
+        return None
+
+    def get_typecast(self, typ: int | str | TypeCode) -> Callable | None:
         """Get the typecast function for the given database type."""
-        return self._typecasts[typ]
+        if isinstance(typ, TypeCode) and hasattr(typ, 'oid'):
+            return self._get_cast(typ)
+        if isinstance(typ, str):
+            cast = self._get_named_cast(typ)
+            if cast:
+                return cast
+        type_code = self.get(typ)
+        if type_code:
+            return self._get_cast(type_code)
+        return self._typecasts[typ] if isinstance(typ, str) else None
 
     def set_typecast(self, typ: str | Sequence[str],
                      cast: Callable | None) -> None:
         """Set a typecast function for the specified database type(s)."""
         self._typecasts.set(typ, cast)
+        self._type_casts.clear()
 
     def reset_typecast(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecast function for the specified database type(s)."""
         self._typecasts.reset(typ)
+        self._type_casts.clear()
 
-    def typecast(self, value: Any, typ: str) -> Any:
+    def typecast(self, value: Any, typ: int | str | TypeCode) -> Any:
         """Cast the given value according to the given database type."""
         if value is None:
             # for NULL values, no typecast is necessary
             return None
-        cast = self._typecasts[typ]
+        cast = self.get_typecast(typ)
         if cast is None or cast is str:
             # no typecast is necessary
             return value
         return cast(value)
 
-    def get_row_caster(self, types: Sequence[str]) -> Callable:
+    def get_row_caster(self, types: Sequence[int | str | TypeCode]
+                       ) -> Callable:
         """Get a typecast function for a complete row of values."""
-        typecasts = self._typecasts
-        casts = [typecasts[typ] for typ in types]
+        get_typecast = self.get_typecast
+        casts = [get_typecast(typ) for typ in types]
         casts = [cast if cast is not str else None for cast in casts]
 
         def row_caster(row: Sequence) -> Sequence:

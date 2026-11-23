@@ -6,6 +6,7 @@ import weakref
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from functools import partial
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from json import dumps as jsonencode
 from math import isinf, isnan
@@ -16,11 +17,11 @@ from uuid import UUID
 
 from .attrs import AttrDict
 from .cast import Typecasts
-from .core import InterfaceError
+from .core import Connection, InterfaceError
 from .helpers import (
     format_text,
+    is_array_type,
     join_text,
-    quote_name,
     type_lookup_condition,
 )
 
@@ -273,9 +274,10 @@ class DbTypes(dict):
         self._db = weakref.proxy(db)
         self._regtypes = False
         self._typecasts = Typecasts()
-        self._typecasts.get_attnames = self._get_attnames  # type: ignore[assignment, method-assign]
-        self._typecasts.get_base = self._get_base  # type: ignore[method-assign]
         self._typecasts.connection = self._db.db
+        # typecasts for type objects, cached by OID
+        self._type_casts: dict[int, Callable | None] = {}
+        self._defaults_changed = Typecasts.defaults_changed
         self._query_pg_type = (
             "SELECT t.oid, t.typname, t.oid::pg_catalog.regtype,"
             " t.typlen, t.typtype, t.typcategory, t.typdelim, t.typrelid,"
@@ -340,7 +342,9 @@ class DbTypes(dict):
             raise KeyError(f'Type {key!r} could not be found')
         res = res[0]
         typ = self.add(*res)
-        self[typ.oid] = self[typ.pgtype] = self[key] = typ
+        # a type found by OID is not cached under its name, since this name
+        # could refer to a different type that comes first in the search path
+        self[typ.oid] = self[key] = typ
         return typ
 
     def get(self, key: int | str,  # type: ignore[override]
@@ -350,20 +354,6 @@ class DbTypes(dict):
             return self[key]
         except KeyError:
             return default
-
-    def _get_attnames(self, typ: Any) -> AttrDict | None:
-        """Get the fields of a composite type given by its internal name."""
-        if isinstance(typ, str) and not isinstance(typ, DbType):
-            typ = quote_name(typ)  # take the name literally
-        return self.get_attnames(typ)
-
-    def _get_base(self, typ: str) -> str | None:
-        """Get the name of the base type if the given type is a domain."""
-        if not isinstance(typ, DbType):
-            typ = quote_name(typ)  # take the name literally
-        db_type = self.get(typ)
-        base = db_type.base if db_type else None
-        return base.pgtype if base else None
 
     def get_attnames(self, typ: Any) -> AttrDict | None:
         """Get names and types of the fields of a composite type."""
@@ -375,30 +365,117 @@ class DbTypes(dict):
             return None
         return self._db.get_attnames(typ.relid)
 
+    def _get_cast(self, typ: DbType) -> Callable | None:
+        """Get the typecast function for the given type object.
+
+        A typecast set for the name of the type is used first. Otherwise,
+        the typecast is created from the base type of domains, the fields
+        of composite types or the element type of arrays. These are
+        looked up by their OIDs, not by their names, which might be
+        ambiguous. The result is cached under the OID of the type until
+        typecasts are set or reset.
+        """
+        type_casts = self._type_casts
+        if self._defaults_changed != Typecasts.defaults_changed:
+            # the typecasts may depend on changed defaults
+            type_casts.clear()
+            self._defaults_changed = Typecasts.defaults_changed
+        oid = typ.oid
+        try:
+            return type_casts[oid]
+        except KeyError:
+            pass
+        typecasts = self._typecasts
+        name = typ.pgtype
+        if name in typecasts or name in typecasts.defaults:
+            cast = typecasts[name]
+        else:
+            cast = self._create_cast(typ)
+        type_casts[oid] = cast
+        return cast
+
+    def _create_cast(self, typ: DbType) -> Callable | None:
+        """Create a typecast function from the structure of the given type."""
+        if typ.base:
+            # domains are cast like their base types,
+            # unless a typecast has been set for the domain
+            return self._get_cast(typ.base)
+        typecasts = self._typecasts
+        if typ.relid:
+            attnames = self.get_attnames(typ)
+            if not attnames:
+                return None
+            casts = [self._get_cast(t) for t in attnames.values()]
+            return typecasts.create_record_cast(typ.pgtype, attnames, casts)
+        if is_array_type(typ.pgtype, typ.typlen, typ.elem):
+            elem_type = self.get(typ.elem)
+            if not elem_type:
+                return typecasts.create_array_cast(None)
+            return typecasts.create_array_cast(
+                self._get_cast(elem_type), elem_type.delim)
+        return None
+
     def get_typecast(self, typ: Any) -> Callable | None:
         """Get the typecast function for the given database type."""
-        return self._typecasts.get(typ)
+        if isinstance(typ, DbType) and hasattr(typ, 'oid'):
+            return self._get_cast(typ)
+        typecasts = self._typecasts
+        if isinstance(typ, str) and (
+                typ in typecasts or typ in typecasts.defaults):
+            return typecasts[typ]
+        db_type = self.get(typ)
+        if db_type:
+            return self._get_cast(db_type)
+        return typecasts.get(typ) if isinstance(typ, str) else None
 
     def set_typecast(self, typ: str | Sequence[str], cast: Callable) -> None:
         """Set a typecast function for the specified database type(s)."""
         self._typecasts.set(typ, cast)
+        self._type_casts.clear()
+
+    def _clear_type_casts(self) -> None:
+        """Clear the typecasts created for type objects.
+
+        These depend on the fields of composite types, which may change.
+        """
+        self._type_casts.clear()
+
+    def _set_connection(self, cnx: Connection) -> None:
+        """Use a new database connection, e.g. after reopening it.
+
+        Types are looked up again, since they may differ in the new session,
+        e.g. temporary types, and typecasts that have been bound to the old
+        connection are bound to the new one.
+        """
+        self.clear()
+        self._type_casts.clear()
+        typecasts = self._typecasts
+        old_cnx, typecasts.connection = typecasts.connection, cnx
+        for typ, cast in list(typecasts.items()):
+            if (isinstance(cast, partial)
+                    and cast.keywords.get('connection') is old_cnx):
+                typecasts[typ] = partial(
+                    cast.func, *cast.args, **{**cast.keywords,
+                                              'connection': cnx})
 
     def reset_typecast(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecast function for the specified database type(s)."""
         self._typecasts.reset(typ)
+        self._type_casts.clear()
 
-    def typecast(self, value: Any, typ: str) -> Any:
+    def typecast(self, value: Any, typ: Any) -> Any:
         """Cast the given value according to the given database type."""
         if value is None:
             # for NULL values, no typecast is necessary
             return None
-        if isinstance(typ, DbType):
-            typ = typ.pgtype  # the string itself is the simple name
+        db_type = typ if isinstance(typ, DbType) and hasattr(
+            typ, 'oid') else self.get(typ)
+        if db_type:
+            cast = self._get_cast(db_type)
+        elif isinstance(typ, str) and typ:
+            cast = self._typecasts.get(typ)
         else:
-            db_type = self.get(typ)
-            if db_type:
-                typ = db_type.pgtype
-        cast = self.get_typecast(typ) if typ else None
+            cast = None
         if not cast or cast is str:
             # no typecast is necessary
             return value

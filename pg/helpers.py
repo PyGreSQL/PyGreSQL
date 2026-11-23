@@ -168,9 +168,16 @@ class RowCache:
 
 # Helper functions used by the query object
 
-def quote_name(name: str) -> str:
-    """Quote a name so that split_qualified_name() takes it literally."""
-    return '"' + name.replace('"', '""') + '"'
+def is_array_type(name: str, typlen: int, elem: int) -> bool:
+    """Check whether a type is an array type with the usual text format.
+
+    Some types like int2vector, oidvector, name and point also have an
+    element type, but are not cast like arrays. PostgreSQL always names
+    array types with a leading underscore, while composite types or
+    domains with such names have no element type or are handled first.
+    The category is not checked, since it is 'P' for _record.
+    """
+    return bool(elem) and typlen == -1 and name.startswith('_')
 
 
 def type_lookup_condition(key: int | str | bytes

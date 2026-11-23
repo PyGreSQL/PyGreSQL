@@ -84,7 +84,8 @@ provides the following methods:
 
     Get the cast function for the given database type
 
-    :param str typ: PostgreSQL type name
+    :param typ: PostgreSQL type name, type object or OID
+    :type typ: str or int
     :returns: the typecast function for the specified type
     :rtype: function or None
 
@@ -107,6 +108,17 @@ Changing the typecast function for a type also affects fields of composite
 types with that type, even if values of these composite types have already
 been cast.
 
+Typecasts, including the default typecasts, are set for the names of types, so
+they apply to all types with that name in all schemas. For composite types,
+domains and arrays without a typecast set for their name, the typecast is
+created from the types of the fields, the base type or the element type. These
+are looked up by their OIDs, so that this also works for types that are not in
+the search path and for types with the same name in different schemas. The
+typecasts for composite types are cached with their fields. After changing the
+fields, call :meth:`DB.get_attnames` with *flush* set. Types that have been
+looked up by name stay cached under that name. After changing the search path,
+call the ``clear()`` method.
+
 .. method:: DbTypes.reset_typecast([typ])
 
     Reset the typecasts for the specified (or all) type(s) to their defaults
@@ -119,7 +131,8 @@ been cast.
 
     Cast the given value according to the given database type
 
-    :param str typ: PostgreSQL type name or type code
+    :param typ: PostgreSQL type name, type object or OID
+    :type typ: str or int
     :returns: the casted value
 
 .. note::

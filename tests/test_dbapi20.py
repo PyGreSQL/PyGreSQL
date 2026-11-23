@@ -646,6 +646,271 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_type_cache_outside_search_path(self):
+        # typecasts for composite types, domains and arrays must be created
+        # from the OIDs of the types, not from their names, since the types
+        # may not be in the search path or their names may be ambiguous
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            execute = cur.execute
+
+            def get(what):
+                execute(f'select {what}')
+                return cur.fetchone()
+
+            execute('create schema test_types_schema')
+            execute('create type test_types_schema.t as (a int, b text)')
+            execute('create domain test_types_schema.d as int')
+            execute('create type test_types_schema.o'
+                    ' as (n test_types_schema.d, t test_types_schema.t)')
+            execute('create table test_types_schema.r'
+                    ' (i int, t test_types_schema.t,'
+                    ' ts test_types_schema.t[])')
+            execute("insert into test_types_schema.r values"
+                    " (1, (2, 'b'), array[(3, 'c')]::test_types_schema.t[])")
+            r = get("(1, 'a')::test_types_schema.t")[0]
+            self.assertEqual(r, (1, 'a'))
+            self.assertEqual(r._fields, ('a', 'b'))
+            r = get("(4, (1, 'a'))::test_types_schema.o")[0]
+            self.assertEqual(r, (4, (1, 'a')))
+            self.assertEqual(r.t.b, 'a')
+            self.assertEqual(get('* from test_types_schema.r'),
+                             (1, (2, 'b'), [(3, 'c')]))
+            self.assertEqual(get('r from test_types_schema.r r')[0],
+                             (1, (2, 'b'), [(3, 'c')]))
+            self.assertEqual(
+                get("array[(1, 'a')]::test_types_schema.t[]")[0], [(1, 'a')])
+            self.assertEqual(get('array[3]::test_types_schema.d[]')[0], [3])
+            # a different type with the same name in the search path
+            execute('create type pg_temp.t as (x text)')
+            self.assertEqual(get("row('z')::pg_temp.t")[0], ('z',))
+            self.assertEqual(get("(1, 'a')::test_types_schema.t")[0], (1, 'a'))
+            self.assertEqual(get("row('z')::pg_temp.t")[0]._fields, ('x',))
+            self.assertEqual(get(
+                "array[(1, 'a')]::test_types_schema.t[],"
+                " array[row('z')]::pg_temp.t[]"), ([(1, 'a')], [('z',)]))
+            # also when fetching many rows with a row caster
+            execute("select array[(1, 'a')]::test_types_schema.t[],"
+                    " array[row('z')]::pg_temp.t[]"
+                    " from generate_series(1, 6)")
+            self.assertEqual(cur.fetchall()[5], ([(1, 'a')], [('z',)]))
+            # typecasts set for the name of a type are used for all types
+            # with that name and for fields and elements of that type
+            type_cache = con.type_cache
+            type_cache.set_typecast('t', lambda v: f'T{v}')
+            try:
+                self.assertEqual(
+                    get("(4, (1, 'a'))::test_types_schema.o")[0],
+                    (4, 'T(1,a)'))
+                self.assertEqual(get("row('z')::pg_temp.t")[0], 'T(z)')
+            finally:
+                type_cache.reset_typecast('t')
+            self.assertEqual(
+                get("(4, (1, 'a'))::test_types_schema.o")[0], (4, (1, 'a')))
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_global_typecast_for_type_without_typecast(self):
+        # a global typecast set for a type without a typecast must be used
+        # by the connection even after values of that type have been cast
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create type pg_temp.test_mood as enum ('happy')")
+            sql = ("select 'happy'::pg_temp.test_mood,"
+                   " array['happy']::pg_temp.test_mood[]")
+            cur.execute(sql)
+            self.assertEqual(cur.fetchone(), ('happy', ['happy']))
+            pgdb.set_typecast('test_mood', str.upper)
+            try:
+                cur.execute(sql)
+                self.assertEqual(cur.fetchone(), ('HAPPY', ['HAPPY']))
+            finally:
+                pgdb.reset_typecast('test_mood')
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_records_with_invalid_python_names(self):
+        # composite types with names that cannot be used for named tuples
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute('create type pg_temp.test_keywords'
+                        ' as ("class" int, "_x" int)')
+            cur.execute('create type pg_temp."test type" as (a int)')
+            cur.execute('select (1, 2)::pg_temp.test_keywords,'
+                        ' row(1)::pg_temp."test type"')
+            r, s = cur.fetchone()
+            self.assertEqual(r, (1, 2))
+            self.assertEqual(type(r).__name__, 'test_keywords')
+            self.assertEqual(r._fields, ('_0', '_1'))
+            self.assertEqual(s, (1,))
+            self.assertEqual(type(s).__name__, 'Record')
+            self.assertEqual(s.a, 1)
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_typecast_with_type_code_without_oid(self):
+        # type codes without OID are looked up by name
+        con = self._connect()
+        try:
+            from pgdb.typecode import TypeCode
+            typ = TypeCode('int4')
+            self.assertIs(con.type_cache.get_typecast(typ), int)
+            self.assertEqual(con.type_cache.typecast('42', typ), 42)
+        finally:
+            con.close()
+
+    def test_type_cache_array_of_records(self):
+        # the element type of arrays of anonymous records is a pseudo type
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select array[(1, 'a'), (2, 'b')]")
+            self.assertEqual(cur.fetchone()[0], [('1', 'a'), ('2', 'b')])
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_global_typecast_for_array_name(self):
+        # a global typecast set for the name of an array type is used,
+        # like in the pg module
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create type pg_temp.test_mood as enum ('happy')")
+            pgdb.set_typecast('_test_mood', str.upper)
+            try:
+                cur.execute("select array['happy']::pg_temp.test_mood[]")
+                self.assertEqual(cur.fetchone()[0], '{HAPPY}')
+            finally:
+                pgdb.reset_typecast('_test_mood')
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_reset_all_typecasts(self):
+        # typecasts that need the connection must still work after
+        # resetting all typecasts of the connection
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select '2020-01-02'::date")
+            self.assertEqual(cur.fetchone()[0], date(2020, 1, 2))
+            con.type_cache.reset_typecast()
+            cur.execute("select '2020-01-02'::date")
+            self.assertEqual(cur.fetchone()[0], date(2020, 1, 2))
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_reset_array_typecast(self):
+        # resetting the typecast for an array type must not store an array
+        # cast derived from its name, which ignores the delimiter
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            con.type_cache.reset_typecast('_box')
+            cur.execute("select array['(1,1),(0,0)'::box,"
+                        " '(2,2),(1,1)'::box]")
+            self.assertEqual(cur.fetchone()[0],
+                             ['(1,1),(0,0)', '(2,2),(1,1)'])
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_array_with_other_delimiter(self):
+        # the elements of box arrays are separated by semicolons
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select array['(1,1),(0,0)'::box,"
+                        " '(2,2),(1,1)'::box]")
+            self.assertEqual(cur.fetchone()[0],
+                             ['(1,1),(0,0)', '(2,2),(1,1)'])
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_after_altering_composite_type(self):
+        # typecasts for composite types must use the current fields
+        # after resetting the typecasts
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute('create type pg_temp.test_alter as (a int)')
+            cur.execute('select row(1)::pg_temp.test_alter')
+            self.assertEqual(cur.fetchone()[0], (1,))
+            cur.execute('alter type pg_temp.test_alter add attribute b int')
+            con.type_cache.reset_typecast()
+            cur.execute('select row(1, 2)::pg_temp.test_alter')
+            r = cur.fetchone()[0]
+            self.assertEqual(r, (1, 2))
+            self.assertEqual(r._fields, ('a', 'b'))
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_reset_does_not_derive_casts_from_names(self):
+        # resetting a typecast must not store an array cast derived from
+        # the name, which would be used for other types with that name
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            con.type_cache.reset_typecast('int4')
+            cur.execute('create type pg_temp."_int4" as (a int)')
+            cur.execute('select row(1)::pg_temp."_int4", array[2, 3]')
+            self.assertEqual(cur.fetchone(), ((1,), [2, 3]))
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_typecast_with_qualified_names(self):
+        # names are taken like the parts of table names
+        con = self._connect()
+        try:
+            type_cache = con.type_cache
+            self.assertIs(type_cache.get_typecast('pg_catalog.int4'), int)
+            self.assertIs(type_cache.get_typecast('pg_catalog."int4"'), int)
+            self.assertEqual(type_cache.typecast('42', 'pg_catalog.int4'), 42)
+            cur = con.cursor()
+            cur.execute('create domain pg_temp."pg_catalog.bool" as int')
+            cast = type_cache.get_typecast('"pg_catalog.bool"')
+            self.assertIs(cast, int)
+            self.assertEqual(
+                type_cache.typecast('42', '"pg_catalog.bool"'), 42)
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_with_underscore_names(self):
+        # only array types are cast as arrays, not types whose names only
+        # start with an underscore, and the element types of arrays are
+        # not derived from the names of the array types
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            execute = cur.execute
+            execute('create type pg_temp._q as (u int)')
+            execute('create type pg_temp.q as (v int)')  # array type is _q_1
+            execute('select row(1)::pg_temp._q')
+            self.assertEqual(cur.fetchone()[0], (1,))
+            execute('select array[row(2)]::pg_temp.q[],'
+                    ' array[row(3)]::pg_temp._q[]')
+            r = cur.fetchone()
+            self.assertEqual(r, ([(2,)], [(3,)]))
+            self.assertEqual(r[0][0]._fields, ('v',))
+            # these types have element types, but are not cast like arrays
+            execute("select '1 2'::oidvector, 'ab'::name, '(1,2)'::point")
+            self.assertEqual(cur.fetchone(), ('1 2', 'ab', '(1,2)'))
+            cur.close()
+        finally:
+            con.close()
+
     def test_type_cache_with_domains(self):
         con = self._connect()
         try:
