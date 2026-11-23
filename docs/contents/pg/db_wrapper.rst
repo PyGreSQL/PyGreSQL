@@ -137,6 +137,8 @@ get_relations -- get list of relations in connected database
     :param bool system: whether system relations should be returned
     :returns: all relations of the given kinds in the database
     :rtype: list
+    :raises TypeError: the kinds are not given as strings
+    :raises ValueError: a kind is not a single letter
 
 This method returns the list of relations in the connected database.  Although
 you can do this with a simple select, it is added here for convenience.  You
@@ -149,6 +151,11 @@ table, ``I`` = partitioned index.  If `kinds` is None or an empty string,
 all relations are returned (this is also the default).  If `system` is set to
 `True`, then system tables and views (temporary tables, toast tables, catalog
 views and tables) will be returned as well, otherwise they will be ignored.
+
+.. versionchanged:: 6.3
+    The kinds are now checked and escaped.  Before, a kind with more than one
+    letter was silently truncated to its first letter, and a kind containing
+    a quote could change the SQL command.
 
 get_tables -- get list of tables in connected database
 ------------------------------------------------------

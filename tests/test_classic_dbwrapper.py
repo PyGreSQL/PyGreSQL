@@ -1328,6 +1328,20 @@ class TestDBClass(unittest.TestCase):
         result = get_relations('cisSt')
         self.assertNotIn('public.test', result)
         self.assertNotIn('public.test_view', result)
+        result = get_relations(['r', 'v'])
+        self.assertIn('public.test', result)
+        self.assertIn('public.test_view', result)
+
+    def test_get_relations_checks_kinds(self):
+        get_relations = self.db.get_relations
+        self.assertEqual(get_relations("'"), [])
+        self.assertEqual(get_relations("\\"), [])
+        self.assertRaises(ValueError, get_relations, ["r') or true or ('x"])
+        self.assertRaises(ValueError, get_relations, ["r' or 'x"])
+        self.assertRaises(ValueError, get_relations, ['rv'])
+        self.assertRaises(ValueError, get_relations, ['r', ''])
+        self.assertRaises(TypeError, get_relations, [1])
+        self.assertRaises(TypeError, get_relations, b'r')
 
     def test_get_system_relations(self):
         get_relations = self.db.get_relations

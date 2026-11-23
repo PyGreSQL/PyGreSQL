@@ -191,6 +191,11 @@ Version 6.3.0 (unreleased)
   - `DB.get_tables()` now also returns partitioned tables, like ``\dt`` in
     psql (#136). Before, only their partitions were returned. The type
     letters for `DB.get_relations()` are now documented completely.
+  - `DB.get_relations()` now escapes the given kinds of relations and raises
+    a `ValueError` for kinds that are not single letters. Before, the kinds
+    were inserted unchanged into the SQL command, so that a kind containing
+    a quote caused a syntax error or could inject other SQL, and kinds with
+    more than one letter were silently truncated to their first letter.
 
 - Changes in the `pgdb` module:
 

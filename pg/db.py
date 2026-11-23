@@ -692,8 +692,14 @@ class DB:
         """
         where_parts = []
         if kinds:
-            where_parts.append(
-                "r.relkind IN ({})".format(','.join(f"'{k}'" for k in kinds)))
+            for kind in kinds:
+                if not isinstance(kind, str):
+                    raise TypeError('The kinds must be given as letters')
+                if len(kind) != 1:
+                    raise ValueError(f'Invalid relation kind: {kind!r}')
+            escape = self._valid_db.escape_literal
+            where_parts.append("r.relkind IN ({})".format(
+                ','.join(escape(kind) for kind in kinds)))
         if not system:
             where_parts.append("s.nspname NOT SIMILAR"
                                " TO 'pg/_%|information/_schema' ESCAPE '/'")
