@@ -1094,6 +1094,27 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_bytearray_and_memoryview_params(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            for value in (bytearray(b'ab'), bytearray(), memoryview(b'ab')):
+                for params in ((value,), ([value],), ((1, value),),
+                               (pgdb.Hstore(k=value),)):
+                    self.assertRaisesRegex(
+                        pgdb.InterfaceError, 'Do not know how to adapt',
+                        cur.execute, 'select %s', params)
+                self.assertRaises(pgdb.InterfaceError, cur.execute,
+                                  'select %(v)s', {'v': value})
+            self.assertRaises(pgdb.InterfaceError, str,
+                              pgdb.Hstore({memoryview(b'k'): 'v'}))
+            # wrapped with Binary, they are passed as binary data
+            cur.execute('select %s::bytea, %s::bytea', (
+                pgdb.Binary(bytearray(b'a\0')), pgdb.Binary(memoryview(b'b'))))
+            self.assertEqual(cur.fetchone(), (b'a\0', b'b'))
+        finally:
+            con.close()
+
     def test_hstore(self):
         con = self._connect()
         cur = con.cursor()

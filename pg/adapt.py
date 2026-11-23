@@ -43,6 +43,17 @@ class Bytea(bytes):
     """Wrapper class for marking Bytea values."""
 
 
+def _reject_buffer(value: Any) -> None:
+    """Raise a TypeError for bytearray and memoryview objects.
+
+    These cannot be adapted yet, and their str() must not be sent instead,
+    like it is done for objects of other types.
+    """
+    if isinstance(value, (bytearray, memoryview)):
+        raise TypeError(f'Cannot adapt {type(value).__name__},'
+                        ' convert it to bytes or Bytea')
+
+
 class Hstore(dict):
     """Wrapper class for marking hstore values."""
 
@@ -62,6 +73,7 @@ class Hstore(dict):
             s = cls._re_escape_bytes.sub(rb'\\\1', s)
             return b'"' + s + b'"' if quote_bytes else s
         if not isinstance(s, str):
+            _reject_buffer(s)
             s = str(s)
         if not s:
             return '""'
@@ -488,6 +500,7 @@ class Adapter:
         """
         if isinstance(v, Hstore):
             return v._literal(self._encoding)
+        _reject_buffer(v)
         return str(v)
 
     _re_array_quote_bytes = regex(rb'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
@@ -527,20 +540,24 @@ class Adapter:
         return v
 
     def _adapt_array(self, v: Any,
-                     adapt: Callable[[Any], str | bytes | None]
-                     ) -> str | bytes:
+                     adapt: Callable[[Any], str | bytes | None],
+                     reject_buffers: bool = True) -> str | bytes:
         """Adapt an array parameter using the given element adapter.
 
         Elements given as bytes are raw text in the client encoding,
-        which is passed unchanged.
+        which is passed unchanged. Elements of the types bytearray and
+        memoryview raise a TypeError, unless reject_buffers is false.
         """
         if isinstance(v, list):
             return self._join(
-                [self._adapt_array(v, adapt) for v in v], ',', '{', '}')
+                [self._adapt_array(v, adapt, reject_buffers) for v in v],
+                ',', '{', '}')
         if v is None:
             return 'null'
         if isinstance(v, bytes):
             return self._quote_array_element(v)
+        if reject_buffers:
+            _reject_buffer(v)
         v = adapt(v)
         return 'null' if v is None else v
 
@@ -576,6 +593,7 @@ class Adapter:
                 self._adapt_bytea_array(v) for v in v) + b'}'
         if v is None:
             return b'null'
+        _reject_buffer(v)
         return self.db.escape_bytea(v).replace(b'\\', b'\\\\')
 
     def _adapt_json_array(self, v: Any) -> str | bytes:
@@ -585,7 +603,8 @@ class Adapter:
                 return None
             v = self._adapt_json(v)
             return None if v is None else self._quote_array_element(v)
-        return self._adapt_array(v, adapt)
+        # the JSON encoder may handle bytearray and memoryview objects
+        return self._adapt_array(v, adapt, reject_buffers=False)
 
     def _adapt_hstore_array(self, v: Any) -> str | bytes:
         """Adapt a hstore array parameter."""
@@ -644,6 +663,10 @@ class Adapter:
                 simple = self.get_simple_name(typ)
             else:
                 typ = simple = self.guess_simple_type(value) or 'text'
+            if not (simple.startswith('json')
+                    or hasattr(value, '__pg_str__')):
+                # the JSON encoder or the hook may handle these objects
+                _reject_buffer(value)
             if isinstance(value, bytes) and simple != 'bytea':
                 return value
             pg_str = getattr(value, '__pg_str__', None)
@@ -794,7 +817,10 @@ class Adapter:
             value = self.db.escape_string(str(value))
             return f"'{value}'::json"
         if isinstance(value, Hstore):
-            value = value._literal(self._encoding)
+            try:
+                value = value._literal(self._encoding)
+            except TypeError as e:  # e.g. bytearray as key or value
+                raise InterfaceError(str(e)) from e
             if isinstance(value, bytes):
                 return b"'" + self.db.escape_string(value) + b"'::hstore"
             value = self.db.escape_string(value)

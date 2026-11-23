@@ -275,10 +275,19 @@ unchanged in binary format, so it does not need to be escaped and does not
 depend on settings like ``standard_conforming_strings``. Binary data in
 arrays and records and binary data passed inline are sent as escaped text.
 
+Objects of the types :class:`bytearray` and :class:`memoryview` cannot be
+adapted yet; convert them to ``bytes`` before passing them. They raise a
+:exc:`TypeError` as parameters, as elements of arrays and records and as
+keys and values of hstore values, and a :exc:`pg.InterfaceError` when they
+are passed inline. Parameters of type ``json`` are an exception: they are
+passed to the JSON encoder (see :meth:`DB.encode_json`), which may be able
+to handle such objects.
+
 .. versionchanged:: 6.3
     Byte strings were adapted as text in earlier versions, unless they had
     been wrapped with :func:`Bytea`. Binary data was always sent as
-    escaped text.
+    escaped text. Objects of the types :class:`bytearray` and
+    :class:`memoryview` were adapted with ``str()``.
 
 When binding the parameters to a query, PyGreSQL not only adapts the basic
 types like ``int``, ``float``, ``bool`` and ``str``, but also tries to make

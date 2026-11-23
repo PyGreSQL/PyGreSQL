@@ -10,6 +10,7 @@ from time import localtime
 from typing import Any
 from uuid import UUID as Uuid  # noqa: N811
 
+from pg.core import InterfaceError
 from pg.helpers import join_text
 
 from .typecode import TypeCode
@@ -224,6 +225,10 @@ class Hstore(dict):
             s = cls._re_escape_bytes.sub(rb'\\\1', s)
             return b'"' + s + b'"' if quote_bytes else s
         if not isinstance(s, str):
+            if isinstance(s, (bytearray, memoryview)):
+                # cannot be adapted yet, like in other parameters
+                raise InterfaceError(
+                    f'Do not know how to adapt type {type(s)}')
             s = str(s)
         if not s:
             return '""'

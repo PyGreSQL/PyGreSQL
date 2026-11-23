@@ -3217,6 +3217,79 @@ class TestDBClass(unittest.TestCase):
                 'select %s::bytea[]', (data,), inline=inline).getresult()
             self.assertEqual(r, [(data,)])
 
+    def test_bytearray_and_memoryview_params(self):
+        query_formatted = self.db.query_formatted
+        values = (bytearray(b'ab'), bytearray(), memoryview(b'ab'))
+        # values for json are passed to the JSON encoder (see below)
+        types = ('bytea', 'text', 'int', 'bool', 'date', 'uuid',
+                 'hstore', 'bytea[]', 'text[]', 'int[]', 'bool[]')
+        for value in values:
+            msg = f'Cannot adapt {type(value).__name__}'
+            # passed directly to the connection
+            self.assertRaisesRegex(
+                TypeError, msg, self.db.query, 'select $1', value)
+            # adapted, with and without types
+            for params in ([value], [[value]], [[1, value]], [(1, value)],
+                           [pg.Hstore(k=value)], {'v': value}):
+                sql = ('select %(v)s' if isinstance(params, dict)
+                       else 'select %s')
+                self.assertRaisesRegex(
+                    TypeError, msg, query_formatted, sql, params)
+            for typ in types:
+                param: Any = [value] if typ.endswith('[]') else value
+                if typ == 'hstore':
+                    param = {'k': value}
+                self.assertRaisesRegex(
+                    TypeError, msg, query_formatted,
+                    'select %s', [param], [typ])
+            # put into the SQL
+            self.assertRaises(pg.InterfaceError, query_formatted,
+                              'select %s', [value], inline=True)
+        self.assertRaisesRegex(TypeError, 'memoryview', str,
+                               pg.Hstore({memoryview(b'k'): 'v'}))
+        self.assertRaisesRegex(
+            pg.InterfaceError, 'Cannot adapt memoryview', query_formatted,
+            'select %s', [pg.Hstore(k=memoryview(b'v'))], inline=True)
+        self.create_table('test_table', 'n int, b bytea, f bool')
+        for value in values:
+            msg = f'Cannot adapt {type(value).__name__}'
+            for column in 'nbf':
+                self.assertRaisesRegex(
+                    TypeError, msg, self.db.insert, 'test_table',
+                    **{column: value})
+        self.assertEqual(self.db.query(
+            'select count(*) from test_table').getresult(), [(0,)])
+
+    def test_bytearray_and_memoryview_with_hooks(self):
+        query_formatted = self.db.query_formatted
+
+        class MyByteArray(bytearray):
+            def __pg_str__(self, typ):
+                return self.decode('ascii')
+
+        # objects with a __pg_str__ hook are adapted by the hook
+        value = MyByteArray(b'abc')
+        for types in (None, ['text']):
+            self.assertEqual(query_formatted(
+                'select %s', [value], types).getresult(), [('abc',)])
+        # the JSON encoder may handle bytearray and memoryview objects
+        self.assertRaisesRegex(
+            TypeError, 'not JSON serializable', query_formatted,
+            'select %s', [bytearray(b'ab')], ['json'])
+
+        def encode_json(obj):
+            return json.dumps(obj, default=lambda o: bytes(o).hex())
+
+        self.db.encode_json = encode_json
+        try:
+            for buffer in (bytearray(b'ab'), memoryview(b'ab')):
+                r = query_formatted('select %s::text', [buffer], ['json'])
+                self.assertEqual(r.getresult(), [('"6162"',)])
+                r = query_formatted('select %s::text', [[buffer]], ['json[]'])
+                self.assertEqual(r.getresult(), [('{"\\"6162\\""}',)])
+        finally:
+            del self.db.encode_json
+
     def test_insert_update_get_bytea(self):
         query = self.db.query
         unescape = pg.unescape_bytea if pg.get_bytea_escaped() else None

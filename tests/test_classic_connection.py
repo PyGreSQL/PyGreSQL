@@ -2192,6 +2192,37 @@ class TestParamQueries(unittest.TestCase):
             "select $1::bytea", (b'\\x4142',)).getresult(), [(b'AB',)])
         self.assertRaises(ValueError, query, "select $1::bytea", (b'\0',))
 
+    def test_query_with_bytearray_and_memoryview_params(self):
+        query = self.c.query
+
+        class MyByteArray(bytearray):
+            pass
+
+        values = (bytearray(b'ab'), bytearray(), MyByteArray(b'ab'),
+                  memoryview(b'ab'), memoryview(b''))
+        for value in values:
+            for sql in ('select $1', 'select $1::bytea', 'select $1::text'):
+                with self.assertRaises(TypeError) as cm:
+                    query(sql, (value,))
+                self.assertEqual(
+                    str(cm.exception), f'Cannot adapt {type(value).__name__},'
+                    ' wrap binary data with Bytea')
+        self.c.prepare('q', 'select $1::bytea')
+        for value in values:
+            self.assertRaises(TypeError, self.c.query_prepared, 'q', (value,))
+            self.assertRaises(
+                TypeError, self.c.send_query, 'select $1', (value,))
+        # the connection is still usable
+        self.assertEqual(query('select 1').getresult(), [(1,)])
+        # wrapped with Bytea, they are passed as binary data
+        for value in values[:3]:
+            self.assertEqual(query(
+                'select $1', (pg.Bytea(value + b'\0'),)).getresult(),
+                [(bytes(value) + b'\0',)])
+        self.assertEqual(query(
+            'select $1', (pg.Bytea(memoryview(b'a\0')),)).getresult(),
+            [(b'a\0',)])
+
     def test_query_with_bytea_and_failing_param(self):
         query = self.c.query
         self.assertRaises(ValueError, query, "select $1, $2",
@@ -4249,6 +4280,17 @@ class TestInserttable(unittest.TestCase):
             [(1, b'AB'), (2, b'\0\xff')])
         self.assertRaises(ValueError, self.c.inserttable, 'bin', [(3, b'\0')])
         self.assertRaises(ValueError, self.c.inserttable, 'bin', [(3, b'\\')])
+
+    def test_inserttable_bytearray_and_memoryview(self):
+        self.c.query("create temporary table bin (b bytea, t text)")
+        for value in (bytearray(b'ab'), memoryview(b'ab')):
+            for row in ((value, None), (None, value)):
+                with self.assertRaises(TypeError) as cm:
+                    self.c.inserttable('bin', [row])
+                self.assertIn(
+                    'wrap binary data with Bytea', str(cm.exception))
+        self.assertEqual(self.c.query(
+            "select count(*) from bin").getresult(), [(0,)])
 
     def test_inserttable_bytea_and_old_query_helpers(self):
         # the type for marking bytea values is optional for set_query_helpers
