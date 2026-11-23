@@ -500,7 +500,6 @@ class Adapter:
         """
         if isinstance(v, Hstore):
             return v._literal(self._encoding)
-        _reject_buffer(v)
         return str(v)
 
     _re_array_quote_bytes = regex(rb'[{},"\\\s]|^[Nn][Uu][Ll][Ll]$')
@@ -663,15 +662,15 @@ class Adapter:
                 simple = self.get_simple_name(typ)
             else:
                 typ = simple = self.guess_simple_type(value) or 'text'
-            if not (simple.startswith('json')
-                    or hasattr(value, '__pg_str__')):
-                # the JSON encoder or the hook may handle these objects
-                _reject_buffer(value)
             if isinstance(value, bytes) and simple != 'bytea':
                 return value
             pg_str = getattr(value, '__pg_str__', None)
             if pg_str:
                 value = pg_str(typ)
+            if not (simple == 'json' or (
+                    simple == 'json[]' and isinstance(value, list))):
+                # the JSON encoder may handle bytearray and memoryview
+                _reject_buffer(value)
             if simple == 'text':
                 pass
             elif simple == 'record':

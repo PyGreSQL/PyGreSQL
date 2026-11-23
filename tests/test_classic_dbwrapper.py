@@ -3288,6 +3288,33 @@ class TestDBClass(unittest.TestCase):
         for types in (None, ['text']):
             self.assertEqual(query_formatted(
                 'select %s', [value], types).getresult(), [('abc',)])
+        # but not as elements of arrays, and their results are checked
+        python_msg = 'Cannot adapt {}, convert it to bytes or Bytea'
+        self.assertRaisesRegex(
+            TypeError, python_msg.format('MyByteArray'),
+            query_formatted, 'select %s', [[value]])
+
+        class Hook:
+            def __init__(self, value):
+                self.value = value
+
+            def __pg_str__(self, typ):
+                return self.value
+
+        for buffer in (bytearray(b'ab'), memoryview(b'ab')):
+            msg = python_msg.format(type(buffer).__name__)
+            for typ in ('uuid', 'text', 'int', 'bool', 'bytea'):
+                with self.assertRaises(TypeError) as cm:
+                    query_formatted('select %s', [Hook(buffer)], [typ])
+                self.assertEqual(str(cm.exception), msg)
+            # also for json arrays if the value is not a list
+            with self.assertRaises(TypeError) as cm:
+                query_formatted('select %s', [buffer], ['json[]'])
+            self.assertEqual(str(cm.exception), msg)
+            with self.assertRaises(pg.InterfaceError) as icm:
+                query_formatted(
+                    'select %s', [pg.Hstore(k=buffer)], inline=True)
+            self.assertEqual(str(icm.exception), msg)
         # the JSON encoder may handle bytearray and memoryview objects
         self.assertRaisesRegex(
             TypeError, 'not JSON serializable', query_formatted,

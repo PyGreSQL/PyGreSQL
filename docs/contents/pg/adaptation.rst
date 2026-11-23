@@ -279,9 +279,11 @@ Objects of the types :class:`bytearray` and :class:`memoryview` cannot be
 adapted yet; convert them to ``bytes`` before passing them. They raise a
 :exc:`TypeError` as parameters, as elements of arrays and records and as
 keys and values of hstore values, and a :exc:`pg.InterfaceError` when they
-are passed inline. Parameters of type ``json`` are an exception: they are
-passed to the JSON encoder (see :meth:`DB.encode_json`), which may be able
-to handle such objects.
+are passed inline. This also applies to the results of ``__pg_str__``
+methods (see below), which are called for top-level values and fields of
+records, but not for elements of arrays. Parameters of type ``json`` are an
+exception: they are passed to the JSON encoder (see :meth:`DB.encode_json`),
+which may be able to handle such objects.
 
 .. versionchanged:: 6.3
     Byte strings were adapted as text in earlier versions, unless they had

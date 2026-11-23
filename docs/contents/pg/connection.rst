@@ -79,8 +79,7 @@ literals, in which keys and values given as bytes are also passed unchanged.
 All other objects are converted to strings with ``str()`` and then also
 encoded with the client encoding, except for objects of the types
 :class:`bytearray` and :class:`memoryview`, which raise a :exc:`TypeError`
-since their string representation is not their content. Wrap binary data
-in such objects with :func:`Bytea`.
+since their string representation is not their content.
 Binary data must be wrapped with :func:`Bytea`. It is then sent unchanged
 in binary format as a parameter of type ``bytea`` and may contain any
 bytes, including NUL bytes, which are not allowed in the other parameters.
