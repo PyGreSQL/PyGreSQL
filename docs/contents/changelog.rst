@@ -210,7 +210,9 @@ Version 6.3.0 (unreleased)
     a `ValueError`. After `DB.reopen()`, typecasts are now bound to the new
     connection. Before, typecasts that need the connection raised a
     `TypeError`. A `DB` object wrapping an existing connection now casts
-    values again after `DB.close()` and `DB.reopen()`.
+    values again after `DB.close()` and `DB.reopen()`. Setting or resetting
+    the typecast for a type name no longer drops the typecast set for the
+    name with a leading underscore, which can be the name of another type.
   - `DB.delete_prepared()` now quotes the name of the prepared statement,
     so that it is taken literally like in `DB.prepare()` and
     `DB.query_prepared()`, and also accepts the name as bytes (#131).
@@ -339,7 +341,10 @@ Version 6.3.0 (unreleased)
     used for other types with such a name, and when called without
     arguments, typecasts that need the connection, like the one for dates,
     no longer raise a `TypeError`. Global typecasts set for array types
-    with `set_typecast()` are now used, like in the `pg` module.
+    with `set_typecast()` are now used, like in the `pg` module. Setting or
+    resetting the typecast for a type name no longer drops the typecast set
+    for the name with a leading underscore, which can be the name of
+    another type.
 
 - Fixes in the C extension:
 

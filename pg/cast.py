@@ -349,14 +349,13 @@ class Typecasts(dict):
         self._records: set[str] = set()  # types with cached record casts
 
     def _drop_record_casts(self) -> None:
-        """Drop the cached casts for composite types and their arrays.
+        """Drop the cached casts for composite types.
 
         These casts use the casts for their fields, which may change.
         They will be created again when needed.
         """
         for typ in self._records:
             self.pop(typ, None)
-            self.pop(f'_{typ}', None)
         self._records.clear()
 
     def __missing__(self, typ: str) -> Callable | None:
@@ -413,13 +412,11 @@ class Typecasts(dict):
         if cast is None:
             for t in typ:
                 self.pop(t, None)
-                self.pop(f'_{t}', None)
         else:
             if not callable(cast):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 self[t] = self._add_connection(cast)
-                self.pop(f'_{t}', None)
 
     def reset(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecasts for the specified type(s) to their defaults.
@@ -434,7 +431,6 @@ class Typecasts(dict):
                 typ = [typ]
             for t in typ:
                 self.pop(t, None)
-                self.pop(f'_{t}', None)
 
     @classmethod
     def get_default(cls, typ: str) -> Any:
@@ -452,13 +448,11 @@ class Typecasts(dict):
         if cast is None:
             for t in typ:
                 defaults.pop(t, None)
-                defaults.pop(f'_{t}', None)
         else:
             if not callable(cast):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 defaults[t] = cast
-                defaults.pop(f'_{t}', None)
 
     # noinspection PyMethodMayBeStatic,PyUnusedLocal
     def get_attnames(self, typ: Any) -> AttrDict:

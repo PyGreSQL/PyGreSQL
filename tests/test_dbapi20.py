@@ -911,6 +911,55 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_type_cache_typecasts_for_underscore_names(self):
+        # setting or resetting a typecast for a name does not affect the
+        # typecast for the name with an underscore, which can be the name
+        # of an unrelated type, while arrays use the typecast for elements
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            type_cache = con.type_cache
+
+            def get():
+                cur.execute('select row(1)::pg_temp._q,'
+                            ' array[row(2)]::pg_temp.q[]')
+                return tuple(cur.fetchone())
+
+            def cast_q(v):
+                return f'q:{v}'
+
+            def cast_uq(v):
+                return f'_q:{v}'
+
+            cur.execute('create type pg_temp._q as (u int)')
+            cur.execute('create type pg_temp.q as (v int)')  # array is _q_1
+            type_cache.set_typecast('_q', cast_uq)
+            type_cache.set_typecast('q', cast_q)
+            self.assertEqual(get(), ('_q:(1)', ['q:(2)']))
+            type_cache.reset_typecast('q')
+            self.assertEqual(get(), ('_q:(1)', [(2,)]))
+            type_cache.reset_typecast('_q')
+            self.assertEqual(get(), ((1,), [(2,)]))
+            # connections keep their cached copies of global typecasts,
+            # so the local typecasts are reset after the global changes
+            pgdb.set_typecast('_q', cast_uq)
+            try:
+                pgdb.set_typecast('q', cast_q)
+                try:
+                    type_cache.reset_typecast()
+                    self.assertEqual(get(), ('_q:(1)', ['q:(2)']))
+                finally:
+                    pgdb.reset_typecast('q')
+                type_cache.reset_typecast()
+                self.assertEqual(get(), ('_q:(1)', [(2,)]))
+            finally:
+                pgdb.reset_typecast('_q')
+            type_cache.reset_typecast()
+            self.assertEqual(get(), ((1,), [(2,)]))
+            cur.close()
+        finally:
+            con.close()
+
     def test_type_cache_with_domains(self):
         con = self._connect()
         try:

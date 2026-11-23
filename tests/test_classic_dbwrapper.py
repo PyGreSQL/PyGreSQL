@@ -4918,6 +4918,49 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(get("'1 2'::oidvector, 'ab'::name, '(1,2)'::point"),
                          ('1 2', 'ab', '(1,2)'))
 
+    def test_db_types_typecasts_for_underscore_names(self):
+        # setting or resetting a typecast for a name does not affect the
+        # typecast for the name with an underscore, which can be the name
+        # of an unrelated type, while arrays use the typecast for elements
+        query = self.db.query
+        dbtypes = self.db.dbtypes
+
+        def get(what):
+            return query(f'select {what}').getresult()[0]
+
+        def cast_q(v):
+            return f'q:{v}'
+
+        def cast_uq(v):
+            return f'_q:{v}'
+
+        query('create type pg_temp._q as (u int)')
+        query('create type pg_temp.q as (v int)')  # array type is _q_1
+        sql = 'row(1)::pg_temp._q, array[row(2)]::pg_temp.q[]'
+        dbtypes.set_typecast('_q', cast_uq)
+        dbtypes.set_typecast('q', cast_q)
+        self.assertEqual(get(sql), ('_q:(1)', ['q:(2)']))
+        dbtypes.reset_typecast('q')
+        self.assertEqual(get(sql), ('_q:(1)', [(2,)]))
+        dbtypes.reset_typecast('_q')
+        self.assertEqual(get(sql), ((1,), [(2,)]))
+        # connections keep their cached copies of global typecasts,
+        # so the local typecasts are reset after the global changes
+        pg.set_typecast('_q', cast_uq)
+        try:
+            pg.set_typecast('q', cast_q)
+            try:
+                dbtypes.reset_typecast()
+                self.assertEqual(get(sql), ('_q:(1)', ['q:(2)']))
+            finally:
+                pg.set_typecast('q', None)
+            dbtypes.reset_typecast()
+            self.assertEqual(get(sql), ('_q:(1)', [(2,)]))
+        finally:
+            pg.set_typecast('_q', None)
+        dbtypes.reset_typecast()
+        self.assertEqual(get(sql), ((1,), [(2,)]))
+
     def test_db_types_info(self):
         dbtypes = self.db.dbtypes
         self.assertIsInstance(dbtypes, dict)

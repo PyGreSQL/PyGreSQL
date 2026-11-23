@@ -334,14 +334,13 @@ class Typecasts(dict):
         self._records: set[str] = set()  # types with cached record casts
 
     def _drop_record_casts(self) -> None:
-        """Drop the cached casts for composite types and their arrays.
+        """Drop the cached casts for composite types.
 
         These casts use the casts for their fields, which may change.
         They will be created again when needed.
         """
         for typ in self._records:
             self.pop(typ, None)
-            self.pop(f'_{typ}', None)
         self._records.clear()
 
     def __missing__(self, typ: str) -> Callable | None:
@@ -391,13 +390,11 @@ class Typecasts(dict):
         if cast is None:
             for t in typ:
                 self.pop(t, None)
-                self.pop(f'_{t}', None)
         else:
             if not callable(cast):
                 raise TypeError("Cast parameter must be callable")
             for t in typ:
                 self[t] = self._add_connection(cast)
-                self.pop(f'_{t}', None)
 
     def reset(self, typ: str | Sequence[str] | None = None) -> None:
         """Reset the typecasts for the specified type(s) to their defaults.
@@ -411,13 +408,12 @@ class Typecasts(dict):
         else:
             if isinstance(typ, str):
                 typ = [typ]
-            for name in typ:
-                for t in (name, f'_{name}'):
-                    cast = self._get_default(t)
-                    if cast:
-                        self[t] = self._add_connection(cast)
-                    else:
-                        self.pop(t, None)
+            for t in typ:
+                cast = self._get_default(t)
+                if cast:
+                    self[t] = self._add_connection(cast)
+                else:
+                    self.pop(t, None)
 
     def _get_default(self, typ: str) -> Callable | None:
         """Get the default typecast that has been set for the given type.
