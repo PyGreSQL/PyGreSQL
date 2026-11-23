@@ -710,9 +710,11 @@ class DB:
     def get_tables(self, system: bool = False) -> list[str]:
         """Return list of tables in connected database.
 
+        This includes ordinary and partitioned tables.
+
         Set the system flag if you want to get the system tables as well.
         """
-        return self.get_relations('r', system)
+        return self.get_relations('rp', system)
 
     def get_attnames(self, table: str | int, with_oid: bool = True,
                      flush: bool = False) -> AttrDict:

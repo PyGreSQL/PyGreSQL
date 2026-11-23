@@ -141,9 +141,11 @@ get_relations -- get list of relations in connected database
 This method returns the list of relations in the connected database.  Although
 you can do this with a simple select, it is added here for convenience.  You
 can select which kinds of relations you are interested in by passing type
-letters in the `kinds` parameter.  The type letters are ``r`` = ordinary table,
-``i`` = index, ``S`` = sequence, ``v`` = view, ``c`` = composite type,
-``s`` = special, ``t`` = TOAST table.  If `kinds` is None or an empty string,
+letters in the `kinds` parameter, as in the ``relkind`` column of the
+``pg_class`` system catalog: ``r`` = ordinary table, ``i`` = index,
+``S`` = sequence, ``t`` = TOAST table, ``v`` = view, ``m`` = materialized
+view, ``c`` = composite type, ``f`` = foreign table, ``p`` = partitioned
+table, ``I`` = partitioned index.  If `kinds` is None or an empty string,
 all relations are returned (this is also the default).  If `system` is set to
 `True`, then system tables and views (temporary tables, toast tables, catalog
 views and tables) will be returned as well, otherwise they will be ignored.
@@ -159,8 +161,12 @@ get_tables -- get list of tables in connected database
     :returns: all tables in connected database
     :rtype: list
 
-This is a shortcut for ``get_relations('r', system)`` that has been added for
-convenience.
+This is a shortcut for ``get_relations('rp', system)`` that has been added for
+convenience.  It returns ordinary tables and partitioned tables, including
+the partitions of partitioned tables, which are ordinary tables themselves.
+
+.. versionchanged:: 6.3
+    Partitioned tables are returned as well.
 
 get_attnames -- get the attribute names of a table
 --------------------------------------------------

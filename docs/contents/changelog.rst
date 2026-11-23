@@ -188,6 +188,9 @@ Version 6.3.0 (unreleased)
   - The infinite intervals supported since PostgreSQL 17 are now returned
     as ``timedelta.max`` and ``timedelta.min``, like infinite dates and
     timestamps (#132). Before, they raised a `ValueError`.
+  - `DB.get_tables()` now also returns partitioned tables, like ``\dt`` in
+    psql (#136). Before, only their partitions were returned. The type
+    letters for `DB.get_relations()` are now documented completely.
 
 - Changes in the `pgdb` module:
 

@@ -1283,6 +1283,34 @@ class TestDBClass(unittest.TestCase):
         self.assertIn('pg_catalog.pg_class', result)
         self.assertNotIn('information_schema.tables', result)
 
+    def test_get_partitioned_tables(self):
+        query = self.db.query
+        query("drop table if exists test_parted cascade")
+        query("create table test_parted (n int) partition by range (n)")
+        self.addCleanup(query, "drop table test_parted cascade")
+        query("create table test_parted_1 partition of test_parted"
+              " for values from (0) to (10)")
+        query("create index test_parted_idx on test_parted (n)")
+        result = self.db.get_tables()
+        self.assertIn('public.test_parted', result)
+        self.assertIn('public.test_parted_1', result)
+        self.assertIn('public.test', result)
+        self.assertNotIn('public.test_view', result)
+        self.assertNotIn('public.test_parted_idx', result)
+        result = self.db.get_relations('p')
+        self.assertIn('public.test_parted', result)
+        self.assertNotIn('public.test_parted_1', result)
+        result = self.db.get_relations('r')
+        self.assertNotIn('public.test_parted', result)
+        self.assertIn('public.test_parted_1', result)
+        result = self.db.get_relations('I')
+        self.assertEqual(result, ['public.test_parted_idx'])
+        # partitioned tables can be used like ordinary tables
+        self.db.insert('test_parted', n=5)
+        self.assertEqual(list(self.db.get_attnames('test_parted')), ['n'])
+        self.assertEqual(
+            query("select n from test_parted_1").getresult(), [(5,)])
+
     def test_get_relations(self):
         get_relations = self.db.get_relations
         result = get_relations()
