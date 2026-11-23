@@ -116,11 +116,12 @@ class TestDBClassBasic(unittest.TestCase):
         attributes = [
             'abort', 'adapter',
             'backend_pid', 'begin',
-            'cancel', 'clear', 'close', 'commit',
+            'cancel', 'change_password', 'clear', 'close', 'commit',
             'date_format', 'db', 'dbname', 'dbtypes',
             'debug', 'decode_json', 'delete',
             'delete_prepared', 'describe_prepared',
-            'encode_json', 'encoding', 'end', 'endcopy', 'error',
+            'encode_json', 'encoding', 'encrypt_password',
+            'end', 'endcopy', 'error',
             'escape_bytea', 'escape_identifier',
             'escape_literal', 'escape_string',
             'fileno', 'full_protocol_version',
@@ -519,6 +520,21 @@ class TestDBClass(unittest.TestCase):
                          '"It\'s fine to have a \\ inside."')
         self.assertEqual(f('All "quotes" must be escaped.'),
                          '"All ""quotes"" must be escaped."')
+
+    def test_password_functions(self):
+        db = self.db
+        # these methods are delegated to the connection
+        encrypted = db.encrypt_password('secret', 'bob', 'md5')
+        self.assertEqual(encrypted, db.db.encrypt_password(
+            'secret', 'bob', 'md5'))
+        self.assertTrue(encrypted.startswith('md5'))
+        db.begin()
+        try:  # changing the own password needs no privileges
+            self.assertIsNone(db.change_password(db.user, 'other secret'))
+        finally:
+            db.rollback()
+        with self.assertRaises(pg.ProgrammingError):
+            db.change_password('test_nonexistent_role', 'secret')
 
     def test_escape_string(self):
         f = self.db.escape_string

@@ -373,6 +373,16 @@ class Connection:
         """Escape binary data for use within SQL as type 'bytea'."""
         ...
 
+    def encrypt_password(self, password: str | bytes, user: str | bytes,
+                         algorithm: str | bytes | None = None) -> str:
+        """Encrypt a password."""
+        ...
+
+    def change_password(self, user: str | bytes,
+                        password: str | bytes) -> None:
+        """Change the password of a user."""
+        ...
+
     def putline(self, line: str | bytes, /) -> None:
         """Write a line to the server socket."""
         ...

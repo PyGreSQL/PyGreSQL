@@ -57,7 +57,8 @@ do
     createdb -E LATIN9 -l C -T template0 test_latin9
     createdb -E ISO_8859_5 -l C -T template0 test_cyrillic
 
-    psql -c "create user test with password 'test'"
+    # createrole for the tests of change_password() with a temporary role
+    psql -c "create user test with createrole password 'test'"
 
     psql -c "grant create on database test to test"
     psql -c "grant create on database test_ascii to test"

@@ -210,6 +210,12 @@ Version 6.3.0 (unreleased)
     is returned by the same statement. Before, it was read with a separate
     query, and could have been changed or deleted by another session in
     between.
+  - New connection methods `encrypt_password()` and `change_password()`
+    (#139), also available in the `DB` wrapper. They encrypt a password on
+    the client, so that it is not sent to the server in clear text, where
+    it could appear in the server log. `change_password()` uses
+    ``PQchangePassword()`` with libpq 17 or newer and does the same itself
+    with older versions of libpq.
 
 - Changes in the `pgdb` module:
 

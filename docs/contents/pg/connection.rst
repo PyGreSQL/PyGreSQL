@@ -511,6 +511,101 @@ derived from the current setting of the database parameter ``DateStyle``.
 
 .. versionadded:: 5.0
 
+encrypt_password -- encrypt a password
+--------------------------------------
+
+.. method:: Connection.encrypt_password(password, user, algorithm=None)
+
+    Encrypt a password for the given user
+
+    :param password: the password in clear text
+    :type password: str or bytes
+    :param user: the name of the user
+    :type user: str or bytes
+    :param algorithm: the encryption algorithm, or None for the server setting
+    :type algorithm: str, bytes or None
+    :returns: the encrypted password
+    :rtype: str
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises ValueError: an argument contains NUL characters
+    :raises ValueError: unknown algorithm
+    :raises UnicodeEncodeError: the user name cannot be encoded
+    :raises pg.InterfaceError: the connection is busy
+    :raises pg.OperationalError: the connection has been lost
+    :raises pg.ProgrammingError: the server setting cannot be read
+
+This method returns the password in the encrypted form that is stored in
+the server, e.g. ``SCRAM-SHA-256$4096:...`` or ``md5...``. It can be used in
+the ``PASSWORD`` clause of the SQL commands ``CREATE ROLE`` and
+``ALTER ROLE``, so that the password itself is not sent to the server,
+where it could appear in the server log or in ``pg_stat_activity``. Use
+the method ``escape_literal()`` (see :meth:`DB.escape_literal`) to insert
+it into the SQL command.
+
+The *algorithm* can be ``'scram-sha-256'`` or ``'md5'``. Note that MD5
+encrypted passwords are deprecated since PostgreSQL 18. If *algorithm* is
+None, the server setting ``password_encryption`` is used, which is queried
+from the server. The encryption itself is done on the client by libpq
+(``PQencryptPasswordConn()``). The user name is only used by the MD5
+algorithm, but must always be passed.
+
+A *password* given as a string is always encoded as UTF-8, regardless of the
+client encoding, since passwords are also sent as UTF-8 when connecting with
+:func:`pg.connect` and SCRAM expects UTF-8 passwords. A *user* name given
+as a string is encoded with the client encoding. Both can also be passed
+as bytes, which are used unchanged. Note that the MD5 algorithm uses the
+user name as salt, while the server uses the name in the server encoding,
+so with MD5, non-ASCII user names only work if the client encoding is the
+same as the server encoding (libpq has the same limitation).
+
+Example::
+
+    encrypted = con.encrypt_password(password, 'bob')
+    con.query(f"CREATE ROLE bob LOGIN PASSWORD"
+              f" {con.escape_literal(encrypted)}")
+
+.. versionadded:: 6.3
+
+change_password -- change the password of a user
+------------------------------------------------
+
+.. method:: Connection.change_password(user, password)
+
+    Change the password of the given user
+
+    :param user: the name of the user
+    :type user: str or bytes
+    :param password: the new password in clear text
+    :type password: str or bytes
+    :rtype: None
+    :raises TypeError: bad argument type, or too many arguments
+    :raises TypeError: invalid connection
+    :raises ValueError: an argument contains NUL characters
+    :raises UnicodeEncodeError: the user name cannot be encoded
+    :raises pg.InterfaceError: the connection is busy
+    :raises pg.OperationalError: the connection has been lost
+    :raises pg.ProgrammingError: the password could not be changed
+
+This method encrypts the password like :meth:`Connection.encrypt_password`
+with the algorithm from the server setting ``password_encryption`` and sends
+it with an ``ALTER USER`` command to the server, so that the password itself
+is never sent to the server. With libpq 17 or newer, this is done by the
+libpq function ``PQchangePassword()``.
+
+The password and the user name are encoded like in
+:meth:`Connection.encrypt_password`. The command runs in the current
+transaction, if one is open, so that the change only takes effect after
+it is committed. Users can always change their own password. Changing the
+password of another user needs the ``CREATEROLE`` privilege (and since
+PostgreSQL 16 the ``ADMIN`` option on that role), or superuser privileges
+if the other user is a superuser.
+The method raises a :exc:`pg.ProgrammingError` if the command fails, e.g.
+because the user does not exist, which you can check with the
+:attr:`sqlstate` attribute of the error.
+
+.. versionadded:: 6.3
+
 fileno -- get the socket used to connect to the database
 --------------------------------------------------------
 

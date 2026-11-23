@@ -1895,6 +1895,232 @@ conn_escape_bytea(connObject *self, PyObject *data)
     return to_obj;
 }
 
+/* Get the password and the user name for encrypt_password() and
+   change_password() as new references to bytes objects. The user name is
+   an identifier written to the server, so a str is encoded strictly with
+   the client encoding. A str password is always encoded as UTF-8, since
+   connect() sends passwords as UTF-8 and SCRAM expects UTF-8, so that the
+   password can be used to log in with connect() whatever the client
+   encoding is. Bytes are passed unchanged. Return 0 on success or -1 with
+   an exception set. */
+static int
+_conn_get_password_args(connObject *self, PyObject *passwd_obj,
+                        PyObject *user_obj, const char *method,
+                        PyObject **passwd, PyObject **user)
+{
+    char usage[100];
+    int encoding;
+
+    if ((encoding = get_client_encoding(self)) < 0)
+        return -1;
+    snprintf(usage, sizeof(usage),
+             "Method %s() expects the password as str or bytes", method);
+    if (!(*passwd = get_encoded_arg(passwd_obj, pg_encoding_utf8, usage)))
+        return -1;
+    snprintf(usage, sizeof(usage),
+             "Method %s() expects the user name as str or bytes", method);
+    if (!(*user = get_encoded_arg(user_obj, encoding, usage))) {
+        Py_CLEAR(*passwd);
+        return -1;
+    }
+    return 0;
+}
+
+/* Encrypt a password. */
+static char conn_encrypt_password__doc__[] =
+    "encrypt_password(password, user, algorithm=None) -- encrypt a password\n"
+    "\n"
+    "Return the password for the given user in encrypted form, as it can be\n"
+    "used in a CREATE ROLE or ALTER ROLE command. The algorithm can be\n"
+    "'scram-sha-256' or 'md5'. If it is None, the server setting\n"
+    "password_encryption is used.\n";
+
+static PyObject *
+conn_encrypt_password(connObject *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwlist[] = {"password", "user", "algorithm", NULL};
+    PyObject *passwd_obj, *user_obj, *alg_obj = Py_None, *ret;
+    char *encrypted, *alg = NULL;
+
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
+
+    /* reads args */
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|O:encrypt_password",
+                                     kwlist, &passwd_obj, &user_obj,
+                                     &alg_obj)) {
+        return NULL;
+    }
+    if (_conn_get_password_args(self, passwd_obj, user_obj, "encrypt_password",
+                                &passwd_obj, &user_obj) < 0)
+        return NULL;
+    if (alg_obj == Py_None) {
+        alg_obj = NULL;
+    }
+    else {
+        /* algorithm names are ASCII, other names are rejected by libpq */
+        if (!(alg_obj = get_encoded_arg(
+                  alg_obj, pg_encoding_utf8,
+                  "Method encrypt_password() expects the algorithm"
+                  " as str, bytes or None"))) {
+            Py_DECREF(passwd_obj);
+            Py_DECREF(user_obj);
+            return NULL;
+        }
+        alg = PyBytes_AS_STRING(alg_obj);
+    }
+
+    /* the connection is used for error messages, and without an algorithm
+       also for querying the server setting, so it must not be busy */
+    if (!_conn_begin(self)) {
+        Py_DECREF(passwd_obj);
+        Py_DECREF(user_obj);
+        Py_XDECREF(alg_obj);
+        return NULL;
+    }
+    if (!alg && _conn_prepare_command(self) < 0) {
+        _conn_end(self);
+        Py_DECREF(passwd_obj);
+        Py_DECREF(user_obj);
+        return NULL;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    encrypted = PQencryptPasswordConn(self->cnx, PyBytes_AS_STRING(passwd_obj),
+                                      PyBytes_AS_STRING(user_obj), alg);
+    Py_END_ALLOW_THREADS
+    _conn_end(self);
+    Py_DECREF(passwd_obj);
+    Py_DECREF(user_obj);
+    Py_XDECREF(alg_obj);
+
+    if (!encrypted) {
+        /* with a given algorithm libpq does not contact the server, so the
+           algorithm is invalid (or not supported by this libpq version) */
+        if (alg)
+            set_error_text(PyExc_ValueError, NULL, self->cnx);
+        else
+            set_error(ProgrammingError, "Cannot encrypt password", self->cnx,
+                      NULL);
+        return NULL;
+    }
+    /* the encrypted password is ASCII */
+    ret = PyUnicode_DecodeASCII(encrypted, (Py_ssize_t)strlen(encrypted),
+                                "strict");
+    PQfreemem(encrypted);
+    return ret;
+}
+
+#ifndef LIBPQ_HAS_CHANGE_PASSWORD
+/* Replacement for PQchangePassword() of libpq 17 and newer, doing the same:
+   encrypt the password with the algorithm from the server setting
+   password_encryption and send it with ALTER USER, so that the password is
+   never sent in clear text. Must be called with the GIL held while the
+   connection is busy. Return the result, or NULL with the error message set
+   in the connection, or NULL with a MemoryError set. */
+static PGresult *
+_conn_change_password(PGconn *cnx, const char *user, const char *passwd)
+{
+    static const char fmt[] = "ALTER USER %s PASSWORD %s";
+    char *encrypted, *escaped_user = NULL, *escaped_passwd, *cmd = NULL;
+    PGresult *result;
+    size_t size;
+
+    Py_BEGIN_ALLOW_THREADS
+    encrypted = PQencryptPasswordConn(cnx, passwd, user, NULL);
+    Py_END_ALLOW_THREADS
+    if (!encrypted)
+        return NULL;
+    escaped_passwd = PQescapeLiteral(cnx, encrypted, strlen(encrypted));
+    PQfreemem(encrypted);
+    if (escaped_passwd)
+        escaped_user = PQescapeIdentifier(cnx, user, strlen(user));
+    if (escaped_user) {
+        size = sizeof(fmt) + strlen(escaped_user) + strlen(escaped_passwd);
+        if ((cmd = PyMem_Malloc(size)))
+            snprintf(cmd, size, fmt, escaped_user, escaped_passwd);
+        else
+            PyErr_NoMemory();
+        PQfreemem(escaped_user);
+    }
+    if (escaped_passwd)
+        PQfreemem(escaped_passwd);
+    if (!cmd)
+        return NULL;
+
+    Py_BEGIN_ALLOW_THREADS
+    result = PQexec(cnx, cmd);
+    Py_END_ALLOW_THREADS
+    PyMem_Free(cmd);
+    return result;
+}
+#endif
+
+/* Change a password. */
+static char conn_change_password__doc__[] =
+    "change_password(user, password) -- change the password of a user\n\n"
+    "The password is encrypted with the algorithm set in the server setting\n"
+    "password_encryption before it is sent to the server with ALTER USER.\n";
+
+static PyObject *
+conn_change_password(connObject *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwlist[] = {"user", "password", NULL};
+    PyObject *passwd_obj, *user_obj;
+    PGresult *result;
+
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
+        return NULL;
+    }
+
+    /* reads args */
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO:change_password", kwlist,
+                                     &user_obj, &passwd_obj)) {
+        return NULL;
+    }
+    if (_conn_get_password_args(self, passwd_obj, user_obj, "change_password",
+                                &passwd_obj, &user_obj) < 0)
+        return NULL;
+
+    if (!_conn_begin(self)) {
+        Py_DECREF(passwd_obj);
+        Py_DECREF(user_obj);
+        return NULL;
+    }
+    if (_conn_prepare_command(self) < 0) {
+        _conn_end(self);
+        Py_DECREF(passwd_obj);
+        Py_DECREF(user_obj);
+        return NULL;
+    }
+
+#ifdef LIBPQ_HAS_CHANGE_PASSWORD
+    Py_BEGIN_ALLOW_THREADS
+    result = PQchangePassword(self->cnx, PyBytes_AS_STRING(user_obj),
+                              PyBytes_AS_STRING(passwd_obj));
+    Py_END_ALLOW_THREADS
+#else
+    result = _conn_change_password(self->cnx, PyBytes_AS_STRING(user_obj),
+                                   PyBytes_AS_STRING(passwd_obj));
+#endif
+    _conn_end(self);
+    Py_DECREF(passwd_obj);
+    Py_DECREF(user_obj);
+    if (result && PQresultStatus(result) == PGRES_COMMAND_OK) {
+        PQclear(result);
+        Py_RETURN_NONE; /* success */
+    }
+    if (result || !PyErr_Occurred())
+        set_error(ProgrammingError, "Cannot change password", self->cnx,
+                  result);
+    if (result)
+        PQclear(result);
+    return NULL; /* error */
+}
+
 /* Constructor for large objects (internal use only) */
 static largeObject *
 large_new(connObject *pgcnx, Oid oid)
@@ -2417,6 +2643,10 @@ static struct PyMethodDef conn_methods[] = {
      conn_escape_string__doc__},
     {"escape_bytea", (PyCFunction)conn_escape_bytea, METH_O,
      conn_escape_bytea__doc__},
+    {"encrypt_password", (PyCFunction)(void (*)(void))conn_encrypt_password,
+     METH_VARARGS | METH_KEYWORDS, conn_encrypt_password__doc__},
+    {"change_password", (PyCFunction)(void (*)(void))conn_change_password,
+     METH_VARARGS | METH_KEYWORDS, conn_change_password__doc__},
 
     {"putline", (PyCFunction)conn_putline, METH_VARARGS, conn_putline__doc__},
     {"getline", (PyCFunction)conn_getline, METH_NOARGS, conn_getline__doc__},

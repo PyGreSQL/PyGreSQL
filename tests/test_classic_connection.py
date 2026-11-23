@@ -11,9 +11,12 @@ These tests need a database to test against.
 
 from __future__ import annotations
 
+import base64
 import ctypes
 import datetime
 import gc
+import hashlib
+import hmac
 import os
 import socket
 import sys
@@ -199,8 +202,9 @@ class TestConnectObject(unittest.TestCase):
 
     def test_all_connect_methods(self):
         methods = [
-            'cancel', 'close', 'date_format', 'describe_prepared',
-            'endcopy', 'escape_bytea', 'escape_identifier',
+            'cancel', 'change_password', 'close', 'date_format',
+            'describe_prepared', 'encrypt_password', 'endcopy',
+            'escape_bytea', 'escape_identifier',
             'escape_literal', 'escape_string', 'fileno', 'get_cast_hook',
             'get_notice_receiver', 'getline', 'getlo', 'getnotify',
             'inserttable', 'is_non_blocking', 'locreate', 'loimport',
@@ -4919,6 +4923,293 @@ class TestNotificatons(unittest.TestCase):
         self.assertEqual(received, ['Bilbo wär hier!'])
 
 
+class TestPasswordFunctions(unittest.TestCase):
+    """Test the functions for encrypting and changing passwords."""
+
+    def setUp(self):
+        self.c = connect()
+
+    def tearDown(self):
+        self.doCleanups()  # drop the roles before closing the connection
+        self.c.close()
+
+    def set_latin1(self, skip: bool = True) -> None:
+        """Set the client encoding to LATIN1 if the server can convert."""
+        encoding = self.c.parameter('server_encoding')
+        if encoding in ('UTF8', 'SQL_ASCII', 'LATIN1'):
+            self.c.query('set client_encoding to latin1')
+        elif skip:
+            self.skipTest(f'cannot convert {encoding} to LATIN1')
+
+    @staticmethod
+    def md5_password(password: bytes, user: bytes) -> str:
+        """Get the expected md5 encrypted password."""
+        md5 = hashlib.md5(password + user, usedforsecurity=False)
+        return 'md5' + md5.hexdigest()
+
+    def assert_scram_password(self, encrypted: str, password: bytes) -> None:
+        """Check that the SCRAM encrypted password matches the password."""
+        self.assertIsInstance(encrypted, str)
+        scheme, rest = encrypted.split('$', 1)
+        self.assertEqual(scheme, 'SCRAM-SHA-256')
+        iterations, rest = rest.split(':', 1)
+        salt, rest = rest.split('$', 1)
+        stored_key, server_key = rest.split(':', 1)
+        salted = hashlib.pbkdf2_hmac(
+            'sha256', password, base64.b64decode(salt), int(iterations))
+        client_key = hmac.digest(salted, b'Client Key', 'sha256')
+        self.assertEqual(base64.b64decode(stored_key),
+                         hashlib.sha256(client_key).digest())
+        self.assertEqual(base64.b64decode(server_key),
+                         hmac.digest(salted, b'Server Key', 'sha256'))
+
+    def test_encrypt_password_with_md5(self):
+        encrypt = self.c.encrypt_password
+        expected = self.md5_password(b'secret', b'bob')
+        self.assertEqual(encrypt('secret', 'bob', 'md5'), expected)
+        self.assertEqual(encrypt(b'secret', b'bob', b'md5'), expected)
+        self.assertEqual(encrypt(
+            algorithm='md5', user='bob', password='secret'), expected)
+        # the result is always a str, also when bytes are passed
+        self.assertIsInstance(encrypt(b'secret', b'bob', b'md5'), str)
+
+    def test_encrypt_password_with_scram(self):
+        encrypt = self.c.encrypt_password
+        encrypted = encrypt('secret', 'bob', 'scram-sha-256')
+        self.assert_scram_password(encrypted, b'secret')
+        # the salt is random
+        self.assertNotEqual(
+            encrypt('secret', 'bob', 'scram-sha-256'), encrypted)
+        self.assert_scram_password(
+            encrypt(b'secret', b'bob', b'scram-sha-256'), b'secret')
+
+    def test_encrypt_password_with_server_setting(self):
+        algorithm = self.c.query('show password_encryption').singlescalar()
+        encrypted = self.c.encrypt_password('secret', 'bob')
+        if algorithm == 'scram-sha-256':
+            self.assert_scram_password(encrypted, b'secret')
+        else:  # md5 is the default for PostgreSQL < 14
+            self.assertEqual(algorithm, 'md5')
+            self.assertEqual(encrypted, self.md5_password(b'secret', b'bob'))
+        for algorithm in ('md5', 'scram-sha-256'):
+            self.c.query(f"set password_encryption = '{algorithm}'")
+            encrypted = self.c.encrypt_password('secret', 'bob', None)
+            self.assertEqual(encrypted.startswith('md5'), algorithm == 'md5')
+
+    def test_encrypt_password_with_invalid_algorithm(self):
+        encrypt = self.c.encrypt_password
+        for algorithm in ('foo', b'foo', 'SCRAM-SHA-256', '', 'md5 '):
+            with self.assertRaises(ValueError) as cm:
+                encrypt('secret', 'bob', algorithm)
+            self.assertNotIsInstance(cm.exception, pg.Error)
+            self.assertIn('algorithm', str(cm.exception))
+        self.assertRaises(ValueError, encrypt, 'secret', 'bob', 'md\x005')
+        # the connection is still usable
+        self.assertEqual(self.c.query('select 1').singlescalar(), 1)
+
+    def test_encrypt_password_with_invalid_arguments(self):
+        encrypt = self.c.encrypt_password
+        self.assertRaises(TypeError, encrypt)
+        self.assertRaises(TypeError, encrypt, 'secret')
+        self.assertRaises(TypeError, encrypt, 'secret', 'bob', 'md5', 'x')
+        self.assertRaises(TypeError, encrypt, 'secret', user='bob', foo='x')
+        for args in ((None, 'bob'), (1, 'bob'), ('secret', None),
+                     ('secret', 1), ('secret', 'bob', 1)):
+            with self.assertRaises(TypeError) as cm:
+                encrypt(*args)
+            self.assertIn('encrypt_password()', str(cm.exception))
+        # NUL characters are not silently truncated
+        for nul_args in (('sec\0ret', 'bob'), (b'sec\0ret', 'bob'),
+                         ('secret', 'b\0b'), ('secret', b'b\0b')):
+            with self.assertRaises(ValueError) as nul_cm:
+                encrypt(*nul_args, 'md5')
+            self.assertEqual(str(nul_cm.exception), 'embedded null character')
+        self.assertRaises(UnicodeEncodeError, encrypt, '\udc80', 'bob', 'md5')
+
+    def test_encrypt_password_encoding(self):
+        self.set_latin1()
+        encrypt = self.c.encrypt_password
+        # passwords are always encoded as UTF-8 like in connect(),
+        # user names are encoded with the client encoding
+        password, user = 'pässwörd€', 'bjørn'
+        self.assertEqual(
+            encrypt(password, 'bob', 'md5'),
+            self.md5_password(password.encode(), b'bob'))
+        self.assertEqual(
+            encrypt('secret', user, 'md5'),
+            self.md5_password(b'secret', user.encode('latin1')))
+        self.assert_scram_password(
+            encrypt(password, user, 'scram-sha-256'), password.encode())
+        # bytes are passed unchanged
+        self.assertEqual(
+            encrypt(password.encode(), user.encode(), 'md5'),
+            self.md5_password(password.encode(), user.encode()))
+        # user names that cannot be encoded raise an error
+        self.assertRaises(UnicodeEncodeError, encrypt, 'secret', 'bjørn€')
+
+    def test_encrypt_password_in_failed_transaction(self):
+        c = self.c
+        c.query('begin')
+        self.assertRaises(pg.DataError, c.query, 'select 1/0')
+        # the server setting cannot be queried
+        self.assertRaises(pg.ProgrammingError, c.encrypt_password, 'x', 'bob')
+        # but an explicit algorithm does not need the server
+        self.assertEqual(c.encrypt_password('x', 'bob', 'md5'),
+                         self.md5_password(b'x', b'bob'))
+        c.query('rollback')
+        self.assertIsInstance(c.encrypt_password('x', 'bob'), str)
+
+    def test_password_functions_with_async_query(self):
+        c = self.c
+        for func in (lambda: c.encrypt_password('x', 'bob'),
+                     lambda: c.change_password('test_nonexistent_role', 'x')):
+            query = c.send_query('select 1 union select 2')
+            # the pending results are moved into the query object
+            with suppress(pg.ProgrammingError):  # role does not exist
+                func()
+            self.assertEqual(query.getresult(), [(1,), (2,)])
+            self.assertIsNone(query.getresult())
+
+    def test_password_functions_on_closed_connection(self):
+        c = self.c
+        c.close()
+        for func in (lambda: c.encrypt_password('x', 'bob', 'md5'),
+                     lambda: c.change_password('bob', 'x')):
+            with self.assertRaises(TypeError) as cm:
+                func()
+            self.assertEqual(str(cm.exception), 'Connection is not valid')
+        self.c = connect()
+
+    def test_change_password_with_invalid_arguments(self):
+        change = self.c.change_password
+        self.assertRaises(TypeError, change)
+        self.assertRaises(TypeError, change, 'bob')
+        self.assertRaises(TypeError, change, 'bob', 'secret', 'md5')
+        self.assertRaises(TypeError, change, 'bob', password='x', foo='x')
+        for args in ((None, 'secret'), (1, 'secret'), ('bob', None),
+                     ('bob', 1)):
+            with self.assertRaises(TypeError) as cm:
+                change(*args)
+            self.assertIn('change_password()', str(cm.exception))
+        for nul_args in (('bob', 'sec\0ret'), ('b\0b', 'secret')):
+            with self.assertRaises(ValueError) as nul_cm:
+                change(*nul_args)
+            self.assertEqual(str(nul_cm.exception), 'embedded null character')
+        self.assertRaises(UnicodeEncodeError, change, 'bob', '\udc80')
+
+    def test_change_password_of_nonexistent_role(self):
+        with self.assertRaises(pg.ProgrammingError) as cm:
+            self.c.change_password('test_nonexistent_role', 'secret')
+        self.assertEqual(cm.exception.sqlstate, '42704')
+        self.assertIn('test_nonexistent_role', str(cm.exception))
+        self.assertNotIn('secret', str(cm.exception))
+        self.assertEqual(self.c.transaction(), pg.TRANS_IDLE)
+
+    def test_change_password_of_current_user_in_transaction(self):
+        # this needs no privileges, the change is rolled back
+        c = self.c
+        c.query('begin')
+        try:
+            self.assertIsNone(c.change_password(
+                password='other secret', user=c.user))
+            self.assertEqual(c.transaction(), pg.TRANS_INTRANS)
+        finally:
+            c.query('rollback')
+
+    def test_change_password_does_not_send_plain_password(self):
+        c = self.c
+        c.query('begin')
+        try:
+            c.change_password(c.user, 'TopSecretPlain')
+            # the command is still shown while the transaction is open
+            other = connect()
+            try:
+                query = other.query(
+                    'select query from pg_catalog.pg_stat_activity'
+                    ' where pid operator(pg_catalog.=) $1',
+                    (c.backend_pid,)).singlescalar()
+            finally:
+                other.close()
+        finally:
+            c.query('rollback')
+        self.assertIsInstance(query, str)
+        self.assertTrue(query.startswith('ALTER USER '), query)
+        self.assertNotIn('TopSecretPlain', query)
+        self.assertTrue('SCRAM-SHA-256$' in query or "'md5" in query, query)
+
+    def test_change_password_in_failed_transaction(self):
+        c = self.c
+        c.query('begin')
+        self.assertRaises(pg.DataError, c.query, 'select 1/0')
+        with self.assertRaises(pg.ProgrammingError) as cm:
+            c.change_password(c.user, 'other secret')
+        self.assertIn('transaction', str(cm.exception))
+        self.assertEqual(c.transaction(), pg.TRANS_INERROR)
+        c.query('rollback')
+
+    def create_role(self) -> str:
+        """Create a temporary login role that is dropped after the test."""
+        if not self.c.query(
+                'select rolsuper or rolcreaterole from pg_catalog.pg_roles'
+                ' where rolname operator(pg_catalog.=) current_user'
+                ).singlescalar():
+            self.skipTest('the test user cannot create roles')
+        # the name needs to be quoted
+        role = f'Test "role" {os.getpid()}'
+        ident = self.c.escape_identifier(role)
+        # the role may be left over from a run that has been killed
+        self.c.query(f'drop role if exists {ident}')
+        self.c.query(f'create role {ident} login')
+        self.addCleanup(self.c.query, f'drop role {ident}')
+        return role
+
+    def connect_as(self, role: str, password: str | bytes) -> pg.Connection:
+        """Connect to the database as the given role."""
+        c = pg.connect(dbname, dbhost, dbport, user=role, passwd=password)
+        self.addCleanup(c.close)
+        self.assertEqual(c.query('select current_user').singlescalar(), role)
+        return c
+
+    def assert_cannot_connect_as(self, role: str, password: str) -> None:
+        """Check that the role cannot connect with the given password."""
+        try:
+            c = pg.connect(dbname, dbhost, dbport, user=role, passwd=password)
+        except pg.InternalError as e:
+            self.assertIn('password', str(e))
+        else:
+            c.close()
+            self.skipTest('the server does not check passwords')
+
+    def test_change_password_of_role(self):
+        role = self.create_role()
+        self.set_latin1(skip=False)
+        # a non-ASCII password is encoded as UTF-8 like in connect()
+        password = 'pässwörd€'
+        self.assertIsNone(self.c.change_password(role, password))
+        self.connect_as(role, password)
+        self.assert_cannot_connect_as(role, 'password')
+        # the password can be changed again
+        self.c.change_password(password='new', user=role)
+        self.connect_as(role, 'new')
+        self.assert_cannot_connect_as(role, password)
+
+    def test_change_password_of_role_with_bytes(self):
+        role = self.create_role()
+        password = 'pässwörd'.encode('latin1')  # bytes are passed unchanged
+        self.assertIsNone(self.c.change_password(role.encode(), password))
+        self.connect_as(role, password)
+        self.assert_cannot_connect_as(role, 'pässwörd')
+
+    def test_create_role_with_encrypted_password(self):
+        role = self.create_role()
+        c = self.c
+        encrypted = c.encrypt_password('secret', role)
+        c.query(f'alter role {c.escape_identifier(role)}'
+                f' password {c.escape_literal(encrypted)}')
+        self.connect_as(role, 'secret')
+        self.assert_cannot_connect_as(role, 'other')
+
+
 class TestBusyConnection(unittest.TestCase):
     """Test using a connection while one of its commands is running."""
 
@@ -4967,6 +5258,9 @@ class TestBusyConnection(unittest.TestCase):
             lambda: c.prepare('busy', 'select 2'),
             lambda: c.query_prepared('busy'),
             lambda: c.describe_prepared('busy'),
+            lambda: c.encrypt_password('x', 'bob'),
+            lambda: c.encrypt_password('x', 'bob', 'md5'),
+            lambda: c.change_password('bob', 'x'),
             lambda: c.inserttable('busy', [(2,)]),
             lambda: c.putline('2\n'),
             c.getline, c.endcopy,
