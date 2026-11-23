@@ -16,6 +16,11 @@ On Windows, you also need to make sure that the directory that contains
 The current version of PyGreSQL has been tested with Python versions
 3.10 to 3.15, and PostgreSQL versions 12 to 19.
 
+PyGreSQL needs libpq version 12 or newer. Some features are only available
+when PyGreSQL has been built with a newer libpq, e.g. encrypted cancel
+requests need libpq 17 or newer. The libpq that is used at runtime must not
+be older than the libpq that PyGreSQL has been built with.
+
 PyGreSQL will be installed as two packages named ``pg`` (for the classic
 interface) and ``pgdb`` (for the DB API 2 compliant interface). The former
 also contains a shared library called ``_pg.so`` (on Linux) or a DLL called

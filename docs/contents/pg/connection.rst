@@ -397,12 +397,33 @@ cancel -- abandon processing of current SQL command
 
 .. method:: Connection.cancel()
 
-    :rtype: None
+    :returns: 1 (the request has been sent)
+    :rtype: int
     :raises TypeError: too many (any) arguments
     :raises TypeError: invalid connection
+    :raises pg.OperationalError: the request could not be sent
+    :raises pg.InterfaceError: the connection is being established
 
 This method requests that the server abandon processing
-of the current SQL command.
+of the current SQL command.  It can be called by another thread while
+the command is running.  If the request has been sent, the command fails
+with an error if it was still running, but the server may also have
+finished processing it already.  If the request could not be sent, a
+:exc:`pg.OperationalError` with the reason given by libpq is raised.
+The method always returns 1 otherwise, for backward compatibility.
+
+The request is sent over a new connection to the server, and other threads
+can run while it is sent.  If PyGreSQL has been built with libpq 17 or
+newer, the request uses the same encryption settings as the connection,
+and connecting is limited by the ``connect_timeout`` of the connection.
+Otherwise, the request is sent unencrypted, and without a timeout.
+
+.. versionchanged:: 6.3
+    The request is sent without blocking other threads and, with libpq 17
+    or newer, encrypted like the connection.  If the request could not be
+    sent, an error is raised instead of returning 0.  Before, the method
+    used the deprecated ``PQrequestCancel()`` function of libpq, which is
+    not thread-safe.
 
 close -- close the database connection
 --------------------------------------

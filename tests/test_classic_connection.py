@@ -449,13 +449,20 @@ class TestConnectObject(unittest.TestCase):
             except pg.DatabaseError as error:
                 errors.append(str(error))
 
-        thread = threading.Thread(target=sleep)
-        t1 = time.time()
-        thread.start()  # run the query
-        while 1:  # make sure the query is really running
-            time.sleep(0.1)
-            if thread.is_alive() or time.time() - t1 > 5:
-                break
+        pid = self.connection.backend_pid
+        other = connect()
+        try:
+            thread = threading.Thread(target=sleep)
+            t1 = time.time()
+            thread.start()  # run the query
+            q = ("select count(*) from pg_stat_activity"
+                 " where pid = $1 and state = 'active'")
+            while time.time() - t1 < 3:  # make sure the query is running
+                if other.query(q, (pid,)).getresult()[0][0]:
+                    break
+                time.sleep(0.01)
+        finally:
+            other.close()
         r = self.connection.cancel()  # cancel the running query
         thread.join()  # wait for the thread to end
         t2 = time.time()
@@ -464,6 +471,35 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(r, 1)  # return code should be 1
         self.assertLessEqual(t2 - t1, 3)  # time should be under 3 seconds
         self.assertTrue(errors)
+
+    def test_cancel_lost_connection(self):
+        connection = self.connection
+        pid = connection.backend_pid
+        other = connect()
+        try:
+            other.query(f"select pg_terminate_backend({pid})")
+        finally:
+            other.close()
+        self.assertRaises(pg.DatabaseError, connection.query, "select 1")
+        error = connection.error
+        self.assertTrue(error)
+        with self.assertRaises(pg.OperationalError) as cm:
+            connection.cancel()  # the request cannot be sent
+        e = cm.exception
+        self.assertIsInstance(str(e), str)
+        self.assertTrue(str(e))
+        self.assertIsNone(e.sqlstate)
+        # the error message of the connection must not be changed,
+        # since another thread could just be reading it
+        self.assertEqual(connection.error, error)
+
+    def test_cancel_before_poll(self):
+        connection = connect_nowait()
+        try:
+            # the connection has not been established yet
+            self.assertRaises(pg.OperationalError, connection.cancel)
+        finally:
+            connection.close()
 
     def test_method_file_no(self):
         r = self.connection.fileno()

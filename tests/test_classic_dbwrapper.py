@@ -299,6 +299,22 @@ class TestDBClassBasic(unittest.TestCase):
         self.db.close()
         self.assertRaises(pg.InternalError, self.db.reset)
 
+    def test_method_cancel(self):
+        r = self.db.cancel()
+        self.assertIsInstance(r, int)
+        self.assertEqual(r, 1)
+        self.db.query("select 1+1")
+        pid = self.db.backend_pid
+        other = DB()
+        try:
+            other.query(f"select pg_terminate_backend({pid})")
+        finally:
+            other.close()
+        self.assertRaises(pg.DatabaseError, self.db.query, "select 1")
+        self.assertRaises(pg.OperationalError, self.db.cancel)
+        self.db.close()
+        self.assertRaises(pg.InternalError, self.db.cancel)
+
     def test_method_reopen(self):
         con = self.db.db
         self.db.reopen()

@@ -415,6 +415,20 @@ Version 6.3.0 (unreleased)
     flag for asynchronous queries, so that it could be handled like one.
     Query objects also released the reference to the connection twice
     when running out of memory.
+  - `Connection.cancel()` used the deprecated ``PQrequestCancel()`` function
+    of libpq, which is not thread-safe, although the method is meant to be
+    called by another thread while a command is running (#133). It sent the
+    request unencrypted, blocked all other threads while sending it, and
+    when the request could not be sent, it returned 0 and overwrote the
+    error message of the connection. Now the request is sent without
+    blocking other threads and, when PyGreSQL has been built with libpq 17
+    or newer, encrypted like the connection and limited by its
+    ``connect_timeout``. If the request cannot be sent, an
+    `OperationalError` with the reason given by libpq is now raised instead
+    of returning 0. On success, the method still returns 1, as documented
+    now, and `DB.cancel()` now returns this value as well. Note that the
+    libpq used at runtime must not be older than the one PyGreSQL has been
+    built with.
 
 - Modernization and build:
 

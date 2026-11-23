@@ -1530,6 +1530,18 @@ set_error_msg(PyObject *type, const char *msg)
     set_error_msg_and_state(type, msg, pg_encoding_ascii, NULL);
 }
 
+/* Set given database error message from libpq, decoded with the given
+   encoding (or the locale if it is -1), with the default message if the
+   given message is empty. */
+void
+set_error_msg_encoded(PyObject *type, const char *msg, int encoding,
+                      const char *default_msg)
+{
+    if (!msg || !*msg)
+        msg = default_msg;
+    set_error_msg_and_state(type, msg, encoding, NULL);
+}
+
 /* Set an exception of the given type with a message from the server or from
    libpq, decoded with the client encoding of the connection like other error
    messages. If no message is given, the last error message of the connection

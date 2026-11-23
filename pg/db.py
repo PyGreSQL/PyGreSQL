@@ -1388,9 +1388,9 @@ class DB:
         """Complete an asynchronous connection and get its state."""
         return self._valid_db.poll()
 
-    def cancel(self) -> None:
+    def cancel(self) -> int:
         """Abandon processing of current SQL command."""
-        self._valid_db.cancel()
+        return self._valid_db.cancel()
 
     def fileno(self) -> int:
         """Get the socket used to connect to the database."""

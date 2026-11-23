@@ -94,7 +94,7 @@ typedef struct {
     PyObject *notice_receiver; /* current notice receiver */
     PQnoticeReceiver default_notice_receiver; /* receiver of libpq */
     int encoding; /* last checked client encoding */
-    int busy;     /* libpq is communicating with the server */
+    int busy;     /* libpq is communicating with the server (2: poll) */
     struct _queryObject *async_query; /* borrowed, async query with results
                                          still pending on the connection */
 } connObject;

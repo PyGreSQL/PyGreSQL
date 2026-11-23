@@ -85,6 +85,9 @@ cast_hstore(char *s, Py_ssize_t size, int encoding);
 void
 set_error_msg(PyObject *type, const char *msg);
 void
+set_error_msg_encoded(PyObject *type, const char *msg, int encoding,
+                      const char *default_msg);
+void
 set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result);
 void
 set_error_text(PyObject *type, const char *msg, PGconn *cnx);

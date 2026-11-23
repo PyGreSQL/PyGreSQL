@@ -295,7 +295,7 @@ class Connection:
         """Reset the connection."""
         ...
 
-    def cancel(self) -> None:
+    def cancel(self) -> int:
         """Abandon processing of current SQL command."""
         ...
 

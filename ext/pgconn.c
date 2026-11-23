@@ -2045,13 +2045,68 @@ static char conn_cancel__doc__[] =
 static PyObject *
 conn_cancel(connObject *self, PyObject *Py_UNUSED(noargs))
 {
+    int ret, encoding;
+
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
+    /* while another thread runs poll(), libpq may change the data that is
+       needed for the cancel request, such as the cancel key */
+    if (self->busy == 2) {
+        set_error_msg(InterfaceError, "The connection is being established");
+        return NULL;
+    }
 
-    /* request that the server abandon processing of the current command */
-    return PyLong_FromLong((long)PQrequestCancel(self->cnx));
+    /* request that the server abandon processing of the current command;
+       the request is sent over a separate connection with its own error
+       message, created while the GIL is held, so that the connection
+       cannot be closed meanwhile, but sent without the GIL, since this
+       method may be called while another thread runs a command, and
+       PQrequestCancel() is not thread-safe; the connection must not be
+       used any more after the GIL has been released */
+    encoding = PQclientEncoding(self->cnx);
+#ifdef LIBPQ_HAS_ASYNC_CANCEL
+    {
+        /* this uses the same encryption settings as the connection */
+        PGcancelConn *cancel_conn = PQcancelCreate(self->cnx);
+
+        if (!cancel_conn)
+            return PyErr_NoMemory();
+        Py_BEGIN_ALLOW_THREADS
+        ret = PQcancelBlocking(cancel_conn);
+        Py_END_ALLOW_THREADS
+        if (!ret)
+            set_error_msg_encoded(OperationalError,
+                                  PQcancelErrorMessage(cancel_conn), encoding,
+                                  "Cancel request failed");
+        PQcancelFinish(cancel_conn);
+    }
+#else
+    {
+        char errbuf[256];
+        /* this returns NULL if the connection is not open (or out of
+           memory), and the request is not encrypted */
+        PGcancel *cancel = PQgetCancel(self->cnx);
+
+        if (!cancel) {
+            set_error_msg(OperationalError, "Connection is not open");
+            return NULL;
+        }
+        errbuf[0] = '\0';
+        Py_BEGIN_ALLOW_THREADS
+        ret = PQcancel(cancel, errbuf, (int)sizeof(errbuf));
+        PQfreeCancel(cancel);
+        Py_END_ALLOW_THREADS
+        if (!ret)
+            set_error_msg_encoded(OperationalError, errbuf, encoding,
+                                  "Cancel request failed");
+    }
+#endif
+    if (!ret)
+        return NULL;
+    /* the request was sent, but the command may still have completed */
+    return PyLong_FromLong(1L);
 }
 
 /* Get connection socket. */
@@ -2126,6 +2181,7 @@ conn_poll(connObject *self, PyObject *Py_UNUSED(noargs))
 
     if (!_conn_begin(self))
         return NULL;
+    self->busy = 2; /* the connection data may change, see cancel() */
     Py_BEGIN_ALLOW_THREADS
     rc = PQconnectPoll(self->cnx);
     Py_END_ALLOW_THREADS
