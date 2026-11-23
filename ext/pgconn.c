@@ -79,6 +79,12 @@ conn_getattr(connObject *self, PyObject *nameobj)
         return get_decoded_text(r, pg_encoding_utf8);
     }
 
+    /* server IP address, empty for Unix-domain sockets */
+    if (!strcmp(name, "hostaddr")) {
+        const char *r = PQhostaddr(self->cnx);
+        return get_decoded_text(r ? r : "", pg_encoding_utf8);
+    }
+
     /* postmaster port */
     if (!strcmp(name, "port"))
         return PyLong_FromLong(atol(PQport(self->cnx)));
@@ -110,6 +116,15 @@ conn_getattr(connObject *self, PyObject *nameobj)
     /* protocol version */
     if (!strcmp(name, "protocol_version"))
         return PyLong_FromLong(PQprotocolVersion(self->cnx));
+
+    /* full protocol version (e.g. 30002 for 3.2) */
+    if (!strcmp(name, "full_protocol_version")) {
+#ifdef LIBPQ_HAS_FULL_PROTOCOL_VERSION
+        return PyLong_FromLong(PQfullProtocolVersion(self->cnx));
+#else
+        return PyLong_FromLong(PQprotocolVersion(self->cnx) * 10000L);
+#endif
+    }
 
     /* Python codec name of the client encoding */
     if (!strcmp(name, "encoding")) {
@@ -2343,9 +2358,10 @@ conn_dir(connObject *self, PyObject *Py_UNUSED(noargs))
     if (!(attrs = PyObject_Dir((PyObject *)Py_TYPE(self))))
         return NULL;
     ret = PyObject_CallMethod(
-        attrs, "extend", "[ssssssssssssss]", "host", "port", "db", "options",
-        "error", "status", "user", "protocol_version", "server_version",
-        "encoding", "socket", "backend_pid", "ssl_in_use", "ssl_attributes");
+        attrs, "extend", "[ssssssssssssssss]", "host", "hostaddr", "port",
+        "db", "options", "error", "status", "user", "protocol_version",
+        "full_protocol_version", "server_version", "encoding", "socket",
+        "backend_pid", "ssl_in_use", "ssl_attributes");
     if (!ret) {
         Py_DECREF(attrs);
         return NULL;

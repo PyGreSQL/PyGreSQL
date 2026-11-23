@@ -238,6 +238,7 @@ class Connection:
     """
 
     host: str
+    hostaddr: str
     port: int
     db: str
     options: str
@@ -245,6 +246,7 @@ class Connection:
     status: int
     user : str
     protocol_version: int
+    full_protocol_version: int
     server_version: int
     encoding: str
     socket: int

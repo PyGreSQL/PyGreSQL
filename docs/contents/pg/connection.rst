@@ -899,6 +899,16 @@ the connection and its status. These attributes are:
 
     the host name of the server (str)
 
+.. attribute:: Connection.hostaddr
+
+    the IP address of the server (str)
+
+This is the address the host name has been resolved to, or the address given
+with the ``hostaddr`` connection parameter. It is empty if the connection uses
+a Unix-domain socket.
+
+.. versionadded:: 6.3
+
 .. attribute:: Connection.port
 
     the port of the server (int)
@@ -917,9 +927,21 @@ the connection and its status. These attributes are:
 
 .. attribute:: Connection.protocol_version
 
-    the frontend/backend protocol being used (int)
+    the major version of the frontend/backend protocol being used (int)
 
 .. versionadded:: 4.0
+
+.. attribute:: Connection.full_protocol_version
+
+    the full version of the frontend/backend protocol being used (int)
+
+The version is given as the major version times 10000 plus the minor version,
+e.g. 30002 for version 3.2, which can be used with PostgreSQL 18 and newer if
+it is allowed with the ``max_protocol_version`` connection parameter. If
+PyGreSQL has been built with a libpq older than version 18, the minor version
+cannot be determined and is returned as 0.
+
+.. versionadded:: 6.3
 
 .. attribute:: Connection.server_version
 

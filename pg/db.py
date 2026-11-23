@@ -48,12 +48,14 @@ class DB:
 
     dbname: str
     host: str
+    hostaddr: str
     port: int
     options: str
     error: str
     status: int
     user : str
     protocol_version: int
+    full_protocol_version: int
     server_version: int
     socket: int
     backend_pid: int

@@ -193,6 +193,10 @@ Version 6.3.0 (unreleased)
     returned as strings. Like the other integer types, they are now
     converted in the C extension, so that custom typecasts for ``oid8``
     only apply to fields of records.
+  - New connection attributes `full_protocol_version` with the full version
+    of the protocol (e.g. 30002 for version 3.2, which PostgreSQL 18 can use
+    when requested with the connection parameter ``max_protocol_version``),
+    and `hostaddr` with the IP address of the server (#138).
   - `DB.get_tables()` now also returns partitioned tables, like ``\dt`` in
     psql (#136). Before, only their partitions were returned. The type
     letters for `DB.get_relations()` are now documented completely.

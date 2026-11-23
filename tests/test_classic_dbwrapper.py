@@ -123,13 +123,13 @@ class TestDBClassBasic(unittest.TestCase):
             'encode_json', 'encoding', 'end', 'endcopy', 'error',
             'escape_bytea', 'escape_identifier',
             'escape_literal', 'escape_string',
-            'fileno',
+            'fileno', 'full_protocol_version',
             'get', 'get_as_dict', 'get_as_list',
             'get_attnames', 'get_cast_hook', 'get_databases',
             'get_generated', 'get_notice_receiver',
             'get_parameter', 'get_relations', 'get_tables',
             'getline', 'getlo', 'getnotify',
-            'has_table_privilege', 'host',
+            'has_table_privilege', 'host', 'hostaddr',
             'insert', 'inserttable', 'is_non_blocking',
             'locreate', 'loimport',
             'notification_handler',
@@ -186,6 +186,17 @@ class TestDBClassBasic(unittest.TestCase):
         self.assertIsInstance(protocol_version, int)
         self.assertTrue(2 <= protocol_version < 4)
         self.assertEqual(protocol_version, self.db.db.protocol_version)
+
+    def test_attribute_full_protocol_version(self):
+        full_protocol_version = self.db.full_protocol_version
+        self.assertIsInstance(full_protocol_version, int)
+        self.assertEqual(
+            full_protocol_version, self.db.db.full_protocol_version)
+
+    def test_attribute_hostaddr(self):
+        hostaddr = self.db.hostaddr
+        self.assertIsInstance(hostaddr, str)
+        self.assertEqual(hostaddr, self.db.db.hostaddr)
 
     def test_attribute_server_version(self):
         server_version = self.db.server_version

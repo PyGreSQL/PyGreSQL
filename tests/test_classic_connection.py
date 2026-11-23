@@ -33,6 +33,7 @@ from ipaddress import (
     IPv6Address,
     IPv6Interface,
     IPv6Network,
+    ip_address,
 )
 from typing import Any
 from unittest import mock
@@ -187,7 +188,8 @@ class TestConnectObject(unittest.TestCase):
 
     def test_all_connect_attributes(self):
         attributes = [
-            'backend_pid', 'db', 'encoding', 'error', 'host', 'options',
+            'backend_pid', 'db', 'encoding', 'error',
+            'full_protocol_version', 'host', 'hostaddr', 'options',
             'port', 'protocol_version', 'server_version',
             'socket', 'ssl_attributes', 'ssl_in_use', 'status', 'user']
         connection_attributes = [
@@ -224,6 +226,17 @@ class TestConnectObject(unittest.TestCase):
         self.assertIsInstance(self.connection.host, str)
         self.assertEqual(self.connection.host, host)
 
+    def test_attribute_hostaddr(self):
+        hostaddr = self.connection.hostaddr
+        self.assertIsInstance(hostaddr, str)
+        # the server address is NULL for Unix-domain sockets
+        server_addr = self.connection.query(
+            'select inet_server_addr()').singlescalar()
+        if server_addr is None:
+            self.assertEqual(hostaddr, '')
+        else:
+            ip_address(hostaddr)  # must be a valid IP address
+
     def test_attribute_options(self):
         no_options = ''
         self.assertEqual(self.connection.options, no_options)
@@ -237,6 +250,26 @@ class TestConnectObject(unittest.TestCase):
         protocol_version = self.connection.protocol_version
         self.assertIsInstance(protocol_version, int)
         self.assertTrue(2 <= protocol_version < 4)
+
+    def test_attribute_full_protocol_version(self):
+        connection = self.connection
+        full_protocol_version = connection.full_protocol_version
+        self.assertIsInstance(full_protocol_version, int)
+        self.assertEqual(
+            full_protocol_version // 10000, connection.protocol_version)
+        if pg.get_pqlib_version() < 180000:
+            # the minor version cannot be determined
+            self.assertEqual(full_protocol_version % 10000, 0)
+        elif connection.server_version >= 180000:
+            # protocol version 3.2 can be requested since PostgreSQL 18
+            with mock.patch.dict(
+                    os.environ, {'PGMAXPROTOCOLVERSION': '3.2'}):
+                connection = connect()
+            try:
+                self.assertEqual(connection.full_protocol_version, 30002)
+                self.assertEqual(connection.protocol_version, 3)
+            finally:
+                connection.close()
 
     def test_attribute_server_version(self):
         server_version = self.connection.server_version
