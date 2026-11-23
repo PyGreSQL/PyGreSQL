@@ -358,9 +358,9 @@ get_field_number(const PGresult *res, PyObject *name, int encoding,
    Bytes are passed unchanged as raw text in the client encoding, and str is
    encoded with the client encoding (UnicodeEncodeError if impossible).
    Hstore values are converted to their literal with _pg_text(), which may
-   contain raw text given as bytes, and all other objects are converted with
-   str(). Errors in the conversion are passed. NUL characters are not checked
-   here. */
+   contain raw text given as bytes. Bytearray and memoryview objects raise a
+   TypeError, and all other objects are converted with str(). Errors in the
+   conversion are passed. NUL characters are not checked here. */
 PyObject *
 get_encoded_value(PyObject *obj, int encoding)
 {
@@ -370,6 +370,13 @@ get_encoded_value(PyObject *obj, int encoding)
         return Py_NewRef(obj);
     if (PyUnicode_Check(obj))
         return get_encoded_string(obj, encoding);
+    if (PyByteArray_Check(obj) || PyMemoryView_Check(obj)) {
+        /* these cannot be adapted yet, and str() would give garbage */
+        PyErr_Format(PyExc_TypeError,
+                     "Cannot adapt %s, wrap binary data with Bytea",
+                     Py_TYPE(obj)->tp_name);
+        return NULL;
+    }
     if (hstore_type && PyObject_TypeCheck(obj, (PyTypeObject *)hstore_type))
         str_obj = PyObject_CallMethod(obj, "_pg_text", "s",
                                       get_codec_name(encoding));

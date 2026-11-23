@@ -77,14 +77,19 @@ bytes are passed unchanged as the text representation of the value in the
 client encoding. Values wrapped with :func:`Hstore` are converted to hstore
 literals, in which keys and values given as bytes are also passed unchanged.
 All other objects are converted to strings with ``str()`` and then also
-encoded with the client encoding.
+encoded with the client encoding, except for objects of the types
+:class:`bytearray` and :class:`memoryview`, which raise a :exc:`TypeError`
+since their string representation is not their content. Wrap binary data
+in such objects with :func:`Bytea`.
 Binary data must be wrapped with :func:`Bytea`. It is then sent unchanged
 in binary format as a parameter of type ``bytea`` and may contain any
 bytes, including NUL bytes, which are not allowed in the other parameters.
 
 .. versionchanged:: 6.3
     Values wrapped with :func:`Bytea` are sent as binary data. Before, they
-    were passed as text like plain bytes.
+    were passed as text like plain bytes. Objects of the types
+    :class:`bytearray` and :class:`memoryview` raise a :exc:`TypeError`.
+    Before, their string representation was sent.
 
 If you don't pass any parameters, the command string can also include
 multiple SQL commands (separated by semicolons). You will only get the
@@ -720,7 +725,8 @@ Strings are encoded with the client encoding, bytes are passed unchanged
 as the text representation of the value in the client encoding.
 Other objects are converted like query parameters (see
 :meth:`Connection.query`), i.e. to hstore literals or with ``str()``,
-and then also encoded with the client encoding.
+and then also encoded with the client encoding. Objects of the types
+:class:`bytearray` and :class:`memoryview` raise a :exc:`TypeError`.
 The values must not contain NUL characters, which PostgreSQL does not
 support in text. Binary data for columns of type ``bytea`` must be
 wrapped with :func:`Bytea`; it is then sent in the hex format of bytea

@@ -25,6 +25,13 @@ Version 6.3.0 (unreleased)
     This also applies to inline parameters, which were not properly quoted
     before. Note that bytes passed for text columns are now stored as an
     escaped bytea string like ``\x616263``; pass `str` values for text.
+  - `bytearray` and `memoryview` objects passed as query parameters, as
+    values for `inserttable()`, or as elements of arrays, records and hstore
+    values now raise a `TypeError` (and an `InterfaceError` when passed
+    inline, as before). Before, their `str()` representation such as
+    ``bytearray(b'...')`` or ``<memory at 0x...>`` was sent, and could be
+    stored without an error. Wrap binary data with `Bytea()`. Support for
+    these types is planned for version 6.4 (#153).
   - Backslashes in keys and values of hstore parameters are now escaped.
     Before, they were dropped or caused a syntax error.
   - Keys and values of hstore parameters containing tabs, newlines or other
@@ -226,6 +233,9 @@ Version 6.3.0 (unreleased)
     `TypeCache.get_fields()` are now typed named tuples.
   - Plain `bytes` parameters are now adapted as `bytea`, like values wrapped
     with `Binary()`. Before, they were not properly quoted.
+  - `bytearray` and `memoryview` objects as keys or values of `Hstore`
+    parameters now raise an `InterfaceError`, like these objects in other
+    parameters. Before, their `str()` representation was sent.
   - Objects of the `ipaddress` module can now be passed as parameters, also
     as elements of lists and tuples (#43). Addresses and interfaces are
     adapted as ``inet``, networks as ``cidr``, as in psycopg 3. Before, this
