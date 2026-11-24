@@ -624,8 +624,9 @@ reset typecast functions on the connection level using the methods
 :meth:`DbTypes.get_typecast`, :meth:`DbTypes.set_typecast` and
 :meth:`DbTypes.reset_typecast` of the :attr:`DB.dbtypes` object.  This will
 not affect other connections or future connections.  In order to be sure
-a global change is picked up by a running connection, you must reopen it or
-call :meth:`DbTypes.reset_typecast` on the :attr:`DB.dbtypes` object.
+a global change is picked up by a running connection, you must call
+:meth:`DbTypes.reset_typecast` on the :attr:`DB.dbtypes` object
+(:meth:`DB.reopen` keeps the typecasts of the connection).
 
 Also note that the typecasting for all of the basic types happens already
 in the C extension module.  The typecast functions that can be set with

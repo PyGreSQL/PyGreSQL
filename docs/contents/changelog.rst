@@ -213,6 +213,20 @@ Version 6.3.0 (unreleased)
     values again after `DB.close()` and `DB.reopen()`. Setting or resetting
     the typecast for a type name no longer drops the typecast set for the
     name with a leading underscore, which can be the name of another type.
+  - The built-in default typecasts are now only used for base types, not
+    for composite types, domains, enums and ranges that have the name of a
+    built-in type in another schema, like a composite type ``s.date``.
+    These are now cast like other types of their kind. Before, values of
+    such types raised errors or were cast wrongly (e.g. a composite type
+    ``s.bool`` as `False`), also as fields and array elements, and values
+    of composite types named like a text type were returned as strings.
+    Typecasts that have been set for a type name, locally or globally,
+    still apply to all types with that name. The simple type names of such
+    types and of their arrays, as returned by `DB.get_attnames()` and used
+    for adapting parameters, now also follow the kind of the type (e.g.
+    ``text`` for enums, ``record[]`` for arrays of composite types). Before,
+    they were the names for the built-in type, so that `DB.insert()` could
+    fail or store wrong values.
   - `DB.delete_prepared()` now quotes the name of the prepared statement,
     so that it is taken literally like in `DB.prepare()` and
     `DB.query_prepared()`, and also accepts the name as bytes (#131).
@@ -345,6 +359,12 @@ Version 6.3.0 (unreleased)
     resetting the typecast for a type name no longer drops the typecast set
     for the name with a leading underscore, which can be the name of
     another type.
+  - The built-in default typecasts are now only used for base types, not
+    for composite types, domains, enums and ranges that have the name of a
+    built-in type in another schema, like in the `pg` module. Before,
+    values of such types raised errors or were cast wrongly, also as fields
+    and array elements. Typecasts that have been set for a type name,
+    locally or globally, still apply to all types with that name.
 
 - Fixes in the C extension:
 

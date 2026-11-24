@@ -108,8 +108,8 @@ reset typecast functions on the connection level using the methods
 :meth:`TypeCache.get_typecast`, :meth:`TypeCache.set_typecast` and
 :meth:`TypeCache.reset_typecast` of the :attr:`Connection.type_cache`.  This
 will not affect other connections or future connections.  In order to be sure
-a global change is picked up by a running connection, you must reopen it or
-call :meth:`TypeCache.reset_typecast` on the :attr:`Connection.type_cache`.
+a global change is picked up, you must use a new connection or call
+:meth:`TypeCache.reset_typecast` on the :attr:`Connection.type_cache`.
 
 Module constants
 ----------------

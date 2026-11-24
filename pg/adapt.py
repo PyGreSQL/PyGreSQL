@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, List  # noqa: UP035
 from uuid import UUID
 
 from .attrs import AttrDict
-from .cast import Typecasts
+from .cast import Typecasts, is_builtin_typecast
 from .core import Connection, InterfaceError
 from .helpers import (
     format_text,
@@ -299,21 +299,28 @@ class DbTypes(dict):
             delim, relid, elem = base.delim, base.relid, base.elem
         elif relid:
             simple = 'record'
+        elif typtype not in 'bp':
+            # enums and ranges, the names of built-in types do not apply
+            simple = 'text'
         else:
             simple = _simpletypes[pgtype]
             if simple.endswith('[]'):
                 if category != 'A' or not elem:
                     simple = 'text'  # not an array, only named like one
-                elif simple == 'text[]':
-                    # check for arrays of composite types and domains
+                else:
+                    # the element type might not be the type with the name
+                    # of the array type without the underscore
                     elem_type = self.get(elem)
                     if elem_type:
                         if elem_type.relid:
                             simple = 'record[]'
-                        elif elem_type.base and elem_type.base.elem == 0:
+                        elif elem_type.base:
                             # arrays of domains over arrays are not
                             # multidimensional arrays, keep them as text
-                            simple = _simpletypes[f'_{elem_type.base.pgtype}']
+                            simple = ('text[]' if elem_type.base.elem
+                                      else f'{elem_type.simple}[]')
+                        elif elem_type.typtype not in 'bp':
+                            simple = 'text[]'
         typ = DbType(regtype if self._regtypes else simple)
         typ.oid = oid
         typ.simple = simple
@@ -368,7 +375,8 @@ class DbTypes(dict):
     def _get_cast(self, typ: DbType) -> Callable | None:
         """Get the typecast function for the given type object.
 
-        A typecast set for the name of the type is used first. Otherwise,
+        A typecast set for the name of the type is used first, but the
+        built-in default typecasts only for base types. Otherwise,
         the typecast is created from the base type of domains, the fields
         of composite types or the element type of arrays. These are
         looked up by their OIDs, not by their names, which might be
@@ -387,9 +395,13 @@ class DbTypes(dict):
             pass
         typecasts = self._typecasts
         name = typ.pgtype
+        cast = None
         if name in typecasts or name in typecasts.defaults:
             cast = typecasts[name]
-        else:
+            if typ.typtype not in 'bp' and is_builtin_typecast(name, cast):
+                # built-in typecasts are only used for base types
+                cast = None
+        if cast is None:
             cast = self._create_cast(typ)
         type_casts[oid] = cast
         return cast

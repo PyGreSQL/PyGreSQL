@@ -4791,6 +4791,97 @@ class TestDBClass(unittest.TestCase):
         finally:
             self.db.rollback()
 
+    def test_db_types_with_names_of_builtin_types(self):
+        # the built-in default typecasts are only used for base types, not
+        # for other types with the same name in another schema, but the
+        # typecasts set for a type name are used for all types with that name
+        query = self.db.query
+        dbtypes = self.db.dbtypes
+        s = 'test_types_schema'
+
+        def get(what):
+            return query(f'select {what}').getresult()[0]
+
+        self.db.begin()
+        try:
+            query(f'create schema {s}')
+            query(f'create type {s}.date as (a int, b text)')
+            query(f'create type {s}.json as (a int)')
+            query(f'create type {s}.bool as (a int)')
+            query(f'create type {s}.text as (a int)')
+            query(f'create type {s}.record as (a int, d date)')
+            query(f"create type {s}.time as enum ('morning')")
+            query(f'create type {s}.money as range (subtype = int4)')
+            query(f'create domain {s}.interval as int')
+            query(f'create domain {s}.timestamp as date')
+            query(f'create domain {s}.float8 as {s}.date')
+            query(f'create type {s}.o as'
+                  f' (d {s}.date, i {s}.interval, t {s}.time)')
+            r = get(f"'2020-01-02'::date, (1, 'x')::{s}.date")
+            self.assertEqual(r, (date(2020, 1, 2), (1, 'x')))
+            self.assertEqual(r[1]._fields, ('a', 'b'))
+            self.assertEqual(get(f'row(1)::{s}.json')[0], (1,))
+            self.assertEqual(get(f'row(1)::{s}.bool')[0], (1,))
+            self.assertEqual(get(f'row(1)::{s}.text')[0], (1,))
+            self.assertEqual(get(f"(1, '2020-01-02')::{s}.record")[0],
+                             (1, date(2020, 1, 2)))
+            self.assertEqual(get(f"'morning'::{s}.time, '10:00'::time"),
+                             ('morning', time(10)))
+            self.assertEqual(get(f"'[1,5)'::{s}.money")[0], '[1,5)')
+            self.assertEqual(get(f'5::{s}.interval')[0], 5)
+            self.assertEqual(get(f"(1, 'x')::{s}.float8")[0], (1, 'x'))
+            self.assertEqual(get(
+                f"array[(1, 'x')]::{s}.date[], array['morning']::{s}.time[],"
+                f" array[5]::{s}.interval[],"
+                f" array['2020-01-02']::{s}.timestamp[]"),
+                ([(1, 'x')], ['morning'], [5], [date(2020, 1, 2)]))
+            self.assertEqual(get(f"((1, 'x'), 5, 'morning')::{s}.o")[0],
+                             ((1, 'x'), 5, 'morning'))
+            self.assertEqual(dbtypes.typecast('(1,x)', f'{s}.date'), (1, 'x'))
+            self.assertEqual(dbtypes.typecast('2020-01-02', 'date'),
+                             date(2020, 1, 2))
+            # typecasts set for the name apply to all types with that name
+            dbtypes.set_typecast('date', lambda v: f'D{v}')
+            try:
+                self.assertEqual(get(
+                    f"'2020-01-02'::date, (1, 'x')::{s}.date,"
+                    f" array[(1, 'x')]::{s}.date[]"),
+                    ('D2020-01-02', 'D(1,x)', ['D(1,x)']))
+            finally:
+                dbtypes.reset_typecast('date')
+            self.assertEqual(get(f"'2020-01-02'::date, (1, 'x')::{s}.date"),
+                             (date(2020, 1, 2), (1, 'x')))
+            # parameters are adapted according to the type structure
+            query(f'create table {s}.tab (id int primary key, d {s}.date,'
+                  f' ds {s}.date[], t {s}.time, b {s}.json, i {s}.interval[])')
+            attnames = self.db.get_attnames(f'{s}.tab')
+            self.assertEqual({k: v.simple for k, v in attnames.items()}, dict(
+                id='int', d='record', ds='record[]', t='text', b='record',
+                i='int[]'))
+            r = self.db.insert(f'{s}.tab', id=1, d=(1, 'x'), ds=[(2, 'y')],
+                               t='morning', i=[5])
+            self.assertEqual(r, dict(id=1, d=(1, 'x'), ds=[(2, 'y')],
+                                     t='morning', b=None, i=[5]))
+            self.assertEqual(self.db.get(f'{s}.tab', 1), r)
+            self.assertEqual(self.db.get_as_dict(f'{s}.tab')[1][0], (1, 'x'))
+        finally:
+            self.db.rollback()
+
+    def test_db_types_global_typecast_for_names_of_builtin_types(self):
+        # a global typecast set for the name of a built-in type is used
+        # for all types with that name, like in previous versions
+        query = self.db.query
+        cast = pg.get_typecast('uuid')
+        pg.set_typecast('uuid', lambda v: f'U{v}')
+        try:
+            query('create type pg_temp.uuid as (a int)')
+            self.assertEqual(query(
+                "select '12345678-1234-5678-1234-567812345678'"
+                "::pg_catalog.uuid, row(1)::pg_temp.uuid").getresult()[0],
+                ('U12345678-1234-5678-1234-567812345678', 'U(1)'))
+        finally:
+            pg.set_typecast('uuid', cast)
+
     def test_db_types_global_typecast_for_type_without_typecast(self):
         # a global typecast set for a type without a typecast must be used
         # by the connection even after values of that type have been cast

@@ -712,6 +712,95 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_type_cache_with_names_of_builtin_types(self):
+        # the built-in default typecasts are only used for base types, not
+        # for other types with the same name in another schema, but the
+        # typecasts set for a type name are used for all types with that name
+        s = 'test_types_schema'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            execute = cur.execute
+
+            def get(what):
+                execute(f'select {what}')
+                return cur.fetchone()
+
+            execute(f'create schema {s}')
+            execute(f'create type {s}.date as (a int, b text)')
+            execute(f'create type {s}.json as (a int)')
+            execute(f'create type {s}.bool as (a int)')
+            execute(f'create type {s}.text as (a int)')
+            execute(f'create type {s}.record as (a int, d date)')
+            execute(f"create type {s}.time as enum ('morning')")
+            execute(f'create type {s}.money as range (subtype = int4)')
+            execute(f'create domain {s}.interval as int')
+            execute(f'create domain {s}.timestamp as date')
+            execute(f'create domain {s}.float8 as {s}.date')
+            execute(f'create type {s}.o as'
+                    f' (d {s}.date, i {s}.interval, t {s}.time)')
+            r = get(f"'2020-01-02'::date, (1, 'x')::{s}.date")
+            self.assertEqual(r, (date(2020, 1, 2), (1, 'x')))
+            self.assertEqual(r[1]._fields, ('a', 'b'))
+            self.assertEqual(
+                get(f"'[1]'::json, row(1)::{s}.json"), ([1], (1,)))
+            self.assertEqual(get(f'row(1)::{s}.bool')[0], (1,))
+            self.assertEqual(get(f'row(1)::{s}.text')[0], (1,))
+            self.assertEqual(get(f"(1, '2020-01-02')::{s}.record")[0],
+                             (1, date(2020, 1, 2)))
+            self.assertEqual(get(f"'morning'::{s}.time, '10:00'::time"),
+                             ('morning', time(10)))
+            self.assertEqual(get(f"'[1,5)'::{s}.money")[0], '[1,5)')
+            self.assertEqual(get(f'5::{s}.interval')[0], 5)
+            self.assertEqual(get(f"(1, 'x')::{s}.float8")[0], (1, 'x'))
+            self.assertEqual(get(
+                f"array[(1, 'x')]::{s}.date[], array['morning']::{s}.time[],"
+                f" array[5]::{s}.interval[],"
+                f" array['2020-01-02']::{s}.timestamp[]"),
+                ([(1, 'x')], ['morning'], [5], [date(2020, 1, 2)]))
+            self.assertEqual(get(f"((1, 'x'), 5, 'morning')::{s}.o")[0],
+                             ((1, 'x'), 5, 'morning'))
+            type_cache = con.type_cache
+            self.assertEqual(
+                type_cache.typecast('(1,x)', f'{s}.date'), (1, 'x'))
+            self.assertEqual(type_cache.typecast('2020-01-02', 'date'),
+                             date(2020, 1, 2))
+            # typecasts set for the name apply to all types with that name
+            type_cache.set_typecast('date', lambda v: f'D{v}')
+            try:
+                self.assertEqual(get(
+                    f"'2020-01-02'::date, (1, 'x')::{s}.date,"
+                    f" array[(1, 'x')]::{s}.date[]"),
+                    ('D2020-01-02', 'D(1,x)', ['D(1,x)']))
+            finally:
+                type_cache.reset_typecast('date')
+            self.assertEqual(get(f"'2020-01-02'::date, (1, 'x')::{s}.date"),
+                             (date(2020, 1, 2), (1, 'x')))
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_global_typecast_for_names_of_builtin_types(self):
+        # a global typecast set for the name of a built-in type is used
+        # for all types with that name, like in previous versions
+        pgdb.set_typecast('uuid', lambda v: f'U{v}')
+        try:
+            con = self._connect()
+            try:
+                cur = con.cursor()
+                cur.execute('create type pg_temp.uuid as (a int)')
+                cur.execute(
+                    "select '12345678-1234-5678-1234-567812345678'"
+                    "::pg_catalog.uuid, row(1)::pg_temp.uuid")
+                self.assertEqual(
+                    cur.fetchone(),
+                    ('U12345678-1234-5678-1234-567812345678', 'U(1)'))
+                cur.close()
+            finally:
+                con.close()
+        finally:
+            pgdb.reset_typecast('uuid')
+
     def test_type_cache_global_typecast_for_type_without_typecast(self):
         # a global typecast set for a type without a typecast must be used
         # by the connection even after values of that type have been cast

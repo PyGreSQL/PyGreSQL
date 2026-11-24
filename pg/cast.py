@@ -506,6 +506,23 @@ class Typecasts(dict):
         return cast
 
 
+# the built-in default typecasts, before they can be changed
+_builtin_typecasts = dict(Typecasts.defaults)
+
+
+def is_builtin_typecast(typ: str, cast: Callable | None) -> bool:
+    """Check whether this is the built-in default typecast for the type.
+
+    The built-in default typecasts are made for the base types of
+    PostgreSQL. They should not be used for composite types, domains,
+    enums and ranges that happen to have the same name in another schema,
+    unlike typecasts that have been set explicitly for the name.
+    """
+    if isinstance(cast, partial):  # with an added connection
+        cast = cast.func
+    return cast is not None and cast is _builtin_typecasts.get(typ)
+
+
 def get_typecast(typ: str) -> Callable | None:
     """Get the global typecast function for the given database type."""
     return Typecasts.get_default(typ)

@@ -95,16 +95,19 @@ Changing the typecast function for a type also affects fields of composite
 types with that type, even if values of these composite types have already
 been cast.
 
-Typecasts, including the default typecasts, are set for the names of types, so
-they apply to all types with that name in all schemas. For composite types,
-domains and arrays without a typecast set for their name, the typecast is
+Typecasts are set for the names of types, so a typecast that you set applies to
+all types with that name in all schemas. The built-in default typecasts,
+however, are only used for base types, not for composite types, domains, enums
+and ranges that have the name of a built-in type. For composite types, domains
+and arrays without a typecast set for their name, the typecast is
 created from the types of the fields, the base type or the element type. These
 are looked up by their OIDs, so that this also works for types that are not in
 the search path and for types with the same name in different schemas. The
 typecasts for composite types are cached with their fields. After changing the
 fields, call :meth:`TypeCache.reset_typecast`. Types that have been looked up
 by name stay cached under that name. After changing the search path, call the
-``clear()`` method.
+``clear()`` method. This only affects lookups by name, values in query results
+are always cast according to the OIDs of their types.
 
 .. method:: TypeCache.reset_typecast([typ])
 
@@ -127,7 +130,8 @@ by name stay cached under that name. After changing the search path, call the
     Note that the :class:`TypeCache` is always bound to a database connection.
     You can also get, set and reset typecast functions on a global level using
     the functions :func:`pgdb.get_typecast`, :func:`pgdb.set_typecast` and
-    :func:`pgdb.reset_typecast`.  If you do this, the current database
-    connections will continue to use their already cached typecast functions
-    unless call the :meth:`TypeCache.reset_typecast` method on the
+    :func:`pgdb.reset_typecast`. If you do this, running connections may
+    continue to use typecast functions they have already cached, particularly
+    for type names they have already used. To be sure that a global change is
+    picked up, call :meth:`TypeCache.reset_typecast` for these types on the
     :attr:`Connection.type_cache` objects of the running connections.

@@ -465,6 +465,19 @@ class Typecasts(dict):
 _typecasts = Typecasts()  # this is the global typecast dictionary
 
 
+def is_builtin_typecast(typ: str, cast: Callable | None) -> bool:
+    """Check whether this is the built-in default typecast for the type.
+
+    The built-in default typecasts are made for the base types of
+    PostgreSQL. They should not be used for composite types, domains,
+    enums and ranges that happen to have the same name in another schema,
+    unlike typecasts that have been set explicitly for the name.
+    """
+    if isinstance(cast, partial):  # with an added connection
+        cast = cast.func
+    return cast is not None and cast is Typecasts.defaults.get(typ)
+
+
 def get_typecast(typ: str) -> Callable | None:
     """Get the global typecast function for the given database type."""
     return _typecasts.get(typ)
@@ -645,7 +658,8 @@ class TypeCache(dict):
     def _get_cast(self, typ: TypeCode) -> Callable | None:
         """Get the typecast function for the given type code.
 
-        A typecast set for the name of the type is used first. Otherwise,
+        A typecast set for the name of the type is used first, but the
+        built-in default typecasts only for base types. Otherwise,
         the typecast is created from the base type of domains, the fields
         of composite types or the element type of arrays. These are
         looked up by their OIDs, not by their names, which might be
@@ -662,7 +676,13 @@ class TypeCache(dict):
             return type_casts[oid]
         except KeyError:
             pass
-        cast = self._get_named_cast(str(typ)) or self._create_cast(typ)
+        name = str(typ)
+        cast = self._get_named_cast(name)
+        if cast and typ.type not in 'bp' and is_builtin_typecast(name, cast):
+            # built-in typecasts are only used for base types
+            cast = None
+        if not cast:
+            cast = self._create_cast(typ)
         type_casts[oid] = cast
         return cast
 

@@ -108,16 +108,19 @@ Changing the typecast function for a type also affects fields of composite
 types with that type, even if values of these composite types have already
 been cast.
 
-Typecasts, including the default typecasts, are set for the names of types, so
-they apply to all types with that name in all schemas. For composite types,
-domains and arrays without a typecast set for their name, the typecast is
+Typecasts are set for the names of types, so a typecast that you set applies to
+all types with that name in all schemas. The built-in default typecasts,
+however, are only used for base types, not for composite types, domains, enums
+and ranges that have the name of a built-in type. For composite types, domains
+and arrays without a typecast set for their name, the typecast is
 created from the types of the fields, the base type or the element type. These
 are looked up by their OIDs, so that this also works for types that are not in
 the search path and for types with the same name in different schemas. The
 typecasts for composite types are cached with their fields. After changing the
 fields, call :meth:`DB.get_attnames` with *flush* set. Types that have been
 looked up by name stay cached under that name. After changing the search path,
-call the ``clear()`` method.
+call the ``clear()`` method. This only affects lookups by name, values in query
+results are always cast according to the OIDs of their types.
 
 .. method:: DbTypes.reset_typecast([typ])
 
@@ -138,12 +141,13 @@ call the ``clear()`` method.
 .. note::
 
     Note that :class:`DbTypes` object is always bound to a database connection.
-    You can also get and set and reset typecast functions on a global level
-    using the functions :func:`pg.get_typecast` and :func:`pg.set_typecast`.
-    If you do this, the current database connections will continue to use their
-    already cached typecast functions unless you reset the typecast functions
-    by calling the :meth:`DbTypes.reset_typecast` method on :attr:`DB.dbtypes`
-    objects of the running connections.
+    You can also get and set typecast functions on a global level using the
+    functions :func:`pg.get_typecast` and :func:`pg.set_typecast`. If you do
+    this, running connections may continue to use typecast functions they have
+    already cached, particularly for type names they have already used. To be
+    sure that a global change is picked up, call :meth:`DbTypes.reset_typecast`
+    for these types on the :attr:`DB.dbtypes` objects of the running
+    connections.
 
     Also note that the typecasting for all of the basic types happens already
     in the C low-level extension module.  The typecast functions that can be
