@@ -570,7 +570,9 @@ class TypeCache(dict):
         self._defaults_changed = Typecasts.defaults_changed
         self._query_pg_type = (
             "SELECT t.oid, t.typname, t.typlen, t.typtype, t.typcategory,"
-            " t.typdelim, t.typrelid, t.typbasetype, t.typelem"
+            " t.typdelim, t.typrelid, t.typbasetype, t.typelem,"
+            " (SELECT e.typtype FROM pg_catalog.pg_type e"
+            " WHERE e.oid OPERATOR(pg_catalog.=) t.typelem)"
             " FROM pg_catalog.pg_type t WHERE {}")
 
     def __missing__(self, key: int | str | bytes) -> TypeCode:
@@ -603,13 +605,16 @@ class TypeCache(dict):
             type_code = self[oid]
         else:
             delim, relid, elem, base = r[5], int(r[6]), int(r[8]), None
+            elem_type = r[9] or ''  # the type of the element type
             if r[3] == 'd' and int(r[7]):
                 # domains are handled like their base types
                 base = self[int(r[7])]
                 base = base.base or base  # resolve domains over domains
                 delim, relid, elem = base.delim, base.relid, base.elem
+                elem_type = base._elem_type
             type_code = TypeCode.create(
                 oid, r[1], int(r[2]), r[3], r[4], delim, relid, base, elem)
+            type_code._elem_type = elem_type
         # a type found by OID is not cached under its name, since this name
         # could refer to a different type that comes first in the search path
         self[type_code.oid] = self[key] = type_code

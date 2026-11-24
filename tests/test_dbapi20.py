@@ -18,6 +18,7 @@ from typing import Any, ClassVar
 from uuid import UUID as Uuid  # noqa: N811
 
 import pgdb
+from pgdb.typecode import TypeCode
 
 from . import dbapi20
 from .config import dbhost, dbname, dbpasswd, dbport, dbuser
@@ -777,6 +778,81 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             self.assertEqual(get(f"'2020-01-02'::date, (1, 'x')::{s}.date"),
                              (date(2020, 1, 2), (1, 'x')))
             cur.close()
+        finally:
+            con.close()
+
+    def test_type_objects_with_names_of_builtin_types(self):
+        # type codes of types that have the names of built-in types in
+        # another schema must not be considered equal to their type objects
+        s = 'test_types_schema'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            execute = cur.execute
+            execute(f'create schema {s}')
+            execute(f'create type {s}.date as (a int)')
+            execute(f"create type {s}.json as enum ('x')")
+            execute(f'create type {s}._q as (a int)')
+            execute(f'create type {s}.int4 as range (subtype = float8)')
+            execute(f'create domain {s}.int8 as text')
+            execute(f'create domain {s}.d as date')
+            execute(f"select row(1)::{s}.date, 'x'::{s}.json,"
+                    f" array[row(1)]::{s}.date[], array['x']::{s}.json[],"
+                    f" row(1)::{s}._q, '2020-01-02'::date, '{{1}}'::int[],"
+                    f" '[1,2)'::{s}.int4, array['x']::{s}.int8[],"
+                    f" array['2020-01-02']::{s}.d[]")
+            date_, json, dates, jsons, q, d, ia, r, i8s, ds = (
+                desc.type_code for desc in cur.description)
+            cur.close()
+            self.assertEqual(date_, 'date')
+            self.assertEqual(date_, pgdb.RECORD)
+            self.assertNotEqual(date_, pgdb.DATE)
+            self.assertNotEqual(date_, pgdb.DATETIME)
+            self.assertNotEqual(date_, pgdb.ARRAY)
+            self.assertNotEqual(json, pgdb.JSON)
+            self.assertNotEqual(json, pgdb.RECORD)
+            self.assertEqual(dates, pgdb.ARRAY)
+            self.assertNotEqual(dates, pgdb.DATE)
+            self.assertNotEqual(dates, pgdb.RECORD)
+            self.assertEqual(jsons, pgdb.ARRAY)
+            self.assertNotEqual(jsons, pgdb.JSON)
+            self.assertEqual(q, pgdb.RECORD)
+            self.assertNotEqual(q, pgdb.ARRAY)
+            self.assertNotEqual(r, pgdb.INTEGER)
+            self.assertNotEqual(r, pgdb.NUMBER)
+            self.assertEqual(i8s, pgdb.ARRAY)
+            self.assertNotEqual(i8s, pgdb.LONG)
+            self.assertEqual(ds, pgdb.ARRAY)
+            self.assertNotEqual(ds, pgdb.DATE)  # like before
+            # reversed operands (the type object is the first operand)
+            self.assertNotEqual(pgdb.DATE, date_)
+            self.assertEqual(pgdb.RECORD, date_)
+            self.assertNotEqual(pgdb.ARRAY, q)
+            self.assertNotEqual(pgdb.JSON, jsons)
+            # built-in types and their arrays are compared as before
+            self.assertEqual(d, pgdb.DATE)
+            self.assertEqual(d, pgdb.DATETIME)
+            self.assertNotEqual(d, pgdb.ARRAY)
+            self.assertNotEqual(d, pgdb.RECORD)
+            self.assertEqual(ia, pgdb.ARRAY)
+            self.assertEqual(ia, pgdb.INTEGER)
+            self.assertNotEqual(ia, pgdb.DATE)
+            # domains are not compared like their base types (as before)
+            self.assertNotEqual(con.type_cache[f'{s}.d'], pgdb.DATE)
+            # strings without type information are compared by name
+            self.assertEqual('date', pgdb.DATE)
+            self.assertEqual('_date', pgdb.DATE)
+            self.assertEqual('_date', pgdb.ARRAY)
+            self.assertEqual('record', pgdb.RECORD)
+            self.assertEqual(TypeCode('date'), pgdb.DATE)
+            self.assertNotEqual(TypeCode('date'), pgdb.RECORD)
+            # type codes created without the element type, as before 6.3
+            ia = TypeCode.create(1007, '_int4', -1, 'b', 'A', ',', 0)
+            self.assertEqual(ia, pgdb.ARRAY)
+            self.assertEqual(ia, pgdb.INTEGER)
+            ia = TypeCode.create(1007, '_int4', -1, 'b', 'A', ',', 0, None, 23)
+            self.assertEqual(ia, pgdb.ARRAY)
+            self.assertEqual(ia, pgdb.INTEGER)
         finally:
             con.close()
 

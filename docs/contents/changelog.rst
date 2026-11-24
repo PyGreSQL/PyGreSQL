@@ -365,6 +365,12 @@ Version 6.3.0 (unreleased)
     values of such types raised errors or were cast wrongly, also as fields
     and array elements. Typecasts that have been set for a type name,
     locally or globally, still apply to all types with that name.
+  - The type objects like `DATE` or `JSON` are now only equal to type codes
+    of base types and arrays of base types with that name, and `ARRAY` and
+    `RECORD` check the type codes instead of their names. Before, the type
+    code of a composite type ``s.date`` was equal to `DATE`, and a composite
+    type named ``_q`` was equal to `ARRAY`. Plain strings and type codes
+    without type information are still compared by name.
 
 - Fixes in the C extension:
 

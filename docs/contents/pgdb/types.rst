@@ -109,6 +109,15 @@ of the :class:`DbType` objects defined below.  Type objects can be equal to
 more than one type code (e.g. :class:`DATETIME` is equal to the type codes
 for ``date``, ``time`` and ``timestamp`` columns).
 
+Type codes of arrays are also equal to the type objects of their elements.
+The type objects for built-in types are only equal to the type codes of base
+types and of arrays of base types, so that composite types, domains, enums and
+ranges that have the name of a built-in type in another schema are not
+mistaken for that type. Plain strings are compared by name.
+
+.. versionchanged:: 6.3
+    Before, type codes were compared by name only.
+
 The pgdb module exports the following :class:`DbType` objects as part of the
 DB-API 2 standard:
 

@@ -11,7 +11,7 @@ from typing import Any
 from uuid import UUID as Uuid  # noqa: N811
 
 from pg.core import InterfaceError
-from pg.helpers import join_text
+from pg.helpers import is_array_type, join_text
 
 from .typecode import TypeCode
 
@@ -50,6 +50,45 @@ __all__ = [
 ]
 
 
+def _type_code_with_info(typ: str) -> TypeCode | None:
+    """Get the type code if it carries type information.
+
+    Returns None for other strings and type codes without information.
+    """
+    if not isinstance(typ, TypeCode) or not hasattr(typ, 'oid'):
+        return None
+    return typ
+
+
+def _is_array_type_code(typ: TypeCode) -> bool:
+    """Check whether the type code with type information is an array."""
+    if typ.elem:
+        return is_array_type(typ, typ.len, typ.elem)
+    # type code created without the element type, as before version 6.3
+    return typ.category == 'A' and typ.startswith('_')
+
+
+def _type_name(typ: str) -> str | None:
+    """Get the type name for comparing a type with a type object.
+
+    Arrays are compared like their element types. Type codes with type
+    information are compared by their names only if they are base or
+    pseudo types, arrays only if their elements are, since other types
+    can have the names of built-in types in other schemas.
+    """
+    type_code = _type_code_with_info(typ)
+    if type_code is None:
+        return typ.removeprefix('_')
+    if _is_array_type_code(type_code):
+        elem_type = type_code._elem_type
+        if elem_type and elem_type not in ('b', 'p'):
+            return None
+        return type_code[1:]
+    if type_code.type not in ('b', 'p'):
+        return None
+    return type_code
+
+
 class DbType(frozenset):
     """Type class for a couple of PostgreSQL data types.
 
@@ -66,15 +105,14 @@ class DbType(frozenset):
     def __eq__(self, other: Any) -> bool:
         """Check whether types are considered equal."""
         if isinstance(other, str):
-            other = other.removeprefix('_')
-            return other in self
+            name = _type_name(other)
+            return name is not None and name in self
         return super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:
         """Check whether types are not considered equal."""
         if isinstance(other, str):
-            other = other.removeprefix('_')
-            return other not in self
+            return not self.__eq__(other)
         return super().__ne__(other)
 
 
@@ -84,13 +122,16 @@ class ArrayType:
     def __eq__(self, other: Any) -> bool:
         """Check whether arrays are equal."""
         if isinstance(other, str):
-            return other.startswith('_')
+            type_code = _type_code_with_info(other)
+            if type_code is None:
+                return other.startswith('_')
+            return _is_array_type_code(type_code)
         return isinstance(other, ArrayType)
 
     def __ne__(self, other: Any) -> bool:
         """Check whether arrays are different."""
         if isinstance(other, str):
-            return not other.startswith('_')
+            return not self.__eq__(other)
         return not isinstance(other, ArrayType)
 
 
@@ -99,18 +140,17 @@ class RecordType:
 
     def __eq__(self, other: Any) -> bool:
         """Check whether records are equal."""
-        if isinstance(other, TypeCode):
-            return other.type == 'c'
         if isinstance(other, str):
-            return other == 'record'
+            type_code = _type_code_with_info(other)
+            if type_code is None:
+                return other == 'record'
+            return type_code.type == 'c'
         return isinstance(other, RecordType)
 
     def __ne__(self, other: Any) -> bool:
         """Check whether records are different."""
-        if isinstance(other, TypeCode):
-            return other.type != 'c'
         if isinstance(other, str):
-            return other != 'record'
+            return not self.__eq__(other)
         return not isinstance(other, RecordType)
 
 

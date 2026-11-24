@@ -20,6 +20,7 @@ class TypeCode(str):
     relid: int
     base: TypeCode | None = None
     elem: int = 0
+    _elem_type: str = ''  # the type of the element type (for comparisons)
 
     # noinspection PyShadowingBuiltins
     @classmethod
