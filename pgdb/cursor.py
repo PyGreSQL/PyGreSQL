@@ -262,8 +262,8 @@ class Cursor:
         """Close the cursor object."""
         self._src.close()
 
-    def execute(self, operation: str, parameters: Sequence | None = None
-                ) -> Cursor:
+    def execute(self, operation: str,
+                parameters: Mapping | Sequence | None = None) -> Cursor:
         """Prepare and execute a database operation (query or command)."""
         # The parameters may also be specified as list of tuples to e.g.
         # insert multiple rows in a single operation, but this kind of
@@ -278,7 +278,8 @@ class Cursor:
         return self.executemany(operation, [parameters])
 
     def executemany(self, operation: str,
-                    seq_of_parameters: Sequence[Sequence | None]) -> Cursor:
+                    seq_of_parameters: Sequence[Mapping | Sequence | None]
+                    ) -> Cursor:
         """Prepare operation and execute it against a parameter sequence."""
         if not seq_of_parameters:
             # don't do anything without parameters

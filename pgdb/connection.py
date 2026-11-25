@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from typing import Any
 
@@ -146,15 +146,16 @@ class Connection:
     if shortcutmethods:  # otherwise do not implement and document this
 
         def execute(self, operation: str,
-                    parameters: Sequence | None = None) -> Cursor:
+                    parameters: Mapping | Sequence | None = None
+                    ) -> Cursor:
             """Shortcut method to run an operation on an implicit cursor."""
             cursor = self.cursor()
             cursor.execute(operation, parameters)
             return cursor
 
         def executemany(self, operation: str,
-                        seq_of_parameters: Sequence[Sequence | None]
-                        ) -> Cursor:
+                        seq_of_parameters: Sequence[
+                            Mapping | Sequence | None]) -> Cursor:
             """Shortcut method to run an operation against a sequence."""
             cursor = self.cursor()
             cursor.executemany(operation, seq_of_parameters)
