@@ -877,7 +877,9 @@ class Adapter:
             return value
         if isinstance(value, bytes):
             value = self.db.escape_bytea(value).decode('ascii')
-        elif isinstance(value, (datetime, date, time, timedelta)):
+            value = self.db.escape_string(value)
+            return f"'{value}'::bytea"
+        if isinstance(value, (datetime, date, time, timedelta)):
             value = str(value)
         if isinstance(value, str):
             value = self.db.escape_string(value)

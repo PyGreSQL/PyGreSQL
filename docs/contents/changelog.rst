@@ -28,8 +28,10 @@ Version 6.3.0 (unreleased)
     Before, they were adapted as text, which truncated binary data at NUL
     bytes and failed for bytes that were not valid in the client encoding.
     This also applies to inline parameters, which were not properly quoted
-    before. Note that bytes passed for text columns are now stored as an
-    escaped bytea string like ``\x616263``; pass `str` values for text.
+    before and are now passed as typed literals like ``'\x6162'::bytea``,
+    also as elements of arrays. Note that bytes passed for text columns are
+    now stored as an escaped bytea string like ``\x616263``; pass `str`
+    values for text.
   - `bytearray` and `memoryview` objects passed as query parameters, as
     values for `inserttable()`, or as elements of arrays, records and hstore
     values now raise a `TypeError` (and an `InterfaceError` when passed
@@ -285,7 +287,9 @@ Version 6.3.0 (unreleased)
   - The items of `Cursor.description` and the results of
     `TypeCache.get_fields()` are now typed named tuples.
   - Plain `bytes` parameters are now adapted as `bytea`, like values wrapped
-    with `Binary()`. Before, they were not properly quoted.
+    with `Binary()`. They are passed as typed literals like
+    ``'\x6162'::bytea``, also as elements of arrays. Before, they were not
+    properly quoted.
   - `bytearray` and `memoryview` objects as keys or values of `Hstore`
     parameters now raise an `InterfaceError`, like these objects in other
     parameters. Before, their `str()` representation was sent.

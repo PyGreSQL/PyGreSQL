@@ -94,7 +94,8 @@ class Cursor:
             case None:
                 return 'NULL'
             case bytes():
-                return f"'{self._cnx.escape_bytea(value).decode('ascii')}'"
+                value = self._cnx.escape_bytea(value).decode('ascii')
+                return f"'{value}'::bytea"
             case str():
                 return f"'{self._escape_text(value)}'"
             case Hstore():

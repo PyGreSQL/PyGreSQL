@@ -1604,6 +1604,18 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_bytes_params_are_typed_as_bytea(self):
+        # bytes must also be bytea where the type cannot be inferred
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute('select %s, pg_typeof(%s)::text, %s',
+                        (b'a\0b', b'', [[b'c', None]]))
+            self.assertEqual(
+                cur.fetchone(), (b'a\0b', 'bytea', [[b'c', None]]))
+        finally:
+            con.close()
+
     def test_error_message_when_adapting_parameters(self):
         # the message must name the operation, not the previous command
         operation = 'select %s'

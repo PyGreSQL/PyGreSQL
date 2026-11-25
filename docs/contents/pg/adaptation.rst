@@ -274,7 +274,8 @@ written back unchanged.
 Binary data passed as a parameter of type ``bytea`` is sent to the server
 unchanged in binary format, so it does not need to be escaped and does not
 depend on settings like ``standard_conforming_strings``. Binary data in
-arrays and records and binary data passed inline are sent as escaped text.
+arrays and records and binary data passed inline are sent as escaped text,
+the latter as typed literals like ``'\x6162'::bytea``.
 
 Objects of the types :class:`bytearray` and :class:`memoryview` cannot be
 adapted yet; convert them to ``bytes`` before passing them. They raise a

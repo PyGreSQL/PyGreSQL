@@ -5797,7 +5797,7 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(params, [b'(1,"\\\\x005cff")'])
         self.assertNotIsInstance(params[0], pg.Bytea)
         sql, params = format_query('%s', (data,), inline=True)
-        self.assertEqual(sql, "'\\x005cff'")
+        self.assertEqual(sql, "'\\x005cff'::bytea")
         self.assertEqual(params, [])
 
     def test_adapt_query_typed_hstore_with_raw_bytes_as_text(self):
@@ -5959,8 +5959,12 @@ class TestDBClassAdapter(unittest.TestCase):
         sql, params = format_query(
             "select %s, %s", (value, [b'a', b'']), inline=True)
         self.assertEqual(
-            sql, "select '\\x69742773205c2000ff', ARRAY['\\x61','\\x']")
+            sql, "select '\\x69742773205c2000ff'::bytea,"
+            " ARRAY['\\x61'::bytea,'\\x'::bytea]")
         self.assertEqual(params, [])
+        # the values are returned as bytes, also in untyped contexts
+        self.assertEqual(self.db.query(sql).getresult(),
+                         [(value, [b'a', b''])])
 
     def test_adapt_query_inline_dict(self):
         format_query = self.adapter.format_query
