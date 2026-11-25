@@ -389,11 +389,12 @@ it's no different from a connection made using blocking calls.
 
 The required steps are to pass the parameter ``nowait=True`` to  the
 :meth:`pg.connect` call, then call :meth:`Connection.poll` until it either
-returns :const:`POLLING_OK` or raises an exception. To avoid blocking
-in :meth:`Connection.poll`, use ``select()`` or ``poll()`` to wait for the
+returns :const:`POLLING_OK` or raises an exception. Before each call of
+:meth:`Connection.poll`, use ``select()`` or ``poll()`` to wait for the
 connection to be readable or writable, depending on the return code of the
-previous call to :meth:`Connection.poll`. The initial state of the connection
-is :const:`POLLING_WRITING`. The possible states are defined as constants in
+previous call to :meth:`Connection.poll`. This is required by libpq: calling
+:meth:`Connection.poll` too early can stall the connection attempt.
+The initial state of the connection is :const:`POLLING_WRITING`. The possible states are defined as constants in
 the :mod:`pg` module (:const:`POLLING_OK`, :const:`POLLING_FAILED`,
 :const:`POLLING_READING` and :const:`POLLING_WRITING`).
 

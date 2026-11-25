@@ -18,6 +18,7 @@ import gc
 import hashlib
 import hmac
 import os
+import select
 import socket
 import sys
 import tempfile
@@ -92,6 +93,22 @@ def connect_nowait():
                       user=dbuser, passwd=dbpasswd, nowait=True)
 
 
+def wait_for_poll(connection: pg.Connection, rc: int) -> None:
+    """Wait until the connection is ready for the next poll() call.
+
+    libpq requires this: depending on the result of the last poll() call
+    (initially POLLING_WRITING), the socket must be readable or writable.
+    Calling poll() too early can stall the connection (seen on macOS).
+    """
+    fileno = connection.fileno()
+    if rc == pg.POLLING_READING:
+        ready = select.select([fileno], [], [], 10)[0]
+    else:
+        ready = select.select([], [fileno], [], 10)[1]
+    if not ready:
+        raise TimeoutError('The connection is not ready to be polled')
+
+
 class TestCanConnect(unittest.TestCase):
     """Test whether a basic connection to PostgreSQL is possible."""
 
@@ -159,10 +176,10 @@ class TestCanConnect(unittest.TestCase):
                                 user=dbuser, passwd=dbpasswd, nowait=True)
         try:
             with self.assertRaises(pg.ConnectError) as cm:
-                for _n in range(1000):
-                    if connection.poll() == pg.POLLING_OK:
-                        break
-                    time.sleep(0.01)
+                rc = pg.POLLING_WRITING
+                while rc != pg.POLLING_OK:
+                    wait_for_poll(connection, rc)
+                    rc = connection.poll()
             self.assertIsInstance(cm.exception, pg.OperationalError)
             self.assertIsInstance(cm.exception, pg.InternalError)
         finally:
@@ -171,9 +188,11 @@ class TestCanConnect(unittest.TestCase):
     def test_can_connect_no_wait(self):
         try:
             connection = connect_nowait()
+            wait_for_poll(connection, pg.POLLING_WRITING)
             rc = connection.poll()
             self.assertIn(rc, (pg.POLLING_READING, pg.POLLING_WRITING))
             while rc not in (pg.POLLING_OK, pg.POLLING_FAILED):
+                wait_for_poll(connection, rc)
                 rc = connection.poll()
         except pg.Error as error:
             self.fail(f'Cannot connect to database {dbname}:\n{error}')
