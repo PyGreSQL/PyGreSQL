@@ -13,7 +13,8 @@ For development, you can build the C extension in place like this:
 
 The custom build_ext options are --strict (treat compiler warnings as
 errors), --pedantic (enable extra compiler warnings), --analyze (run the
-static analyzer of gcc, slow) and --memory-size or --no-memory-size
+static analyzer of gcc, slow), --coverage (instrument the C extension for
+coverage measurement with gcov) and --memory-size or --no-memory-size
 (enabled by default if supported). Note that build frontends do not
 pass these options through as simple config settings.
 You need to pass them as build options instead, like this:
@@ -30,6 +31,7 @@ import warnings
 
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
+from setuptools.errors import OptionError
 
 min_py_version = 3, 10  # supported: Python >= 3.10
 max_py_version = 4, 0  # and < 4.0
@@ -86,6 +88,7 @@ library_dirs = [sysconfig.get_path("purelib"), pg_config('libdir')]
 define_macros = [('PYGRESQL_VERSION', version)]
 undef_macros = []
 extra_compile_args = ['-O2', '-funsigned-char', '-Wall', '-Wconversion']
+extra_link_args = []
 
 
 class BuildPgExt(build_ext):
@@ -97,11 +100,13 @@ class BuildPgExt(build_ext):
         ('strict', None, "count all compiler warnings as errors"),
         ('pedantic', None, "enable extra compiler warnings"),
         ('analyze', None, "run the static analyzer of gcc (slow)"),
+        ('coverage', None,
+         "instrument the C extension for coverage measurement with gcov"),
         ('memory-size', None, "enable memory size function"),
         ('no-memory-size', None, "disable memory size function")]
 
     boolean_options = [*build_ext.boolean_options,  # noqa: RUF012
-        'strict', 'pedantic', 'analyze', 'memory-size']
+        'strict', 'pedantic', 'analyze', 'coverage', 'memory-size']
 
     negative_opt = {  # noqa: RUF012
         'no-memory-size': 'memory-size'}
@@ -112,6 +117,7 @@ class BuildPgExt(build_ext):
         self.strict = False
         self.pedantic = False
         self.analyze = False
+        self.coverage = False
         self.memory_size = None
         supported = pg_version >= min_pg_version
         if not supported:
@@ -134,6 +140,17 @@ class BuildPgExt(build_ext):
             # dereference, so the analysis must be done without them
             extra_compile_args[extra_compile_args.index('-O2')] = '-O0'
             extra_compile_args.append('-fanalyzer')
+        if self.coverage:
+            if self.analyze:
+                raise OptionError(
+                    "The options --analyze and --coverage cannot be combined")
+            # optimizations merge or remove lines, which makes the
+            # coverage report misleading; some tests use threads, so the
+            # counters must be updated atomically
+            extra_compile_args[extra_compile_args.index('-O2')] = '-O0'
+            extra_compile_args.extend(
+                ['--coverage', '-fprofile-update=atomic'])
+            extra_link_args.append('--coverage')
         if self.strict:
             extra_compile_args.append('-Werror')
         wanted = self.memory_size
@@ -159,6 +176,9 @@ class BuildPgExt(build_ext):
                 if platform.architecture()[0] == '64bit':  # needs MinGW-w64
                     define_macros.append(('MS_WIN64', None))
             elif compiler_type == 'msvc':  # Microsoft Visual C++
+                if self.coverage:
+                    raise OptionError(
+                        "The option --coverage needs gcc or clang")
                 extra_compile_args[1:] = ['-J', '-W3', '-WX', '-wd4391']
         super().build_extensions()
 
@@ -179,6 +199,7 @@ setup(
         ],
         include_dirs=include_dirs, library_dirs=library_dirs,
         define_macros=define_macros, undef_macros=undef_macros,
-        libraries=libraries, extra_compile_args=extra_compile_args)],
+        libraries=libraries, extra_compile_args=extra_compile_args,
+        extra_link_args=extra_link_args)],
     cmdclass=dict(build_ext=BuildPgExt),
 )
