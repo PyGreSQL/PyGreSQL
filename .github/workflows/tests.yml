@@ -85,6 +85,14 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install tox
         run: pip install tox
+      - name: Enable SSL on the database server
+        # with the self-signed certificate of the image (service containers
+        # cannot be started with options, so the setting is changed later)
+        run: |
+          docker exec ${{ job.services.postgresql.id }} psql -U test -c \
+            "alter system set ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'" \
+            -c "alter system set ssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'" \
+            -c "alter system set ssl = on" -c "select pg_reload_conf()"
       - name: Run tests
         env:
           MATRIX_PYTHON: ${{ matrix.python }}
@@ -97,11 +105,15 @@ jobs:
     # the whole job usually takes less than 2 minutes
     timeout-minutes: 15
 
+    # the newest server with UTF8 and the oldest server with SQL_ASCII
+    # together reach all code (see the coverage-thorough env in tox.ini)
     env:
-      PYGRESQL_DB: test
-      PYGRESQL_HOST: 127.0.0.1
       PYGRESQL_USER: test
       PYGRESQL_PASSWD: test
+      PYGRESQL_NEWEST_HOST: 127.0.0.1
+      PYGRESQL_NEWEST_PORT: 5432
+      PYGRESQL_OLDEST_HOST: 127.0.0.1
+      PYGRESQL_OLDEST_PORT: 5433
 
     services:
       postgresql:
@@ -111,6 +123,20 @@ jobs:
           POSTGRES_PASSWORD: test
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --log-opt max-size=1m
+          --log-opt max-file=1
+      oldest:
+        image: postgres:12
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -134,18 +160,32 @@ jobs:
           python-version: "3.15"
       - name: Install tox
         run: pip install tox
+      - name: Enable SSL on the database server
+        # with the self-signed certificate of the image (service containers
+        # cannot be started with options, so the setting is changed later)
+        run: |
+          docker exec ${{ job.services.postgresql.id }} psql -U test -c \
+            "alter system set ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'" \
+            -c "alter system set ssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'" \
+            -c "alter system set ssl = on" -c "select pg_reload_conf()"
+      - name: Create a database with SQL_ASCII on the oldest server
+        run: |
+          docker exec ${{ job.services.oldest.id }} \
+            createdb -U test -E SQL_ASCII -T template0 test_ascii
       - name: Run tests with coverage measurement
-        # fails if the coverage of the Python or C code is below the minimum
-        run: tox -e coverage
+        # fails if not all statements of the Python and C code are covered
+        run: tox -e coverage-thorough
         timeout-minutes: 5
       - name: Write coverage summary
         if: ${{ !cancelled() && hashFiles('htmlcov/c/coverage.json') != '' }}
         run: |
           {
             echo "### Python code"
-            .tox/coverage/bin/coverage report --format=markdown --fail-under=0
+            .tox/coverage-thorough/bin/coverage report --format=markdown \
+              --fail-under=0
             echo
-            .tox/coverage/bin/gcovr --add-tracefile htmlcov/c/coverage.json \
+            .tox/coverage-thorough/bin/gcovr \
+              --add-tracefile htmlcov/c/coverage.json \
               --markdown-summary --markdown-title "C extension" \
               --markdown-heading-level 3
           } >> "$GITHUB_STEP_SUMMARY"

@@ -77,6 +77,13 @@ do
     psql -c "create extension hstore" test_latin1
     psql -c "create extension hstore" test_latin9
     psql -c "create extension hstore" test_cyrillic
+
+    # enable SSL with the self-signed certificate of the image, so that the
+    # tests can also cover SSL connections (they request SSL explicitly)
+    psql -c "alter system set ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'"
+    psql -c "alter system set ssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'"
+    psql -c "alter system set ssl = on"
+    psql -c "select pg_reload_conf()"
 done
 
 export PGDATABASE=test

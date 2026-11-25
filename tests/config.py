@@ -17,6 +17,10 @@ from os import environ
 
 get = environ.get
 
+# The tests connect without SSL, unless PGSSLMODE is set otherwise.
+# The tests of the SSL attributes request SSL explicitly.
+environ.setdefault('PGSSLMODE', 'disable')
+
 dbname = get('PYGRESQL_DB', get('PGDATABASE', 'test'))
 dbhost = get('PYGRESQL_HOST', get('PGHOST', 'localhost'))
 dbport = int(get('PYGRESQL_PORT', get('PGPORT', 5432)))
