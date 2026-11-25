@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2026 by the PyGreSQL Development Team
  *
- * Please see the LICENSE.TXT file for specific restrictions.
+ * Please see the LICENSE.txt file for specific restrictions.
  */
 
 /* Note: This should be linked against the same C runtime lib as Python */

@@ -4,7 +4,7 @@
 
 This software is Public Domain and may be used without restrictions.
 
-Some modernization of the code has been done by the PyGreSQL team.
+Some modernization of the code has been done by the PyGreSQL Development Team.
 """
 
 from __future__ import annotations

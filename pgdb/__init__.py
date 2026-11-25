@@ -6,11 +6,11 @@
 #
 # Copyright (c) 2026 by the PyGreSQL Development Team
 #
-# Please see the LICENSE.TXT file for specific restrictions.
+# Please see the LICENSE.txt file for specific restrictions.
 
 """pgdb - DB-API 2.0 compliant module for PyGreSQL.
 
-(c) 1999, Pascal Andre <andre@via.ecp.fr>.
+(c) 1999, Pascal Andre <andre@chimay.via.ecp.fr>.
 See package documentation for further information on copyright.
 
 This module implements the Python Database API Specification v2.0

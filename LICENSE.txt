@@ -1,4 +1,4 @@
-Written by D'Arcy J.M. Cain (darcy@PyGreSQL.org)
+Written by D'Arcy J.M. Cain (darcy@pygresql.org)
 
 Based heavily on code written by Pascal Andre (andre@chimay.via.ecp.fr)
 

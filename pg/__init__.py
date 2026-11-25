@@ -9,7 +9,7 @@
 # The notification handler is based on pgnotify which is
 # Copyright (c) 2001 Ng Pheng Siong. All rights reserved.
 #
-# Please see the LICENSE.TXT file for specific restrictions.
+# Please see the LICENSE.txt file for specific restrictions.
 
 """PyGreSQL classic interface.
 

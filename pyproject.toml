@@ -3,7 +3,7 @@ name = "PyGreSQL"
 version = "6.3.0"
 requires-python = ">=3.10"
 authors = [
-  {name = "D'Arcy J. M. Cain", email = "darcy@pygresql.org"},
+  {name = "D'Arcy J.M. Cain", email = "darcy@pygresql.org"},
   {name = "Christoph Zwerschke", email = "cito@online.de"},
 ]
 description = "Python PostgreSQL interfaces"

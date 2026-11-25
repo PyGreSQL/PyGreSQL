@@ -1,16 +1,18 @@
 Copyright notice
 ================
 
-Written by D'Arcy J.M. Cain (darcy@druid.net)
+Written by D'Arcy J.M. Cain (darcy@pygresql.org)
 
 Based heavily on code written by Pascal Andre (andre@chimay.via.ecp.fr)
 
 Copyright (c) 1995, Pascal Andre
 
 Further modifications copyright (c) 1997-2008 by D'Arcy J.M. Cain
-(darcy@PyGreSQL.org)
 
-Further modifications copyright (c) 2009-2026 by the PyGreSQL team.
+Further modifications copyright (c) 2009-2026 by the PyGreSQL Development Team
+
+PyGreSQL is released under the PostgreSQL License, a liberal Open Source
+license, similar to the BSD or MIT licenses:
 
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose, without fee, and without a written agreement

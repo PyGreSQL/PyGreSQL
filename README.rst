@@ -7,7 +7,7 @@ powerful PostgreSQL features from Python.
 
 PyGreSQL should run on most platforms where PostgreSQL and Python are running.
 It is based on the PyGres95 code written by Pascal Andre.
-D'Arcy J. M. Cain renamed it to PyGreSQL starting with version 2.0
+D'Arcy J.M. Cain renamed it to PyGreSQL starting with version 2.0
 and serves as the "BDFL" of PyGreSQL.
 Christoph Zwerschke volunteered as another maintainer and has been the main
 contributor since version 3.8 of PyGreSQL.

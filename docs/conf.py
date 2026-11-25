@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'PyGreSQL'
-author = 'The PyGreSQL team'
+author = 'The PyGreSQL Development Team'
 copyright = '2026, ' + author
 
 def project_version():
