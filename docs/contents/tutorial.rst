@@ -70,7 +70,7 @@ Or, you can add a whole bunch of fruits at the same time using the
 command of PostgreSQL to insert all data in one batch operation, which is much
 faster than sending many individual INSERT commands::
 
-    >>> more_fruits = 'cherimaya durian eggfruit fig grapefruit'.split()
+    >>> more_fruits = 'cherimoya durian eggfruit fig grapefruit'.split()
     >>> data = list(enumerate(more_fruits, start=3))
     >>> db.inserttable('fruits', data)
     5
@@ -83,7 +83,7 @@ the *fruits* table::
     --+----------
      1|apple
      2|banana
-     3|cherimaya
+     3|cherimoya
      4|durian
      5|eggfruit
      6|fig
@@ -119,7 +119,7 @@ Using the method :meth:`DB.get_as_dict`, you can easily import the whole table
 into a Python dictionary mapping the primary key *id* to the *name*::
 
     >>> db.get_as_dict('fruits', scalar=True)
-    {1: 'apple', 2: 'banana', 3: 'cherimaya', 4: 'durian', 5: 'eggfruit',
+    {1: 'apple', 2: 'banana', 3: 'cherimoya', 4: 'durian', 5: 'eggfruit',
      6: 'fig', 7: 'grapefruit'}
 
 To change a single row in the database, you can use the :meth:`DB.update`
@@ -132,7 +132,7 @@ method. For instance, if you want to capitalize the name 'banana'::
     --+---------
      1|apple
      2|Banana
-     3|cherimaya
+     3|cherimoya
     (3 rows)
 
 Let's also capitalize the other names in the database::
@@ -219,7 +219,7 @@ You can pass parameters in a safe way::
 
 To insert multiple rows at once, you can use the following method::
 
-   >>> more_fruits = 'cherimaya durian eggfruit fig grapefruit'.split()
+   >>> more_fruits = 'cherimoya durian eggfruit fig grapefruit'.split()
    >>> parameters = [(name,) for name in more_fruits]
    >>> cursor.executemany("insert into fruits (name) values (%s)", parameters)
 
