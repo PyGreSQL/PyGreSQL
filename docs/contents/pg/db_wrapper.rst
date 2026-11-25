@@ -1039,8 +1039,9 @@ has only one column anyway.
     :param bool scalar: whether only the first column shall be returned
     :returns: the content of the table as a dictionary
     :rtype: dict
-    :raises TypeError: the table name has not been specified
-    :raises KeyError: keyname(s) are invalid or not part of the result
+    :raises TypeError: the table name has not been specified,
+        or the keyname is not a column name or a sequence of names
+    :raises KeyError: keyname(s) not part of the result
     :raises pg.ProgrammingError: no keyname(s) and table has no primary key
 
 This method is similar to :meth:`DB.get_as_list`, but returns the table as

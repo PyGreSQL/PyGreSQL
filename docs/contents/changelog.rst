@@ -26,6 +26,9 @@ Version 6.3.0 (unreleased)
     encoding, like `escape_literal()` and `escape_identifier()`. Before,
     such characters were silently replaced with invalid characters.
   - `format_query()` now also accepts builtin generic types like `list[int]`.
+  - `DB.get_as_dict()` now raises a `TypeError` instead of a `KeyError` if
+    the keyname is not a column name or a sequence of names, like `DB.get()`
+    and similar methods.
   - `DB.set_parameter()` and `DB.truncate()` now raise a `ValueError` for
     lists of different lengths instead of silently ignoring extra items.
   - Empty hstore values (e.g. an empty dict) passed as parameters for hstore

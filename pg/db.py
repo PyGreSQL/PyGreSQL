@@ -1306,17 +1306,9 @@ class DB:
         """
         if not table:
             raise TypeError('The table name is missing')
+        keynames = self._get_keynames(table, keyname)
         if not keyname:
-            try:
-                keyname = self.pkeys(table)
-            except (KeyError, ValueError, ProgrammingError) as e:
-                raise prg_error(f'Table {table} has no primary key') from e
-        if isinstance(keyname, str):
-            keynames: list[str] | tuple[str, ...] = (keyname,)
-        elif isinstance(keyname, (list, tuple)):
-            keynames = keyname
-        else:
-            raise KeyError('The keyname must be a string, list or tuple')
+            keyname = keynames
         if what:
             if isinstance(what, (list, tuple)):
                 what = ', '.join(map(str, what))

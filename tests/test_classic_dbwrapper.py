@@ -2936,9 +2936,10 @@ class TestDBClass(unittest.TestCase):
         self.create_table(
             table, 'id smallint primary key, rgb char(7), name varchar',
             values=colors)
-        # keyname must be string, list or tuple
-        self.assertRaises(KeyError, get_as_dict, table, 3)
-        self.assertRaises(KeyError, get_as_dict, table, dict(id=None))
+        # keyname must be a column name or a sequence of names
+        self.assertRaises(TypeError, get_as_dict, table, 3)
+        self.assertRaises(TypeError, get_as_dict, table, dict(id=None))
+        self.assertRaises(TypeError, get_as_dict, table, ['id', 3])
         # missing keyname in row
         self.assertRaises(KeyError, get_as_dict, table,
                           keyname='rgb', what='name')
