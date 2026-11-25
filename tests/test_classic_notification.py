@@ -127,6 +127,35 @@ class TestSyncNotification(unittest.TestCase):
         self.assertFalse(handler.listening)
         handler.unlisten()
 
+    def test_notify_escapes_payload(self):
+        handler = self.get_handler()
+        handler.listen()
+        payloads = [
+            "it's", 'back\\slash', 'with "double" quotes',
+            "x'; notify test_async_notification, 'injected"]
+        for payload in payloads:
+            handler.notify(payload=payload)
+        handler.notify(payload=b"raw 'bytes'")  # raw text, passed unchanged
+        handler()
+        self.assertFalse(self.timeout)
+        self.assertEqual(self.payloads, [*payloads, "raw 'bytes'"])
+        handler.unlisten()
+
+    def test_notify_escapes_event_names(self):
+        for event in ('Mixed Case', 'with "quotes"', "it's", 'a; b'):
+            handler = self.get_handler(event)
+            self.assertEqual(handler.stop_event, f'stop_{event}')
+            handler.listen()
+            handler.notify(payload='foo')
+            handler()
+            self.assertEqual(self.payloads, ['foo'])
+            self.assertTrue(handler.listening)
+            handler.notify(stop=True, payload='bar')
+            handler()
+            self.assertEqual(self.payloads, ['foo', 'bar'])
+            self.assertFalse(handler.listening)
+            del self.payloads[:]
+
     def test_notify_wrong_event(self):
         handler = self.get_handler('good_event')
         self.assertEqual(handler.timeout, 0)

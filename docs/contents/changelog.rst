@@ -12,6 +12,11 @@ Version 6.3.0 (unreleased)
 
 - Changes in the `pg` module:
 
+  - The notification handler now properly escapes the payload and the
+    channel names. Before, they were put into the SQL commands unescaped,
+    so that a payload containing a single quote caused a syntax error and
+    could be used for SQL injection, and channel names could not contain
+    double quotes. Payloads can now also be passed as raw bytes.
   - `format_query()` now also accepts builtin generic types like `list[int]`.
   - `DB.set_parameter()` and `DB.truncate()` now raise a `ValueError` for
     lists of different lengths instead of silently ignoring extra items.

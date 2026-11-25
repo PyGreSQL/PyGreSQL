@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from .core import Query
 from .error import db_error
+from .helpers import join_text
 
 if TYPE_CHECKING:
     from .db import DB
@@ -66,23 +67,24 @@ class NotificationHandler:
         """Start listening for the event and the stop event."""
         db = self.db
         if db and not self.listening:
-            db.query(f'listen "{self.event}"')
-            db.query(f'listen "{self.stop_event}"')
+            for event in (self.event, self.stop_event):
+                db.query('listen ' + db.escape_identifier(event))
             self.listening = True
 
     def unlisten(self) -> None:
         """Stop listening for the event and the stop event."""
         db = self.db
         if db and self.listening:
-            db.query(f'unlisten "{self.event}"')
-            db.query(f'unlisten "{self.stop_event}"')
+            for event in (self.event, self.stop_event):
+                db.query('unlisten ' + db.escape_identifier(event))
             self.listening = False
 
     def notify(self, db: DB | None = None, stop: bool = False,
-               payload: str | None = None) -> Query | None:
+               payload: str | bytes | None = None) -> Query | None:
         """Generate a notification.
 
-        Optionally, you can pass a payload with the notification.
+        Optionally, you can pass a payload with the notification. A payload
+        given as bytes is raw text in the client encoding.
 
         If you set the stop flag, a stop notification will be sent that
         will cause the handler to stop listening.
@@ -101,10 +103,12 @@ class NotificationHandler:
             if not db:
                 return None
         event = self.stop_event if stop else self.event
-        cmd = f'notify "{event}"'
+        parts: list[str | bytes] = ['notify ' + db.escape_identifier(event)]
         if payload:
-            cmd += f", '{payload}'"
-        return db.query(cmd)
+            if not isinstance(payload, (str, bytes)):
+                payload = str(payload)
+            parts.append(db.escape_literal(payload))
+        return db.query(join_text(parts, ', ', lambda: db.encoding))
 
     def __call__(self) -> None:
         """Invoke the notification handler.

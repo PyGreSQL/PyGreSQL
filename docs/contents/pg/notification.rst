@@ -83,11 +83,14 @@ database directly, or using the following method:
     :param db: the database connection for sending the notification
     :type db: :class:`DB` or :class:`Connection`
     :param bool stop: whether to produce a normal event or a stop event
-    :param str payload: an optional payload to be sent with the notification
+    :param payload: an optional payload to be sent with the notification
+    :type payload: str or bytes
 
 This method sends a notification event together with an optional *payload*.
 If you set the *stop* flag, a stop notification will be sent instead of
 a normal notification.  This will cause the handler to stop listening.
+The payload and the names of the channels are properly escaped. A payload
+given as ``bytes`` is raw text in the client encoding and sent unchanged.
 Note that the notification is only sent while the handler is listening,
 otherwise this method does nothing and returns ``None``.
 
