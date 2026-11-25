@@ -273,6 +273,10 @@ Version 6.3.0 (unreleased)
 
 - Changes in the `pgdb` module:
 
+  - Like in the `pg` module, the connection is now passed to typecast
+    functions that take a parameter named ``connection``, as documented.
+    Before, only a parameter named ``cnx`` was recognized, which is still
+    supported.
   - `Connection.commit()` and `Connection.rollback()` no longer mark the
     transaction as ended when the command could not be sent, e.g. because
     the connection is busy.

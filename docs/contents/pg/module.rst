@@ -643,8 +643,9 @@ you can set these using the following functions.
 The typecast function must take one string object as argument and return a
 Python object into which the PostgreSQL type shall be cast.  If the function
 takes another parameter named *connection*, then the current database
-connection will also be passed to the typecast function.  This may sometimes
-be necessary to look up certain database settings.
+connection (the low-level :class:`Connection`) will also be passed to the
+typecast function.  This may sometimes be necessary to look up certain
+database settings.
 
 .. versionadded:: 5.0
 

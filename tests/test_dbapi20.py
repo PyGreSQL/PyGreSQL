@@ -17,6 +17,7 @@ from ipaddress import (
 from typing import Any, ClassVar
 from uuid import UUID as Uuid  # noqa: N811
 
+import pg
 import pgdb
 from pgdb.typecode import TypeCode
 
@@ -1016,6 +1017,36 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
             r = cur.fetchone()[0]
             self.assertEqual(r, (1, 2))
             self.assertEqual(r._fields, ('a', 'b'))
+            cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_typecast_with_connection(self):
+        # like in pg, the connection is passed to a typecast function
+        # with a parameter named 'connection' (also with the name 'cnx')
+        def cast_connection(value, connection):
+            return value, connection
+
+        def cast_cnx(value, cnx):
+            return value, cnx
+
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cnx = con._cnx
+            self.assertIsInstance(cnx, pg.Connection)
+            con.type_cache.set_typecast('int4', cast_connection)
+            con.type_cache.set_typecast('int8', cast_cnx)
+            cur.execute('select 1::int4, 2::int8')
+            self.assertEqual(cur.fetchone(), (('1', cnx), ('2', cnx)))
+            con.type_cache.reset_typecast()
+            pgdb.set_typecast('int2', cast_connection)
+            try:
+                cur.execute('select 3::int2')
+                self.assertEqual(cur.fetchone(), (('3', cnx),))
+            finally:
+                pgdb.reset_typecast('int2')
+                con.type_cache.reset_typecast('int2')
             cur.close()
         finally:
             con.close()

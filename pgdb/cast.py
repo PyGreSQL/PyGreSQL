@@ -363,19 +363,29 @@ class Typecasts(dict):
         return cast
 
     @staticmethod
-    def _needs_connection(func: Callable) -> bool:
-        """Check if a typecast function needs a connection argument."""
+    def _connection_arg(func: Callable) -> str | None:
+        """Get the name of the connection argument of a typecast function.
+
+        Like in the pg module, the argument is named 'connection'. The name
+        'cnx' used by the built-in typecast functions is also accepted.
+        """
         try:
-            args = get_args(func)
+            args = get_args(func)[1:]
         except (TypeError, ValueError):
-            return False
-        return 'cnx' in args[1:]
+            return None
+        for name in ('connection', 'cnx'):
+            if name in args:
+                return name
+        return None
 
     def _add_connection(self, cast: Callable) -> Callable:
         """Add a connection argument to the typecast function if necessary."""
-        if not self.cnx or not self._needs_connection(cast):
+        if not self.cnx:
             return cast
-        return partial(cast, cnx=self.cnx)
+        name = self._connection_arg(cast)
+        if not name:
+            return cast
+        return partial(cast, **{name: self.cnx})
 
     def get(self, typ: str, default: Callable | None = None  # type: ignore[override]
             ) -> Callable | None:

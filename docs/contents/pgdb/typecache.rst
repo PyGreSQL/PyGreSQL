@@ -89,10 +89,15 @@ the following methods:
     :type cast: callable or None
 
 The typecast function must take one string object as argument and return a
-Python object into which the PostgreSQL type shall be casted.  If the function
-takes another parameter named *connection*, then the current database
-connection will also be passed to the typecast function.  This may sometimes
-be necessary to look up certain database settings.
+Python object into which the PostgreSQL type shall be cast.  If the function
+takes another parameter named *connection*, then the low-level
+:class:`pg.Connection` underlying the current database connection will also
+be passed to the typecast function, like in the :mod:`pg` module.  This may
+sometimes be necessary to look up certain database settings.
+
+.. versionchanged:: 6.3
+    Before, the connection was only passed to a parameter named *cnx*,
+    which is still supported.
 
 Changing the typecast function for a type also affects fields of composite
 types with that type, even if values of these composite types have already
