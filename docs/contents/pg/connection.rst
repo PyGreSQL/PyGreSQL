@@ -1004,10 +1004,14 @@ getlo -- build a large object from given oid
     :rtype: :class:`LargeObject`
     :raises TypeError: invalid connection, bad parameter type, or too many
         parameters
-    :raises ValueError: bad OID value (0 is invalid_oid)
+    :raises ValueError: bad OID value (0, negative or not 32-bit)
 
 This method allows reusing a previously created large object through the
 :class:`LargeObject` interface, provided the user has its OID.
+
+.. versionchanged:: 6.3
+    OIDs of 2\ :sup:`31` and above can now be passed. Before, they raised
+    a :exc:`TypeError`, and negative numbers were converted to such OIDs.
 
 loimport -- import a file to a large object
 -------------------------------------------

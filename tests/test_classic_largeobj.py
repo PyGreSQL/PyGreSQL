@@ -106,6 +106,36 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.assertIsInstance(r, bytes)
         self.assertEqual(r, data)
 
+    def test_get_lo_with_large_oid(self):
+        # OIDs are unsigned, this raised a TypeError before
+        oid = 3_000_000_000
+        self.c.query(f'select lo_create({oid})')
+        large_object = self.c.getlo(oid)
+        try:
+            self.assertIsLargeObject(large_object)
+            self.assertEqual(large_object.oid, oid)
+            self.assertIn(f'oid {oid}', str(large_object))
+            large_object.open(pg.INV_WRITE)
+            large_object.write(b'data')
+            large_object.close()
+            large_object.open(pg.INV_READ)
+            self.assertEqual(large_object.read(80), b'data')
+            large_object.close()
+        finally:
+            del large_object
+
+    def test_get_lo_with_invalid_oid(self):
+        getlo = self.c.getlo
+        for oid in (0, -1, 2**32, 2**64):
+            # negative OIDs were silently converted before
+            self.assertRaises(ValueError, getlo, oid)
+        for bad_oid in (None, '1', 1.0, True):
+            self.assertRaises(TypeError, getlo, bad_oid)
+        with self.assertRaises(ValueError) as cm:
+            getlo(-1)
+        self.assertEqual(str(cm.exception), 'Invalid large object OID: -1')
+        self.assertEqual(getlo(2**32 - 1).oid, 2**32 - 1)
+
     def test_lo_import(self):
         f : Any
         if windows:

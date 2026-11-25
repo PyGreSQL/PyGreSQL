@@ -266,7 +266,7 @@ _conn_non_query_result(int status, PGresult *result, PGconn *cnx)
             }
             /* for a single insert, return the oid */
             PQclear(result);
-            return PyLong_FromLong((long)oid);
+            return PyLong_FromUnsignedLong((unsigned long)oid);
         }
         case PGRES_COPY_OUT: /* no data will be received */
         case PGRES_COPY_IN:
@@ -2203,29 +2203,42 @@ static char conn_getlo__doc__[] =
 static PyObject *
 conn_getlo(connObject *self, PyObject *args)
 {
-    int oid;
-    Oid lo_oid;
+    PyObject *oid_obj, *int_obj;
+    long long value;
+    int overflow;
 
     /* checks validity */
     if (!_check_cnx_obj(self)) {
         return NULL;
     }
 
-    /* gets arguments */
-    if (!PyArg_ParseTuple(args, "i", &oid)) {
+    /* gets arguments (OIDs are unsigned 32-bit integers) */
+    if (!PyArg_ParseTuple(args, "O", &oid_obj)) {
+        return NULL;
+    }
+    if (!PyIndex_Check(oid_obj) || PyBool_Check(oid_obj)) {
         PyErr_SetString(PyExc_TypeError,
                         "Method getlo() takes an integer argument");
         return NULL;
     }
-
-    lo_oid = (Oid)oid;
-    if (lo_oid == 0) {
+    if (!(int_obj = PyNumber_Index(oid_obj)))
+        return NULL;
+    value = PyLong_AsLongLongAndOverflow(int_obj, &overflow);
+    Py_DECREF(int_obj);
+    if (value == -1 && PyErr_Occurred())
+        return NULL;
+    if (overflow || value < 0 || value > (long long)UINT_MAX) {
+        PyErr_Format(PyExc_ValueError, "Invalid large object OID: %R",
+                     oid_obj);
+        return NULL;
+    }
+    if (!value) {
         PyErr_SetString(PyExc_ValueError, "The object oid can't be null");
         return NULL;
     }
 
     /* creates object */
-    return (PyObject *)large_new(self, lo_oid);
+    return (PyObject *)large_new(self, (Oid)value);
 }
 
 /* Import unix file. */

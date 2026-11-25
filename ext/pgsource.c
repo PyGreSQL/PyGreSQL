@@ -277,7 +277,7 @@ source_oidstatus(sourceObject *self, PyObject *Py_UNUSED(noargs))
         Py_RETURN_NONE;
     }
 
-    return PyLong_FromLong((long)oid);
+    return PyLong_FromUnsignedLong((unsigned long)oid);
 }
 
 /* Fetch rows from last result. */
@@ -721,8 +721,9 @@ _source_buildinfo(sourceObject *self, int num)
     /* affects field information */
     PyTuple_SET_ITEM(result, 0, PyLong_FromLong(num));
     PyTuple_SET_ITEM(result, 1, name);
-    PyTuple_SET_ITEM(result, 2,
-                     PyLong_FromLong((long)PQftype(self->result, num)));
+    PyTuple_SET_ITEM(
+        result, 2,
+        PyLong_FromUnsignedLong((unsigned long)PQftype(self->result, num)));
     PyTuple_SET_ITEM(result, 3, PyLong_FromLong(PQfsize(self->result, num)));
     PyTuple_SET_ITEM(result, 4, PyLong_FromLong(PQfmod(self->result, num)));
 

@@ -33,9 +33,9 @@ large_str(largeObject *self)
 {
     char str[80];
     snprintf(str, sizeof(str),
-             self->lo_fd >= 0 ? "Opened large object, oid %ld"
-                              : "Closed large object, oid %ld",
-             (long)self->lo_oid);
+             self->lo_fd >= 0 ? "Opened large object, oid %lu"
+                              : "Closed large object, oid %lu",
+             (unsigned long)self->lo_oid);
     return PyUnicode_FromString(str);
 }
 
@@ -102,7 +102,7 @@ large_getattr(largeObject *self, PyObject *nameobj)
     /* large object oid */
     if (!strcmp(name, "oid")) {
         if (_check_lo_obj(self, 0))
-            return PyLong_FromLong((long)self->lo_oid);
+            return PyLong_FromUnsignedLong((unsigned long)self->lo_oid);
         PyErr_Clear();
         Py_RETURN_NONE;
     }

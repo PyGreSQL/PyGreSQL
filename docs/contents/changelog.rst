@@ -21,6 +21,11 @@ Version 6.3.0 (unreleased)
     so that a payload containing a single quote caused a syntax error and
     could be used for SQL injection, and channel names could not contain
     double quotes. Payloads can now also be passed as raw bytes.
+  - `Connection.getlo()` now accepts OIDs of 2**31 and above, which raised
+    a `TypeError` before, and raises a `ValueError` for negative numbers,
+    which were converted to such OIDs. OIDs of 2**31 and above are now also
+    returned correctly on Windows (as `LargeObject.oid`, by `query()` and
+    `oidstatus()`, and as type OIDs by `fieldinfo()` and `listinfo()`).
   - The messages of the `OSError` raised by the COPY methods `putline()`,
     `getline()` and `endcopy()`, by `set_non_blocking()` and by the methods
     `putdata()` and `getdata()` of source objects no longer contain the

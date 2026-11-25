@@ -601,8 +601,9 @@ _query_build_field_info(PGresult *res, int col_num, int encoding)
     }
     else {
         PyTuple_SET_ITEM(info, 0, name);
-        PyTuple_SET_ITEM(info, 1,
-                         PyLong_FromLong((long)PQftype(res, col_num)));
+        PyTuple_SET_ITEM(
+            info, 1,
+            PyLong_FromUnsignedLong((unsigned long)PQftype(res, col_num)));
         PyTuple_SET_ITEM(info, 2, PyLong_FromLong(PQfsize(res, col_num)));
         PyTuple_SET_ITEM(info, 3, PyLong_FromLong(PQfmod(res, col_num)));
     }
