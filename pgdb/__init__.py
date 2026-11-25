@@ -13,55 +13,23 @@
 (c) 1999, Pascal Andre <andre@via.ecp.fr>.
 See package documentation for further information on copyright.
 
-Inline documentation is sparse.
-See DB-API 2.0 specification for usage information:
-http://www.python.org/peps/pep-0249.html
+This module implements the Python Database API Specification v2.0
+(PEP 249, https://peps.python.org/pep-0249/) on top of the classic
+pg module. Basic usage:
 
-Basic usage:
+    con = pgdb.connect(host='localhost:5432', database='test')
+    cur = con.cursor()
+    cur.execute("SELECT * FROM fruits WHERE name = %(name)s",
+                {'name': 'apple'})
+    rows = cur.fetchall()  # list of named tuples
+    con.commit()
+    con.close()
 
-    pgdb.connect(connect_string) # open a connection
-    # connect_string = 'host:database:user:password:opt'
-    # All parts are optional. You may also pass host through
-    # password as keyword arguments. To pass a port,
-    # pass it in the host keyword parameter:
-    connection = pgdb.connect(host='localhost:5432')
+Parameters are passed separately as a sequence or a mapping and are
+properly quoted by the module (paramstyle 'pyformat').
 
-    cursor = connection.cursor() # open a cursor
-
-    cursor.execute(query[, params])
-    # Execute a query, binding params (a dictionary) if they are
-    # passed. The binding syntax is the same as the % operator
-    # for dictionaries, and no quoting is done.
-
-    cursor.executemany(query, list of params)
-    # Execute a query many times, binding each param dictionary
-    # from the list.
-
-    cursor.fetchone() # fetch one row, [value, value, ...]
-
-    cursor.fetchall() # fetch all rows, [[value, value, ...], ...]
-
-    cursor.fetchmany([size])
-    # returns size or cursor.arraysize number of rows,
-    # [[value, value, ...], ...] from result set.
-    # Default cursor.arraysize is 1.
-
-    cursor.description # returns information about the columns
-    #	[(column_name, type_name, display_size,
-    #		internal_size, precision, scale, null_ok), ...]
-    # Note that display_size, precision, scale and null_ok
-    # are not implemented.
-
-    cursor.rowcount # number of rows available in the result set
-    # Available after a call to execute.
-
-    connection.commit() # commit transaction
-
-    connection.rollback() # or rollback transaction
-
-    cursor.close() # close the cursor
-
-    connection.close() # close the connection
+See the documentation at https://pygresql.github.io/contents/
+for details and for the extensions to the DB-API 2.0.
 """
 
 from pg.core import (

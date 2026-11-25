@@ -15,5 +15,5 @@ The authoritative programming information for the DB-API is :pep:`0249`.
 .. seealso::
 
     A useful tutorial-like `introduction to the DB-API
-    <http://www2.linuxjournal.com/lj-issues/issue49/2605.html>`_
+    <https://www.linuxjournal.com/article/2605>`_
     has been written by Andrew M. Kuchling for the LINUX Journal in 1998.

@@ -3,8 +3,8 @@ Module functions and constants
 
 .. currentmodule:: pgdb
 
-The :mod:`pgdb` module defines a :func:`connect` function that allows to
-connect to a database, some global constants describing the capabilities
+The :mod:`pgdb` module defines a :func:`connect` function that allows you
+to connect to a database, some global constants describing the capabilities
 of the module as well as several exception classes.
 
 connect -- Open a PostgreSQL connection
@@ -48,7 +48,7 @@ get/set/reset_typecast -- Control the global typecast functions
 PyGreSQL uses typecast functions to cast the raw data coming from the
 database to Python objects suitable for the particular database type.
 These functions take a single string argument that represents the data
-to be casted and must return the casted value.
+to be cast and must return the cast value.
 
 PyGreSQL provides built-in typecast functions for the common database types,
 but if you want to change these or add more typecast functions, you can set
@@ -74,8 +74,9 @@ these up using the following functions.
 
     :param typ: PostgreSQL type name or type code, or list of such
     :type typ: str or list
-    :param cast: the typecast function to be set for the specified type(s)
-    :type typ: str or int
+    :param cast: the typecast function to be set for the specified type(s),
+        or ``None`` to remove a typecast that has been set
+    :type cast: callable or None
 
 The typecast function must take one string object as argument and return a
 Python object into which the PostgreSQL type shall be casted.  If the function
@@ -87,16 +88,18 @@ be necessary to look up certain database settings.
 
 As of version 5.0.3 you can also use this method to change the typecasting
 of PostgreSQL array types. You must run ``set_typecast('anyarray', cast)``
-in order to do this. The ``cast`` method must take a string value and a cast
-function for the base type and return the array converted to a Python object.
-For instance, run ``set_typecast('anyarray', lambda v, c: v)`` to switch off
-the casting of arrays completely, and always return them encoded as strings.
+in order to do this. The ``cast`` function must take a string value and a
+cast function for the element type, and for element types with a delimiter
+other than a comma also the delimiter as bytes, and return the array converted
+to a Python object. For instance, run
+``set_typecast('anyarray', lambda v, c, d=None: v)`` to switch off the
+casting of arrays completely, and always return them encoded as strings.
 
 .. method:: reset_typecast([typ])
 
     Reset the typecasts for the specified (or all) type(s) to their defaults
 
-    :param str typ: PostgreSQL type name or type code, or list of such,
+    :param typ: PostgreSQL type name or type code, or list of such,
         or None to reset all typecast functions
     :type typ: str, list or None
 
@@ -129,6 +132,11 @@ Module constants
 
     The string constant ``pyformat``, stating that parameters should be passed
     using Python extended format codes, e.g. ``" ... WHERE name=%(name)s"``.
+
+.. data:: version
+          __version__
+
+    The version of PyGreSQL as a string, e.g. ``'6.3.0'``.
 
 Errors raised by this module
 ----------------------------
@@ -169,6 +177,10 @@ The errors that can be raised by the :mod:`pgdb` module are the following:
     and not necessarily under the control of the programmer, e.g. an unexpected
     disconnect occurs, the data source name is not found, a transaction could
     not be processed, or a memory allocation error occurred during processing.
+
+.. exception:: InternalError
+
+    Exception raised when the database encounters an internal error.
 
 .. exception:: IntegrityError
 

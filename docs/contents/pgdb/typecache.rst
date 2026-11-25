@@ -9,7 +9,8 @@ TypeCache -- The internal cache for database types
 
 The internal :class:`TypeCache` of PyGreSQL is not part of the DB-API 2
 standard, but is documented here in case you need full control and
-understanding of the internal handling of database types.
+understanding of the internal handling of database types. Each connection
+has its own type cache, available as :attr:`Connection.type_cache`.
 
 The TypeCache is essentially a dictionary mapping PostgreSQL internal
 type names and type OIDs to DB-API 2 "type codes" (which are also returned
@@ -30,7 +31,7 @@ that does not exist never aborts the current transaction.
     a type that did not exist aborted the current transaction.
 
 These type codes are strings which are equal to the PostgreSQL internal
-type name, but they are also carrying additional information about the
+type name, but they also carry additional information about the
 associated PostgreSQL type in the following attributes:
 
         - *oid* -- the OID of the type
@@ -53,7 +54,7 @@ type, which is also the type code in :attr:`Cursor.description`.
     The *base* and *elem* attributes have been added.
 
 For details, see the PostgreSQL documentation on `pg_type
-<http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.
+<https://www.postgresql.org/docs/current/catalog-pg-type.html>`_.
 
 In addition to the dictionary methods, the :class:`TypeCache` provides
 the following methods:
@@ -64,8 +65,9 @@ the following methods:
 
     :param typ: PostgreSQL type name or OID of a composite type
     :type typ: str or int
-    :returns: a list of pairs of field names and types
-    :rtype: list
+    :returns: a list of named tuples with the *name* and the *type*
+        (type code) of each field, or None if the type is not composite
+    :rtype: list or None
 
 .. method:: TypeCache.get_typecast(typ)
 
@@ -82,8 +84,9 @@ the following methods:
 
     :param typ: PostgreSQL type name or type code, or list of such
     :type typ: str or list
-    :param cast: the typecast function to be set for the specified type(s)
-    :type typ: str or int
+    :param cast: the typecast function to be set for the specified type(s),
+        or ``None`` to remove a typecast that has been set
+    :type cast: callable or None
 
 The typecast function must take one string object as argument and return a
 Python object into which the PostgreSQL type shall be casted.  If the function
@@ -113,7 +116,7 @@ are always cast according to the OIDs of their types.
 
     Reset the typecasts for the specified (or all) type(s) to their defaults
 
-    :param str typ: PostgreSQL type name or type code, or list of such,
+    :param typ: PostgreSQL type name or type code, or list of such,
         or None to reset all typecast functions
     :type typ: str, list or None
 
@@ -121,9 +124,10 @@ are always cast according to the OIDs of their types.
 
     Cast the given value according to the given database type
 
+    :param value: the value to be cast, as returned by the database
     :param typ: PostgreSQL type name, type code or OID
     :type typ: str or int
-    :returns: the casted value
+    :returns: the cast value
 
 .. note::
 

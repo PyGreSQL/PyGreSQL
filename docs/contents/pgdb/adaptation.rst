@@ -127,7 +127,7 @@ to a query. For example::
     >>> con = pgdb.connect(...)
     >>> cur = con.cursor()
     >>> parameters = (144, 3.75, 'hello', None)
-    >>> tuple(cur.execute('SELECT %s, %s, %s, %s', parameters).fetchone()
+    >>> tuple(cur.execute('SELECT %s, %s, %s, %s', parameters).fetchone())
     (144, Decimal('3.75'), 'hello', None)
 
 This is the result we can expect, so obviously PyGreSQL has adapted the
@@ -143,7 +143,7 @@ Python with the ``%`` operator for formatting strings, we didn't use the ``%``
 operator to format the parameters, but passed them as the second argument to
 :meth:`cur.execute`.  I.e. we **didn't** write the following::
 
->>> tuple(cur.execute('SELECT %s, %s, %s, %s' % parameters).fetchone()
+>>> tuple(cur.execute('SELECT %s, %s, %s, %s' % parameters).fetchone())
 
 If we had done this, PostgreSQL would have complained because the parameters
 were not adapted.  Particularly, there would be no quotes around the value
@@ -238,7 +238,7 @@ In this case you can give PyGreSQL a hint by using :ref:`type_constructors`::
     >>> sql = ("INSERT INTO json_data VALUES (%(data)s, %(created)s)")
     >>> cur.execute(sql, params)
     >>> cur.execute("SELECT * FROM json_data").fetchone()
-    Row(data=[1, 2, 3], created='2016-01-29')
+    Row(data=[1, 2, 3], created=datetime.date(2016, 1, 29))
 
 Let's think of another example where we create a table with a composite
 type in PostgreSQL:
@@ -335,7 +335,7 @@ For instance, you will find that PyGreSQL uses the normal ``int`` function
 to cast PostgreSQL ``int4`` type values to Python::
 
     >>> pgdb.get_typecast('int4')
-    int
+    <class 'int'>
 
 You can change this to return float values instead::
 
@@ -365,7 +365,7 @@ to instances of the corresponding Python class::
     >>> str(cur.execute("SELECT * FROM on_hand").fetchone()[0])
     'fuzzy dice (from 42, at $1.99)'
 
-As you saw in the last section you, PyGreSQL also has a typecast function
+As you saw in the last section, PyGreSQL also has a typecast function
 for JSON, which is the default JSON decoder from the standard library.
 Let's assume we want to use a slight variation of that decoder in which
 every integer in JSON is converted to a float in Python. This can be

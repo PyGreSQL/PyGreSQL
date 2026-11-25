@@ -59,18 +59,46 @@ cursor -- return a new cursor object
 
     Return a new cursor object using the connection
 
-    :returns: a connection object
+    :returns: a cursor object
     :rtype: :class:`Cursor`
 
 This method returns a new :class:`Cursor` object that can be used to
 operate on the database in the way described in the next section.
 
-Attributes that are not part of the standard
---------------------------------------------
+Methods and attributes that are not part of the standard
+--------------------------------------------------------
 
 .. note::
 
-    The following attributes are not part of the DB-API 2 standard.
+    The following methods and attributes are not part of the DB-API 2
+    standard.
+
+.. method:: Connection.execute(operation, [parameters])
+
+    Execute a database operation on a new cursor
+
+    :param str operation: the database operation
+    :param parameters: a sequence or mapping of parameters
+    :returns: the new cursor
+
+.. method:: Connection.executemany(operation, seq_of_parameters)
+
+    Execute a database operation on a new cursor for all parameters
+
+    :param str operation: the database operation
+    :param seq_of_parameters: a sequence of parameter tuples or mappings
+    :returns: the new cursor
+
+These shortcut methods create a new cursor with :meth:`Connection.cursor`,
+call :meth:`Cursor.execute` or :meth:`Cursor.executemany` on it and return
+the cursor, so that you can fetch the result from it, e.g.
+``con.execute('select 1').fetchone()``.
+
+.. attribute:: Connection.Error
+
+    The exception classes of the module are also available as attributes of
+    the connection, e.g. ``con.Error`` or ``con.ProgrammingError``,
+    as an optional DB-API 2 extension.
 
 .. attribute:: Connection.closed
 
@@ -81,7 +109,7 @@ Attributes that are not part of the standard
     The default cursor type used by the connection
 
 If you want to use your own custom subclass of the :class:`Cursor` class
-with he connection, set this attribute to your custom cursor class. You will
+with the connection, set this attribute to your custom cursor class. You will
 then get your custom cursor whenever you call :meth:`Connection.cursor`.
 
 .. versionadded:: 5.0

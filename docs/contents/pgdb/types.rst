@@ -11,10 +11,10 @@ Type constructors
 For binding to an operation's input parameters, PostgreSQL needs to have
 the input in a particular format.  However, from the parameters to the
 :meth:`Cursor.execute` and :meth:`Cursor.executemany` methods it is not
-always obvious as which PostgreSQL data types they shall be bound.
+always obvious to which PostgreSQL data types they should be bound.
 For instance, a Python string could be bound as a simple ``char`` value,
-or also as a ``date`` or a ``time``.  Or a list could be bound as a
-``array`` or a ``json`` object.  To make the intention clear in such cases,
+or also as a ``date`` or a ``time``.  Or a list could be bound as
+an ``array`` or a ``json`` object.  To make the intention clear in such cases,
 you can wrap the parameters in type helper objects.  PyGreSQL provides the
 constructors defined below to create such objects that can hold special values.
 When passed to the cursor methods, PyGreSQL can then detect the proper type
@@ -105,7 +105,7 @@ Type objects
 
 The :attr:`Cursor.description` attribute returns information about each
 of the result columns of a query.  The *type_code* must compare equal to one
-of the :class:`DbType` objects defined below.  Type objects can be equal to
+of the type objects defined below.  Type objects can be equal to
 more than one type code (e.g. :class:`DATETIME` is equal to the type codes
 for ``date``, ``time`` and ``timestamp`` columns).
 
@@ -139,7 +139,7 @@ DB-API 2 standard:
 
 .. object:: ROWID
 
-    Used to describe the ``oid`` column of PostgreSQL database tables
+    Used to describe ``oid`` columns (e.g. in the system catalogs)
 
 .. note::
 
@@ -155,7 +155,7 @@ DB-API 2 standard:
 
 .. object:: INTEGER
 
-    Used to describe ``integer`` columns
+    Used to describe ``smallint``, ``integer`` and ``bigint`` columns
 
 .. object:: LONG
 
@@ -163,7 +163,7 @@ DB-API 2 standard:
 
 .. object:: FLOAT
 
-    Used to describe ``float`` columns
+    Used to describe ``real`` and ``double precision`` columns
 
 .. object:: NUMERIC
 

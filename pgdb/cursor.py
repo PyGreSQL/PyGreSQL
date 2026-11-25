@@ -248,13 +248,13 @@ class Cursor:
 
     @property
     def colnames(self) -> Sequence[str] | None:
-        """Unofficial convenience method for getting the column names."""
+        """Unofficial convenience attribute with the column names."""
         description = self.description
         return None if description is None else [d[0] for d in description]
 
     @property
     def coltypes(self) -> Sequence[TypeCode] | None:
-        """Unofficial convenience method for getting the column types."""
+        """Unofficial convenience attribute with the column types."""
         description = self.description
         return None if description is None else [d[1] for d in description]
 
@@ -669,7 +669,8 @@ class Cursor:
         it can also be None, in which case the method will return a generator
         yielding a row on each iteration.
 
-        Output will be returned as byte strings unless you set decode to true.
+        Output will be returned as strings unless you set decode to false
+        or use the binary format, which always returns byte strings.
 
         Note that you can also use a select query instead of the table name.
 

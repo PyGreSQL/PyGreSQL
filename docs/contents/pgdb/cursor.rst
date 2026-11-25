@@ -8,15 +8,16 @@ Cursor -- The cursor object
 These objects represent a database cursor, which is used to manage the context
 of a fetch operation. Cursors created from the same connection are not
 isolated, i.e., any changes done to the database by a cursor are immediately
-visible by the other cursors. Cursors created from different connections can
-or can not be isolated, depending on the level of transaction isolation.
+visible by the other cursors. Cursors created from different connections may
+or may not be isolated, depending on the level of transaction isolation.
 The default PostgreSQL transaction isolation level is "read committed".
 
 Cursor objects respond to the following methods and attributes.
 
 Note that ``Cursor`` objects also implement both the iterator and the
 context manager protocol, i.e. you can iterate over them and you can use them
-in a ``with`` statement.
+in a ``with`` statement. When the ``with`` block ends, the cursor is closed.
+Unlike with connections, the transaction is not committed.
 
 description -- details regarding the result columns
 ---------------------------------------------------
@@ -44,7 +45,7 @@ description -- details regarding the result columns
     :meth:`Cursor.execute` or :meth:`Cursor.executemany` method yet.
 
 .. versionchanged:: 5.0
-    Before version 5.0, this attribute was an ordinary tuple.
+    Before version 5.0, this attribute was a list of ordinary tuples.
 
 rowcount -- number of rows of the result
 ----------------------------------------
@@ -85,12 +86,11 @@ execute -- execute a database operation
 
 Parameters may be provided as sequence or mapping and will be bound to
 variables in the operation. Variables are specified using Python extended
-format codes, e.g. ``" ... WHERE name=%(name)s"``.
-
-A reference to the operation will be retained by the cursor. If the same
-operation object is passed in again, then the cursor can optimize its behavior.
-This is most effective for algorithms where the same operation is used,
-but different parameters are bound to it (many times).
+format codes, e.g. ``" ... WHERE name=%(name)s"``. Literal percent signs in
+the operation must be doubled (``%%``) when parameters are passed. Without
+parameters, doubled percent signs are reduced to single ones as well, unless
+the operation also contains single percent signs; in that case it is used
+unchanged.
 
 The parameters may also be specified as list of tuples to e.g. insert multiple
 rows in a single operation, but this kind of usage is deprecated:
@@ -106,12 +106,12 @@ looking at the textual error message.
 executemany -- execute many similar database operations
 -------------------------------------------------------
 
-.. method:: Cursor.executemany(operation, [seq_of_parameters])
+.. method:: Cursor.executemany(operation, seq_of_parameters)
 
     Prepare and execute many similar database operations (queries or commands)
 
     :param str operation: the database operation
-    :param seq_of_parameters: a sequence or mapping of parameter tuples or mappings
+    :param seq_of_parameters: a sequence of parameter tuples or mappings
     :returns: the cursor, so you can chain commands
 
 Prepare a database operation (query or command) and then execute it against
@@ -185,7 +185,8 @@ fetchone -- fetch next row of the query result
 Fetch the next row of a query result set, returning a single named tuple,
 or ``None`` when no more data is available. The field names of the named
 tuple are the same as the column names of the database query as long as
-they are valid Python identifiers.
+they are valid as field names for named tuples, otherwise they are given
+positional names.
 
 An :exc:`Error` (or subclass) exception is raised if the previous call to
 :meth:`Cursor.execute` or :meth:`Cursor.executemany` did not produce
@@ -204,14 +205,15 @@ fetchmany -- fetch next set of rows of the query result
     :param size: the number of rows to be fetched
     :type size: int or None
     :param keep: if set to true, will keep the passed arraysize
-    :tpye keep: bool
+    :type keep: bool
     :returns: the next set of rows of the query result
     :rtype: list of namedtuples
 
 Fetch the next set of rows of a query result, returning a list of named
 tuples. An empty sequence is returned when no more rows are available.
 The field names of the named tuple are the same as the column names of
-the database query as long as they are valid Python identifiers.
+the database query as long as they are valid as field names for named
+tuples, otherwise they are given positional names.
 
 The number of rows to fetch per call is specified by the *size* parameter.
 If it is not given, the cursor's :attr:`arraysize` determines the number of
@@ -255,8 +257,8 @@ of this operation.
 .. versionchanged:: 5.0
     Before version 5.0, this method returned ordinary tuples.
 
-arraysize - the number of rows to fetch at a time
--------------------------------------------------
+arraysize -- the number of rows to fetch at a time
+--------------------------------------------------
 
 .. attribute:: Cursor.arraysize
 
@@ -265,6 +267,32 @@ arraysize - the number of rows to fetch at a time
 This read/write attribute specifies the number of rows to fetch at a time with
 :meth:`Cursor.fetchmany`. It defaults to 1, meaning to fetch a single row
 at a time.
+
+nextset, setinputsizes, setoutputsize -- unsupported methods
+------------------------------------------------------------
+
+.. method:: Cursor.nextset()
+
+    Not supported, always raises a :exc:`NotSupportedError`
+
+.. method:: Cursor.setinputsizes(sizes)
+
+    Not supported, does nothing
+
+.. method:: Cursor.setoutputsize(size, [column])
+
+    Not supported, does nothing
+
+Optional DB-API 2 extensions
+----------------------------
+
+.. attribute:: Cursor.connection
+
+    The connection on which the cursor has been created
+
+.. attribute:: Cursor.lastrowid
+
+    Always ``None``, since PostgreSQL tables have no row OIDs any more
 
 Methods and attributes that are not part of the standard
 --------------------------------------------------------
@@ -287,12 +315,14 @@ Methods and attributes that are not part of the standard
     :param str null: the textual representation of the ``NULL`` value,
         can also be an empty string (the default is ``'\\N'``)
     :param int size: the size of the buffer when reading file-like objects
-    :param list column: an optional list of column names
+    :param list columns: an optional list of column names
     :returns: the cursor, so you can chain commands
 
     :raises TypeError: parameters with wrong types
     :raises ValueError: invalid parameters
-    :raises IOError: error when executing the copy operation
+    :raises ProgrammingError: the copy command cannot be executed,
+        e.g. the table does not exist
+    :raises IOError: error when copying the data
 
 This method can be used to copy data from an input stream on the client side
 to a database table on the server side using the ``COPY FROM`` command.
@@ -315,26 +345,34 @@ specified, all of them will be copied.
 
 .. versionadded:: 5.0
 
+.. versionchanged:: 6.3
+    The table name is split at all dots and parts can be enclosed in double
+    quotes. Before, it was split at the first dot only, and quoted parts
+    were not supported.
+
 .. method:: Cursor.copy_to(stream, table, [format], [sep], [null], [decode], [columns])
 
     Copy data from the specified table to an output stream
 
     :param stream: the output stream (must be a file-like object or ``None``)
     :param str table: the name of a database table or a ``SELECT`` query
-    :param str format: the format of the data in the input stream,
+    :param str format: the format of the data in the output stream,
         can be ``'text'`` (the default), ``'csv'``, or ``'binary'``
     :param str sep: a single character separator
         (the default is ``'\t'`` for text and ``','`` for csv)
     :param str null: the textual representation of the ``NULL`` value,
         can also be an empty string (the default is ``'\\N'``)
     :param bool decode: whether decoded strings shall be returned
-        for non-binary formats (the default is ``True``)
-    :param list column: an optional list of column names
+        for non-binary formats (the default is ``True``,
+        except for the binary format)
+    :param list columns: an optional list of column names
     :returns: a generator if stream is set to ``None``, otherwise the cursor
 
     :raises TypeError: parameters with wrong types
     :raises ValueError: invalid parameters
-    :raises IOError: error when executing the copy operation
+    :raises ProgrammingError: the copy command cannot be executed,
+        e.g. the table does not exist
+    :raises IOError: error when copying the data
 
 This method can be used to copy data from a database table on the server side
 to an output stream on the client side using the ``COPY TO`` command.
@@ -344,7 +382,8 @@ have a ``write()`` method). Alternatively, if ``None`` is passed as the
 output stream, the method will return a generator yielding one row of output
 data on each iteration.
 
-Output will be returned as byte strings unless you set decode to true.
+Output will be returned as strings unless you set *decode* to false or use
+the binary format, which always returns byte strings.
 Rows that cannot be decoded with the client encoding (e.g. non-ASCII text
 with the client encoding ``SQL_ASCII``) are still returned as byte strings.
 
@@ -361,6 +400,11 @@ specified, all of them will be copied.
 
 .. versionadded:: 5.0
 
+.. versionchanged:: 6.3
+    The table name is split at all dots and parts can be enclosed in double
+    quotes. Before, it was split at the first dot only, and quoted parts
+    were not supported.
+
 .. method:: Cursor.row_factory(row)
 
     Process rows before they are returned
@@ -371,7 +415,7 @@ specified, all of them will be copied.
 This method is used for processing result rows before returning them through
 one of the fetch methods. By default, rows are returned as named tuples.
 You can overwrite this method with a custom row factory if you want to
-return the rows as different kids of objects. This same row factory will then
+return the rows as different kinds of objects. This same row factory will then
 be used for all result sets. If you overwrite this method, the method
 :meth:`Cursor.build_row_factory` for creating row factories dynamically
 will be ignored.
@@ -413,7 +457,7 @@ looks like this::
 
 .. attribute:: Cursor.colnames
 
-    The list of columns names of the current result set
+    The list of column names of the current result set
 
 The values in this list are the same values as the *name* elements
 in the :attr:`Cursor.description` attribute. Always use the latter
@@ -423,10 +467,14 @@ if you want to remain standard compliant.
 
 .. attribute:: Cursor.coltypes
 
-    The list of columns types of the current result set
+    The list of column types of the current result set
 
 The values in this list are the same values as the *type_code* elements
 in the :attr:`Cursor.description` attribute. Always use the latter
 if you want to remain standard compliant.
 
 .. versionadded:: 5.0
+
+.. attribute:: Cursor.type_cache
+
+    The :class:`TypeCache` of the connection, see :attr:`Connection.type_cache`
