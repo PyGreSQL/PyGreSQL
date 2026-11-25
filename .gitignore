@@ -22,6 +22,8 @@ _build_doctrees/
 /tests/LOCAL_*.py
 
 .coverage
+.coverage.*
+htmlcov/
 .tox/
 .venv/
 .vagrant/

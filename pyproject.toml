@@ -93,6 +93,24 @@ module = [
 ]
 disallow_untyped_defs = false
 
+[tool.coverage.run]
+source = ["pg", "pgdb"]
+branch = true
+parallel = true
+
+[tool.coverage.report]
+fail_under = 80
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "raise NotImplementedError",
+    "\\.\\.\\.$",
+]
+
+[tool.coverage.html]
+directory = "htmlcov/python"
+
 [tool.setuptools]
 packages = ["pg", "pgdb"]
 
