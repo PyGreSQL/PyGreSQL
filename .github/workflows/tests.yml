@@ -90,3 +90,68 @@ jobs:
           MATRIX_PYTHON: ${{ matrix.python }}
         run: tox -e py${MATRIX_PYTHON/./}
         timeout-minutes: 5
+
+  coverage:
+    name: Test coverage
+    runs-on: ubuntu-24.04
+    # the whole job usually takes less than 2 minutes
+    timeout-minutes: 15
+
+    env:
+      PYGRESQL_DB: test
+      PYGRESQL_HOST: 127.0.0.1
+      PYGRESQL_USER: test
+      PYGRESQL_PASSWD: test
+
+    services:
+      postgresql:
+        image: postgres:19
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --log-opt max-size=1m
+          --log-opt max-file=1
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Install latest libpq from PGDG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y libpq-dev
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+      - name: Install tox
+        run: pip install tox
+      - name: Run tests with coverage measurement
+        # fails if the coverage of the Python or C code is below the minimum
+        run: tox -e coverage
+        timeout-minutes: 5
+      - name: Write coverage summary
+        if: ${{ !cancelled() && hashFiles('htmlcov/c/coverage.json') != '' }}
+        run: |
+          {
+            echo "### Python code"
+            .tox/coverage/bin/coverage report --format=markdown --fail-under=0
+            echo
+            .tox/coverage/bin/gcovr --add-tracefile htmlcov/c/coverage.json \
+              --markdown-summary --markdown-title "C extension" \
+              --markdown-heading-level 3
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage reports
+        if: ${{ !cancelled() && hashFiles('htmlcov/c/coverage.json') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-reports
+          path: htmlcov/
