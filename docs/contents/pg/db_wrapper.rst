@@ -124,6 +124,8 @@ connection is attached to the instance again instead.
     Reset the connection
 
     :raises pg.InternalError: the connection has been closed
+    :raises pg.ConnectError: the connection could not be established again
+        (a subclass of :exc:`pg.OperationalError`)
 
 This resets the connection to the database with the same parameters, like
 :meth:`Connection.reset`.  Large objects and pending results of asynchronous

@@ -16,6 +16,10 @@ Version 6.3.0 (unreleased)
     `ConnectError`, a subclass of `OperationalError` as suggested by the
     DB-API 2 and, for backward compatibility, of `InternalError`, which was
     raised before. Catch `OperationalError` in new code.
+  - `Connection.reset()` and `DB.reset()` now raise a `ConnectError` if the
+    connection cannot be established again. Before, the failure passed
+    silently. Also, `Connection.date_format()` no longer returns the date
+    format of the old session after a reset.
   - The notification handler now properly escapes the payload and the
     channel names. Before, they were put into the SQL commands unescaped,
     so that a payload containing a single quote caused a syntax error and

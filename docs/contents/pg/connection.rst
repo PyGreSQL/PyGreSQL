@@ -353,13 +353,20 @@ reset -- reset the connection
     :raises TypeError: too many (any) arguments
     :raises TypeError: invalid connection
     :raises pg.InterfaceError: the connection is busy
+    :raises pg.ConnectError: the connection could not be established again
+        (a subclass of :exc:`pg.OperationalError`)
 
 This method resets the current database connection, i.e. it closes the
 connection to the server and opens a new one with the same parameters.
 The state of the session on the server, such as open transactions, prepared
-statements, temporary tables and open large objects, is lost. Results of an
-asynchronous query that have not yet been fetched are discarded, but the
-results of other queries remain available.
+statements, temporary tables and open large objects, is lost, and session
+settings such as the date style have their default values again. Results
+of an asynchronous query that have not yet been fetched are discarded, but
+the results of other queries remain available.
+
+.. versionchanged:: 6.3
+    A :exc:`pg.ConnectError` is raised if the connection could not be
+    established again. Before, the failure passed silently.
 
 poll -- completes an asynchronous connection
 --------------------------------------------

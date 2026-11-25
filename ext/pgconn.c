@@ -2306,7 +2306,15 @@ conn_reset(connObject *self, PyObject *Py_UNUSED(noargs))
        otherwise access data of the connection that is freed by the reset,
        e.g. with parameter(), which does not check the busy flag) */
     PQreset(self->cnx);
+    /* the new session uses the default date style of the server */
+    self->date_format = NULL;
     _conn_end(self);
+    /* like connect(), raise an error if the connection cannot be
+       established again, instead of failing silently */
+    if (PQstatus(self->cnx) != CONNECTION_OK) {
+        set_error(ConnectError, "Cannot reset connection", self->cnx, NULL);
+        return NULL;
+    }
     Py_RETURN_NONE;
 }
 

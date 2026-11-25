@@ -3521,6 +3521,19 @@ class TestAsyncQueries(unittest.TestCase):
         self.assertIsNone(q.getresult())
         self.assertEqual(c.date_format(), '%Y-%m-%d')
 
+    def test_date_format_after_reset(self):
+        c = self.c
+        default = c.date_format()
+        german = '%d.%m.%Y'
+        if default == german:
+            self.skipTest('the default datestyle is already german')
+        c.query("set datestyle to german")
+        self.assertEqual(c.date_format(), german)
+        # the new session uses the default datestyle again,
+        # but the cached date format was stale before
+        c.reset()
+        self.assertEqual(c.date_format(), default)
+
     def test_non_blocking_mode(self):
         c = self.c
         c.set_non_blocking(True)
@@ -5309,6 +5322,23 @@ class TestPasswordFunctions(unittest.TestCase):
         else:
             c.close()
             self.skipTest('the server does not check passwords')
+
+    def test_reset_failure(self):
+        # a failed reset passed silently before
+        role = self.create_role()
+        self.c.change_password(role, 'secret')
+        c = self.connect_as(role, 'secret')
+        ident = self.c.escape_identifier(role)
+        self.c.query(f'alter role {ident} nologin')
+        with self.assertRaises(pg.ConnectError) as cm:
+            c.reset()
+        self.assertIsInstance(cm.exception, pg.OperationalError)
+        self.assertTrue(str(cm.exception))
+        self.assertEqual(c.status, 0)
+        self.c.query(f'alter role {ident} login')
+        c.reset()
+        self.assertEqual(c.status, 1)
+        self.assertEqual(c.query('select current_user').singlescalar(), role)
 
     def test_change_password_of_role(self):
         role = self.create_role()
