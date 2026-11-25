@@ -661,6 +661,8 @@ query_formatted -- execute a formatted SQL command string
     :raises TypeError: bad argument type, or too many arguments
     :raises ValueError: empty SQL query,
         or *types* passed together with *inline*
+    :raises pg.InterfaceError: a parameter cannot be adapted,
+        e.g. a plain dict without a type
     :raises pg.DatabaseError: error in query (a subclass depending on the
         ``SQLSTATE``, e.g. :exc:`pg.ProgrammingError`)
     :raises pg.OperationalError: the connection has been lost

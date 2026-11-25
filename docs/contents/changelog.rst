@@ -43,6 +43,12 @@ Version 6.3.0 (unreleased)
     ``bytearray(b'...')`` or ``<memory at 0x...>`` was sent, and could be
     stored without an error. Wrap binary data with `Bytea()`. Support for
     these types is planned for version 6.4 (#153).
+  - Plain dicts passed as parameters to `query_formatted()` without a type,
+    also as elements of arrays and records, now raise an `InterfaceError`
+    (as they already did when passed inline), since they could be meant as
+    json or hstore values. Before, their Python representation was sent.
+    Wrap them with `Json()` or `Hstore()`, or pass their type. The error
+    message for such dicts now suggests this, also in the `pgdb` module.
   - Backslashes in keys and values of hstore parameters are now escaped.
     Before, they were dropped or caused a syntax error.
   - Keys and values of hstore parameters containing tabs, newlines or other

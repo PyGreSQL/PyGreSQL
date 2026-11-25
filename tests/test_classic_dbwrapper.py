@@ -5730,6 +5730,38 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
+    def test_adapt_query_untyped_with_plain_dict(self):
+        format_query = self.adapter.format_query
+        value = {'one': 1}
+        for inline in False, True:
+            for values in ((value,), ([value],), ((1, value),),
+                           ([(1, value)],)):
+                with self.assertRaises(pg.InterfaceError) as cm:
+                    format_query("select %s", values, inline=inline)
+                msg = str(cm.exception)
+                self.assertIn("type <class 'dict'>", msg)
+                self.assertIn('wrap dicts with Json() or Hstore()', msg)
+        self.assertRaises(
+            pg.InterfaceError, self.adapter.guess_simple_type, value)
+        self.assertRaises(pg.InterfaceError, self.adapter.adapt, value)
+        # with a type, plain dicts can be passed
+        sql, params = format_query("select %s", (value,), ('json',))
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['{"one": 1}'])
+        sql, params = format_query("select %s", (value,), ('hstore',))
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['one=>1'])
+
+    def test_adapt_query_untyped_with_pg_str_dict(self):
+        class MyDict(dict):
+            def __pg_str__(self, typ: Any) -> str:
+                return 'my dict'
+
+        format_query = self.adapter.format_query
+        sql, params = format_query("select %s", (MyDict(one=1),))
+        self.assertEqual(sql, 'select $1')
+        self.assertEqual(params, ['my dict'])
+
     def test_adapt_query_untyped_with_arrays(self):
         format_query = self.adapter.format_query
         values: Any = [

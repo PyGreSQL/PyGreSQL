@@ -19,6 +19,7 @@ from .attrs import AttrDict
 from .cast import Typecasts, is_builtin_typecast
 from .core import Connection, InterfaceError
 from .helpers import (
+    adapt_error,
     format_text,
     is_array_type,
     join_text,
@@ -855,6 +856,9 @@ class Adapter:
             typ = simple_type('record')
             typ._get_attnames = get_attnames
             return typ
+        if isinstance(value, dict) and not hasattr(value, '__pg_str__'):
+            # do not guess between json and hstore or adapt as text
+            raise adapt_error(value)
         return None
 
     @classmethod
@@ -925,8 +929,7 @@ class Adapter:
             return f"'{value}'::cidr"
         pg_repr = getattr(value, '__pg_repr__', None)
         if not pg_repr:
-            raise InterfaceError(
-                f'Do not know how to adapt type {type(value)}')
+            raise adapt_error(value)
         value = pg_repr()
         if isinstance(value, (tuple, list)):
             value = self.adapt_inline(value)

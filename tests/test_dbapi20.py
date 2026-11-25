@@ -1643,6 +1643,22 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_plain_dict_params(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            value = {'one': 1}
+            for params in ((value,), ([value],), ((1, value),)):
+                with self.assertRaises(pgdb.InterfaceError) as cm:
+                    cur.execute('select %s', params)
+                msg = str(cm.exception)
+                self.assertIn("type <class 'dict'>", msg)
+                self.assertIn('wrap dicts with Json() or Hstore()', msg)
+            cur.execute('select %s::json', (pgdb.Json(value),))
+            self.assertEqual(cur.fetchone()[0], value)
+        finally:
+            con.close()
+
     def test_bytearray_and_memoryview_params(self):
         con = self._connect()
         try:

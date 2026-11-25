@@ -22,7 +22,6 @@ from pg.core import (
     DatabaseError,
     DataError,
     Error,
-    InterfaceError,
     NotSupportedError,
 )
 from pg.core import Connection as Cnx
@@ -30,6 +29,7 @@ from pg.error import db_error, error, if_error, op_error, prg_error
 from pg.helpers import (
     QuoteDict,
     RowCache,
+    adapt_error,
     format_text,
     join_text,
     split_qualified_name,
@@ -152,8 +152,7 @@ class Cursor:
         try:  # noinspection PyUnresolvedReferences
             value = value.__pg_repr__()
         except AttributeError as e:
-            raise InterfaceError(
-                f'Do not know how to adapt type {type(value)}') from e
+            raise adapt_error(value) from e
         if isinstance(value, (tuple, list)):
             value = self._quote(value)
         return value

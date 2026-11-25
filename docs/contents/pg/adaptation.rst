@@ -293,6 +293,17 @@ which may be able to handle such objects.
     escaped text. Objects of the types :class:`bytearray` and
     :class:`memoryview` were adapted with ``str()``.
 
+A ``dict`` could be meant as a value of type ``json``, ``jsonb`` or
+``hstore``, so its type is not guessed. Wrap it with :func:`Json` or
+:func:`Hstore`, or pass its type with the *types* parameter, otherwise a
+:exc:`pg.InterfaceError` is raised. This also applies to dictionaries in
+lists and tuples. Methods like :meth:`DB.insert` know the types of the
+columns, so you can pass plain dictionaries there.
+
+.. versionchanged:: 6.3
+    Plain dictionaries without a type were passed as their Python
+    representation in earlier versions, unless they were passed inline.
+
 When adapting the parameters for :meth:`DB.query_formatted` and the higher
 level methods, PyGreSQL not only adapts the basic types like ``int``,
 ``float``, ``bool`` and ``str``, but also tries to make sense of Python lists

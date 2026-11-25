@@ -9,7 +9,13 @@ from functools import lru_cache
 from json import loads as jsondecode
 from typing import Any, NamedTuple, TypeAlias
 
-from .core import Query, set_decimal, set_jsondecode, set_query_helpers
+from .core import (
+    InterfaceError,
+    Query,
+    set_decimal,
+    set_jsondecode,
+    set_query_helpers,
+)
 
 SomeNamedTuple: TypeAlias = Any  # alias for accessing arbitrary named tuples
 
@@ -26,6 +32,18 @@ __all__ = [
 
 
 # Small helper functions
+
+def adapt_error(value: Any) -> InterfaceError:
+    """Create the error for a value whose type cannot be adapted.
+
+    Plain dicts are not adapted, since they could be meant as json or
+    hstore values, so the message suggests to make this explicit.
+    """
+    msg = f'Do not know how to adapt type {type(value)}'
+    if isinstance(value, dict):
+        msg += ', wrap dicts with Json() or Hstore()'
+    return InterfaceError(msg)
+
 
 def format_text(command: str, params: tuple | dict,
                 encoding: Callable[[], str]) -> str | bytes:
