@@ -36,6 +36,9 @@ Version 6.3.0 (unreleased)
   - Deprecated the method `dateformat()` of `Typecasts`, which has never
     been used and always returned the ISO date format. Use the method
     `Connection.date_format()` instead. It will be removed in version 7.0.
+  - The documented classes `DbTypes`, `DbType` and `LargeObject` are now
+    exported by the `pg` module, and `TypeCache` by the `pgdb` module.
+    Before, they were only available in submodules.
   - `DB.get_as_dict()` now raises a `TypeError` instead of a `KeyError` if
     the keyname is not a column name or a sequence of names, like `DB.get()`
     and similar methods.

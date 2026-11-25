@@ -5,6 +5,9 @@ LargeObject -- Large Objects
 
 .. class:: LargeObject
 
+.. versionchanged:: 6.3
+    The class is now exported by the :mod:`pg` module.
+
 Instances of the class :class:`LargeObject` are used to handle all the
 requests concerning a PostgreSQL large object. These objects embed and hide
 all the recurring variables (object OID and connection), in the same way

@@ -28,9 +28,13 @@ parameter of :meth:`DB.prepare` takes SQL type names instead.
 
 These type names are strings which are equal to either the simple PyGreSQL
 names or to the more fine-grained registered PostgreSQL type names if these
-have been enabled with :meth:`DB.use_regtypes`. Type names are strings that
-are augmented with additional information about the associated PostgreSQL
-type that can be inspected using the following attributes:
+have been enabled with :meth:`DB.use_regtypes`. They are instances of the
+following subclass of :class:`str`:
+
+.. class:: DbType
+
+    A type name augmented with additional information about the associated
+    PostgreSQL type, which can be inspected using the following attributes:
 
         - *oid* -- the PostgreSQL type OID
         - *pgtype* -- the internal PostgreSQL data type name
@@ -44,6 +48,10 @@ type that can be inspected using the following attributes:
         - *elem* -- the type OID of the elements for array types
         - *base* -- the base type for domains, None for other types
         - *attnames* -- attributes for composite types
+
+.. versionchanged:: 6.3
+    The classes :class:`DbTypes` and :class:`DbType` are now exported
+    by the :mod:`pg` module.
 
 Domains are handled like their base types: their *simple* name and the
 attributes *delim*, *relid*, *elem* and *attnames* are those of the base

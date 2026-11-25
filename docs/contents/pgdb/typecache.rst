@@ -7,6 +7,9 @@ TypeCache -- The internal cache for database types
 
 .. versionadded:: 5.0
 
+.. versionchanged:: 6.3
+    The class is now exported by the :mod:`pgdb` module.
+
 The internal :class:`TypeCache` of PyGreSQL is not part of the DB-API 2
 standard, but is documented here in case you need full control and
 understanding of the internal handling of database types. Each connection

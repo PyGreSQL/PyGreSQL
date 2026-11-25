@@ -83,7 +83,7 @@ from .adapt import (
     TimestampFromTicks,
     Uuid,
 )
-from .cast import get_typecast, reset_typecast, set_typecast
+from .cast import TypeCache, get_typecast, reset_typecast, set_typecast
 from .connect import connect
 from .connection import Connection
 from .constants import apilevel, paramstyle, shortcutmethods, threadsafety
@@ -135,6 +135,7 @@ __all__ = [
     'TimeFromTicks',
     'Timestamp',
     'TimestampFromTicks',
+    'TypeCache',
     'Uuid',
     'Warning',
     '__version__',

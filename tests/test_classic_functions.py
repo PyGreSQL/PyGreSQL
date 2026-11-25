@@ -53,6 +53,14 @@ class TestHasConnect(unittest.TestCase):
         self.assertTrue(issubclass(pg.ConnectError, pg.OperationalError))
         self.assertTrue(issubclass(pg.ConnectError, pg.InternalError))
 
+    def test_has_documented_classes(self):
+        # these were only available in submodules before
+        self.assertIs(pg.DbTypes, pg.adapt.DbTypes)
+        self.assertIs(pg.DbType, pg.adapt.DbType)
+        self.assertIs(pg.LargeObject, pg.core.LargeObject)
+        for name in ('DbTypes', 'DbType', 'LargeObject'):
+            self.assertIn(name, pg.__all__)
+
     def test_has_pg_operational_error(self):
         self.assertTrue(issubclass(pg.OperationalError, pg.DatabaseError))
 

@@ -22,7 +22,7 @@ For a DB-API 2 compliant interface use the newer pgdb module.
 
 from __future__ import annotations
 
-from .adapt import Adapter, Bytea, Hstore, Json, Literal
+from .adapt import Adapter, Bytea, DbType, DbTypes, Hstore, Json, Literal
 from .cast import Typecasts, get_typecast, set_typecast
 from .core import (
     INV_READ,
@@ -52,6 +52,7 @@ from .core import (
     InterfaceError,
     InternalError,
     InvalidResultError,
+    LargeObject,
     MultipleResultsError,
     NoResultError,
     NotSupportedError,
@@ -125,6 +126,8 @@ __all__ = [
     'Connection',
     'DataError',
     'DatabaseError',
+    'DbType',
+    'DbTypes',
     'Error',
     'Hstore',
     'IntegrityError',
@@ -132,6 +135,7 @@ __all__ = [
     'InternalError',
     'InvalidResultError',
     'Json',
+    'LargeObject',
     'Literal',
     'MultipleResultsError',
     'NoResultError',

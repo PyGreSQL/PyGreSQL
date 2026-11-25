@@ -554,6 +554,15 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_type_cache_class_is_exported(self):
+        # this was only available in pgdb.cast before
+        self.assertIn('TypeCache', pgdb.__all__)
+        con = self._connect()
+        try:
+            self.assertIsInstance(con.type_cache, pgdb.TypeCache)
+        finally:
+            con.close()
+
     def test_type_cache_info(self):
         con = self._connect()
         try:
