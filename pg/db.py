@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from json import dumps as jsonencode
 from json import loads as jsondecode
@@ -852,6 +852,24 @@ class DB:
                 'The keyname must be a column name or a sequence of names')
         return tuple(keyname)
 
+    def _get_attnames_with(self, table: str, names: Iterable[Any]
+                           ) -> AttrDict:
+        """Get the column names of a table, refreshed for unknown names.
+
+        The column names and generated columns are cached, so columns that
+        have been added after they were cached would be ignored. If any of
+        the given names is not a cached column name, the cached column names
+        and generated columns of the table are fetched again once. Names
+        that are still unknown then are not columns of the table.
+        """
+        attnames = self.get_attnames(table)
+        if any(name not in attnames for name in names):
+            key = self._relation_key(table)
+            self._attnames.pop(key, None)
+            self._generated.pop(key, None)
+            attnames = self.get_attnames(table)
+        return attnames
+
     def get(self, table: str, row: Any,
             keyname: str | Sequence[str] | None = None) -> dict[str, Any]:
         """Get a row from a database table or view.
@@ -868,8 +886,8 @@ class DB:
         the existing values when row was passed as a dictionary.
         """
         table = self._parent_table(table)
-        attnames = self.get_attnames(table)
         keyname = self._get_keynames(table, keyname)
+        attnames = self._get_attnames_with(table, keyname)
         if isinstance(row, dict):
             # check whether all key columns have values
             if not set(keyname).issubset(row):
@@ -919,7 +937,7 @@ class DB:
         if row is None:
             row = {}
         row.update(kw)
-        attnames = self.get_attnames(table)
+        attnames = self._get_attnames_with(table, row)
         generated = self.get_generated(table)
         params = self.adapter.parameter_list()
         adapt = params.add
@@ -959,11 +977,11 @@ class DB:
         update due to triggers, rules, default values, etc.
         """
         table = self._parent_table(table)
-        attnames = self.get_attnames(table)
-        generated = self.get_generated(table)
         if row is None:
             row = {}
         row.update(kw)
+        attnames = self._get_attnames_with(table, row)
+        generated = self.get_generated(table)
         keynames = self._get_keynames(table, keyname)
         keyset = set(keynames)
         # check whether all key columns have values
@@ -1046,7 +1064,7 @@ class DB:
         table = self._parent_table(table)
         if row is None:
             row = {}
-        attnames = self.get_attnames(table)
+        attnames = self._get_attnames_with(table, row)
         generated = self.get_generated(table)
         params = self.adapter.parameter_list()
         adapt = params.add
@@ -1129,7 +1147,6 @@ class DB:
         referenced by another table, this method raises an IntegrityError.
         """
         table = self._parent_table(table)
-        attnames = self.get_attnames(table)
         if row is None:
             row = {}
         row.update(kw)
@@ -1137,6 +1154,7 @@ class DB:
         # check whether all key columns have values
         if not set(keynames).issubset(row):
             raise KeyError('Missing value in row for the key')
+        attnames = self._get_attnames_with(table, keynames)
         params = self.adapter.parameter_list()
         adapt = params.add
         col = self.escape_identifier

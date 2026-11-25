@@ -51,6 +51,12 @@ Version 6.3.0 (unreleased)
   - The documented classes `DbTypes`, `DbType` and `LargeObject` are now
     exported by the `pg` module, and `TypeCache` by the `pgdb` module.
     Before, they were only available in submodules.
+  - `DB.insert()`, `DB.update()`, `DB.upsert()`, `DB.get()` and `DB.delete()`
+    now fetch the column names of a table again if a key of the row (or a
+    key name) is not a cached column name. Before, values for columns added
+    with ``ALTER TABLE`` after the column names had been cached were
+    silently dropped, and `DB.update()` returned them as if they had been
+    written, until the cache was flushed with `DB.get_attnames()`.
   - `DB.get_as_dict()` now raises a `TypeError` instead of a `KeyError` if
     the keyname is not a column name or a sequence of names, like `DB.get()`
     and similar methods.

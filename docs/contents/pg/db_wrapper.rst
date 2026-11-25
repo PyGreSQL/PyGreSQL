@@ -261,6 +261,16 @@ The attribute names are cached.  If *flush* is set, the internal cache for
 attribute names will be flushed.  This may be necessary after the database
 schema or the search path has been changed.
 
+The methods :meth:`DB.get`, :meth:`DB.insert`, :meth:`DB.update`,
+:meth:`DB.upsert` and :meth:`DB.delete` fetch the attribute names of a
+table again when a key of the row (or a key name) is not a cached attribute
+name, so that columns added in the meantime are not ignored.  Keys that are
+still not attribute names then are ignored.
+
+.. versionchanged:: 6.3
+    Before, the values for added columns were silently ignored until the
+    cache was flushed.
+
 get_generated -- get the generated columns of a table
 -----------------------------------------------------
 

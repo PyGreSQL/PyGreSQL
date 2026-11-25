@@ -1949,6 +1949,37 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(data, expect)
             query(f'truncate table "{table}"')
 
+    def test_methods_after_adding_columns(self):
+        # values for added columns were silently dropped before,
+        # since the column names of the table had been cached
+        db = self.db
+        table = 'test_added_columns'
+        self.create_table(table, 'id smallint primary key, a text')
+        query = db.query
+        r = db.insert(table, id=1, a='x', nocol='ignored')
+        self.assertEqual(r, {'id': 1, 'a': 'x', 'nocol': 'ignored'})
+        query(f'alter table {table} add column b text')
+        r = db.insert(table, id=2, a='y', b='new')
+        self.assertEqual(r, {'id': 2, 'a': 'y', 'b': 'new'})
+        r = db.update(table, id=1, b='changed')
+        self.assertEqual(r, {'id': 1, 'a': 'x', 'b': 'changed'})
+        query(f'alter table {table}'
+              ' add column c int generated always as (id * 10) stored')
+        r = db.upsert(table, {'id': 3, 'a': 'z', 'c': 5})
+        self.assertEqual(r, {'id': 3, 'a': 'z', 'b': None, 'c': 30})
+        query(f'alter table {table} add column k int unique')
+        query(f'update {table} set k = id')
+        r = db.get(table, 2, 'k')
+        self.assertEqual(r, {'id': 2, 'a': 'y', 'b': 'new', 'c': 20, 'k': 2})
+        self.assertEqual(db.delete(table, {'k': 3}, 'k'), 1)
+        r = query(f'select * from {table} order by id').getresult()
+        self.assertEqual(r, [(1, 'x', 'changed', 10, 1),
+                             (2, 'y', 'new', 20, 2)])
+        # unknown keys are still ignored
+        r = db.update(table, id=2, a='w', nocol='ignored')
+        self.assertEqual(r['a'], 'w')
+        self.assertEqual(r['nocol'], 'ignored')
+
     def test_insert_with_quoted_names(self):
         insert = self.db.insert
         query = self.db.query
