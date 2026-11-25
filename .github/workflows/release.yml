@@ -1,8 +1,13 @@
-name: Build and test the release files
+name: Build, test and publish the release files
 
 # Builds the sdist and the Windows wheels, from the sdist, and tests each
 # wheel against a PostgreSQL server. All files are uploaded as the workflow
-# artifact "dist". On a version tag, the files are published (not yet).
+# artifact "dist". On a version tag, the files are published to TestPyPI,
+# installed from there and checked, and then published to PyPI after a
+# manual approval of the deployment to the "pypi" environment. Publishing
+# uses trusted publishing (no API tokens): the trusted publishers on PyPI
+# and TestPyPI must name this workflow and the environments "pypi" and
+# "testpypi", which only allow version tags.
 
 on:
   push:
@@ -232,3 +237,132 @@ jobs:
           name: dist
           path: dist/*
           if-no-files-found: error
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: dist
+    # only for version tags (the environment also only allows these)
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/PyGreSQL
+    permissions:
+      # for trusted publishing
+      id-token: write
+
+    steps:
+      - name: Download the release files
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # so that a tag can be pushed again after a failure later on;
+          # files that are already there are not replaced
+          skip-existing: true
+
+  verify-testpypi:
+    name: Install from TestPyPI with ${{ matrix.python }}
+    needs: [check-version, publish-testpypi]
+    runs-on: windows-2025
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # the ends of the range of the wheels
+        python: ["3.10", "3.15"]
+
+    env:
+      PYGRESQL_DB: test
+      PYGRESQL_HOST: 127.0.0.1
+      PYGRESQL_USER: test
+      PYGRESQL_PASSWD: test
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        # only for the setup-postgres action
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up PostgreSQL
+        uses: ./.github/actions/setup-postgres
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the wheel from TestPyPI
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        # only the wheel, not the sdist; new files can take a few minutes
+        # to become available on the index
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if pip install --no-cache-dir --only-binary :all: \
+                --index-url https://test.pypi.org/simple/ \
+                "pygresql==$VERSION"; then
+              exit 0
+            fi
+            echo "Attempt $attempt failed, waiting"
+            sleep 30
+          done
+          echo "::error::Cannot install pygresql $VERSION from TestPyPI"
+          exit 1
+      - name: Check the installed package
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        # outside the checkout, so that the installed package is imported
+        working-directory: ${{ runner.temp }}
+        run: |
+          python - << "EOF"
+          import os
+
+          import pg
+          import pgdb
+
+          version = os.environ["VERSION"]
+          print(pg.__file__, pg.version, pg.get_pqlib_version())
+          assert "site-packages" in pg.__file__
+          assert pg.version == pg.__version__ == version
+          assert pgdb.version == version
+          db = pg.DB()
+          print(db.query("select version()").singlescalar())
+          assert db.query("select 1 + 1").singlescalar() == 2
+          db.close()
+          con = pgdb.connect()
+          cur = con.cursor()
+          cur.execute("select %s || %s", ("pygres", "ql"))
+          assert cur.fetchone()[0] == "pygresql"
+          con.close()
+          EOF
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: verify-testpypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # the deployment waits until a required reviewer approves it
+    environment:
+      name: pypi
+      url: https://pypi.org/p/PyGreSQL
+    permissions:
+      # for trusted publishing
+      id-token: write
+
+    steps:
+      - name: Download the release files
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
