@@ -2588,12 +2588,12 @@ class TestQueryResultTypes(unittest.TestCase):
         self.assert_proper_cast('infinity', 'float', float)
 
     def test_numeric(self):
-        decimal = pg.get_decimal()
+        decimal = pg.get_decimal() or float
         self.assert_proper_cast(decimal(0), 'numeric', decimal)
         self.assert_proper_cast(decimal(0), 'decimal', decimal)
 
     def test_money(self):
-        decimal = pg.get_decimal()
+        decimal = pg.get_decimal() or float
         self.assert_proper_cast(decimal('0'), 'money', decimal)
 
     def test_bool(self):
@@ -5743,7 +5743,7 @@ class TestConfigFunctions(unittest.TestCase):
         self.assertEqual(r, 1.5)
 
     def test_set_decimal(self):
-        decimal_class = pg.get_decimal()
+        decimal_class = pg.get_decimal() or float
         # error if no parameter is passed
         self.assertRaises(TypeError, pg.set_decimal)
         query = self.c.query

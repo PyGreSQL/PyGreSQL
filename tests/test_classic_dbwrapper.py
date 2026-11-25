@@ -1861,7 +1861,7 @@ class TestDBClass(unittest.TestCase):
         insert = self.db.insert
         query = self.db.query
         bool_on = pg.get_bool()
-        decimal = pg.get_decimal()
+        decimal = pg.get_decimal() or float
         table = 'insert_test_table'
         self.create_table(
             table, 'i2 smallint, i4 integer, i8 bigint,'
@@ -3594,7 +3594,7 @@ class TestDBClass(unittest.TestCase):
                 id='int', i2='int[]', i4='int[]', i8='int[]',
                 d='num[]', f4='float[]', f8='float[]', m='money[]',
                 b='bool[]', v4='text[]', c4='text[]', t='text[]'))
-        decimal = pg.get_decimal()
+        decimal = pg.get_decimal() or float
         if decimal is Decimal:
             long_decimal = decimal('123456789.123456789')
             odd_money = decimal('1234567891234567.89')
@@ -3876,7 +3876,7 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(person_typ.attnames, dict(
                 name='text', age='int', married='bool',
                 weight='float', salary='money'))
-        decimal = pg.get_decimal()
+        decimal = pg.get_decimal() or float
         bool_class: type
         t: bool | str
         f: bool | str

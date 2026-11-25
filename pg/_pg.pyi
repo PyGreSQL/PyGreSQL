@@ -10,6 +10,9 @@ from typing import Any, SupportsIndex, TypeAlias, TypeVar, final, overload
 _AnyStr = TypeVar('_AnyStr', str, bytes, str | bytes)
 _SomeNamedTuple: TypeAlias = Any  # alias for accessing arbitrary named tuples
 _StrOrBytesPath: TypeAlias = str | bytes | PathLike[str] | PathLike[bytes]
+# column names as list or tuple of str or bytes (lists are invariant)
+_ColumnNames: TypeAlias = (list[str] | list[bytes] | list[str | bytes]
+                           | tuple[str | bytes, ...])
 
 version: str
 __version__: str
@@ -336,7 +339,7 @@ class Connection:
 
     def inserttable(self, table: str | bytes,
                     values: Iterable[list | tuple],
-                    columns: list[str] | tuple[str, ...] | None = None,
+                    columns: _ColumnNames | None = None,
                     *, freeze: bool = False) -> int:
         """Insert a Python iterable into a database table."""
         ...
@@ -645,7 +648,7 @@ def set_datestyle(datestyle: str | None, /) -> None:
     ...
 
 
-def get_decimal() -> type:
+def get_decimal() -> type | None:
     """Get the decimal type to be used for numeric values."""
     ...
 

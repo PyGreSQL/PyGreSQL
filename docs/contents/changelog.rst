@@ -21,6 +21,8 @@ Version 6.3.0 (unreleased)
     so that a payload containing a single quote caused a syntax error and
     could be used for SQL injection, and channel names could not contain
     double quotes. Payloads can now also be passed as raw bytes.
+  - Type hints in the stub file: `get_decimal()` can return `None`, and the
+    column names passed to `inserttable()` can also be given as bytes.
   - `Connection.getlo()` now accepts OIDs of 2**31 and above, which raised
     a `TypeError` before, and raises a `ValueError` for negative numbers,
     which were converted to such OIDs. OIDs of 2**31 and above are now also
