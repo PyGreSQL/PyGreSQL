@@ -1604,6 +1604,23 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_error_message_when_adapting_parameters(self):
+        # the message must name the operation, not the previous command
+        operation = 'select %s'
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            for params in ([[object()]], [[1], [object()]]):
+                with self.assertRaises(pgdb.InterfaceError) as cm:
+                    cur.executemany(operation, params)
+                msg = str(cm.exception)
+                self.assertTrue(msg.startswith(f"Error in '{operation}':"),
+                                msg)
+                self.assertIn('Do not know how to adapt', msg)
+                con.rollback()
+        finally:
+            con.close()
+
     def test_bytearray_and_memoryview_params(self):
         con = self._connect()
         try:

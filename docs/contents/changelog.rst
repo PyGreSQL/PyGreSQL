@@ -273,6 +273,8 @@ Version 6.3.0 (unreleased)
 
 - Changes in the `pgdb` module:
 
+  - When a parameter could not be adapted, the error message named the
+    previous command (e.g. ``BEGIN``) instead of the operation.
   - Like in the `pg` module, the connection is now passed to typecast
     functions that take a parameter named ``connection``, as documented.
     Before, only a parameter named ``cnx`` was recognized, which is still

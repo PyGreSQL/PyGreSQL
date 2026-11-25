@@ -299,6 +299,7 @@ class Cursor:
                 else:
                     self._connection._tnx = True
             for parameters in seq_of_parameters:
+                sql = operation  # for error messages while quoting
                 sql = self._quoteparams(operation, parameters)
                 if (b'\0' in sql if isinstance(sql, bytes)
                         else '\0' in sql):

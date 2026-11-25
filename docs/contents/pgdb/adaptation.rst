@@ -292,7 +292,8 @@ will get an error::
 
     >>> cur.execute("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
     ...     dict(item=InventoryItem('fuzzy dice', 42, 1.99), count=1000))
-    InterfaceError: Do not know how to adapt type <class 'InventoryItem'>
+    InterfaceError: Error in 'INSERT INTO on_hand VALUES (%(item)s, %(count)s)':
+    'Do not know how to adapt type <class '__main__.InventoryItem'>'
 
 While PyGreSQL knows how to adapt tuples, it does not know what to make out
 of our custom class.  To simply convert the object to a string using the
