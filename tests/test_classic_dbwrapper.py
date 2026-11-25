@@ -5785,6 +5785,35 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, "select $1")
         self.assertEqual(params, ['one=>"it\'s fine\",two=>2'])
 
+    def test_adapt_query_with_bytes_command(self):
+        # this raised a TypeError or a KeyError before
+        format_query = self.adapter.format_query
+        sql, params = format_query(b'select %s, %s', (1, 'a'))
+        self.assertEqual(sql, b'select $1, $2')
+        self.assertEqual(params, [1, 'a'])
+        sql, params = format_query(b'select %s, %s', (1, 'a'), inline=True)
+        self.assertEqual(sql, b"select 1, 'a'")
+        self.assertEqual(params, [])
+        values = {'x': 'a', 'y': [1, 2], 'z': 'unused'}
+        sql, params = format_query(
+            b'select %(x)s, %(y)s', values, {'y': 'int[]'})
+        self.assertEqual(sql, b'select $1, $2')
+        self.assertEqual(params, ['a', '{1,2}'])
+        sql, params = format_query(b'select %(x)s', values, inline=True)
+        self.assertEqual(sql, b"select 'a'")
+        self.assertEqual(params, [])
+        # keys can also be given as bytes
+        sql, params = format_query(b'select %(x)s', {b'x': 'a'})
+        self.assertEqual(sql, b'select $1')
+        self.assertEqual(params, ['a'])
+        self.assertRaises(KeyError, format_query, b'select %(x)s', {'y': 1})
+        r = self.db.query_formatted(
+            b'select %(x)s::text, %(y)s::int[]', values).getresult()
+        self.assertEqual(r, [('a', [1, 2])])
+        r = self.db.query_formatted(
+            b'select %s::text, %s', ('a', b'raw'), inline=True).getresult()
+        self.assertEqual(r, [('a', b'raw')])
+
     def test_adapt_query_untyped_with_plain_dict(self):
         format_query = self.adapter.format_query
         value = {'one': 1}

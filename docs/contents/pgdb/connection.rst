@@ -77,7 +77,8 @@ Methods and attributes that are not part of the standard
 
     Execute a database operation on a new cursor
 
-    :param str operation: the database operation
+    :param operation: the database operation
+    :type operation: str or bytes
     :param parameters: a sequence or mapping of parameters
     :returns: the new cursor
 
@@ -85,7 +86,8 @@ Methods and attributes that are not part of the standard
 
     Execute a database operation on a new cursor for all parameters
 
-    :param str operation: the database operation
+    :param operation: the database operation
+    :type operation: str or bytes
     :param seq_of_parameters: a sequence of parameter tuples or mappings
     :returns: the new cursor
 

@@ -957,7 +957,7 @@ class Adapter:
         params.adapt = self._adapt_parameter
         return params
 
-    def format_query(self, command: str,
+    def format_query(self, command: str | bytes,
                      values: list | tuple | dict | None = None,
                      types: list | tuple | dict | None = None,
                      inline: bool=False
@@ -997,16 +997,27 @@ class Adapter:
                 command, tuple(seq_literals), self._encoding)
         elif isinstance(values, dict):
             # we want to allow extra keys in the dictionary,
-            # so we first must find the values actually used in the command
+            # so we first must find the values actually used in the command;
+            # in a command given as bytes, the keys are encoded like the
+            # command is encoded for keys given as str
+            empty: str | bytes
+            if isinstance(command, bytes):
+                codec = self._encoding()
+                names = {key.encode(codec) if isinstance(key, str) else key:
+                         key for key in values}
+                empty = b''
+            else:
+                names = {key: key for key in values}
+                empty = ''
             used_values = {}
-            map_literals = dict.fromkeys(values, '')
-            for key in values:
-                del map_literals[key]
+            map_literals: dict = dict.fromkeys(names, empty)
+            for name, key in names.items():
+                del map_literals[name]
                 try:
                     command % map_literals
                 except KeyError:
-                    used_values[key] = values[key]
-                map_literals[key] = ''
+                    used_values[name] = values[key]
+                map_literals[name] = empty
             if inline:
                 adapt = self.adapt_inline
                 map_literals = {key: adapt(value)
@@ -1016,8 +1027,9 @@ class Adapter:
                 if types:
                     if not isinstance(types, dict):
                         raise TypeError('The values and types do not match')
-                    map_literals = {key: add(used_values[key], types.get(key))
-                                for key in sorted(used_values)}
+                    map_literals = {
+                        name: add(used_values[name], types.get(names[name]))
+                        for name in sorted(used_values)}
                 else:
                     map_literals = {key: add(used_values[key])
                                 for key in sorted(used_values)}

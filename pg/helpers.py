@@ -45,16 +45,18 @@ def adapt_error(value: Any) -> InterfaceError:
     return InterfaceError(msg)
 
 
-def format_text(command: str, params: tuple | dict,
+def format_text(command: str | bytes, params: tuple | dict,
                 encoding: Callable[[], str]) -> str | bytes:
-    """Format a command with literals, as bytes if any literal is bytes.
+    """Format a command with literals, as bytes if any of them is bytes.
 
-    Literals given as bytes are raw text in the client encoding. In this
-    case, the command and the other literals are encoded with the codec
-    returned by the given encoding function.
+    A command or literals given as bytes are raw text in the client
+    encoding. In this case, the command, the other literals and the keys
+    of the literals given as a dict are encoded with the codec returned
+    by the given encoding function.
     """
     values = params.values() if isinstance(params, dict) else params
-    if not any(isinstance(value, bytes) for value in values):
+    if isinstance(command, str) and not any(
+            isinstance(value, bytes) for value in values):
         return command % params
     codec = encoding()
 
@@ -64,11 +66,11 @@ def format_text(command: str, params: tuple | dict,
         return str(value).encode(codec)
 
     if isinstance(params, dict):
-        params = {key.encode(codec): encode(value)
+        params = {encode(key): encode(value)
                   for key, value in params.items()}
     else:
         params = tuple(map(encode, params))
-    return command.encode(codec) % params
+    return encode(command) % params
 
 
 def join_text(parts: Sequence[str | bytes], sep: str,

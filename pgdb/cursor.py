@@ -187,7 +187,7 @@ class Cursor:
             raise error('Text values cannot contain NUL characters', DataError)
         return self._cnx.escape_string(value)
 
-    def _quoteparams(self, string: str,
+    def _quoteparams(self, string: str | bytes,
                      parameters: Mapping | Sequence | None) -> str | bytes:
         """Quote parameters.
 
@@ -195,6 +195,10 @@ class Cursor:
 
         The function should be used even when there are no parameters,
         so that we have a consistent behavior regarding percent signs.
+
+        A string given as bytes is raw text in the client encoding. The
+        keys of mappings given as str and the quoted parameters are then
+        encoded with the client encoding.
         """
         if not parameters:
             try:
@@ -202,8 +206,20 @@ class Cursor:
             except (TypeError, ValueError):
                 return string  # silently accept unescaped quotes
         if isinstance(parameters, dict):
+            quote = self._quote
+            if isinstance(string, bytes):
+                codec = self._encoding()
+                parameters = {
+                    key.encode(codec) if isinstance(key, str) else key: value
+                    for key, value in parameters.items()}
+
+                def quote(value: Any) -> bytes:
+                    value = self._quote(value)
+                    return (value if isinstance(value, bytes)
+                            else str(value).encode(codec))
+
             quote_dict = QuoteDict(parameters)
-            quote_dict.quote = self._quote
+            quote_dict.quote = quote
             formatted = string % quote_dict
             quoted = quote_dict.quoted
             if any(isinstance(value, bytes) for value in quoted.values()):
@@ -262,7 +278,7 @@ class Cursor:
         """Close the cursor object."""
         self._src.close()
 
-    def execute(self, operation: str,
+    def execute(self, operation: str | bytes,
                 parameters: Mapping | Sequence | None = None) -> Cursor:
         """Prepare and execute a database operation (query or command)."""
         # The parameters may also be specified as list of tuples to e.g.
@@ -277,7 +293,7 @@ class Cursor:
         # not a list of tuples
         return self.executemany(operation, [parameters])
 
-    def executemany(self, operation: str,
+    def executemany(self, operation: str | bytes,
                     seq_of_parameters: Sequence[Mapping | Sequence | None]
                     ) -> Cursor:
         """Prepare operation and execute it against a parameter sequence."""

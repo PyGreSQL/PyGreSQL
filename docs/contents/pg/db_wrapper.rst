@@ -657,7 +657,8 @@ query_formatted -- execute a formatted SQL command string
 
     Execute a formatted SQL command string
 
-    :param str command: SQL command
+    :param command: SQL command
+    :type command: str or bytes
     :param parameters: the values of the parameters for the SQL command
     :type parameters: tuple, list or dict
     :param types: optionally, the types of the parameters
@@ -683,6 +684,13 @@ as a tuple or list, the types can also be passed as a single string with the
 type names separated by whitespace, like ``'json int'``.  The types can only
 be passed if the parameters are not sent *inline*, otherwise a
 :exc:`ValueError` is raised.
+
+A command given as ``bytes`` is raw text in the client encoding. The
+parameters are then encoded with the client encoding, and so are the keys
+of parameters passed as a dict, unless they are given as ``bytes`` as well.
+
+.. versionchanged:: 6.3
+    Commands given as ``bytes`` can now be used with parameters.
 
 The types can be given as simple PyGreSQL type names like ``'int'``,
 ``'bytea'`` or ``'int[]'``, as PostgreSQL type names like ``'int4'`` or

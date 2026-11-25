@@ -1674,6 +1674,26 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_bytes_operation_with_params(self):
+        # this raised an OperationalError before
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute(b'select %s::text, %s', ('a', 1))
+            self.assertEqual(tuple(cur.fetchone()), ('a', 1))
+            cur.execute(b'select %(x)s::text, %(y)s',
+                        {'x': 'a', 'y': b'raw', 'z': object()})
+            self.assertEqual(tuple(cur.fetchone()), ('a', b'raw'))
+            cur.execute(b'select %(x)s::text', {b'x': 'a'})
+            self.assertEqual(cur.fetchone()[0], 'a')
+            cur.executemany(b'select %(x)s', [{'x': 1}, {'x': 2}])
+            self.assertEqual(cur.fetchone()[0], 2)
+            with self.assertRaises(pgdb.OperationalError) as cm:
+                cur.execute(b'select %(x)s', {'y': 1})
+            self.assertIn("error in 'select %(x)s'", str(cm.exception))
+        finally:
+            con.close()
+
     def test_plain_dict_params(self):
         con = self._connect()
         try:

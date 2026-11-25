@@ -80,7 +80,8 @@ execute -- execute a database operation
 
     Prepare and execute a database operation (query or command)
 
-    :param str operation: the database operation
+    :param operation: the database operation
+    :type operation: str or bytes
     :param parameters: a sequence or mapping of parameters
     :returns: the cursor, so you can chain commands
 
@@ -91,6 +92,13 @@ the operation must be doubled (``%%``) when parameters are passed. Without
 parameters, doubled percent signs are reduced to single ones as well, unless
 the operation also contains single percent signs; in that case it is used
 unchanged.
+
+An operation given as ``bytes`` is raw text in the client encoding. The
+parameters are then encoded with the client encoding, and so are the keys
+of parameters passed as a mapping, unless they are given as ``bytes`` as well.
+
+.. versionchanged:: 6.3
+    Operations given as ``bytes`` can now be used with parameters.
 
 The parameters may also be specified as list of tuples to e.g. insert multiple
 rows in a single operation, but this kind of usage is deprecated:
@@ -110,7 +118,8 @@ executemany -- execute many similar database operations
 
     Prepare and execute many similar database operations (queries or commands)
 
-    :param str operation: the database operation
+    :param operation: the database operation
+    :type operation: str or bytes
     :param seq_of_parameters: a sequence of parameter tuples or mappings
     :returns: the cursor, so you can chain commands
 

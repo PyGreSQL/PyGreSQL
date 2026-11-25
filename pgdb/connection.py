@@ -145,7 +145,7 @@ class Connection:
 
     if shortcutmethods:  # otherwise do not implement and document this
 
-        def execute(self, operation: str,
+        def execute(self, operation: str | bytes,
                     parameters: Mapping | Sequence | None = None
                     ) -> Cursor:
             """Shortcut method to run an operation on an implicit cursor."""
@@ -153,7 +153,7 @@ class Connection:
             cursor.execute(operation, parameters)
             return cursor
 
-        def executemany(self, operation: str,
+        def executemany(self, operation: str | bytes,
                         seq_of_parameters: Sequence[
                             Mapping | Sequence | None]) -> Cursor:
             """Shortcut method to run an operation against a sequence."""

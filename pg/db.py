@@ -519,7 +519,7 @@ class DB:
         self._do_debug(command)
         return db.query(command)
 
-    def query_formatted(self, command: str,
+    def query_formatted(self, command: str | bytes,
                         parameters: tuple | list | dict | None = None,
                         types: tuple | list | dict | None = None,
                         inline: bool =False) -> Query:

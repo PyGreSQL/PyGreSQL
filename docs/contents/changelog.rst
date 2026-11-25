@@ -60,6 +60,11 @@ Version 6.3.0 (unreleased)
     ``bytearray(b'...')`` or ``<memory at 0x...>`` was sent, and could be
     stored without an error. Wrap binary data with `Bytea()`. Support for
     these types is planned for version 6.4 (#153).
+  - Commands given as bytes can now be used with parameters in
+    `query_formatted()` and `format_query()`, and in `execute()` and
+    `executemany()` in the `pgdb` module. The parameters are encoded with
+    the client encoding then. Before, this raised a `TypeError`, a
+    `KeyError` or an `OperationalError`.
   - Plain dicts passed as parameters to `query_formatted()` without a type,
     also as elements of arrays and records, now raise an `InterfaceError`
     (as they already did when passed inline), since they could be meant as
