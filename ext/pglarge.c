@@ -109,8 +109,8 @@ large_getattr(largeObject *self, PyObject *nameobj)
 
     /* error (status) message */
     if (!strcmp(name, "error"))
-        return get_decoded_text(PQerrorMessage(self->pgcnx->cnx),
-                                PQclientEncoding(self->pgcnx->cnx));
+        return get_decoded_message(PQerrorMessage(self->pgcnx->cnx),
+                                   PQclientEncoding(self->pgcnx->cnx));
 
     /* seeks name in methods (fallback) */
     return PyObject_GenericGetAttr((PyObject *)self, nameobj);

@@ -204,6 +204,25 @@ get_decoded_text(const char *str, int encoding)
     return obj;
 }
 
+/* Get a message from the server or from libpq decoded like other text (see
+   get_decoded_text), without the trailing newline and other whitespace. */
+PyObject *
+get_decoded_message(const char *msg, int encoding)
+{
+    PyObject *obj = get_decoded_text(msg, encoding), *stripped;
+    Py_ssize_t size, len;
+
+    if (!obj)
+        return NULL;
+    size = len = PyUnicode_GET_LENGTH(obj);
+    while (len && Py_UNICODE_ISSPACE(PyUnicode_READ_CHAR(obj, len - 1))) --len;
+    if (len == size)
+        return obj;
+    stripped = PyUnicode_Substring(obj, 0, len);
+    Py_DECREF(obj);
+    return stripped;
+}
+
 /* Get a str or bytes argument as a new reference to a bytes object. A str
    is encoded with the given encoding, or with UTF-8 if this fails and the
    fallback is set. Return NULL and set a TypeError with the given message if
@@ -1512,7 +1531,7 @@ set_error_msg_and_state(PyObject *type, const char *msg, int encoding,
 {
     PyObject *err_obj, *msg_obj, *sql_obj;
 
-    if (!(msg_obj = get_decoded_text(msg, encoding)))
+    if (!(msg_obj = get_decoded_message(msg, encoding)))
         return;
 
     sql_obj = sqlstate ? PyUnicode_FromStringAndSize(sqlstate, 5)
@@ -1562,7 +1581,7 @@ set_error_text(PyObject *type, const char *msg, PGconn *cnx)
 
     if (!msg)
         msg = PQerrorMessage(cnx);
-    if ((msg_obj = get_decoded_text(msg, PQclientEncoding(cnx)))) {
+    if ((msg_obj = get_decoded_message(msg, PQclientEncoding(cnx)))) {
         PyErr_SetObject(type, msg_obj);
         Py_DECREF(msg_obj);
     }

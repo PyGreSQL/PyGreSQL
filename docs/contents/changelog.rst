@@ -21,6 +21,10 @@ Version 6.3.0 (unreleased)
     so that a payload containing a single quote caused a syntax error and
     could be used for SQL injection, and channel names could not contain
     double quotes. Payloads can now also be passed as raw bytes.
+  - Error messages from the server or from libpq no longer end with a
+    newline, in the messages of exceptions (also in the `pgdb` module) and
+    in the `error` attributes of connections and large objects. Multi-line
+    messages keep their inner newlines.
   - `Connection.escape_string()` and `DB.escape_string()` now raise a
     `DataError` for bytes with invalid multibyte characters in the client
     encoding, like `escape_literal()` and `escape_identifier()`. Before,

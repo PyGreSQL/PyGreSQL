@@ -41,6 +41,8 @@ get_decoded_string_or_bytes(const char *str, Py_ssize_t size, int encoding);
 PyObject *
 get_decoded_text(const char *str, int encoding);
 PyObject *
+get_decoded_message(const char *msg, int encoding);
+PyObject *
 get_encoded_arg(PyObject *obj, int encoding, const char *usage);
 PyObject *
 get_encoded_name(PyObject *name, int encoding, const char *usage);

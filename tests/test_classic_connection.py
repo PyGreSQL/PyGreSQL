@@ -148,6 +148,8 @@ class TestCanConnect(unittest.TestCase):
         self.assertIsInstance(error, pg.OperationalError)
         self.assertIsInstance(error, pg.InternalError)
         self.assertIn('test_no_such_database', str(error))
+        # the trailing newline from libpq has been removed
+        self.assertEqual(str(error), str(error).rstrip())
         with self.assertRaises(pg.OperationalError):
             pg.DB('test_no_such_database', dbhost, dbport,
                   user=dbuser, passwd=dbpasswd)
@@ -1414,6 +1416,15 @@ class TestServerStringsLatin1(unittest.TestCase):
         # this raised UnicodeDecodeError before
         self.assertIn('wärme', self.c.error)
 
+    def test_error_messages_without_trailing_newline(self):
+        with self.assertRaises(pg.ProgrammingError) as cm:
+            self.c.query('selec 1')
+        message = str(cm.exception)
+        # multi-line messages keep their inner newlines
+        self.assertIn('\nLINE 1: selec 1\n', message)
+        self.assertTrue(message.endswith('^'), message)
+        self.assertEqual(self.c.error, message)
+
     def test_parameter(self):
         if self.c.server_version < 180000:
             self.skipTest('search_path is reported since PostgreSQL 18')
@@ -1510,7 +1521,11 @@ class TestStringsSentToServer(unittest.TestCase):
         for value in (b'a\xff\xfeb', b'a\xc3'):
             for escape in (self.c.escape_string, self.c.escape_literal,
                            self.c.escape_identifier):
-                self.assertRaises(pg.DataError, escape, value)
+                with self.assertRaises(pg.DataError) as cm:
+                    escape(value)
+                # the message has no trailing newline
+                self.assertEqual(str(cm.exception),
+                                 str(cm.exception).rstrip())
         self.assertEqual(self.c.escape_string(b"\xc3\xa4'"), b"\xc3\xa4''")
         self.assertEqual(self.c.escape_string("\xe4'"), "\xe4''")
 

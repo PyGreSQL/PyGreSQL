@@ -102,8 +102,8 @@ conn_getattr(connObject *self, PyObject *nameobj)
 
     /* error (status) message */
     if (!strcmp(name, "error"))
-        return get_decoded_text(PQerrorMessage(self->cnx),
-                                PQclientEncoding(self->cnx));
+        return get_decoded_message(PQerrorMessage(self->cnx),
+                                   PQclientEncoding(self->cnx));
 
     /* connection status : 1 - OK, 0 - BAD */
     if (!strcmp(name, "status"))
