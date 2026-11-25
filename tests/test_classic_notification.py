@@ -258,21 +258,24 @@ class TestAsyncNotification(unittest.TestCase):
         self.arg_dict = handler.arg_dict
         self.assertEqual(handler.timeout, timeout)
         self.assertFalse(handler.listening)
+        # initialize this before the handler can call the callback
+        self.timeout = False
+        self.received = []
+        self.sent = []
         thread = Thread(target=handler, name='test_notification_thread')
         self.thread = thread
         thread.start()
         self.stopped = timeout == 0
         self.addCleanup(self.stop_handler)
+        # with a short timeout, the handler may have listened and stopped
+        # listening again already, before we can see it listening
         for _n in range(500):
-            if handler.listening:
+            if handler.listening or self.timeout:
                 break
             sleep(0.01)
-        self.assertTrue(handler.listening)
-        if not self.stopped:
+        self.assertTrue(handler.listening or self.timeout)
+        if not self.stopped and not self.timeout:
             self.assertTrue(thread.is_alive())
-        self.timeout = False
-        self.received = []
-        self.sent = []
 
     def stop_handler(self):
         handler = self.handler
@@ -449,7 +452,9 @@ class TestAsyncNotification(unittest.TestCase):
     def test_notify_with_timeout(self):
         # noinspection PyTypeChecker
         self.start_handler(timeout=0.01)
-        sleep(0.02)
+        # the handler stops after the timeout, but may take longer
+        self.thread.join(5)
+        self.assertFalse(self.thread.is_alive())
         self.assertTrue(self.timeout)
 
 
