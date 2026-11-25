@@ -279,10 +279,14 @@ jobs:
         python: ["3.10", "3.15"]
 
     env:
-      PYGRESQL_DB: test
-      PYGRESQL_HOST: 127.0.0.1
-      PYGRESQL_USER: test
-      PYGRESQL_PASSWD: test
+      # the server of the setup-postgres action, for libpq (the smoke test
+      # does not use the test configuration with the PYGRESQL_* variables);
+      # these also replace the PGUSER and PGPASSWORD of the runner image
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGDATABASE: test
+      PGUSER: test
+      PGPASSWORD: test
 
     defaults:
       run:
