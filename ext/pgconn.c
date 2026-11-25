@@ -922,6 +922,7 @@ conn_putline(connObject *self, PyObject *args)
 {
     PyObject *line_obj;
     int encoding, ret;
+    size_t offset; /* length of the error message before sending */
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -953,6 +954,7 @@ conn_putline(connObject *self, PyObject *args)
         return NULL;
     }
     /* send line to backend (the size is passed, so NUL bytes are sent) */
+    offset = strlen(PQerrorMessage(self->cnx));
     ret = PQputCopyData(self->cnx, PyBytes_AS_STRING(line_obj),
                         (int)PyBytes_GET_SIZE(line_obj));
     _conn_end(self);
@@ -961,7 +963,7 @@ conn_putline(connObject *self, PyObject *args)
         set_error_text(
             PyExc_IOError,
             ret == -1
-                ? NULL
+                ? get_new_error_message(self->cnx, offset)
                 : "Line cannot be queued, wait for write-ready and try again",
             self->cnx);
         return NULL;
@@ -979,6 +981,7 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
     char *line = NULL;
     PyObject *str = NULL;
     int ret, finished = 0;
+    size_t offset; /* length of the error message before receiving */
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -988,6 +991,7 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
     if (!_conn_begin(self))
         return NULL;
     /* get line synchronously */
+    offset = strlen(PQerrorMessage(self->cnx));
     ret = PQgetCopyData(self->cnx, &line, 0);
     if (ret == -1) /* end of copy, consume the final results */
         finished = _conn_finish_copy(self);
@@ -1004,7 +1008,7 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
         }
         set_error_text(
             PyExc_IOError,
-            ret == -2 ? NULL
+            ret == -2 ? get_new_error_message(self->cnx, offset)
                       : "No line available, wait for read-ready and try again",
             self->cnx);
         return NULL;
@@ -1029,6 +1033,7 @@ static PyObject *
 conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     int ret;
+    size_t offset; /* length of the error message before ending */
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1038,11 +1043,12 @@ conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
     if (!_conn_begin(self))
         return NULL;
     /* end direct copy */
+    offset = strlen(PQerrorMessage(self->cnx));
     ret = PQputCopyEnd(self->cnx, NULL);
     if (ret != 1) {
         _conn_end(self);
         set_error_text(PyExc_IOError,
-                       ret == -1 ? NULL
+                       ret == -1 ? get_new_error_message(self->cnx, offset)
                                  : "Termination message cannot be queued,"
                                    " wait for write-ready and try again",
                        self->cnx);
@@ -1064,6 +1070,7 @@ static PyObject *
 conn_set_non_blocking(connObject *self, PyObject *args)
 {
     int non_blocking, ret;
+    size_t offset; /* length of the error message before the change */
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1080,10 +1087,12 @@ conn_set_non_blocking(connObject *self, PyObject *args)
     if (!_conn_begin(self))
         return NULL;
     /* this may flush the output buffer when switching to blocking mode */
+    offset = strlen(PQerrorMessage(self->cnx));
     ret = PQsetnonblocking(self->cnx, non_blocking);
     _conn_end(self);
     if (ret < 0) {
-        set_error_text(PyExc_IOError, NULL, self->cnx);
+        set_error_text(PyExc_IOError, get_new_error_message(self->cnx, offset),
+                       self->cnx);
         return NULL;
     }
     Py_RETURN_NONE;

@@ -21,6 +21,11 @@ Version 6.3.0 (unreleased)
     so that a payload containing a single quote caused a syntax error and
     could be used for SQL injection, and channel names could not contain
     double quotes. Payloads can now also be passed as raw bytes.
+  - The messages of the `OSError` raised by the COPY methods `putline()`,
+    `getline()` and `endcopy()`, by `set_non_blocking()` and by the methods
+    `putdata()` and `getdata()` of source objects no longer contain the
+    previous error messages of the connection, which libpq accumulates
+    until the next command is sent, e.g. after the connection was lost.
   - Error messages from the server or from libpq no longer end with a
     newline, in the messages of exceptions (also in the `pgdb` module) and
     in the `error` attributes of connections and large objects. Multi-line

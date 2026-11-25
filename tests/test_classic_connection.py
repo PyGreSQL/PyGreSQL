@@ -681,6 +681,38 @@ class TestLostConnection(unittest.TestCase):
         # escaping bytes does not need the client encoding
         self.assertEqual(c.escape_literal(b"a'b"), b"'a''b'")
 
+    def test_copy_errors_are_not_accumulated(self):
+        c = connect()
+        try:
+            c.query('create temporary table test_copy (n int)')
+            c.query('copy test_copy from stdin')
+            other = connect()
+            try:
+                pid = c.backend_pid
+                other.query(f'select pg_terminate_backend({pid})')
+                for _n in range(200):  # wait until the backend is gone
+                    if not other.query(
+                            'select 1 from pg_stat_activity'
+                            f' where pid = {pid}').getresult():
+                        break
+                    time.sleep(0.01)
+            finally:
+                other.close()
+            with self.assertRaises((pg.DatabaseError, OSError)) as cm:
+                c.endcopy()
+            first = str(cm.exception)
+            messages = []
+            for _n in range(2):
+                with self.assertRaises(OSError) as cm_os:
+                    c.endcopy()
+                messages.append(str(cm_os.exception))
+            # the messages contained all previous messages before
+            self.assertTrue(messages[0])
+            self.assertEqual(messages[1], messages[0])
+            self.assertNotIn(first, messages[0])
+        finally:
+            c.close()
+
     def test_connection_not_established(self):
         c = connect_nowait()
         try:

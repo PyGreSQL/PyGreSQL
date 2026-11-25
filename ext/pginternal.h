@@ -93,6 +93,8 @@ void
 set_error(PyObject *type, const char *msg, PGconn *cnx, PGresult *result);
 void
 set_error_text(PyObject *type, const char *msg, PGconn *cnx);
+const char *
+get_new_error_message(PGconn *cnx, size_t offset);
 void
 set_result_error(const PGresult *result, int encoding);
 

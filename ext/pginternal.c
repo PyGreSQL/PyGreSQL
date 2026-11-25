@@ -1570,6 +1570,19 @@ set_error_msg_encoded(PyObject *type, const char *msg, int encoding,
     set_error_msg_and_state(type, msg, encoding, NULL);
 }
 
+/* Get the error message of the connection without the messages that were
+   already there before an operation, given as the offset (the length of the
+   error message before the operation). libpq accumulates the messages until
+   the next command is sent, so they would be repeated otherwise. If no new
+   message has been added, the whole error message is returned. */
+const char *
+get_new_error_message(PGconn *cnx, size_t offset)
+{
+    const char *msg = PQerrorMessage(cnx);
+
+    return offset < strlen(msg) ? msg + offset : msg;
+}
+
 /* Set an exception of the given type with a message from the server or from
    libpq, decoded with the client encoding of the connection like other error
    messages. If no message is given, the last error message of the connection

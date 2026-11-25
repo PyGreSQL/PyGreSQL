@@ -513,6 +513,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
     Py_ssize_t nbytes;        /* length of string */
     char *errormsg = NULL;    /* error message */
     int res;                  /* direct result of the operation */
+    size_t offset;            /* length of the error message before */
     PyObject *ret;            /* return value */
 
     /* checks validity */
@@ -579,6 +580,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
         return NULL;
     }
 
+    offset = strlen(PQerrorMessage(self->pgcnx->cnx));
     if (buf) {
         res = nbytes ? PQputCopyData(self->pgcnx->cnx, buf, (int)nbytes) : 1;
     }
@@ -587,7 +589,9 @@ source_putdata(sourceObject *self, PyObject *buffer)
     }
 
     if (res != 1) {
-        set_error_text(PyExc_IOError, NULL, self->pgcnx->cnx);
+        set_error_text(PyExc_IOError,
+                       get_new_error_message(self->pgcnx->cnx, offset),
+                       self->pgcnx->cnx);
         ret = NULL;
     }
     else if (buf) { /* buffer has been sent */
@@ -613,6 +617,7 @@ source_getdata(sourceObject *self, PyObject *args)
     int decode = 0;    /* decode flag */
     char *buffer;      /* the copied buffer as encoded byte string */
     Py_ssize_t nbytes; /* length of the byte string */
+    size_t offset;     /* length of the error message before */
     PyObject *ret;     /* return value */
 
     /* checks validity */
@@ -634,6 +639,7 @@ source_getdata(sourceObject *self, PyObject *args)
                         "Connection is invalid or not in copy_out state");
         return NULL;
     }
+    offset = strlen(PQerrorMessage(self->pgcnx->cnx));
     nbytes = PQgetCopyData(self->pgcnx->cnx, &buffer, 0);
     if (nbytes == -1) { /* copy is done */
         ret = _source_end_copy(self, NULL);
@@ -643,7 +649,9 @@ source_getdata(sourceObject *self, PyObject *args)
     _conn_end(self->pgcnx);
 
     if (!nbytes || nbytes < -1) { /* an error occurred */
-        set_error_text(PyExc_IOError, NULL, self->pgcnx->cnx);
+        set_error_text(PyExc_IOError,
+                       get_new_error_message(self->pgcnx->cnx, offset),
+                       self->pgcnx->cnx);
         return NULL;
     }
 
