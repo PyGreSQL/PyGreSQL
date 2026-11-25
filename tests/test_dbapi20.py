@@ -105,6 +105,16 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         # the name must arrive unchanged at the server
         self.assertIn(f'"{special_dbname}"', str(cm.exception))
 
+    def test_connect_error(self):
+        # failed connections raise an OperationalError as in DB-API 2,
+        # which is also an InternalError for backward compatibility
+        kwargs = {**self.connect_kw_args, 'database': 'test_no_such_db'}
+        with self.assertRaises(pgdb.ConnectError) as cm:
+            pgdb.connect(**kwargs)
+        self.assertIsInstance(cm.exception, pgdb.OperationalError)
+        self.assertIsInstance(cm.exception, pgdb.InternalError)
+        self.assertIs(pgdb.ConnectError, pg.ConnectError)
+
     def test_percent_sign(self):
         con = self._connect()
         cur = con.cursor()

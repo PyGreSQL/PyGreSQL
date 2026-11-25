@@ -22,7 +22,7 @@
 PyObject *Error, *Warning, *InterfaceError, *DatabaseError, *InternalError,
     *OperationalError, *ProgrammingError, *IntegrityError, *DataError,
     *NotSupportedError, *InvalidResultError, *NoResultError,
-    *MultipleResultsError;
+    *MultipleResultsError, *ConnectError;
 
 #define _TOSTRING(x) #x
 #define TOSTRING(x) _TOSTRING(x)
@@ -281,7 +281,7 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     while (ndef) Py_DECREF(defaults[--ndef]);
 
     if (PQstatus(conn_obj->cnx) == CONNECTION_BAD) {
-        set_error(InternalError, "Cannot connect", conn_obj->cnx, NULL);
+        set_error(ConnectError, "Cannot connect", conn_obj->cnx, NULL);
         Py_XDECREF(conn_obj);
         return NULL;
     }
@@ -1202,6 +1202,17 @@ PyInit__pg(void)
         !(MultipleResultsError = add_exception(mod, "pg.MultipleResultsError",
                                                InvalidResultError))) {
         goto error;
+    }
+    /* Connection failures are operational errors as suggested by DB-API 2.0,
+       but also internal errors for backward compatibility */
+    {
+        PyObject *bases = PyTuple_Pack(2, OperationalError, InternalError);
+
+        ConnectError =
+            bases ? add_exception(mod, "pg.ConnectError", bases) : NULL;
+        Py_XDECREF(bases);
+        if (!ConnectError)
+            goto error;
     }
 
     /* Types (only some of them are exposed in the module) */

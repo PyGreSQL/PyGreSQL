@@ -2436,7 +2436,7 @@ conn_poll(connObject *self, PyObject *Py_UNUSED(noargs))
     _conn_end(self);
 
     if (rc == PGRES_POLLING_FAILED) {
-        set_error(InternalError, "Polling failed", self->cnx, NULL);
+        set_error(ConnectError, "Polling failed", self->cnx, NULL);
         return NULL;
     }
 

@@ -22,7 +22,8 @@ connect -- Open a PostgreSQL connection
     :param dict kwargs: other connection parameters
     :returns: a connection object
     :rtype: :class:`Connection`
-    :raises pgdb.OperationalError: error connecting to the database
+    :raises pgdb.ConnectError: error connecting to the database
+        (a subclass of :exc:`pgdb.OperationalError`)
 
 This function takes parameters specifying how to connect to a PostgreSQL
 database and returns a :class:`Connection` object using these parameters.
@@ -202,3 +203,12 @@ The errors that can be raised by the :mod:`pgdb` module are the following:
 
     Exception raised in case a method or database API was used which is not
     supported by the database.
+
+.. exception:: ConnectError
+
+    Subclass of :exc:`OperationalError` raised when a connection to the
+    database cannot be established. For backward compatibility, it is also
+    a subclass of :exc:`InternalError`, which was raised in this case before.
+    Catch :exc:`OperationalError` (or :exc:`ConnectError`) in new code.
+
+    .. versionadded:: 6.3

@@ -49,6 +49,10 @@ class TestHasConnect(unittest.TestCase):
     def test_has_pg_internal_error(self):
         self.assertTrue(issubclass(pg.InternalError, pg.DatabaseError))
 
+    def test_has_pg_connect_error(self):
+        self.assertTrue(issubclass(pg.ConnectError, pg.OperationalError))
+        self.assertTrue(issubclass(pg.ConnectError, pg.InternalError))
+
     def test_has_pg_operational_error(self):
         self.assertTrue(issubclass(pg.OperationalError, pg.DatabaseError))
 

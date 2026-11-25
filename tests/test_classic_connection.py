@@ -138,6 +138,34 @@ class TestCanConnect(unittest.TestCase):
             with self.subTest(port=port):
                 self.assertRaises(ValueError, pg.connect, dbname, port=port)
 
+    def test_connect_error(self):
+        # failed connections raise an OperationalError like in DB-API 2,
+        # which is also an InternalError for backward compatibility
+        with self.assertRaises(pg.ConnectError) as cm:
+            pg.connect('test_no_such_database', dbhost, dbport,
+                       user=dbuser, passwd=dbpasswd)
+        error = cm.exception
+        self.assertIsInstance(error, pg.OperationalError)
+        self.assertIsInstance(error, pg.InternalError)
+        self.assertIn('test_no_such_database', str(error))
+        with self.assertRaises(pg.OperationalError):
+            pg.DB('test_no_such_database', dbhost, dbport,
+                  user=dbuser, passwd=dbpasswd)
+
+    def test_connect_error_no_wait(self):
+        connection = pg.connect('test_no_such_database', dbhost, dbport,
+                                user=dbuser, passwd=dbpasswd, nowait=True)
+        try:
+            with self.assertRaises(pg.ConnectError) as cm:
+                for _n in range(1000):
+                    if connection.poll() == pg.POLLING_OK:
+                        break
+                    time.sleep(0.01)
+            self.assertIsInstance(cm.exception, pg.OperationalError)
+            self.assertIsInstance(cm.exception, pg.InternalError)
+        finally:
+            connection.close()
+
     def test_can_connect_no_wait(self):
         try:
             connection = connect_nowait()

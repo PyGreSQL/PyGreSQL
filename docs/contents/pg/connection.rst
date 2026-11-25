@@ -372,7 +372,8 @@ poll -- completes an asynchronous connection
     :rtype: int
     :raises TypeError: too many (any) arguments
     :raises TypeError: invalid connection
-    :raises pg.InternalError: some error occurred during pg connection
+    :raises pg.ConnectError: the connection could not be established
+        (a subclass of :exc:`pg.OperationalError`)
 
 The database connection can be performed without any blocking calls.
 This allows the application mainline to perform other operations or perhaps

@@ -64,6 +64,10 @@ class OperationalError(DatabaseError):
     """Exception raised for errors related to the operation of the database."""
 
 
+class ConnectError(OperationalError, InternalError):
+    """Exception raised when a connection cannot be established."""
+
+
 class ProgrammingError(DatabaseError):
     """Exception raised for programming errors."""
 

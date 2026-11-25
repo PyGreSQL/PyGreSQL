@@ -33,6 +33,7 @@ for details and for the extensions to the DB-API 2.0.
 """
 
 from pg.core import (
+    ConnectError,
     DatabaseError,
     DataError,
     Error,
@@ -111,6 +112,7 @@ __all__ = [
     'TIMESTAMP',
     'UUID',
     'Binary',
+    'ConnectError',
     'Connection',
     'Cursor',
     'DataError',

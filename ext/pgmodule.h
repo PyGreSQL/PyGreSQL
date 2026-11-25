@@ -57,7 +57,7 @@ extern PyTypeObject largeType;
 extern PyObject *Error, *Warning, *InterfaceError, *DatabaseError,
     *InternalError, *OperationalError, *ProgrammingError, *IntegrityError,
     *DataError, *NotSupportedError, *InvalidResultError, *NoResultError,
-    *MultipleResultsError;
+    *MultipleResultsError, *ConnectError;
 
 /* Module global configuration/state (defined in pgmodule.c) */
 extern PyObject *pg_default_host;   /* default database host */

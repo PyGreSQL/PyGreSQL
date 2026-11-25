@@ -43,7 +43,8 @@ connect -- Open a PostgreSQL connection
     :raises ValueError: parameters containing NUL characters, or a port
         that is not between 1 and 65535 (other than -1)
     :raises UnicodeEncodeError: parameters that cannot be encoded as UTF-8
-    :raises pg.InternalError: the connection could not be established
+    :raises pg.ConnectError: the connection could not be established
+        (a subclass of :exc:`pg.OperationalError`)
     :raises MemoryError: the connection object could not be allocated
 
 This function opens a connection to a specified database on a given
@@ -910,12 +911,12 @@ classes that are used by the :mod:`pgdb` module.
 
     Exception raised for errors that are related to the database's operation
     and not necessarily under the control of the programmer, e.g. when the
-    connection has been lost or closed, or a prepared statement does not exist.
+    connection could not be established, has been lost or closed, or a
+    prepared statement does not exist.
 
 .. exception:: InternalError
 
-    Exception raised when the database encounters an internal error, or
-    when a connection could not be established.
+    Exception raised when the database encounters an internal error.
 
 .. exception:: IntegrityError
 
@@ -948,3 +949,12 @@ classes that are used by the :mod:`pgdb` module.
 
     Subclass of :exc:`InvalidResultError` raised by these methods if the
     result has multiple rows.
+
+.. exception:: ConnectError
+
+    Subclass of :exc:`OperationalError` raised when a connection to the
+    database cannot be established. For backward compatibility, it is also
+    a subclass of :exc:`InternalError`, which was raised in this case before.
+    Catch :exc:`OperationalError` (or :exc:`ConnectError`) in new code.
+
+    .. versionadded:: 6.3
