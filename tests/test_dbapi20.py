@@ -2680,17 +2680,17 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                              0 if maxsize is not None and maxsize < 2 else 4)
 
     def test_memory_leaks(self):
-        ids: set = set()
-        objs: list = []
-        add_ids = ids.update
+        # warm up first, so that objects created only on the first call
+        # (e.g. by a coverage tracer) are not counted as leaks
+        self.test_no_close()
+        ids: set[int] = set()  # must exist before the snapshot
         gc.collect()
-        objs[:] = gc.get_objects()
-        add_ids(id(obj) for obj in objs)
+        # use no Python function here that runs for the first time
+        ids.update(map(id, gc.get_objects()))
         self.test_no_close()
         gc.collect()
-        objs[:] = gc.get_objects()
-        objs[:] = [obj for obj in objs if id(obj) not in ids]
-        self.assertEqual(len(objs), 0)
+        objs = [obj for obj in gc.get_objects() if id(obj) not in ids]
+        self.assertEqual(objs, [])
 
     def test_cve_2018_1058(self):
         # internal queries should use qualified table and operator names,

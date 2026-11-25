@@ -6438,17 +6438,17 @@ class TestMemoryLeaks(unittest.TestCase):
     """Test that the DB class does not leak memory."""
 
     def get_leaks(self, fut: Callable):
-        ids: set = set()
-        objs: list = []
-        add_ids = ids.update
+        # warm up first, so that objects created only on the first call
+        # (e.g. by a coverage tracer) are not counted as leaks
+        fut()
+        ids: set[int] = set()  # must exist before the snapshot
         gc.collect()
-        objs[:] = gc.get_objects()
-        add_ids(id(obj) for obj in objs)
+        # use no Python function here that runs for the first time
+        ids.update(map(id, gc.get_objects()))
         fut()
         gc.collect()
-        objs[:] = gc.get_objects()
-        objs[:] = [obj for obj in objs if id(obj) not in ids]
-        self.assertEqual(len(objs), 0)
+        objs = [obj for obj in gc.get_objects() if id(obj) not in ids]
+        self.assertEqual(objs, [])
 
     def test_leaks_with_close(self):
         def fut():
