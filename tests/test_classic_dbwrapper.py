@@ -220,15 +220,14 @@ class TestDBClassBasic(unittest.TestCase):
     def test_attribute_ssl_in_use(self):
         ssl_in_use = self.db.ssl_in_use
         self.assertIsInstance(ssl_in_use, bool)
-        self.assertFalse(ssl_in_use)
+        self.assertIs(ssl_in_use, self.db.query(
+            "select ssl from pg_stat_ssl"
+            " where pid operator(pg_catalog.=) pg_backend_pid()").single()[0])
 
     def test_attribute_ssl_attributes(self):
         ssl_attributes = self.db.ssl_attributes
         self.assertIsInstance(ssl_attributes, dict)
-        if ssl_attributes:
-            self.assertEqual(ssl_attributes, {
-                'cipher': None, 'compression': None, 'key_bits': None,
-                'library': None, 'protocol': None})
+        self.assertEqual(ssl_attributes, self.db.db.ssl_attributes)
 
     def test_attribute_status(self):
         status_ok = 1
@@ -384,6 +383,85 @@ class TestDBClassBasic(unittest.TestCase):
         assert self.db.db is not None
         db = pg.DB(db=self.db.db)
         self.assertEqual(self.db.db, db.db)
+
+    def test_connection_parameters_as_positional_arguments(self):
+        db = pg.DB(dbname, dbhost, dbport, None, dbuser, dbpasswd)
+        try:
+            self.assertEqual(db.query('select 1').singlescalar(), 1)
+        finally:
+            db.close()
+
+    def test_invalid_connection_arguments(self):
+        with self.assertRaises(TypeError) as cm:
+            pg.DB(self.db.db, db=self.db.db)  # type: ignore[call-overload]
+        self.assertEqual(
+            str(cm.exception), 'Conflicting connection parameters')
+        with self.assertRaises(TypeError) as cm:
+            pg.DB(db=self.db.db, dbname=dbname)  # type: ignore[call-overload]
+        self.assertEqual(
+            str(cm.exception), 'Conflicting connection parameters')
+        with self.assertRaises(TypeError) as cm:
+            pg.DB(db=object())  # type: ignore[call-overload]
+        self.assertIn('must be a valid database connection',
+                      str(cm.exception))
+        # objects whose initialization failed must be deletable
+        pg.DB.__new__(pg.DB).__del__()
+
+    def test_methods_delegated_to_connection(self):
+        db, con = self.db, self.db.db
+        assert con is not None
+        self.assertEqual(db.poll(), pg.POLLING_OK)
+        self.assertEqual(db.transaction(), con.transaction())
+        self.assertEqual(db.parameter('datestyle'),
+                         con.parameter('datestyle'))
+        self.assertEqual(db.date_format(), con.date_format())
+
+        def hook(value: Any, pgtype: int) -> Any:
+            return value
+
+        db.set_cast_hook(hook)
+        self.assertIs(db.get_cast_hook(), hook)
+        self.assertIs(con.get_cast_hook(), hook)
+        db.set_cast_hook(None)
+
+        def receiver(notice: Any) -> None:
+            pass
+
+        db.set_notice_receiver(receiver)
+        self.assertIs(db.get_notice_receiver(), receiver)
+        db.set_notice_receiver(None)
+        db.set_non_blocking(True)
+        self.assertIs(db.is_non_blocking(), True)
+        db.set_non_blocking(False)
+        self.assertIs(db.is_non_blocking(), False)
+        db.query('create temporary table test_delegated (n int)')
+        db.query('copy test_delegated from stdin')
+        db.putline('42\n')
+        db.endcopy()
+        db.query('copy test_delegated to stdout')
+        self.assertEqual(db.getline(), '42')
+        self.assertIsNone(db.getline())
+        db.begin()
+        try:
+            lo = db.locreate(pg.INV_READ | pg.INV_WRITE)
+            self.assertEqual(db.getlo(lo.oid).oid, lo.oid)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                path = os.path.join(tmpdir, 'test.txt')
+                with open(path, 'wb') as f:
+                    f.write(b'data')
+                lo = db.loimport(path)
+            lo.open(pg.INV_READ)
+            self.assertEqual(lo.read(10), b'data')
+            lo.close()
+        finally:
+            db.rollback()
+
+    def test_close_with_existing_connection_that_has_been_closed(self):
+        con = pg.connect(dbname, dbhost, dbport, user=dbuser, passwd=dbpasswd)
+        db = pg.DB(con)
+        con.close()
+        db.close()  # must not fail
+        self.assertIsNone(db.db)
 
     def test_existing_db_api2_connection(self):
 
@@ -720,6 +798,11 @@ class TestDBClass(unittest.TestCase):
         f({'enable_seqscan': 'on', 'datestyle': 'ISO, YMD'})
         self.assertEqual(g('enable_seqscan'), 'on')
         self.assertEqual(g('datestyle'), 'ISO, YMD')
+        # numbers can be given as strings, they are not quoted
+        f('extra_float_digits', '2')
+        self.assertEqual(g('extra_float_digits'), '2')
+        f('extra_float_digits', 1)
+        self.assertEqual(g('extra_float_digits'), '1')
 
     def test_reset_parameter(self):
         db = DB()
@@ -1680,6 +1763,7 @@ class TestDBClass(unittest.TestCase):
         self.assertEqual(can('test', 'delete'), True)
         self.assertRaises(pg.DataError, can, 'test', 'foobar')
         self.assertRaises(pg.ProgrammingError, can, 'table_does_not_exist')
+        self.assertEqual(can('test', flush=True), True)
         r = self.db.query(
             'select rolsuper FROM pg_roles'
             ' where rolname=current_user').getresult()[0][0]
@@ -2024,6 +2108,14 @@ class TestDBClass(unittest.TestCase):
         self.assertNotIn('c4', r)
         r = query(q).getresult()
         self.assertEqual(r, [(1234, 'abcd'), (5678, 'efgh')])
+
+    def test_insert_without_insertable_columns(self):
+        table = 'insert_test_table_3'
+        self.create_table(table, 'n int')
+        with self.assertRaises(pg.ProgrammingError) as cm:
+            self.db.insert(table, {'m': 1})
+        self.assertEqual(
+            str(cm.exception), 'No column found that can be inserted')
 
     def test_insert_with_generated_columns(self):
         insert = self.db.insert
@@ -4742,6 +4834,43 @@ class TestDBClass(unittest.TestCase):
                      'PG_CATALOG.int4', 'pg_catalog.int4[]', 'public.int4'):
             self.assertIsNone(dbtypes.get(name), name)
 
+    def test_db_types_unknown_types(self):
+        dbtypes = self.db.dbtypes
+        self.assertIsNone(dbtypes.get_attnames('no_such_type'))
+        self.assertIsNone(dbtypes.get_typecast(999_999_999))
+        # values of unknown types are not cast
+        self.assertEqual(dbtypes.typecast('1', 'no_such_type'), '1')
+        self.assertEqual(dbtypes.typecast('1', 999_999_999), '1')
+        self.assertIsNone(dbtypes.typecast(None, 'int4'))
+        self.assertIs(dbtypes.get_typecast(dbtypes['int4']), int)
+
+    def test_db_types_enums_and_ranges_are_text(self):
+        query = self.db.query
+        query("create type pg_temp.test_mood as enum ('sad', 'happy')")
+        dbtypes = self.db.dbtypes
+        self.assertEqual(dbtypes['test_mood'].simple, 'text')
+        self.assertEqual(dbtypes['int4range'].simple, 'text')
+        self.assertEqual(
+            query("select 'happy'::pg_temp.test_mood").singlescalar(),
+            'happy')
+
+    def test_db_types_base_type_named_like_array(self):
+        # creating such a type needs superuser rights, so only pass the
+        # values from the catalog for a base type that is not an array
+        typ = self.db.dbtypes.add(
+            999_999_999, '_test_base', '_test_base', -1, 'b', 'U', ',', 0)
+        self.assertEqual(typ.simple, 'text')
+
+    def test_db_types_composite_type_without_fields(self):
+        query = self.db.query
+        query("create type pg_temp.test_empty as ()")
+        dbtypes = self.db.dbtypes
+        self.assertEqual(dbtypes.get_attnames('test_empty'), {})
+        self.assertIsNone(dbtypes.get_typecast('test_empty'))
+        # a composite type without fields is returned as string
+        self.assertEqual(
+            query("select '()'::pg_temp.test_empty").singlescalar(), '()')
+
     def test_db_types_failing_lookup_in_transaction(self):
         query = self.db.query
         dbtypes = self.db.dbtypes
@@ -5484,6 +5613,113 @@ class TestDBClassAdapter(unittest.TestCase):
 
         f = self.adapter.guess_simple_type
         self.assertEqual(f(MyBytes(b'test')), 'bytea')
+
+    def test_simple_name_of_unknown_python_type(self):
+        class Unknown:
+            pass
+
+        self.assertEqual(self.adapter.get_simple_name(Unknown), 'text')
+
+    def test_guess_simple_type_of_other_subclasses(self):
+        class MyStr(str):
+            pass
+
+        class MyInt(int):
+            pass
+
+        class MyFloat(float):
+            pass
+
+        class MyDecimal(Decimal):
+            pass
+
+        class MyDate(date):
+            pass
+
+        class MyJson(pg.Json):
+            pass
+
+        class MyHstore(pg.Hstore):
+            pass
+
+        class MyUuid(UUID):
+            pass
+
+        f = self.adapter.guess_simple_type
+        for value, simple_type in (
+                (MyStr('test'), 'text'), (MyInt(1), 'int'),
+                (MyFloat(1.5), 'float'), (MyDecimal('1.5'), 'num'),
+                (MyDate(2016, 1, 30), 'date'), (MyJson([1]), 'json'),
+                (MyHstore({'k': 'v'}), 'hstore'),
+                (MyUuid(int=1), 'uuid')):
+            with self.subTest(value=value):
+                self.assertEqual(f(value), simple_type)
+
+    def test_adapt_query_with_invalid_types(self):
+        format_query = self.adapter.format_query
+        with self.assertRaises(ValueError) as cm:
+            format_query('select %s', [1], ['int'], inline=True)
+        self.assertEqual(
+            str(cm.exception), 'Typed parameters must be sent separately')
+        with self.assertRaises(TypeError) as cm_type:
+            format_query('select %(a)s', {'a': 1}, ['int'])
+        self.assertEqual(
+            str(cm_type.exception), 'The values and types do not match')
+        with self.assertRaises(TypeError) as cm_type:
+            format_query('select %s', [1], ['hstore'])
+        self.assertEqual(
+            str(cm_type.exception), 'Hstore parameter 1 has wrong type')
+
+    def test_adapt_query_typed_with_null_values(self):
+        format_query = self.adapter.format_query
+        for typ in 'json', 'hstore', 'uuid':
+            with self.subTest(type=typ):
+                self.assertEqual(
+                    format_query('select %s', [None], [typ]),
+                    ('select $1', [None]))
+
+    def test_adapt_query_typed_bool_array_with_strings(self):
+        self.assertEqual(self.adapter.format_query(
+            'select %s', [['', 'true', 'no']], ['bool[]']),
+            ('select $1', ['{null,t,f}']))
+
+    def test_adapt_query_inline_special_floats(self):
+        self.assertEqual(self.adapter.format_query(
+            'select %s, %s, %s',
+            [float('inf'), float('-inf'), float('nan')], inline=True),
+            ("select 'Infinity', '-Infinity', 'NaN'", []))
+
+    def test_adapt_query_inline_with_pg_repr_returning_tuple(self):
+        class Pair:
+            def __pg_repr__(self) -> tuple:
+                return 1, 'a'
+
+        self.assertEqual(self.adapter.format_query(
+            'select %s', [Pair()], inline=True), ("select (1,'a')", []))
+
+    def test_adapt_query_typed_record_with_empty_raw_bytes(self):
+        db = self.db
+        db.query('create type pg_temp.test_pair as (a text, b int)')
+        typ = db.dbtypes['test_pair']
+        self.assertEqual(db.adapter.format_query(
+            'select %s', [(b'', 1)], [typ]), ('select $1', [b'("",1)']))
+        # a string is passed as the literal of the record
+        self.assertEqual(db.adapter.format_query(
+            'select %s', ['(a,1)'], [typ]), ('select $1', ['(a,1)']))
+
+    def test_adapt_query_typed_uuid_with_empty_string(self):
+        self.assertEqual(self.adapter.format_query(
+            'select %s', [''], ['uuid']), ('select $1', [None]))
+
+    def test_adapt_query_inline_literal(self):
+        self.assertEqual(self.adapter.format_query(
+            'select %s', [pg.Literal('now()')], inline=True),
+            ('select now()', []))
+
+    def test_adapt_query_typed_hstore_with_empty_raw_bytes(self):
+        self.assertEqual(self.adapter.format_query(
+            'select %s', [pg.Hstore({b'': b''})], ['hstore']),
+            ('select $1', [b'""=>""']))
 
     def test_adapt_query_typed_list(self):
         format_query = self.adapter.format_query

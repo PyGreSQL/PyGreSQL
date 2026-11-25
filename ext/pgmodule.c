@@ -224,8 +224,10 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
         !_param_value(user_obj, pg_default_user, &pguser, defaults, &ndef) ||
         !_param_value(passwd_obj, pg_default_passwd, &pgpasswd, defaults,
                       &ndef)) {
+        /* GCOVR_EXCL_START: the defaults are checked when they are set */
         while (ndef) Py_DECREF(defaults[--ndef]);
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     if (!(conn_obj = PyObject_GC_New(connObject, &connType))) {
@@ -695,15 +697,21 @@ static char pg_set_query_helpers__doc__[] =
 static PyObject *
 pg_set_query_helpers(PyObject *Py_UNUSED(self), PyObject *args)
 {
+    PyObject *dict_iter, *named_iter, *named_next, *scalar_iter;
     PyObject *bytea = NULL, *hstore = NULL;
 
     /* gets arguments */
-    if (!PyArg_ParseTuple(args, "O!O!O!O!|O!O!", &PyFunction_Type, &dictiter,
-                          &PyFunction_Type, &namediter, &PyFunction_Type,
-                          &namednext, &PyFunction_Type, &scalariter,
+    if (!PyArg_ParseTuple(args, "O!O!O!O!|O!O!", &PyFunction_Type, &dict_iter,
+                          &PyFunction_Type, &named_iter, &PyFunction_Type,
+                          &named_next, &PyFunction_Type, &scalar_iter,
                           &PyType_Type, &bytea, &PyType_Type, &hstore)) {
         return NULL;
     }
+    /* the helpers must be kept alive (they were borrowed references) */
+    Py_XSETREF(dictiter, Py_NewRef(dict_iter));
+    Py_XSETREF(namediter, Py_NewRef(named_iter));
+    Py_XSETREF(namednext, Py_NewRef(named_next));
+    Py_XSETREF(scalariter, Py_NewRef(scalar_iter));
     if (bytea)
         Py_XSETREF(bytea_type, Py_NewRef(bytea));
     if (hstore)
@@ -920,6 +928,10 @@ pg_cast_array(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
                                      &string_obj, &cast_obj, &delim)) {
         return NULL;
     }
+    if (!delim) { /* would be taken as the default delimiter */
+        PyErr_SetString(PyExc_ValueError, "Invalid array delimiter");
+        return NULL;
+    }
 
     if (PyBytes_Check(string_obj)) {
         PyBytes_AsStringAndSize(string_obj, &string, &size);
@@ -1015,7 +1027,7 @@ pg_cast_record(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
         return NULL;
     }
 
-    ret = cast_record(string, size, encoding, 0, cast_obj, len, delim);
+    ret = cast_record(string, size, encoding, cast_obj, len, delim);
 
     Py_XDECREF(string_obj);
 

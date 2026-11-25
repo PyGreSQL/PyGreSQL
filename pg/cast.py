@@ -87,10 +87,11 @@ def cast_money(value: str) -> Any:
     point = get_decimal_point()
     if not point:
         return value
-    if point != '.':
-        value = value.replace(point, '.')
-    value = value.replace('(', '-')
-    value = ''.join(c for c in value if c.isdigit() or c in '.-')
+    # like in the C extension, keep only the digits, the decimal point
+    # and the sign, so that thousands separators are also removed
+    value = ''.join(
+        '.' if c == point else '-' if c in '(-' else c
+        for c in value if c.isdigit() or c == point or c in '(-')
     return (get_decimal() or float)(value)
 
 

@@ -76,6 +76,16 @@ class TestCreatingLargeObjects(unittest.TestCase):
         finally:
             del large_object
 
+    def test_lo_create_with_invalid_arguments(self):
+        self.assertRaises(TypeError, self.c.locreate)
+        self.assertRaises(TypeError, self.c.locreate, 'r')
+
+    def test_lo_create_in_failed_transaction(self):
+        self.assertRaises(pg.DataError, self.c.query, 'select 1/0')
+        with self.assertRaises(pg.OperationalError) as cm:
+            self.c.locreate(pg.INV_READ | pg.INV_WRITE)
+        self.assertEqual(str(cm.exception), "Can't create large object")
+
     def test_get_lo(self):
         large_object = self.c.locreate(pg.INV_READ | pg.INV_WRITE)
         try:
@@ -131,6 +141,13 @@ class TestCreatingLargeObjects(unittest.TestCase):
             self.assertRaises(ValueError, getlo, oid)
         for bad_oid in (None, '1', 1.0, True):
             self.assertRaises(TypeError, getlo, bad_oid)
+        self.assertRaises(TypeError, getlo)
+
+        class BadOid:
+            def __index__(self) -> int:
+                raise ZeroDivisionError
+
+        self.assertRaises(ZeroDivisionError, getlo, BadOid())
         with self.assertRaises(ValueError) as cm:
             getlo(-1)
         self.assertEqual(str(cm.exception), 'Invalid large object OID: -1')
@@ -188,6 +205,13 @@ class TestCreatingLargeObjects(unittest.TestCase):
         self.assertRaises(ValueError, self.c.loimport, 'invalid\0name')
         self.assertRaises(TypeError, self.c.loimport, 0)
 
+    def test_lo_import_missing_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = pathlib.Path(tmpdir, 'missing.txt')
+            with self.assertRaises(pg.OperationalError) as cm:
+                self.c.loimport(path)
+        self.assertEqual(str(cm.exception), "Can't create large object")
+
     def test_lo_import_bytes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = pathlib.Path(tmpdir, 'import.txt')
@@ -230,6 +254,30 @@ class TestLargeObjects(unittest.TestCase):
 
     def test_pgcn(self):
         self.assertIs(self.obj.pgcnx, self.pgcnx)
+
+    def test_attribute_with_invalid_name(self):
+        self.assertRaises(AttributeError, getattr, self.obj, 'foo')
+        self.assertRaises(UnicodeEncodeError, getattr, self.obj, '\udcff')
+
+    def test_closed_connection(self):
+        obj = self.obj
+        self.pgcnx.close()
+        self.assertIsNone(obj.pgcnx)
+        self.assertIsNone(obj.oid)
+        self.assertIsInstance(obj.error, str)
+        for method, args in (
+                (obj.open, (pg.INV_READ,)), (obj.close, ()),
+                (obj.read, (1,)), (obj.write, (b'x',)),
+                (obj.seek, (0, pg.SEEK_SET)), (obj.tell, ()),
+                (obj.size, ()), (obj.unlink, ()), (obj.export, ('x',))):
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(pg.OperationalError) as cm:
+                    method(*args)
+                self.assertEqual(
+                    str(cm.exception), 'Connection has been closed')
+        self.pgcnx = connect()
+        self.pgcnx.query('begin')
+        self.obj = self.pgcnx.locreate(pg.INV_READ)
 
     def test_error(self):
         self.assertIsInstance(self.obj.error, str)
@@ -429,6 +477,30 @@ class TestLargeObjects(unittest.TestCase):
         self.assertIsNone(self.obj.oid)
         # unlinking after object has been already unlinked
         self.assertRaises(pg.IntegrityError, unlink)
+
+    def test_methods_after_end_of_transaction(self):
+        obj = self.obj
+        obj.open(pg.INV_READ | pg.INV_WRITE)
+        # this invalidates the descriptor and removes the object
+        self.pgcnx.query('rollback')
+        for method, args in (
+                (obj.read, (1,)), (obj.write, (b'x',)),
+                (obj.seek, (0, pg.SEEK_SET)), (obj.tell, ()),
+                (obj.size, ())):
+            with self.subTest(method=method.__name__):
+                self.assertRaises(OSError, method, *args)
+        with self.assertRaises(OSError) as cm:
+            obj.close()
+        self.assertEqual(str(cm.exception),
+                         'Error while closing large object fd')
+        # the object stayed open before, so that it could not be used
+        with self.assertRaises(OSError) as cm:
+            obj.close()
+        self.assertEqual(str(cm.exception), 'Object is not opened')
+        self.pgcnx.query('begin')
+        with self.assertRaises(OSError) as cm:
+            obj.open(pg.INV_READ)
+        self.assertEqual(str(cm.exception), "Can't open large object")
 
     def test_unlink_inexistent(self):
         unlink = self.obj.unlink

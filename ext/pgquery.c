@@ -105,8 +105,13 @@ _query_detach(queryObject *self)
             break;
         if (_is_copy_status(PQresultStatus(result))) {
             copy = 1;
-            if (self->copy && self->next_pending == self->num_pending) {
-                /* this is the current result which is returned again */
+            if (self->next_pending == self->num_pending
+                    ? self->copy
+                    : _is_copy_status(PQresultStatus(
+                          self->pending[self->num_pending - 1]))) {
+                /* this is the current or the last moved result, which is
+                   returned again, since the COPY has not been completed
+                   (a completed COPY is followed by its command status) */
                 PQclear(result);
                 break;
             }
@@ -168,8 +173,10 @@ _query_finish(queryObject *self)
                 ExecStatusType status = PQresultStatus(result);
 
                 PQclear(result);
+                /* this is only called after the last result or an error,
+                   and the server skips the statements after an error */
                 if (_is_copy_status(status))
-                    break;
+                    break; /* GCOVR_EXCL_LINE: see above */
             }
             Py_END_ALLOW_THREADS
             _conn_end(cnx_obj);
@@ -204,7 +211,7 @@ _query_fetch(queryObject *self)
         return NULL;
     }
     if (self->async == ASYNC_DONE)
-        Py_RETURN_NONE;
+        Py_RETURN_NONE; /* GCOVR_EXCL_LINE: the callers check this */
 
     if (self->next_pending < self->num_pending) {
         /* results that have been moved from the connection come first */
@@ -338,8 +345,10 @@ _query_current_result(queryObject *self)
     if (!(res = _query_fetch(self)))
         return -1;
     if (self->async == ASYNC_DONE) {
+        /* GCOVR_EXCL_START: an asynchronous query has at least one result */
         if (res != (PyObject *)self)
             Py_DECREF(res);
+        /* GCOVR_EXCL_STOP */
     }
     else {
         self->async = ASYNC_UNDELIVERED;
@@ -638,7 +647,12 @@ query_fieldinfo(queryObject *self, PyObject *args)
     if (field) {
         /* gets field number */
         if (PyLong_Check(field)) {
-            num = (int)PyLong_AsLong(field);
+            /* numbers that do not fit into an int are unknown fields */
+            long n = PyLong_AsLong(field);
+
+            if (n == -1 && PyErr_Occurred())
+                PyErr_Clear();
+            num = n < 0 || n >= self->num_fields ? -1 : (int)n;
         }
         else {
             num = get_field_number(
@@ -972,7 +986,9 @@ query_dictiter(queryObject *self, PyObject *noargs)
     PyObject *res;
 
     if (!dictiter) {
+        /* GCOVR_EXCL_START: unreachable, set when pg is imported */
         return query_dictresult(self, noargs);
+        /* GCOVR_EXCL_STOP */
     }
 
     if ((res = _query_next_result(self)) != (PyObject *)self)
@@ -999,7 +1015,9 @@ query_onenamed(queryObject *self, PyObject *noargs)
     PyObject *res;
 
     if (!namednext) {
+        /* GCOVR_EXCL_START: unreachable, set when pg is imported */
         return query_one(self, noargs);
+        /* GCOVR_EXCL_STOP */
     }
 
     if (_query_current_result(self) < 0)
@@ -1032,7 +1050,9 @@ query_singlenamed(queryObject *self, PyObject *noargs)
     PyObject *res;
 
     if (!namednext) {
+        /* GCOVR_EXCL_START: unreachable, set when pg is imported */
         return query_single(self, noargs);
+        /* GCOVR_EXCL_STOP */
     }
 
     if (_query_current_result(self) < 0)
@@ -1060,7 +1080,9 @@ _query_named_list(queryObject *self)
     PyObject *res, *res_list;
 
     if (!namediter) {
+        /* GCOVR_EXCL_START: unreachable, set when pg is imported */
         return _query_tuple_list(self);
+        /* GCOVR_EXCL_STOP */
     }
 
     ++self->in_use;
@@ -1108,8 +1130,11 @@ query_namediter(queryObject *self, PyObject *Py_UNUSED(noargs))
     if ((res = _query_next_result(self)) != (PyObject *)self)
         return res;
 
-    if (!namediter)
+    if (!namediter) {
+        /* GCOVR_EXCL_START: unreachable, set when pg is imported */
         return _list_iter(_query_tuple_list(self));
+        /* GCOVR_EXCL_STOP */
+    }
 
     /* see query_dictiter() */
     if (self->async)
@@ -1182,7 +1207,9 @@ query_scalariter(queryObject *self, PyObject *noargs)
     PyObject *res;
 
     if (!scalariter) {
+        /* GCOVR_EXCL_START: unreachable, set when pg is imported */
         return query_scalarresult(self, noargs);
+        /* GCOVR_EXCL_STOP */
     }
 
     if ((res = _query_next_result(self)) != (PyObject *)self)

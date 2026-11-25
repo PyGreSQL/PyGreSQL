@@ -524,6 +524,8 @@ class LocalTypecasts(Typecasts):
 
     def __missing__(self, typ: str) -> Callable | None:
         """Create a cast function if it is not cached."""
+        if not isinstance(typ, str):
+            raise TypeError(f'Invalid type: {typ}')
         cast: Callable | None = self._get_default(typ)
         if cast:
             cast = self._add_connection(cast)
@@ -718,7 +720,7 @@ class TypeCache(dict):
             return typecasts.create_record_cast(str(typ), field_names, casts)
         if is_array_type(str(typ), typ.len, typ.elem):
             elem_type = self.get(typ.elem)
-            if not elem_type:
+            if not elem_type:  # pragma: no cover (always exists)
                 return typecasts.create_array_cast(None)
             return typecasts.create_array_cast(
                 self._get_cast(elem_type), elem_type.delim)

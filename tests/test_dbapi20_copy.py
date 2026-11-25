@@ -292,6 +292,11 @@ class TestCopyFrom(TestCopy):
                        for row in self.data_text.splitlines())
         self.check_table()
 
+    def test_input_iterable_bytes_with_newlines(self):
+        self.copy_from(f'{row}\n'.encode()
+                       for row in self.data_text.splitlines())
+        self.check_table()
+
     def test_sep(self):
         stream = ('{}-{}'.format(*row) for row in self.data)
         self.copy_from(stream, sep='-')

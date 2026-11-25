@@ -335,6 +335,9 @@ Version 6.3.0 (unreleased)
     it could appear in the server log. `change_password()` uses
     ``PQchangePassword()`` with libpq 17 or newer and does the same itself
     with older versions of libpq.
+  - The typecast function `cast_money()` in `pg.cast` now also removes
+    thousands separators when the decimal point is not a period. Before,
+    a value like ``1.234,50 €`` raised an error.
 
 - Changes in the `pgdb` module:
 
@@ -460,6 +463,10 @@ Version 6.3.0 (unreleased)
     code of a composite type ``s.date`` was equal to `DATE`, and a composite
     type named ``_q`` was equal to `ARRAY`. Plain strings and type codes
     without type information are still compared by name.
+  - Creating a `Connection` from an invalid `pg` connection now raises
+    the intended `OperationalError` instead of a `TypeError` from the type
+    cache, and the connection specific typecasts raise a `TypeError` for
+    types that are not strings like the global ones.
 
 - Fixes in the C extension:
 
@@ -649,6 +656,40 @@ Version 6.3.0 (unreleased)
     now, and `DB.cancel()` now returns this value as well. Note that the
     libpq used at runtime must not be older than the one PyGreSQL has been
     built with.
+  - Fixes in the source object (found by measuring the test coverage):
+    deleting the ``arraysize`` attribute crashed, setting it to a number
+    that is too large and getting ``pgcnx`` of a closed source object
+    caused a `SystemError` later, the ``resulttype``, ``ntuples`` and
+    ``nfields`` attributes and `str()` of a new source object read
+    undefined values, `movelast()` on an empty result made `fetch()`
+    return a row of `None` values, and the command status shown by `str()`
+    is now decoded with the client encoding.
+  - Field numbers that do not fit into a C int, e.g. 2**32, given to
+    `fieldinfo()` and `field()` of source objects and to
+    `Query.fieldinfo()` now raise an error instead of being truncated,
+    which returned another field.
+  - Each command that was refused because the COPY of a pending
+    asynchronous query had not been completed added another COPY result to
+    that query, so that its `getresult()` returned empty strings instead of
+    the row count of the COPY.
+  - `cast_hstore()` now raises a `ValueError` for a trailing backslash in an
+    unquoted key or value, like PostgreSQL. Before, it was kept in a value,
+    and together with other escapes an undefined byte was read. A leak when
+    a quoted value was not terminated has also been fixed. `cast_array()`
+    and `cast_record()` now raise a `ValueError` for a NUL character as
+    delimiter, which was taken as a comma.
+  - Money values in arrays were not cast correctly when `set_decimal(None)`
+    was set, the conversion read beyond the digits and failed.
+  - `set_query_helpers()` did not keep references to the helper functions.
+  - The ``ssl_attributes`` of a connection could crash when an attribute
+    could not be converted. Values that are not valid UTF-8 now contain
+    backslash escapes.
+  - The methods `source()`, `locreate()`, `getlo()` and `loimport()` of a
+    closed connection, when bound before closing it, raised an
+    `OperationalError` instead of the documented `TypeError`.
+  - `LargeObject.close()` now also marks the large object as closed if
+    closing fails, e.g. because the transaction has ended, so that it can be
+    opened again or unlinked. Before, it stayed open and unusable.
 
 - Documentation:
 

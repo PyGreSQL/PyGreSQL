@@ -15,8 +15,9 @@ import json
 import re
 import tracemalloc
 import unittest
-from collections.abc import Sequence
-from datetime import timedelta
+from collections.abc import Callable, Sequence
+from contextlib import suppress
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from ipaddress import (
     IPv4Address,
@@ -26,6 +27,7 @@ from ipaddress import (
     IPv6Interface,
     IPv6Network,
 )
+from types import SimpleNamespace
 from typing import Any
 
 import pg  # the module under test
@@ -325,12 +327,30 @@ class TestParseArray(unittest.TestCase):
          int, [[[1, 2, 3], [4, 5, 6]]]),
         ('[1:1][3:5]={{1,2,3},{4,5,6}}', int, [[1, 2, 3], [4, 5, 6]]),
         ('[3:5]={{1,2,3},{4,5,6}}', int, ValueError),
-        ('[1:1][-2:-1][3:5]={{1,2,3},{4,5,6}}', int, ValueError)]
+        ('[1:1][-2:-1][3:5]={{1,2,3},{4,5,6}}', int, ValueError),
+        ('[1:3]=', int, ValueError),
+        ('[1:3]=  ', int, ValueError),
+        ('{"a\\', str, ValueError),
+        ('{a\\', str, ValueError),
+        ('{,}', str, ValueError),
+        ('{a, ,b}', str, ValueError),
+        ('{a,', str, ValueError),
+        ('{a, ', str, ValueError),
+        ('{{', int, ValueError),
+        ('{{ ', int, ValueError),
+        ('{{1},2}', int, ValueError),
+        ('{{1} ', int, ValueError),
+        ('{{1}x', int, ValueError),
+        ('[1:1][1:1]={1}', int, ValueError),
+        ('{{1}, ', int, ValueError),
+        ('{{1},{2}x', int, ValueError),
+        ('{{{1}},{2}}', int, ValueError)]
 
     def test_parser_params(self):
         f = pg.cast_array
         self.assertRaises(TypeError, f)
         self.assertRaises(TypeError, f, None)
+        self.assertRaises(UnicodeEncodeError, f, '{\udcff}')
         self.assertRaises(TypeError, f, '{}', 1)
         self.assertRaises(TypeError, f, '{}', b',',)
         self.assertRaises(TypeError, f, '{}', None, None)
@@ -339,6 +359,8 @@ class TestParseArray(unittest.TestCase):
         self.assertRaises(ValueError, f, '{}', None, b'\\')
         self.assertRaises(ValueError, f, '{}', None, b'{')
         self.assertRaises(ValueError, f, '{}', None, b'}')
+        # this was taken as the default delimiter before
+        self.assertRaises(ValueError, f, '{}', None, b'\0')
         self.assertRaises(TypeError, f, '{}', None, b',;')
         self.assertEqual(f('{}'), [])
         self.assertEqual(f('{}', None), [])
@@ -463,7 +485,7 @@ class TestParseArray(unittest.TestCase):
         for string, cast, expected in self.test_strings:
             string = replace_comma(string)
             if expected is ValueError:
-                self.assertRaises(ValueError, f, string, cast)
+                self.assertRaises(ValueError, f, string, cast, b';')
             else:
                 expected = replace_comma(expected)
                 self.assertEqual(f(string, cast, b';'), expected)
@@ -483,6 +505,11 @@ class TestParseRecord(unittest.TestCase):
         ('(,)', str, (None, None)),
         ('( , )', str, (' ', ' ')),
         ('(")', None, ValueError),
+        ('("a\\', None, ValueError),
+        ('(a\\', None, ValueError),
+        ('(a', None, ValueError),
+        ('(a,b) x', None, ValueError),
+        ('("a"', None, ValueError),
         ('("")', None, ('',)),
         ('("")', str, ('',)),
         ('("")', int, ValueError),
@@ -614,6 +641,7 @@ class TestParseRecord(unittest.TestCase):
         f = pg.cast_record
         self.assertRaises(TypeError, f)
         self.assertRaises(TypeError, f, None)
+        self.assertRaises(UnicodeEncodeError, f, '(\udcff)')
         self.assertRaises(TypeError, f, '()', 1)
         self.assertRaises(TypeError, f, '()', b',',)
         self.assertRaises(TypeError, f, '()', None, None)
@@ -622,6 +650,8 @@ class TestParseRecord(unittest.TestCase):
         self.assertRaises(ValueError, f, '()', None, b'\\')
         self.assertRaises(ValueError, f, '()', None, b'(')
         self.assertRaises(ValueError, f, '()', None, b')')
+        # this was taken as the default delimiter before
+        self.assertRaises(ValueError, f, '()', None, b'\0')
         self.assertRaises(TypeError, f, '{}', None, b',;')
         self.assertEqual(f('()'), (None,))
         self.assertEqual(f('()', None), (None,))
@@ -702,6 +732,12 @@ class TestParseRecord(unittest.TestCase):
             f('(1,2,3,4,5,6)', [int, float, str, None, cast1, cast2]),
             (1, 2.0, '3', '4', '5 is ok', 'and 6 is ok, too'))
 
+        class BadCasts(list):
+            def __getitem__(self, index):
+                raise ZeroDivisionError
+
+        self.assertRaises(ZeroDivisionError, f, '(1,2)', BadCasts([int, int]))
+
     def test_parser_delim(self):
         f = pg.cast_record
         self.assertEqual(f('(1,2)'), ('1', '2'))
@@ -763,6 +799,7 @@ class TestParseHStore(unittest.TestCase):
 
     test_strings: Sequence[tuple[str, Any]] = [
         ('', {}),
+        ('   ', {}),
         ('=>', ValueError),
         ('""=>', ValueError),
         ('=>""', ValueError),
@@ -790,7 +827,16 @@ class TestParseHStore(unittest.TestCase):
         ('"Hi!"=>"Hello, World!"', {'Hi!': 'Hello, World!'}),
         (r'"k=>v"=>k\=\>v', {'k=>v': 'k=>v'}),
         (r'k\=\>v=>"k=>v"', {'k=>v': 'k=>v'}),
-        ('a\\,b=>a,b=>a', {'a,b': 'a', 'b': 'a'})]
+        ('a\\,b=>a,b=>a', {'a,b': 'a', 'b': 'a'}),
+        ('"k\\', ValueError),
+        ('k=>"v\\', ValueError),
+        # a trailing backslash was kept or read beyond the value before
+        ('k\\', ValueError),
+        ('k=>v\\', ValueError),
+        ('k=>v\\,w\\', ValueError),
+        (r'k\\=>v\\', {'k\\': 'v\\'}),
+        ('k=>v x', ValueError),
+        ('k=>v, ', ValueError)]
 
     def test_parser(self):
         f = pg.cast_hstore
@@ -799,12 +845,35 @@ class TestParseHStore(unittest.TestCase):
         self.assertRaises(TypeError, f, None)
         self.assertRaises(TypeError, f, 42)
         self.assertRaises(TypeError, f, '', None)
+        self.assertRaises(UnicodeEncodeError, f, 'k=>\udcff')
 
         for string, expected in self.test_strings:
             if expected is ValueError:
                 self.assertRaises(ValueError, f, string)
             else:
                 self.assertEqual(f(string), expected)
+
+    def test_parser_errors_do_not_leak(self):
+        f = pg.cast_hstore
+        key = 'k' * 1000
+        strings = [f'{key}=>"v', f'{key}=>v\\', f'{key}=>v x', f'{key}=>v, ']
+
+        def parse():
+            for _i in range(100):
+                for string in strings:
+                    with suppress(ValueError):
+                        f(string)
+
+        parse()  # warm-up
+        tracemalloc.start()
+        try:
+            before = tracemalloc.get_traced_memory()[0]
+            parse()
+            leaked = tracemalloc.get_traced_memory()[0] - before
+        finally:
+            tracemalloc.stop()
+        # the key of an unterminated quoted value leaked before
+        self.assertLess(leaked, 10_000, f'{leaked} bytes leaked')
 
 
 class TestCastInterval(unittest.TestCase):
@@ -971,14 +1040,17 @@ class TestCastInterval(unittest.TestCase):
 
     def test_cast_interval(self):
         from pg.cast import cast_interval
-        for result, values in self.intervals:
-            years, mons, days, hours, mins, secs, usecs = result
-            days += 365 * years + 30 * mons
-            interval = timedelta(
-                days=days, hours=hours, minutes=mins,
-                seconds=secs, microseconds=usecs)
-            for value in values:
-                self.assertEqual(cast_interval(value), interval)
+        from pgdb.cast import cast_interval as pgdb_cast_interval
+        for cast in cast_interval, pgdb_cast_interval:
+            for result, values in self.intervals:
+                years, mons, days, hours, mins, secs, usecs = result
+                days += 365 * years + 30 * mons
+                interval = timedelta(
+                    days=days, hours=hours, minutes=mins,
+                    seconds=secs, microseconds=usecs)
+                for value in values:
+                    with self.subTest(cast=cast.__module__, value=value):
+                        self.assertEqual(cast(value), interval)
 
     def test_cast_infinite_interval(self):
         from pg.cast import cast_interval
@@ -988,6 +1060,192 @@ class TestCastInterval(unittest.TestCase):
             self.assertEqual(cast('-infinity'), timedelta.min)
             self.assertRaises(ValueError, cast, '+infinity')
             self.assertRaises(ValueError, cast, 'Infinity')
+
+
+class TestCastDateTime(unittest.TestCase):
+    """Test the typecast functions for dates and times."""
+
+    class Connection:
+        """Stub for a connection with the given date format."""
+
+        def __init__(self, date_format: str) -> None:
+            self._date_format = date_format
+
+        def date_format(self) -> str:
+            return self._date_format
+
+    iso, postgres_mdy, postgres_dmy = '%Y-%m-%d', '%m-%d-%Y', '%d-%m-%Y'
+    sql_mdy, german = '%m/%d/%Y', '%d.%m.%Y'
+
+    def casts(self, name: str) -> list[Callable]:
+        import pg.cast
+        import pgdb.cast
+        return [getattr(pg.cast, name), getattr(pgdb.cast, name)]
+
+    def test_cast_date(self):
+        for cast in self.casts('cast_date'):
+            for date_format, value, expected in (
+                    (self.iso, '2016-03-14', date(2016, 3, 14)),
+                    (self.postgres_mdy, '03-14-2016', date(2016, 3, 14)),
+                    (self.german, '14.03.2016', date(2016, 3, 14)),
+                    (self.iso, 'infinity', date.max),
+                    (self.iso, '-infinity', date.min),
+                    (self.iso, '0099-01-08 BC', date.min),
+                    (self.iso, '10000-01-01', date.max)):
+                with self.subTest(cast=cast.__module__, value=value):
+                    self.assertEqual(
+                        cast(value, self.Connection(date_format)), expected)
+
+    def test_cast_timetz(self):
+        for cast in self.casts('cast_timetz'):
+            for value, offset in (
+                    ('15:09:26', 0), ('15:09:26+01', 60),
+                    ('15:09:26-08', -480), ('15:09:26+05:30', 330)):
+                with self.subTest(cast=cast.__module__, value=value):
+                    tz = timezone(timedelta(minutes=offset))
+                    self.assertEqual(
+                        cast(value), time(15, 9, 26, tzinfo=tz))
+
+    def test_cast_timestamp(self):
+        expected = datetime(2016, 3, 14, 15, 9, 26)
+        for cast in self.casts('cast_timestamp'):
+            for date_format, value, result in (
+                    (self.iso, '2016-03-14 15:09:26', expected),
+                    (self.iso, '2016-03-14 15:09:26.5',
+                     expected.replace(microsecond=500000)),
+                    (self.postgres_mdy, 'Mon Mar 14 15:09:26 2016', expected),
+                    (self.postgres_dmy, 'Mon 14 Mar 15:09:26 2016', expected),
+                    (self.sql_mdy, '03/14/2016 15:09:26', expected),
+                    (self.german, '14.03.2016 15:09:26', expected),
+                    (self.iso, 'infinity', datetime.max),
+                    (self.iso, '-infinity', datetime.min),
+                    (self.iso, '0099-01-08 15:09:26 BC', datetime.min),
+                    (self.iso, '10000-01-01 00:00:00', datetime.max),
+                    (self.postgres_mdy, 'Sat Jan 01 00:00:00 10000',
+                     datetime.max)):
+                with self.subTest(cast=cast.__module__, value=value):
+                    self.assertEqual(
+                        cast(value, self.Connection(date_format)), result)
+
+    def test_cast_timestamptz(self):
+        cet = timezone(timedelta(hours=1))
+        expected = datetime(2016, 3, 14, 15, 9, 26, tzinfo=cet)
+        utc = expected.replace(tzinfo=timezone.utc)
+        for cast in self.casts('cast_timestamptz'):
+            for date_format, value, result in (
+                    (self.iso, '2016-03-14 15:09:26+01', expected),
+                    (self.iso, '2016-03-14 15:09:26', utc),
+                    (self.postgres_mdy, 'Mon Mar 14 15:09:26 2016 CET',
+                     expected),
+                    (self.postgres_dmy, 'Mon 14 Mar 15:09:26 2016 CET',
+                     expected),
+                    (self.sql_mdy, '03/14/2016 15:09:26 CET', expected),
+                    (self.german, '14.03.2016 15:09:26 XYZ', utc),
+                    (self.iso, 'infinity', datetime.max),
+                    (self.iso, '-infinity', datetime.min),
+                    (self.iso, '0099-01-08 15:09:26+00 BC', datetime.min),
+                    (self.iso, '10000-01-01 00:00:00+00', datetime.max),
+                    (self.postgres_mdy, 'Sat Jan 01 00:00:00 10000 UTC',
+                     datetime.max)):
+                with self.subTest(cast=cast.__module__, value=value):
+                    self.assertEqual(
+                        cast(value, self.Connection(date_format)), result)
+
+    def test_cast_money_with_decimal_point(self):
+        from pg.cast import cast_money
+        point = pg.get_decimal_point()
+        self.addCleanup(pg.set_decimal_point, point)
+        self.assertEqual(cast_money('$1,234.50'), Decimal('1234.50'))
+        self.assertEqual(cast_money('($1,234.50)'), Decimal('-1234.50'))
+        self.assertEqual(cast_money('-$1,234.50'), Decimal('-1234.50'))
+        pg.set_decimal_point(',')
+        # the thousands separator was taken as decimal point before
+        self.assertEqual(cast_money('1.234,50 €'), Decimal('1234.50'))
+        self.assertEqual(cast_money('-1.234,50 €'), Decimal('-1234.50'))
+        pg.set_decimal_point(None)
+        # money is returned as string if the decimal point is not known
+        self.assertEqual(cast_money('1.234,50 €'), '1.234,50 €')
+
+    def test_cast_money_and_int2vector(self):
+        from pgdb.cast import cast_int2vector, cast_money
+        self.assertIsNone(cast_money(''))
+        self.assertEqual(cast_money('($1,234.50)'), Decimal('-1234.50'))
+        self.assertEqual(cast_int2vector('1 2 3'), [1, 2, 3])
+
+
+class TestTypecastsClasses(unittest.TestCase):
+    """Test the Typecasts classes of both modules without a connection."""
+
+    def typecasts(self) -> list[Any]:
+        """Get subclasses that support one composite type 'pair'."""
+        import pg.cast
+        import pgdb.cast
+        from pg.attrs import AttrDict
+
+        class PgTypecasts(pg.cast.Typecasts):
+            def get_attnames(self, typ: Any) -> AttrDict:
+                if typ != 'pair':
+                    return super().get_attnames(typ)
+                int4 = SimpleNamespace(pgtype='int4')
+                return AttrDict(a=int4, b=int4)
+
+        class PgDbTypecasts(pgdb.cast.LocalTypecasts):
+            def get_fields(self, typ: str) -> list:
+                if typ != 'pair':
+                    return super().get_fields(typ)
+                info = pgdb.cast.FieldInfo
+                int4: Any = 'int4'  # a type name instead of a type code
+                return [info('a', int4), info('b', int4)]
+
+        return [PgTypecasts(), PgDbTypecasts()]
+
+    def test_invalid_type(self):
+        import pgdb.cast
+        for typecasts in [*self.typecasts(), pgdb.cast.Typecasts()]:
+            with self.subTest(typecasts=type(typecasts).__name__):
+                self.assertRaises(TypeError, typecasts.__getitem__, 1)
+                self.assertIsNone(typecasts['unknown'])
+                self.assertIs(typecasts.get('unknown', str), str)
+
+    def test_array_cast_from_name(self):
+        import pgdb.cast
+        for typecasts in [*self.typecasts(), pgdb.cast.Typecasts()]:
+            with self.subTest(typecasts=type(typecasts).__name__):
+                self.assertEqual(typecasts['_int4']('{1,2}'), [1, 2])
+                self.assertNotIn('_int4', typecasts)  # not cached
+
+    def test_record_cast_from_fields(self):
+        for typecasts in self.typecasts():
+            with self.subTest(typecasts=type(typecasts).__name__):
+                pair = typecasts['pair']('(1,2)')
+                self.assertEqual(pair, (1, 2))
+                self.assertEqual(pair._fields, ('a', 'b'))
+                self.assertIn('pair', typecasts)  # cached
+                # changing a typecast drops the cached record casts
+                typecasts.set('int4', str)
+                self.assertNotIn('pair', typecasts)
+                self.assertEqual(typecasts['pair']('(1,2)'), ('1', '2'))
+
+    def test_set_and_remove(self):
+        for typecasts in self.typecasts():
+            with self.subTest(typecasts=type(typecasts).__name__):
+                typecasts.set(['t1', 't2'], int)
+                self.assertEqual(typecasts['t1']('1'), 1)
+                self.assertEqual(typecasts['t2']('2'), 2)
+                typecasts.set(['t1', 't2'], None)
+                self.assertIsNone(typecasts['t1'])
+                self.assertIsNone(typecasts['t2'])
+                self.assertRaises(TypeError, typecasts.set, 't1', 1)
+                if hasattr(typecasts, 'set_default'):  # only in pg
+                    self.assertRaises(
+                        TypeError, typecasts.set_default, 't1', 1)
+                    self.assertNotIn('t1', typecasts.defaults)
+                    try:
+                        typecasts.set_default(['t1', 't2'], int)
+                        self.assertIs(typecasts.defaults['t2'], int)
+                    finally:
+                        typecasts.set_default(['t1', 't2'], None)
+                    self.assertNotIn('t2', typecasts.defaults)
 
 
 class TestCastNetworkTypes(unittest.TestCase):

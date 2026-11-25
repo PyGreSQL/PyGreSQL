@@ -32,7 +32,7 @@ source_str(sourceObject *self)
             return format_result(self->result, self->encoding);
         case RESULT_DDL:
         case RESULT_DML:
-            return PyUnicode_FromString(PQcmdStatus(self->result));
+            return get_decoded_text(PQcmdStatus(self->result), self->encoding);
         case RESULT_EMPTY:
         default:
             return PyUnicode_FromString("(empty PostgreSQL source object)");
@@ -78,6 +78,7 @@ source_getattr(sourceObject *self, PyObject *nameobj)
         if (_check_source_obj(self, 0)) {
             return Py_NewRef(self->pgcnx);
         }
+        PyErr_Clear();
         Py_RETURN_NONE;
     }
 
@@ -107,12 +108,21 @@ source_setattr(sourceObject *self, char *name, PyObject *v)
 {
     /* arraysize */
     if (!strcmp(name, "arraysize")) {
+        long arraysize;
+
+        if (!v) {
+            PyErr_SetString(PyExc_TypeError, "arraysize cannot be deleted");
+            return -1;
+        }
         if (!PyLong_Check(v)) {
             PyErr_SetString(PyExc_TypeError, "arraysize must be integer");
             return -1;
         }
+        arraysize = PyLong_AsLong(v);
+        if (arraysize == -1 && PyErr_Occurred())
+            return -1; /* pass the OverflowError */
 
-        self->arraysize = PyLong_AsLong(v);
+        self->arraysize = arraysize;
         return 0;
     }
 
@@ -186,6 +196,7 @@ source_execute(sourceObject *self, PyObject *sql)
         PQclear(self->result);
         self->result = NULL;
     }
+    self->result_type = RESULT_EMPTY;
     self->max_row = 0;
     self->current_row = 0;
     self->num_fields = 0;
@@ -202,8 +213,10 @@ source_execute(sourceObject *self, PyObject *sql)
 
     /* checks result validity */
     if (!self->result) {
+        /* GCOVR_EXCL_START: out of memory (or COPY BOTH, not supported) */
         set_error_text(PyExc_ValueError, NULL, self->pgcnx->cnx);
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     /* this may have changed the datestyle, so we reset the date format
@@ -384,7 +397,8 @@ _source_move(sourceObject *self, int move)
             self->current_row = 0;
             break;
         case QUERY_MOVELAST:
-            self->current_row = self->max_row - 1;
+            /* stays at the first row if there are no rows */
+            self->current_row = self->max_row ? self->max_row - 1 : 0;
             break;
         case QUERY_MOVENEXT:
             if (self->current_row != self->max_row)
@@ -558,7 +572,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
         tmp_obj = get_encoded_text(str_obj, encoding);
         Py_DECREF(str_obj);
         if (!tmp_obj)
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         /* errormsg points into tmp_obj, which must be kept until the end */
         errormsg = PyBytes_AsString(tmp_obj);
         buf = NULL;
@@ -687,7 +701,12 @@ _source_fieldindex(sourceObject *self, PyObject *param, const char *usage)
 
     /* gets field number */
     if (PyLong_Check(param)) {
-        num = (int)PyLong_AsLong(param);
+        /* numbers that do not fit into an int are unknown fields */
+        long n = PyLong_AsLong(param);
+
+        if (n == -1 && PyErr_Occurred())
+            PyErr_Clear();
+        num = n < 0 || n >= self->num_fields ? -1 : (int)n;
     }
     else {
         num = get_field_number(self->result, param, self->encoding, usage);

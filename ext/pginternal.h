@@ -78,7 +78,7 @@ PyObject *
 cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
            char delim);
 PyObject *
-cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
+cast_record(char *s, Py_ssize_t size, int encoding, PyObject *cast,
             Py_ssize_t len, char delim);
 PyObject *
 cast_hstore(char *s, Py_ssize_t size, int encoding);

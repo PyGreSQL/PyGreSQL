@@ -176,7 +176,8 @@ class Cursor:
             return sql
         try:
             codec = self._encoding()
-        except Exception:  # e.g. the connection has been lost
+        # a lost connection fails earlier with a database error
+        except Exception:  # pragma: no cover (defensive)
             codec = 'utf-8'
         return sql.decode(codec, 'backslashreplace')
 
@@ -383,11 +384,13 @@ class Cursor:
             result = self._src.fetch(size)
         except DatabaseError:
             raise
-        except Error as err:
+        # fetch() raises only database errors
+        except Error as err:  # pragma: no cover (defensive)
             raise db_error(str(err)) from err
         row_factory = self.row_factory
         coltypes = self.coltypes
-        if coltypes is None:
+        # the column types are known if rows could be fetched
+        if coltypes is None:  # pragma: no cover (defensive)
             # cannot determine column types, return raw result
             return [row_factory(row) for row in result]
         if len(result) > 5:
@@ -438,9 +441,11 @@ class Cursor:
         values = list(parameters)
         if outputs and self._src.resulttype == RESULT_DQL:
             row = self._src.fetch(1)
-            if row:
+            # a call with output parameters always returns a row,
+            # and then the column types are always known
+            if row:  # pragma: no branch
                 coltypes = self.coltypes
-                if coltypes is not None:
+                if coltypes is not None:  # pragma: no branch
                     typecast = self.type_cache.typecast
                     row_values = [typecast(value, typ) for typ, value in
                                   zip(coltypes, row[0], strict=True)]

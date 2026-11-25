@@ -44,15 +44,16 @@ class Connection:
 
     def __init__(self, cnx: Cnx) -> None:
         """Create a database connection object."""
+        # check the connection first, the type cache also uses it
+        try:
+            cnx.source()
+        except Exception as e:
+            raise op_error("Invalid connection") from e
         self._cnx: Cnx | None = cnx  # connection
         self._tnx = False  # transaction state
         self.type_cache = TypeCache(cnx)
         self.cursor_type = Cursor
         self.autocommit = False
-        try:
-            self._cnx.source()
-        except Exception as e:
-            raise op_error("Invalid connection") from e
 
     def __enter__(self) -> Connection:
         """Enter the runtime context for the connection object.
@@ -143,7 +144,8 @@ class Connection:
         except Exception as e:
             raise op_error("Invalid connection") from e
 
-    if shortcutmethods:  # otherwise do not implement and document this
+    # a constant, otherwise do not implement and document this
+    if shortcutmethods:  # pragma: no branch
 
         def execute(self, operation: str | bytes,
                     parameters: Mapping | Sequence | None = None

@@ -247,6 +247,11 @@ class TestConnectObject(unittest.TestCase):
             if not a.startswith('__') and self.is_method(a)]
         self.assertEqual(methods, connection_methods)
 
+    def test_attribute_with_invalid_name(self):
+        connection = self.connection
+        self.assertRaises(AttributeError, getattr, connection, 'foo')
+        self.assertRaises(UnicodeEncodeError, getattr, connection, '\udcff')
+
     def test_attribute_db(self):
         self.assertEqual(self.connection.db, dbname)
 
@@ -259,6 +264,20 @@ class TestConnectObject(unittest.TestCase):
         host = dbhost if dbhost and not dbhost.startswith('/') else 'localhost'
         self.assertIsInstance(self.connection.host, str)
         self.assertEqual(self.connection.host, host)
+
+    @unittest.skipIf(os.name == 'nt', 'no Unix sockets on Windows')
+    def test_attribute_host_with_unix_socket(self):
+        with tempfile.TemporaryDirectory() as tmpdir, socket.socket(
+                socket.AF_UNIX) as server:
+            server.bind(os.path.join(tmpdir, '.s.PGSQL.5432'))
+            server.listen()
+            # the connection stays in progress, since the server never answers
+            connection = pg.connect(dbname, tmpdir, 5432, nowait=True)
+            try:
+                # the socket directory is shown as localhost
+                self.assertEqual(connection.host, 'localhost')
+            finally:
+                connection.close()
 
     def test_attribute_hostaddr(self):
         hostaddr = self.connection.hostaddr
@@ -340,18 +359,41 @@ class TestConnectObject(unittest.TestCase):
         self.assertIsInstance(backend_pid, int)
         self.assertGreaterEqual(backend_pid, 1)
 
-    def test_attribute_ssl_in_use(self):
-        ssl_in_use = self.connection.ssl_in_use
+    def check_ssl_attributes(self, connection: pg.Connection) -> None:
+        """Check the SSL attributes against the view of the server."""
+        ssl, version, cipher, bits = connection.query(
+            "select ssl, version, cipher, bits from pg_stat_ssl"
+            " where pid operator(pg_catalog.=) pg_backend_pid()").single()
+        ssl_in_use = connection.ssl_in_use
         self.assertIsInstance(ssl_in_use, bool)
-        self.assertFalse(ssl_in_use)
-
-    def test_attribute_ssl_attributes(self):
-        ssl_attributes = self.connection.ssl_attributes
+        self.assertIs(ssl_in_use, ssl)
+        ssl_attributes = connection.ssl_attributes
         self.assertIsInstance(ssl_attributes, dict)
-        if ssl_attributes:
-            self.assertEqual(ssl_attributes, {
-                'cipher': None, 'compression': None, 'key_bits': None,
-                'library': None, 'protocol': None})
+        if ssl:
+            self.assertIsInstance(ssl_attributes['library'], str)
+            self.assertEqual(ssl_attributes['protocol'], version)
+            self.assertEqual(ssl_attributes['cipher'], cipher)
+            self.assertEqual(ssl_attributes['key_bits'], str(bits))
+        else:  # older libpq versions return all names
+            self.assertFalse(any(ssl_attributes.values()))
+
+    def test_attribute_ssl_in_use(self):
+        self.check_ssl_attributes(self.connection)
+
+    def test_ssl_attributes_with_and_without_ssl(self):
+        for sslmode in 'disable', 'require':
+            with self.subTest(sslmode=sslmode):
+                try:
+                    connection = pg.connect(
+                        f"dbname={dbname} sslmode={sslmode}", dbhost, dbport,
+                        user=dbuser, passwd=dbpasswd)
+                except pg.OperationalError:
+                    self.skipTest('the server does not support SSL')
+                try:
+                    self.assertIs(connection.ssl_in_use, sslmode != 'disable')
+                    self.check_ssl_attributes(connection)
+                finally:
+                    connection.close()
 
     def test_attribute_status(self):
         status_ok = 1
@@ -476,6 +518,39 @@ class TestConnectObject(unittest.TestCase):
                 with self.assertRaises(TypeError) as cm:
                     method(arg)
                 self.assertEqual(str(cm.exception), 'Connection is not valid')
+        self.connection = connect()
+
+    def test_methods_after_close(self):
+        connection = self.connection
+        methods = [
+            (connection.source, ()), (connection.query, ('select 1',)),
+            (connection.send_query, ('select 1',)),
+            (connection.query_prepared, ('q',)),
+            (connection.prepare, ('q', 'select 1')),
+            (connection.describe_prepared, ('q',)),
+            (connection.poll, ()), (connection.reset, ()),
+            (connection.cancel, ()), (connection.fileno, ()),
+            (connection.getnotify, ()),
+            (connection.inserttable, ('t', [(1,)])),
+            (connection.transaction, ()),
+            (connection.parameter, ('datestyle',)),
+            (connection.date_format, ()),
+            (connection.putline, ('1\n',)), (connection.getline, ()),
+            (connection.endcopy, ()),
+            (connection.set_non_blocking, (True,)),
+            (connection.is_non_blocking, ()),
+            (connection.locreate, (pg.INV_READ,)),
+            (connection.getlo, (1,)), (connection.loimport, ('x',)),
+            (connection.encrypt_password, ('x', 'bob', 'md5')),
+            (connection.change_password, ('bob', 'x'))]
+        connection.close()
+        for method, args in methods:
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(TypeError) as cm:
+                    method(*args)
+                # some methods raised OperationalError before
+                self.assertEqual(str(cm.exception), 'Connection is not valid')
+        self.assertRaises(TypeError, getattr, connection, 'query')
         self.connection = connect()
 
     def test_escape_literal_and_identifier_with_invalid_bytes(self):
@@ -639,6 +714,32 @@ class TestConnectObject(unittest.TestCase):
         self.assertEqual(r, [('cast (1,2)', 42)])
         self.assertEqual(calls, [('(1,2)', 600)])  # 600 is the point type
 
+    def test_cast_hook_raising_error(self):
+        def cast_hook(value, oid):
+            raise ZeroDivisionError
+
+        c = self.connection
+        c.set_cast_hook(cast_hook)
+        sql = "select '(1,2)'::point as p, 1 as n"
+        for method in (
+                'getresult', 'dictresult', 'namedresult', 'scalarresult',
+                'dictiter', 'namediter', 'scalariter', 'one', 'onedict',
+                'onenamed', 'onescalar', 'single', 'singledict',
+                'singlenamed', 'singlescalar'):
+            for send in c.query, c.send_query:
+                with self.subTest(method=method, send=send.__name__):
+                    q = send(sql)
+                    func = getattr(q, method)
+                    with self.assertRaises(ZeroDivisionError):
+                        r = func()
+                        if method.endswith('iter'):
+                            list(r)
+        q = c.query(sql)
+        self.assertRaises(ZeroDivisionError, q.__getitem__, 0)
+        self.assertRaises(ZeroDivisionError, next, iter(q))
+        # the scalar methods only convert the first column
+        self.assertEqual(c.query("select 1, '(1,2)'::point").onescalar(), 1)
+
 
 class TestLostConnection(unittest.TestCase):
     """Test a connection that has been lost or is not yet established."""
@@ -671,7 +772,13 @@ class TestLostConnection(unittest.TestCase):
                 (c.escape_string, ('a',)), (c.escape_bytea, ('a',)),
                 (c.inserttable, ('t', [(1,)])),
                 (c.source().execute, ('select 1',)),
-                (c.source().execute, (b'select 1',))):
+                (c.source().execute, (b'select 1',)),
+                (c.source().putdata, ('1\n',)),
+                (c.source().putdata, (ValueError('Copy aborted'),)),
+                (c.putline, ('1\n',)), (c.putline, (b'1\n',)),
+                (c.encrypt_password, ('x', 'bob', 'md5')),
+                (c.change_password, ('bob', 'x')),
+                (getattr, (c, 'encoding'))):
             with self.subTest(method=method.__name__, args=args):
                 with self.assertRaises(pg.OperationalError) as cm:
                     method(*args)
@@ -1009,6 +1116,67 @@ class TestSimpleQueries(unittest.TestCase):
         r = self.c.query(q).fieldname(3)
         self.assertEqual(r, 'y')
 
+    def test_error_types_from_sqlstate(self):
+        error_types = {
+            '0A000': pg.NotSupportedError, '0B000': pg.DatabaseError,
+            '20000': pg.ProgrammingError, '21000': pg.ProgrammingError,
+            '22012': pg.DataError, '23505': pg.IntegrityError,
+            '24000': pg.InternalError, '25001': pg.InternalError,
+            '26000': pg.OperationalError, '27000': pg.OperationalError,
+            '28000': pg.OperationalError, '2B000': pg.InternalError,
+            '2D000': pg.InternalError, '2F000': pg.InternalError,
+            '2C000': pg.DatabaseError, '34000': pg.OperationalError,
+            '38000': pg.InternalError, '39000': pg.InternalError,
+            '3B000': pg.InternalError, '3D000': pg.ProgrammingError,
+            '3F000': pg.ProgrammingError, '3C000': pg.DatabaseError,
+            '40001': pg.OperationalError, '42601': pg.ProgrammingError,
+            '44000': pg.ProgrammingError, '41000': pg.DatabaseError,
+            '53000': pg.OperationalError, 'HV000': pg.OperationalError,
+            'F0000': pg.InternalError, 'P0001': pg.InternalError,
+            'XX000': pg.InternalError, '6Z000': pg.DatabaseError}
+        for sqlstate, error_type in error_types.items():
+            with self.subTest(sqlstate=sqlstate):
+                with self.assertRaises(pg.DatabaseError) as cm:
+                    self.c.query(f"do $$ begin raise exception 'test'"
+                                 f" using errcode = '{sqlstate}'; end $$")
+                error = cm.exception
+                self.assertIs(type(error), error_type)
+                self.assertEqual(error.sqlstate, sqlstate)
+
+    def test_field_methods_with_invalid_arguments(self):
+        q = self.c.query("select 0 as x")
+        self.assertRaises(TypeError, q.fieldname)
+        self.assertRaises(TypeError, q.fieldname, 'x')
+        self.assertRaises(TypeError, q.fieldnum)
+        self.assertRaises(TypeError, q.fieldnum, 'x', 'y')
+        self.assertRaises(TypeError, q.fieldinfo, 0, 1)
+
+    def test_scalar_methods_without_fields(self):
+        for method in (
+                'scalarresult', 'scalariter', 'onescalar', 'singlescalar'):
+            with self.subTest(method=method):
+                q = self.c.query("select")
+                self.assertEqual(len(q), 1)
+                with self.assertRaises(pg.ProgrammingError) as cm:
+                    getattr(q, method)()
+                self.assertEqual(str(cm.exception), 'No fields in result')
+
+    def test_namediter_helper_returning_list(self):
+        helpers = pg.helpers
+        try:
+            pg.set_query_helpers(
+                helpers.dictiter, lambda q: list(helpers.namediter(q)),
+                helpers.namednext, helpers.scalariter)
+            q = self.c.query("select 1 as a union select 2")
+            self.assertEqual(q.namedresult(), [(1,), (2,)])
+            r = self.c.query("select 1 as a").namediter()
+            self.assertNotIsInstance(r, list)
+            self.assertEqual([row.a for row in r], [1])
+        finally:
+            pg.set_query_helpers(
+                helpers.dictiter, helpers.namediter,
+                helpers.namednext, helpers.scalariter)
+
     def test_fieldname_out_of_range(self):
         q = self.c.query("select 0 as x")
         self.assertRaises(ValueError, q.fieldname, 1)
@@ -1036,6 +1204,23 @@ class TestSimpleQueries(unittest.TestCase):
         # names were truncated at NUL characters
         self.assertRaises(ValueError, self.c.query(q).fieldnum, 'y\0z')
         self.assertRaises(ValueError, self.c.query(q).fieldinfo, b'y\0z')
+
+    def test_fieldnum_with_str_subclass_raising_error(self):
+        class Name(str):
+            __hash__ = str.__hash__
+
+            def __eq__(self, other: object) -> bool:
+                raise ZeroDivisionError
+
+        q = self.c.query("select 1 as x")
+        self.assertRaises(ZeroDivisionError, q.fieldnum, Name('y'))
+        # the raw name is found without comparing
+        self.assertEqual(q.fieldnum(Name('x')), 0)
+
+    def test_fieldnum_with_name_that_cannot_be_encoded(self):
+        q = self.c.query("select 1 as x")
+        self.assertRaises(UnicodeEncodeError, q.fieldnum, '\udcff')
+        self.assertRaises(UnicodeEncodeError, q.fieldinfo, '\udcff')
 
     def test_fieldnum_mixed_case(self):
         q = self.c.query('select 1 as "Xy", 2 as xy2')
@@ -1561,6 +1746,21 @@ class TestStringsSentToServer(unittest.TestCase):
         self.assertEqual(self.c.escape_string(b"\xc3\xa4'"), b"\xc3\xa4''")
         self.assertEqual(self.c.escape_string("\xe4'"), "\xe4''")
 
+    def test_query_with_params_closing_the_connection(self):
+        c = self.c
+
+        class S:
+            def __str__(self) -> str:
+                c.close()
+                return 'x'
+
+        for method in c.query, c.send_query:
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(TypeError) as cm:
+                    method('select $1', [S()])
+                self.assertEqual(str(cm.exception), 'Connection is not valid')
+                c = self.c = connect()
+
     def test_query_with_params_changed_by_str(self):
         params: list = []
 
@@ -1694,6 +1894,21 @@ class TestStringsSentToServer(unittest.TestCase):
         self.assertRaises(TypeError, prepare, 'q')
         self.assertRaises(TypeError, prepare, 'q', 1)
         self.assertRaises(TypeError, describe, 1)
+
+    def test_escape_latin1(self):
+        self.set_latin1()
+        c = self.c
+        self.assertEqual(c.escape_literal("wär'me"), "'wär''me'")
+        self.assertEqual(c.escape_identifier('wär"me'), '"wär""me"')
+        self.assertEqual(c.escape_string("wär'me"), "wär''me")
+        self.assertEqual(c.escape_bytea('wärme'), '\\x77e4726d65')
+        for escape in (c.escape_literal, c.escape_identifier,
+                       c.escape_string, c.escape_bytea):
+            with self.subTest(escape=escape.__name__):
+                self.assertRaises(UnicodeEncodeError, escape, 'мир')
+                with self.assertRaises(TypeError) as cm:
+                    escape(1)
+                self.assertIn('expects a string', str(cm.exception))
 
     def test_putline_latin1(self):
         self.set_latin1()
@@ -1988,6 +2203,207 @@ class TestSourceFields(unittest.TestCase):
         self.assertRaises(IndexError, field, 0)
         self.s.movelast()
         self.assertRaises(IndexError, field, 0)
+
+    def test_field_number_out_of_range(self):
+        self.s.execute("select 1 as a, 2 as b")
+        for num in (2, -1, 2**32, 2**32 + 1, -2**32, 2**64):
+            with self.subTest(num=num):
+                # numbers beyond the int range returned other fields before
+                self.assertRaises(ValueError, self.s.fieldinfo, num)
+                self.assertRaises(ValueError, self.s.field, num)
+                self.assertRaises(
+                    IndexError, self.c.query("select 1 as a").fieldinfo, num)
+
+    def test_field_methods_without_tuples(self):
+        s = self.s
+        methods = (s.listinfo, ()), (s.fieldinfo, (0,)), (s.field, (0,))
+        for method, args in methods:
+            with self.subTest(method=method.__name__):
+                self.assertRaises(pg.DatabaseError, method, *args)
+        s.execute("set datestyle to iso")
+        for method, args in methods:
+            with self.subTest(method=method.__name__):
+                self.assertRaises(pg.DatabaseError, method, *args)
+
+
+class TestSourceObject(unittest.TestCase):
+    """Test the attributes and other methods of source objects."""
+
+    def setUp(self):
+        self.c = connect()
+        self.c.query("create temporary table test_source (n int)")
+        self.s = self.c.source()
+
+    def tearDown(self):
+        self.s.close()
+        self.c.close()
+
+    def test_str(self):
+        s = self.s
+        self.assertEqual(str(s), '(empty PostgreSQL source object)')
+        s.execute("set datestyle to iso")
+        self.assertEqual(str(s), 'SET')
+        s.execute("insert into test_source values (1), (2)")
+        self.assertEqual(str(s), 'INSERT 0 2')
+        s.execute("select n from test_source order by n")
+        self.assertEqual(str(s), 'n\n-\n1\n2\n(2 rows)')
+        self.assertRaises(ValueError, s.execute, "")
+        self.assertEqual(str(s), '(empty PostgreSQL source object)')
+        s.execute("select n from test_source")
+        s.close()
+        self.assertEqual(str(s), '(empty PostgreSQL source object)')
+
+    def test_attributes(self):
+        s = self.s
+        self.assertIs(s.pgcnx, self.c)
+        self.assertEqual(s.arraysize, 1)
+        self.assertEqual(s.resulttype, pg.RESULT_EMPTY)
+        self.assertEqual(s.ntuples, 0)
+        self.assertEqual(s.nfields, 0)
+        self.assertEqual(s.execute("insert into test_source values (1)"), 1)
+        self.assertEqual(s.resulttype, pg.RESULT_DML)
+        self.assertIsNone(s.execute("select 1 as a, 2 as b union select 3, 4"))
+        self.assertEqual(s.resulttype, pg.RESULT_DQL)
+        self.assertEqual(s.ntuples, 2)
+        self.assertEqual(s.nfields, 2)
+        self.assertEqual(s.execute("set datestyle to iso"), -1)
+        self.assertEqual(s.resulttype, pg.RESULT_DDL)
+        self.assertRaises(AttributeError, getattr, s, 'foo')
+        self.assertRaises(UnicodeEncodeError, getattr, s, '\udcff')
+
+    def test_pgcnx_of_closed_source(self):
+        self.s.close()
+        # this left an exception set, raising SystemError later
+        self.assertIsNone(self.s.pgcnx)
+        self.assertIsNone(self.s.pgcnx)
+
+    def test_set_arraysize(self):
+        s = self.s
+        s.execute("select generate_series(1, 5)")
+        s.arraysize = 2
+        self.assertEqual(s.arraysize, 2)
+        self.assertEqual(s.fetch(), [('1',), ('2',)])
+        s.arraysize = -1
+        self.assertEqual(s.arraysize, -1)
+        self.assertEqual(s.fetch(), [('3',), ('4',), ('5',)])
+        with self.assertRaises(TypeError):
+            s.arraysize = '2'
+        # this left an exception set, raising SystemError later
+        with self.assertRaises(OverflowError):
+            s.arraysize = 2**64
+        # this crashed
+        with self.assertRaises(TypeError):
+            del s.arraysize
+        self.assertEqual(s.arraysize, -1)
+        for name in 'ntuples', 'foo':
+            with self.assertRaises(TypeError):
+                setattr(s, name, 1)
+            with self.assertRaises(TypeError):
+                delattr(s, name)
+
+    def test_fetch(self):
+        s = self.s
+        s.execute("select generate_series(1, 3)")
+        self.assertEqual(s.fetch(0), [])
+        self.assertEqual(s.fetch(2), [('1',), ('2',)])
+        self.assertEqual(s.fetch(-1), [('3',)])
+        self.assertEqual(s.fetch(), [])
+        self.assertRaises(TypeError, s.fetch, '1')
+        s.execute("set datestyle to iso")
+        self.assertRaises(pg.DatabaseError, s.fetch)
+
+    def test_fetch_binary(self):
+        s = self.s
+        s.execute("begin")
+        s.execute("declare c binary cursor for select"
+                  " 1::int4 as n, null::int4 as nothing, 'a'::text as t")
+        s.execute("fetch all from c")
+        self.assertEqual(str(s), '   n    |nothing |   t    \n'
+                         '--------+--------+--------\n'
+                         '<binary>|        |<binary>\n(1 row)')
+        self.assertEqual(s.fetch(), [(b'\0\0\0\1', None, b'a')])
+        s.execute("rollback")
+
+    def test_move(self):
+        s = self.s
+        s.execute("select generate_series(1, 3)")
+        s.movelast()
+        self.assertEqual(s.fetch(), [('3',)])
+        s.moveprev()
+        s.moveprev()
+        self.assertEqual(s.fetch(), [('2',)])
+        s.movefirst()
+        s.moveprev()
+        self.assertEqual(s.fetch(), [('1',)])
+        s.movenext()
+        self.assertEqual(s.fetch(), [('3',)])
+        s.movenext()
+        self.assertEqual(s.fetch(), [])
+        s.moveprev()
+        self.assertEqual(s.fetch(-1), [('3',)])
+
+    def test_move_without_rows(self):
+        s = self.s
+        s.execute("select 1 where false")
+        for move in s.movefirst, s.movelast, s.movenext, s.moveprev:
+            with self.subTest(move=move.__name__):
+                move()
+                # movelast() returned a row of None values before
+                self.assertEqual(s.fetch(-1), [])
+
+    def test_move_without_result(self):
+        s = self.s
+        for move in s.movefirst, s.movelast, s.movenext, s.moveprev:
+            with self.subTest(move=move.__name__):
+                self.assertRaises(pg.DatabaseError, move)
+                s.execute("set datestyle to iso")
+                self.assertRaises(pg.DatabaseError, move)
+                s.close()
+                self.assertRaises(pg.OperationalError, move)
+                s = self.s = self.c.source()
+                move = getattr(s, move.__name__)
+
+    def test_oidstatus(self):
+        s = self.s
+        self.assertRaises(pg.DatabaseError, s.oidstatus)
+        s.execute("insert into test_source values (1)")
+        self.assertIsNone(s.oidstatus())
+        s.close()
+        self.assertRaises(pg.OperationalError, s.oidstatus)
+
+    def test_execute_with_pending_copy_of_async_query(self):
+        c, s = self.c, self.s
+        q = c.send_query("copy test_source from stdin")
+        self.assertRaises(pg.InterfaceError, s.execute, "select 1")
+        self.assertEqual(q.getresult(), '')
+        self.assertRaises(pg.InterfaceError, s.execute, "select 1")
+        c.putline('1\n')
+        c.endcopy()
+        self.assertIsNone(s.execute("select n from test_source"))
+        self.assertEqual(s.fetch(), [('1',)])
+
+    def test_send_query_with_pending_copy_of_source(self):
+        c, s = self.c, self.s
+        s.execute("copy test_source from stdin")
+        with self.assertRaises(ValueError) as cm:
+            c.send_query("select 1")
+        self.assertIn('another command is already in progress',
+                      str(cm.exception))
+        self.assertEqual(s.putdata(None), 0)
+        self.assertEqual(c.send_query("select 1").getresult(), [(1,)])
+
+    def test_methods_of_closed_source(self):
+        s = self.s
+        s.close()
+        for method, args in (
+                (s.execute, ('select 1',)), (s.fetch, ()),
+                (s.putdata, (b'1\n',)), (s.getdata, ()),
+                (s.listinfo, ()), (s.fieldinfo, (0,)), (s.field, (0,))):
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(pg.OperationalError) as cm:
+                    method(*args)
+                self.assertEqual(str(cm.exception), 'Object has been closed')
+        s.close()  # can be closed twice
 
 
 class TestFakeServer(unittest.TestCase):
@@ -2484,6 +2900,27 @@ class TestPreparedQueries(unittest.TestCase):
         self.assertEqual(
             self.c.query_prepared('q', [1, 2]).getresult(), [(1, '2')])
 
+    def test_prepare_with_types_raising_errors(self):
+        class BadOid:
+            def __index__(self) -> int:
+                raise ZeroDivisionError
+
+        class BadSequence:
+            def __len__(self) -> int:
+                return 1
+
+            def __getitem__(self, index: int) -> int:
+                raise ZeroDivisionError
+
+        prepare = self.c.prepare
+        for types in [BadOid()], (23, BadOid()), BadSequence():
+            with self.subTest(types=types):
+                self.assertRaises(
+                    ZeroDivisionError, prepare, 'q', 'select $1, $2', types)
+        # nothing has been prepared
+        self.assertRaises(
+            pg.OperationalError, self.c.describe_prepared, 'q')
+
     def test_prepare_with_types_on_closed_connection(self):
         c = connect()
         prepare = c.prepare
@@ -2502,6 +2939,12 @@ class TestPreparedQueries(unittest.TestCase):
     def test_describe_non_existent_query(self):
         self.assertRaises(
             pg.OperationalError, self.c.describe_prepared, 'does-not-exist')
+
+    def test_describe_prepared_with_invalid_arguments(self):
+        describe_prepared = self.c.describe_prepared
+        self.assertRaises(TypeError, describe_prepared)
+        self.assertRaises(TypeError, describe_prepared, 'q', 'q')
+        self.assertRaises(TypeError, describe_prepared, 1)
 
     def test_describe_unnamed_query(self):
         self.c.prepare('', "select 1::int, 'a'::char")
@@ -3416,6 +3859,82 @@ class TestAsyncQueries(unittest.TestCase):
         self.assertEqual(q.getresult(), [(1,)])
         self.assertIsNone(q.getresult())
 
+    def test_methods_with_error_in_first_result(self):
+        c = self.c
+        methods: list[Callable[[pg.Query], Any]] = [
+            str, len, iter, next, lambda q: q[0],
+            pg.Query.listfields, lambda q: q.fieldname(0),
+            lambda q: q.fieldnum('a'), pg.Query.fieldinfo,
+            pg.Query.one, pg.Query.single, pg.Query.onedict,
+            pg.Query.singledict, pg.Query.onenamed, pg.Query.singlenamed,
+            pg.Query.onescalar, pg.Query.singlescalar]
+        if hasattr(pg.Query, 'memsize'):
+            methods.append(pg.Query.memsize)
+        for method in methods:
+            with self.subTest(method=getattr(method, '__name__', method)):
+                q = c.send_query('select 1/0 as a')
+                with self.assertRaises(pg.DataError) as cm:
+                    method(q)
+                self.assertIn('division by zero', str(cm.exception))
+                # the error is only raised once
+                self.assertIsNone(q.getresult())
+
+    def test_copy_result_is_not_repeated_by_other_commands(self):
+        c = self.c
+        c.query('create temp table test_async (n int primary key)')
+        q = c.send_query('copy test_async from stdin;'
+                         ' copy test_async from stdin')
+        for _i in range(3):
+            self.assertRaises(pg.InterfaceError, c.query, 'select 1')
+        # each failed command added a COPY result before
+        self.assertEqual(q.getresult(), '')
+        self.assertRaises(pg.InterfaceError, c.query, 'select 1')
+        c.putline('1\n')
+        c.endcopy()
+        # this moves the results up to the second COPY into the query
+        for _i in range(3):
+            self.assertRaises(pg.InterfaceError, c.query, 'select 1')
+        self.assertEqual(q.getresult(), '1')
+        self.assertEqual(q.getresult(), '')
+        c.putline('2\n')
+        c.endcopy()
+        self.assertEqual(c.query('select 1').singlescalar(), 1)
+        self.assertEqual(q.getresult(), '1')
+        self.assertIsNone(q.getresult())
+        self.assertEqual(c.query('select count(*) from test_async')
+                         .singlescalar(), 2)
+
+    def test_copy_must_be_completed_before_other_methods(self):
+        c = self.c
+        c.query('create temp table test_async (n int primary key)')
+        c.query('begin')  # the large object will be rolled back
+        lo = c.locreate(pg.INV_READ | pg.INV_WRITE)
+        q = c.send_query('copy test_async from stdin')
+        for method, args in (
+                (lo.open, (pg.INV_READ,)), (lo.unlink, ()),
+                (c.query, ('select $1', [1])), (c.query_prepared, ('q',)),
+                (c.prepare, ('q', 'select 1')),
+                (c.describe_prepared, ('q',)),
+                (c.inserttable, ('test_async', [(1,)])),
+                (c.encrypt_password, ('x', 'bob')),
+                (c.change_password, ('bob', 'x')),
+                (c.locreate, (pg.INV_READ,)), (c.loimport, ('x',)),
+                (c.source().execute, ('select 1',))):
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(pg.InterfaceError) as cm:
+                    method(*args)
+                self.assertIn('COPY', str(cm.exception))
+        self.assertEqual(q.getresult(), '')
+        c.putline('1\n')
+        c.endcopy()
+        self.assertEqual(q.getresult(), '1')
+        self.assertIsNone(q.getresult())
+        self.assertEqual(
+            c.query('select n from test_async').getresult(), [(1,)])
+        lo.open(pg.INV_WRITE)
+        lo.close()
+        c.query('rollback')
+
     def test_results_are_kept_when_connection_is_used_otherwise(self):
         c = self.c
         c.query('create temp table test_async (n int)')
@@ -3546,6 +4065,9 @@ class TestAsyncQueries(unittest.TestCase):
             self.assertEqual(c.query('select 3').getresult(), [(3,)])
         finally:
             c.set_non_blocking(False)
+        self.assertIs(c.is_non_blocking(), False)
+        self.assertRaises(TypeError, c.set_non_blocking)
+        self.assertRaises(TypeError, c.set_non_blocking, 'yes')
         self.assertIs(c.is_non_blocking(), False)
 
 
@@ -3724,6 +4246,16 @@ class TestInserttable(unittest.TestCase):
         self.c.inserttable('test', data)
         self.assertEqual(self.get_back(), self.data)
 
+    def test_inserttable_from_sequence_without_length(self):
+        data = self.data
+
+        class Rows:  # a sequence that only supports indexing
+            def __getitem__(self, index: int) -> tuple:
+                return data[index]
+
+        self.c.inserttable('test', Rows())
+        self.assertEqual(self.get_back(), self.data)
+
     def test_inserttable_from_list_of_sets(self):
         data = [set(row) for row in self.data]
         try:
@@ -3879,6 +4411,12 @@ class TestInserttable(unittest.TestCase):
             self.assertFalse('expected an error')
         # make sure that it works if parameters are passed properly
         self.c.inserttable('test', data, ['i2', 'i4'])
+
+    def test_inserttable_with_column_name_that_is_not_a_string(self):
+        with self.assertRaises(TypeError) as cm:
+            self.c.inserttable('test', [(2, 4)], ['i2', 4])
+        self.assertIn('must contain only strings', str(cm.exception))
+        self.assertEqual(self.get_back(), [])
 
     def test_inserttable_with_invalid_colum_list(self):
         data = self.data
@@ -4591,6 +5129,18 @@ class TestDirectSocketAccess(unittest.TestCase):
     def test_no_copy_in_progress(self):
         self.assertRaises(OSError, self.c.getline)
         self.assertRaises(OSError, self.c.endcopy)
+        with self.assertRaises(OSError) as cm:
+            self.c.putline('1\tapple\n')
+        self.assertIn('no COPY in progress', str(cm.exception))
+
+    def test_getline_with_failing_statement_after_copy(self):
+        c = self.c
+        c.query("copy (select 1) to stdout; select 1/0")
+        self.assertEqual(c.getline(), '1')
+        with self.assertRaises(pg.DataError) as cm:
+            c.getline()
+        self.assertIn('division by zero', str(cm.exception))
+        self.assertEqual(c.transaction(), pg.TRANS_IDLE)
 
     def test_parameter_checks(self):
         self.assertRaises(TypeError, self.c.putline)
@@ -4717,6 +5267,47 @@ class TestCopyData(unittest.TestCase):
         with self.assertRaises(OSError) as cm:
             source.getdata()
         self.assertIn('division by zero', str(cm.exception))
+
+    def test_putdata_with_statement_after_copy(self):
+        source = self.source
+        source.execute("copy test_copy from stdin; select 1")
+        self.assertIsNone(source.putdata(b'1\n'))
+        self.assertEqual(source.putdata(None), 1)
+        self.assertEqual(self.c.transaction(), pg.TRANS_IDLE)
+        self.assertEqual(self.get_table(), [(1,)])
+
+    def test_putdata_after_copy_ended_by_other_command(self):
+        source = self.source
+        source.execute("copy test_copy from stdin")
+        # this terminates the copy operation
+        self.assertEqual(self.c.query("select 1").getresult(), [(1,)])
+        for data in b'1\n', None:
+            with self.assertRaises(OSError) as cm:
+                source.putdata(data)
+            self.assertIn('no COPY in progress', str(cm.exception))
+        self.assertEqual(self.get_table(), [])
+
+    def test_getdata_after_copy_ended_by_other_command(self):
+        source = self.source
+        source.execute("copy (select 1) to stdout")
+        # this terminates the copy operation
+        self.assertEqual(self.c.query("select 2").getresult(), [(2,)])
+        with self.assertRaises(OSError) as cm:
+            source.getdata()
+        self.assertIn('no COPY in progress', str(cm.exception))
+
+    def test_putdata_with_characters_that_cannot_be_encoded(self):
+        # this client encoding is possible with all databases
+        self.c.query("set client_encoding to sql_ascii")
+        source = self.source
+        source.execute("copy test_copy from stdin")
+        self.assertRaises(UnicodeEncodeError, source.putdata, '€\n')
+        self.assertIsNone(source.putdata('1\n'))
+        # the error message is sent with backslash escapes
+        with self.assertRaises(OSError) as cm:
+            source.putdata(ValueError('Cost: 1€'))
+        self.assertEqual(str(cm.exception), 'Cost: 1\\u20ac')
+        self.assertEqual(self.get_table(), [])
 
     def test_multiple_copy_operations(self):
         source = self.source
@@ -5749,6 +6340,17 @@ class TestConfigFunctions(unittest.TestCase):
             pg.set_decimal_point(point)
         self.assertEqual(r, bad_money)
 
+    def test_set_functions_with_invalid_arguments(self):
+        functions: list[tuple[Callable[[Any], None], Any]] = [
+            (pg.set_datestyle, 1), (pg.set_decimal, 1), (pg.set_array, 'yes')]
+        for f, arg in functions:
+            with self.subTest(function=f.__name__):
+                with self.assertRaises(TypeError) as cm:
+                    f(arg)
+                self.assertIn(f'Function {f.__name__}() expects',
+                              str(cm.exception))
+        self.assertRaises(TypeError, pg.set_query_helpers, 1, 2, 3, 4)
+
     def test_get_decimal(self):
         decimal_class = pg.get_decimal()
         # error if a parameter is passed
@@ -5771,6 +6373,12 @@ class TestConfigFunctions(unittest.TestCase):
         r = self.c.query("select 1.5::numeric").singlescalar()
         self.assertIsInstance(r, float)
         self.assertEqual(r, 1.5)
+        # also in arrays
+        r = self.c.query(
+            "select array[1.5::numeric], array[1.5::money]").single()
+        self.assertEqual(r, ([1.5], [1.5]))
+        self.assertIsInstance(r[0][0], float)
+        self.assertIsInstance(r[1][0], float)
 
     def test_set_decimal(self):
         decimal_class = pg.get_decimal() or float
@@ -5844,10 +6452,12 @@ class TestConfigFunctions(unittest.TestCase):
         pg.set_bool(False)
         try:
             r = query("select true::bool").getresult()[0][0]
+            a = query("select array[true, false]::bool[]").singlescalar()
         finally:
             pg.set_bool(use_bool)
         self.assertIsInstance(r, str)
         self.assertEqual(r, 't')
+        self.assertEqual(a, ['t', 'f'])
         pg.set_bool(True)
         try:
             r = query("select true::bool").getresult()[0][0]
@@ -5939,6 +6549,13 @@ class TestConfigFunctions(unittest.TestCase):
             self.assertEqual(info.hits,
                              0 if maxsize is not None and maxsize < 2 else 4)
 
+    def test_clear_row_factory_cache(self):
+        cache = pg.RowCache
+        self.c.query('select 1 as a').namedresult()
+        self.assertGreater(cache.row_factory.cache_info().currsize, 0)
+        cache.clear()
+        self.assertEqual(cache.row_factory.cache_info().currsize, 0)
+
 
 class TestStandaloneEscapeFunctions(unittest.TestCase):
     """Test pg escape functions.
@@ -5986,6 +6603,14 @@ class TestStandaloneEscapeFunctions(unittest.TestCase):
             self.assertEqual(s, r"It''s bad to have a \ inside.")
         else:
             self.assertEqual(s, r"It''s bad to have a \\ inside.")
+
+    def test_escape_functions_with_invalid_arguments(self):
+        for f in pg.escape_string, pg.escape_bytea, pg.unescape_bytea:
+            with self.subTest(function=f.__name__):
+                self.assertRaises(UnicodeEncodeError, f, 'käse')
+                with self.assertRaises(TypeError) as cm:
+                    f(1)  # type: ignore[type-var]
+                self.assertIn('expects a string', str(cm.exception))
 
     def test_escape_bytea(self):
         self.assertTrue(self.cls_set_up)

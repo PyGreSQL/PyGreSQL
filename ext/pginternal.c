@@ -168,7 +168,9 @@ static int
 _is_codec_error(void)
 {
     return PyErr_ExceptionMatches(PyExc_UnicodeError) ||
+           /* GCOVR_EXCL_START: all codecs exist, other errors are rare */
            PyErr_ExceptionMatches(PyExc_LookupError);
+    /* GCOVR_EXCL_STOP */
 }
 
 /* Get a decoded string, or the raw bytes if it cannot be decoded with the
@@ -708,8 +710,8 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
                     buf[j++] = '-';
                 }
             }
+            buf[j] = '\0';
             if (decimal) {
-                buf[j] = '\0';
                 obj = PyObject_CallFunction(decimal, "(s)", buf);
             }
             else {
@@ -837,11 +839,8 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
     char *end = s + size, *t;
     int depth, ranges = 0, level = 0;
 
-    if (type) {
+    if (type)
         type &= ~PYGRES_ARRAY; /* get the base type */
-        if (!type)
-            type = PYGRES_TEXT;
-    }
     if (!delim) {
         delim = ',';
     }
@@ -1090,22 +1089,19 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
 
 /* Cast string s with size and encoding to a Python tuple.
    using the input and output syntax for composite types.
-   Use array of internal types or cast function or sequence of cast
-   functions to cast elements. The parameter len is the record size.
-   The parameter delim can specify a delimiter for the elements,
-   although composite types always use a comma as delimiter. */
+   Use a cast function or a sequence of cast functions to cast elements. The
+   parameter len is the record size. The parameter delim can specify a
+   delimiter for the elements, although composite types always use a comma as
+   delimiter. */
 PyObject *
-cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
+cast_record(char *s, Py_ssize_t size, int encoding, PyObject *cast,
             Py_ssize_t len, char delim)
 {
     PyObject *result, *ret;
     char *end = s + size, *t;
     Py_ssize_t i;
 
-    if (!delim) {
-        delim = ',';
-    }
-    else if (delim == '(' || delim == ')' || delim == '\\') {
+    if (!delim || delim == '(' || delim == ')' || delim == '\\') {
         PyErr_SetString(PyExc_ValueError, "Invalid record delimiter");
         return NULL;
     }
@@ -1187,44 +1183,31 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
                     *r++ = *t++;
                 }
             }
-            if (type) { /* internal casting of element type */
-                int etype = type[i];
+            /* pass bytes if the element cannot be decoded */
+            element = get_decoded_string_or_bytes(estr, esize, encoding);
+            if (element && cast) {
+                if (len) {
+                    PyObject *ecast = PySequence_GetItem(cast, i);
 
-                if (etype & PYGRES_ARRAY)
-                    element =
-                        cast_array(estr, esize, encoding, etype, NULL, 0);
-                else if (etype & PYGRES_TEXT)
-                    element = cast_sized_text(estr, esize, encoding, etype);
-                else
-                    element = cast_sized_simple(estr, esize, etype);
-            }
-            else { /* external casting of base type */
-                /* pass bytes if the element cannot be decoded */
-                element = get_decoded_string_or_bytes(estr, esize, encoding);
-                if (element && cast) {
-                    if (len) {
-                        PyObject *ecast = PySequence_GetItem(cast, i);
-
-                        if (ecast) {
-                            if (ecast != Py_None) {
-                                PyObject *tmp = element;
-                                element = PyObject_CallFunctionObjArgs(
-                                    ecast, element, NULL);
-                                Py_DECREF(tmp);
-                            }
-                            Py_DECREF(ecast);
+                    if (ecast) {
+                        if (ecast != Py_None) {
+                            PyObject *tmp = element;
+                            element = PyObject_CallFunctionObjArgs(
+                                ecast, element, NULL);
+                            Py_DECREF(tmp);
                         }
-                        else {
-                            Py_DECREF(element);
-                            element = NULL;
-                        }
+                        Py_DECREF(ecast);
                     }
                     else {
-                        PyObject *tmp = element;
-                        element =
-                            PyObject_CallFunctionObjArgs(cast, element, NULL);
-                        Py_DECREF(tmp);
+                        Py_DECREF(element);
+                        element = NULL;
                     }
+                }
+                else {
+                    PyObject *tmp = element;
+                    element =
+                        PyObject_CallFunctionObjArgs(cast, element, NULL);
+                    Py_DECREF(tmp);
                 }
             }
             if (escaped)
@@ -1282,7 +1265,8 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
     PyObject *result;
     char *end = s + size;
 
-    result = PyDict_New();
+    if (!(result = PyDict_New()))
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
 
     /* everything is set up, start parsing the record */
     while (s != end) {
@@ -1319,8 +1303,12 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                 if (*s == '=' || *s == ' ')
                     break;
                 if (*s == '\\') {
-                    if (++s == end)
-                        break;
+                    if (++s == end) {
+                        PyErr_SetString(PyExc_ValueError,
+                                        "Unterminated escape");
+                        Py_DECREF(result);
+                        return NULL;
+                    }
                     ++key_esc;
                 }
                 ++s;
@@ -1341,11 +1329,8 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             }
             t = key;
             while (r != s) {
-                if (*r == '\\') {
+                if (*r == '\\') /* the escapes are complete */
                     ++r;
-                    if (r == s)
-                        break;
-                }
                 *t++ = *r++;
             }
         }
@@ -1366,7 +1351,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             return NULL;
         }
         while (s != end && *s == ' ') ++s;
-        quoted = *s == '"';
+        quoted = s != end && *s == '"';
         if (quoted) {
             val = ++s;
             while (s != end) {
@@ -1381,6 +1366,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             }
             if (s == end) {
                 PyErr_SetString(PyExc_ValueError, "Unterminated quote");
+                Py_DECREF(key_obj);
                 Py_DECREF(result);
                 return NULL;
             }
@@ -1391,8 +1377,13 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                 if (*s == ',' || *s == ' ')
                     break;
                 if (*s == '\\') {
-                    if (++s == end)
-                        break;
+                    if (++s == end) {
+                        PyErr_SetString(PyExc_ValueError,
+                                        "Unterminated escape");
+                        Py_DECREF(key_obj);
+                        Py_DECREF(result);
+                        return NULL;
+                    }
                     ++val_esc;
                 }
                 ++s;
@@ -1420,11 +1411,8 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                 }
                 t = val;
                 while (r != s) {
-                    if (*r == '\\') {
+                    if (*r == '\\') /* the escapes are complete */
                         ++r;
-                        if (r == s)
-                            break;
-                    }
                     *t++ = *r++;
                 }
             }
@@ -1576,7 +1564,7 @@ set_error_msg_encoded(PyObject *type, const char *msg, int encoding,
                       const char *default_msg)
 {
     if (!msg || !*msg)
-        msg = default_msg;
+        msg = default_msg; /* GCOVR_EXCL_LINE: libpq always gives a message */
     set_error_msg_and_state(type, msg, encoding, NULL);
 }
 
@@ -1666,15 +1654,20 @@ get_ssl_attributes(PGconn *cnx)
 
     for (s = PQsslAttributeNames(cnx); *s; ++s) {
         const char *val = PQsslAttribute(cnx, *s);
+        /* the values come from the SSL library, not from the server */
+        PyObject *val_obj =
+            val ? get_decoded_text(val, pg_encoding_utf8) : Py_NewRef(Py_None);
+        int rc;
 
-        if (val) {
-            PyObject *val_obj = PyUnicode_FromString(val);
-
-            PyDict_SetItemString(attr_dict, *s, val_obj);
-            Py_DECREF(val_obj);
+        if (!val_obj) {
+            Py_DECREF(attr_dict);
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
-        else {
-            PyDict_SetItemString(attr_dict, *s, Py_None);
+        rc = PyDict_SetItemString(attr_dict, *s, val_obj);
+        Py_DECREF(val_obj);
+        if (rc < 0) {
+            Py_DECREF(attr_dict);
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
     }
 
@@ -2040,7 +2033,7 @@ ext_char_buffer_s(struct CharBuffer *buf, const char *s)
     size_t len = strlen(s), need;
 
     if (!len || buf->error)
-        return;
+        return; /* GCOVR_EXCL_LINE: empty or after running out of memory */
 
     need = buf->size + len;
     if (need >= buf->max_size && !grow_char_buffer(buf, need))
@@ -2055,7 +2048,7 @@ void
 ext_char_buffer_c(struct CharBuffer *buf, char c)
 {
     if (buf->error)
-        return;
+        return; /* GCOVR_EXCL_LINE: after running out of memory */
 
     if (buf->size >= buf->max_size && !grow_char_buffer(buf, buf->size + 1))
         return; /* GCOVR_EXCL_LINE: out of memory */

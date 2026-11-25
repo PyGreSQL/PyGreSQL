@@ -75,6 +75,13 @@ class TestSyncNotification(unittest.TestCase):
         self.db = None
         self.assertIs(handler.db, None)
 
+    def test_close_handler_twice(self):
+        handler = self.get_handler()
+        handler.close()
+        handler.close()  # does nothing
+        self.assertIsNone(handler.db)
+        self.db = None
+
     def test_delete_handler(self):
         handler = self.get_handler('test_del')
         self.assertIs(handler.db, self.db)
@@ -97,6 +104,25 @@ class TestSyncNotification(unittest.TestCase):
         handler.unlisten()
         self.db.close()
         self.db = None
+
+    def test_notify_without_listening_or_connection(self):
+        handler = self.get_handler()
+        self.assertIsNone(handler.notify(payload='baz'))  # not listening
+        handler.listen()
+        db = handler.db
+        handler.db = None
+        self.assertIsNone(handler.notify(payload='baz'))  # no connection
+        self.assertIsNone(handler())  # does nothing without connection
+        handler.db = db
+        handler.unlisten()
+
+    def test_notify_with_payload_that_is_not_a_string(self):
+        handler = self.get_handler()
+        handler.listen()
+        handler.notify(payload=42)
+        handler()
+        self.assertEqual(self.payloads, ['42'])
+        handler.unlisten()
 
     def test_notify_with_args_and_payload(self):
         arg_dict = {'foo': 'bar'}

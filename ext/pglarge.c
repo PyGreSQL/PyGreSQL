@@ -188,11 +188,14 @@ large_close(largeObject *self, PyObject *Py_UNUSED(noargs))
     /* closes large object */
     ret = lo_close(self->pgcnx->cnx, self->lo_fd);
     _conn_end(self->pgcnx);
+    /* the descriptor cannot be used any more even if this failed (e.g.
+       because the transaction has ended), so that the object can be
+       opened again or unlinked */
+    self->lo_fd = -1;
     if (ret) {
         PyErr_SetString(PyExc_IOError, "Error while closing large object fd");
         return NULL;
     }
-    self->lo_fd = -1;
 
     /* no error : returns Py_None */
     Py_RETURN_NONE;
@@ -224,7 +227,7 @@ large_read(largeObject *self, PyObject *args)
 
     /* allocate buffer */
     if (!(buffer = PyBytes_FromStringAndSize((char *)NULL, size)))
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
 
     /* checks validity */
     if (!_check_lo_obj(self, CHECK_OPEN)) {
@@ -343,18 +346,22 @@ large_size(largeObject *self, PyObject *Py_UNUSED(noargs))
 
     /* gets end position */
     if ((end = lo_lseek(self->pgcnx->cnx, self->lo_fd, 0, SEEK_END)) == -1) {
+        /* GCOVR_EXCL_START: lo_tell() has just succeeded */
         _conn_end(self->pgcnx);
         PyErr_SetString(PyExc_IOError, "Error while getting end position");
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     /* move back to start position */
     start = lo_lseek(self->pgcnx->cnx, self->lo_fd, start, SEEK_SET);
     _conn_end(self->pgcnx);
     if (start == -1) {
+        /* GCOVR_EXCL_START: lo_tell() and lo_lseek() have just succeeded */
         PyErr_SetString(PyExc_IOError,
                         "Error while moving back to first position");
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     /* returns size */

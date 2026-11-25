@@ -172,10 +172,7 @@ class DB:
 
     def __del__(self) -> None:
         """Delete the connection."""
-        try:
-            db = self.db
-        except AttributeError:
-            db = None
+        db = self.db  # the class attribute is None if init failed
         if db:
             with suppress(TypeError):  # when already closed
                 db.set_cast_hook(None)
@@ -956,7 +953,7 @@ class DB:
         self._do_debug(cmd, params)
         query = self._valid_db.query(cmd, params)
         res = query.dictresult()
-        if res:  # this should always be true
+        if res:  # pragma: no branch (this should always be true)
             row.update(res[0])
         return row
 
@@ -1555,10 +1552,6 @@ class _MemoryQuery:
     def listfields(self) -> tuple[str, ...]:
         """Return the stored field names of this query."""
         return self.fields
-
-    def getresult(self) -> Any:
-        """Return the stored result of this query."""
-        return self.result
 
     def __iter__(self) -> Iterator[Any]:
         return iter(self.result)

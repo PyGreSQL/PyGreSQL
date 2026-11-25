@@ -10,24 +10,18 @@ class AttrDict(dict):
 
     def __init__(self, *args: Any, **kw: Any) -> None:
         """Initialize the dictionary."""
-        self._read_only = False
-        super().__init__(*args, **kw)
-        self._read_only = True
+        super().__init__(*args, **kw)  # this does not call __setitem__
         error = self._read_only_error
         self.clear = self.update = error  # type: ignore[method-assign]
         self.pop = self.setdefault = self.popitem = error  # type: ignore[method-assign]
 
     def __setitem__(self, key: str, value: Any) -> None:
-        """Set a value."""
-        if self._read_only:
-            self._read_only_error()
-        super().__setitem__(key, value)
+        """Set a value (not allowed)."""
+        self._read_only_error()
 
     def __delitem__(self, key: str) -> None:
-        """Delete a value."""
-        if self._read_only:
-            self._read_only_error()
-        super().__delitem__(key)
+        """Delete a value (not allowed)."""
+        self._read_only_error()
 
     @staticmethod
     def _read_only_error(*_args: Any, **_kw: Any) -> Any:

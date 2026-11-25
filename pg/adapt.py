@@ -161,7 +161,7 @@ class _SimpleTypes(dict):
                 self[key] = typ
                 if isinstance(key, str):
                     self[f'_{key}'] = f'{typ}[]'
-                elif not isinstance(key, tuple):
+                else:  # the aliases are type names or Python types
                     # support builtin and legacy typing generics
                     array = f'{typ}[]'
                     self[list[key]] = array  # type: ignore[valid-type]
@@ -314,7 +314,8 @@ class DbTypes(dict):
                     # the element type might not be the type with the name
                     # of the array type without the underscore
                     elem_type = self.get(elem)
-                    if elem_type:
+                    # the element type of an array type always exists
+                    if elem_type:  # pragma: no branch
                         if elem_type.relid:
                             simple = 'record[]'
                         elif elem_type.base:
@@ -424,7 +425,7 @@ class DbTypes(dict):
             return typecasts.create_record_cast(typ.pgtype, attnames, casts)
         if is_array_type(typ.pgtype, typ.typlen, typ.elem):
             elem_type = self.get(typ.elem)
-            if not elem_type:
+            if not elem_type:  # pragma: no cover (always exists)
                 return typecasts.create_array_cast(None)
             return typecasts.create_array_cast(
                 self._get_cast(elem_type), elem_type.delim)
@@ -545,20 +546,16 @@ class Adapter:
         """Adapt a bytea parameter."""
         return self.db.escape_bytea(v)
 
-    def _adapt_json(self, v: Any) -> str | None:
-        """Adapt a json parameter."""
-        if v is None:
-            return None
+    def _adapt_json(self, v: Any) -> str:
+        """Adapt a json parameter (None has been handled by the caller)."""
         if isinstance(v, str):
             return v
         if isinstance(v, Json):
             return str(v)
         return self.db.encode_json(v)
 
-    def _adapt_hstore(self, v: Any) -> str | bytes | None:
-        """Adapt a hstore parameter."""
-        if v is None:
-            return None
+    def _adapt_hstore(self, v: Any) -> str | bytes:
+        """Adapt a hstore parameter (None has been handled by the caller)."""
         if isinstance(v, (str, bytes)):
             return v
         if isinstance(v, dict):
@@ -692,16 +689,14 @@ class Adapter:
         def adapt(v: Any) -> str | bytes | None:
             if v == '':  # empty strings are adapted as null
                 return None
-            v = self._adapt_json(v)
-            return None if v is None else self._quote_array_element(v)
+            return self._quote_array_element(self._adapt_json(v))
         # the JSON encoder may handle bytearray and memoryview objects
         return self._adapt_array(v, adapt, reject_buffers=False)
 
     def _adapt_hstore_array(self, v: Any) -> str | bytes:
         """Adapt a hstore array parameter."""
-        def adapt(v: Any) -> str | bytes | None:
-            v = self._adapt_hstore(v)
-            return None if v is None else self._quote_array_element(v)
+        def adapt(v: Any) -> str | bytes:
+            return self._quote_array_element(self._adapt_hstore(v))
         return self._adapt_array(v, adapt)
 
     def _adapt_uuid_array(self, v: Any) -> str | bytes:
@@ -833,8 +828,7 @@ class Adapter:
             return 'text'
         if isinstance(value, bytes):
             return 'bytea'
-        if isinstance(value, bool):
-            return 'bool'
+        # bool cannot be subclassed and has been found above
         if isinstance(value, int):
             return 'int'
         if isinstance(value, float):

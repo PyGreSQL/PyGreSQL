@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import sys
 import unittest
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -15,6 +16,7 @@ from ipaddress import (
     IPv6Network,
 )
 from typing import Any, ClassVar
+from unittest import mock
 from uuid import UUID as Uuid  # noqa: N811
 
 import pg
@@ -642,6 +644,22 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                          'public.int4'):
                 self.assertIsNone(type_cache.get(name), name)
             cur.close()
+        finally:
+            con.close()
+
+    def test_type_cache_fields_and_typecasts_of_other_types(self):
+        con = self._connect()
+        try:
+            type_cache = con.type_cache
+            self.assertIsNone(type_cache.get_fields('no_such_type'))
+            self.assertIsNone(type_cache.get_fields('int4'))  # not composite
+            self.assertIsNone(type_cache.get_typecast(999_999_999))
+            cur = con.cursor()
+            cur.execute("create type pg_temp.test_empty as ()")
+            self.assertEqual(type_cache.get_fields('pg_temp.test_empty'), [])
+            # a composite type without fields is returned as string
+            cur.execute("select '()'::pg_temp.test_empty")
+            self.assertEqual(cur.fetchone(), ('()',))
         finally:
             con.close()
 
@@ -1769,6 +1787,13 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         self.assertIsInstance(result, dict)
         self.assertEqual(result, d)
 
+    def test_hstore_str(self):
+        self.assertEqual(str(pgdb.Hstore({'k': 'v'})), 'k=>v')
+        hstore = pgdb.Hstore({'k': 'v', 'n': 1, 'e': '', 'b': b'\xe4'})
+        # other values are converted, raw bytes are shown with escapes
+        self.assertEqual(str(hstore), 'k=>v,n=>1,e=>"",b=>\\xe4')
+        self.assertEqual(str(pgdb.Hstore({b'': b'x'})), '""=>x')
+
     def test_hstore_with_undecodable_text(self):
         con = self._connect()
         try:
@@ -2543,6 +2568,43 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_executemany_and_callproc_with_busy_connection(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create temp table test_busy (n int)")
+            con.commit()
+            errors: list[Exception] = []
+
+            def receiver(_notice):
+                for func in (lambda: cur.executemany(
+                        "insert into test_busy values (%s)", [(1,)]),
+                        lambda: cur.callproc('now')):
+                    try:
+                        func()
+                    except Exception as e:
+                        errors.append(e)
+
+            cnx = con._cnx
+            assert cnx is not None
+            cnx.query('set client_min_messages=notice')
+            cnx.set_notice_receiver(receiver)
+            # the notice is sent outside of the pgdb transaction
+            cnx.query("do $$ begin raise notice 'busy'; end $$")
+            cnx.set_notice_receiver(None)
+            self.assertEqual(len(errors), 2)
+            error = errors[0]
+            self.assertIsInstance(error, pgdb.OperationalError)
+            self.assertEqual(str(error), "Can't start transaction")
+            self.assertIsInstance(error.__cause__, pgdb.InterfaceError)
+            self.assertFalse(con._tnx)
+            # the lookup of the routine could not be executed
+            error = errors[1]
+            self.assertIsInstance(error, pgdb.InterfaceError)
+            self.assertIn('The connection is busy', str(error))
+        finally:
+            con.close()
+
     def test_autocommit(self):
         table = self.table_prefix + 'booze'
         con1 = self._connect()
@@ -2599,6 +2661,138 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 con.close()
             self.assertEqual(rows, [1, 2, 5, 6, 9])
 
+    def test_connect_parameters(self):
+        # the module is shadowed by the function in the package
+        connect_module = sys.modules['pgdb.connect']
+        for args, kwargs, expected in (
+                (('h:d:u:p:o',), {}, ('d', 'h', -1, 'o', 'u', 'p')),
+                (('h:d',), {}, ('d', 'h', -1, '', None, '')),
+                ((':d::p',), {}, ('d', None, -1, '', None, 'p')),
+                (('h:d:u:p:o',), {
+                    'user': 'v', 'password': 'q', 'database': 'e',
+                    'host': 'i:42'}, ('e', 'i', 42, 'o', 'v', 'q')),
+                ((), {'host': 'i'}, ('', 'i', -1, '', None, '')),
+                ((), {'host': 'i:x'}, ('', 'i', -1, '', None, '')),
+                ((), {'user': '', 'password': '', 'database': ''},
+                 ('', None, -1, '', None, '')),
+                ((), {'database': 'host=h dbname=d', 'application_name': 'a'},
+                 ("host=h dbname=d application_name='a'",
+                  None, -1, '', None, '')),
+                ((), {'database': 'd', 'application_name': "it's"},
+                 ("dbname='d' application_name='it\\'s'",
+                  None, -1, '', None, ''))):
+            with self.subTest(args=args, kwargs=kwargs):
+                with mock.patch.object(connect_module, 'get_cnx') as get_cnx:
+                    con = pgdb.connect(*args, **kwargs)
+                get_cnx.assert_called_once_with(*expected)
+                self.assertIsInstance(con, pgdb.Connection)
+
+    def test_connection_with_invalid_cnx(self):
+        cnx = pg.connect(dbname, dbhost or None, dbport or -1,
+                         None, dbuser, dbpasswd)
+        cnx.close()
+        # this raised a TypeError from the type cache before
+        with self.assertRaises(pgdb.OperationalError) as cm:
+            pgdb.Connection(cnx)
+        self.assertEqual(str(cm.exception), 'Invalid connection')
+        self.assertIsInstance(cm.exception.__cause__, TypeError)
+
+    def test_connection_with_closed_cnx(self):
+        con = self._connect()
+        cnx = con._cnx
+        assert cnx is not None
+        cur = con.cursor()
+        cur.execute("select 1")  # starts a transaction
+        cnx.close()  # close the underlying connection
+        # the status of the closed connection raised a TypeError
+        self.assertTrue(con.closed)
+        for method in con.commit, con.rollback:
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(pgdb.OperationalError) as cm:
+                    method()
+                self.assertIsInstance(cm.exception.__cause__, TypeError)
+        con.autocommit = True
+        with self.assertRaises(pgdb.OperationalError) as cm, con:
+            pass
+        self.assertEqual(str(cm.exception), "Can't start transaction")
+        con._cnx = None
+        for method in con.commit, con.rollback, con.cursor:
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(pgdb.OperationalError) as cm:
+                    method()
+                self.assertEqual(str(cm.exception),
+                                 'Connection has been closed')
+        with self.assertRaises(pgdb.OperationalError) as cm, con:
+            pass
+        self.assertEqual(str(cm.exception), 'Connection has been closed')
+
+    def test_commit_failing_with_deferred_constraint(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("create temp table test_deferred (n int unique"
+                        " deferrable initially deferred) on commit drop")
+            cur.execute("insert into test_deferred values (1), (1)")
+            self.assertRaises(pgdb.IntegrityError, con.commit)
+            # the transaction has ended anyway
+            self.assertFalse(con._tnx)
+            con.rollback()  # nothing to roll back
+        finally:
+            con.close()
+
+    def test_rollback_and_begin_of_lost_connection(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select 1")  # starts a transaction
+            other = self._connect()
+            try:
+                other.cursor().execute(
+                    f"select pg_terminate_backend({con._cnx.backend_pid})")
+            finally:
+                other.close()
+            self.assertRaises(pgdb.OperationalError, con.rollback)
+            # the transaction has ended anyway
+            self.assertFalse(con._tnx)
+            con.autocommit = True
+            with self.assertRaises(pgdb.OperationalError), con:
+                pass
+        finally:
+            con.close()
+
+    def test_cursor_type_raising_error(self):
+        con = self._connect()
+        try:
+            def cursor_type(_con):
+                raise ZeroDivisionError
+            con.cursor_type = cursor_type
+            with self.assertRaises(pgdb.OperationalError) as cm:
+                con.cursor()
+            self.assertEqual(str(cm.exception), 'Invalid connection')
+            self.assertIsInstance(cm.exception.__cause__, ZeroDivisionError)
+        finally:
+            con.close()
+
+    def test_cursor_of_closed_connection(self):
+        con = self._connect()
+        con.close()
+        with self.assertRaises(pgdb.OperationalError) as cm:
+            pgdb.Cursor(con)
+        self.assertEqual(str(cm.exception), 'Connection has been closed')
+
+    def test_parameter_with_pg_repr_returning_tuple(self):
+        class Pair:
+            def __pg_repr__(self) -> tuple:
+                return 1, 'a'
+
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select %s", [Pair()])
+            self.assertEqual(cur.fetchone(), (('1', 'a'),))
+        finally:
+            con.close()
+
     def test_cursor_connection(self):
         con = self._connect()
         cur = con.cursor()
@@ -2609,6 +2803,12 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         con = self._connect()
         with con.cursor() as cur:
             self.assertEqual(cur.connection, con)
+
+    def test_pgdb_type_from_iterable(self):
+        typ = pgdb.DbType(['int2', 'int4'])
+        self.assertEqual(typ, pgdb.DbType('int2 int4'))
+        self.assertEqual('int4', typ)
+        self.assertNotEqual('int8', typ)
 
     def test_pgdb_type(self):
         self.assertEqual(pgdb.STRING, pgdb.STRING)

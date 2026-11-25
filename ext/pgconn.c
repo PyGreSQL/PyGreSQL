@@ -216,8 +216,8 @@ conn_source(connObject *self, PyObject *Py_UNUSED(noargs))
 {
     sourceObject *source_obj;
 
-    /* checks validity */
-    if (!_check_cnx_obj(self)) {
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
@@ -231,7 +231,12 @@ conn_source(connObject *self, PyObject *Py_UNUSED(noargs))
     source_obj->pgcnx = self;
     source_obj->result = NULL;
     source_obj->valid = 1;
+    source_obj->encoding = -1; /* set by execute() */
+    source_obj->result_type = RESULT_EMPTY;
     source_obj->arraysize = PG_ARRAYSIZE;
+    source_obj->current_row = 0;
+    source_obj->max_row = 0;
+    source_obj->num_fields = 0;
 
     return (PyObject *)source_obj;
 }
@@ -1016,9 +1021,7 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
     _conn_end(self);
 
     /* check result */
-    if (ret <= 0) {
-        if (line != NULL)
-            PQfreemem(line);
+    if (ret <= 0) { /* no line has been allocated in this case */
         if (ret == -1) {
             if (finished < 0)
                 return NULL;
@@ -1030,9 +1033,6 @@ conn_getline(connObject *self, PyObject *Py_UNUSED(noargs))
                       : "No line available, wait for read-ready and try again",
             self->cnx);
         return NULL;
-    }
-    if (line == NULL) {
-        Py_RETURN_NONE;
     }
     /* for backward compatibility, strip the terminating newline */
     if (line[ret - 1] == '\n')
@@ -1109,9 +1109,11 @@ conn_set_non_blocking(connObject *self, PyObject *args)
     ret = PQsetnonblocking(self->cnx, non_blocking);
     _conn_end(self);
     if (ret < 0) {
+        /* GCOVR_EXCL_START: write errors are reported with the next result */
         set_error_text(PyExc_IOError, get_new_error_message(self->cnx, offset),
                        self->cnx);
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
     Py_RETURN_NONE;
 }
@@ -1322,11 +1324,15 @@ _inserttable_put_data(connObject *self, struct CharBuffer *buf)
     buf->size = 0;
     if (rc == 1)
         return 0;
+    /* GCOVR_EXCL_START: only out of memory or when the server has already
+       sent an error, which depends on timing (and write errors are reported
+       with the next result) */
     if (rc == -1)
         set_error(PyExc_IOError, "Data cannot be sent", self->cnx, NULL);
     else
         PyErr_SetString(PyExc_IOError, "Data cannot be queued");
     return -1;
+    /* GCOVR_EXCL_STOP */
 }
 
 /* Consume the remaining results after the end of a copy operation, so that
@@ -1564,23 +1570,29 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         if (buffer.size > 128 * 1024) {
             /* send buffered data after reaching 128KB */
             if (_inserttable_put_data(self, &buffer) < 0) {
+                /* GCOVR_EXCL_START: see _inserttable_put_data() */
                 errormsg = "Data cannot be sent";
                 goto cleanup;
+                /* GCOVR_EXCL_STOP */
             }
         }
     }
 
     /* flush any remaining data */
     if (buffer.size && _inserttable_put_data(self, &buffer) < 0) {
+        /* GCOVR_EXCL_START: see _inserttable_put_data() */
         errormsg = "Data cannot be sent";
         goto cleanup;
+        /* GCOVR_EXCL_STOP */
     }
 
     errormsg = NULL; /* the copy operation will be ended below */
     if (PQputCopyEnd(self->cnx, NULL) != 1) {
+        /* GCOVR_EXCL_START: see _inserttable_put_data() */
         set_error(PyExc_IOError, "Cannot end copy", self->cnx, NULL);
         _inserttable_drain(self);
         goto cleanup;
+        /* GCOVR_EXCL_STOP */
     }
 
     Py_BEGIN_ALLOW_THREADS
@@ -2199,8 +2211,8 @@ conn_locreate(connObject *self, PyObject *args)
     int mode;
     Oid lo_oid;
 
-    /* checks validity */
-    if (!_check_cnx_obj(self)) {
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
@@ -2239,8 +2251,8 @@ conn_getlo(connObject *self, PyObject *args)
     long long value;
     int overflow;
 
-    /* checks validity */
-    if (!_check_cnx_obj(self)) {
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
@@ -2283,8 +2295,8 @@ conn_loimport(connObject *self, PyObject *args)
     PyObject *name_obj;
     Oid lo_oid;
 
-    /* checks validity */
-    if (!_check_cnx_obj(self)) {
+    if (!self->cnx) {
+        PyErr_SetString(PyExc_TypeError, "Connection is not valid");
         return NULL;
     }
 
@@ -2366,8 +2378,10 @@ conn_cancel(connObject *self, PyObject *Py_UNUSED(noargs))
     /* while another thread runs poll(), libpq may change the data that is
        needed for the cancel request, such as the cancel key */
     if (self->busy == 2) {
+        /* GCOVR_EXCL_START: a race with poll() in another thread */
         set_error_msg(InterfaceError, "The connection is being established");
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     /* request that the server abandon processing of the current command;
