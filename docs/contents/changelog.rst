@@ -1,721 +1,119 @@
 ChangeLog
 =========
 
-Version 6.3.0 (unreleased)
---------------------------
+Version 6.3.0b1 (unreleased)
+----------------------------
+A beta release with many fixes that were found in a review of the whole code
+and by measuring the test coverage, particularly for client encodings other
+than UTF-8. Some changes are not backward compatible, see the first section.
+
 - Supported versions:
 
-  - Added support for Python 3.15 and PostgreSQL 19 (thanks to
-    Christoph Berg for pointing out an issue with PostgreSQL 19 in #97).
-  - Removed support for Python 3.8 and 3.9. PostgreSQL 12 or newer
-    is still supported.
+  - Added support for Python 3.15 and PostgreSQL 19 (thanks to Christoph Berg
+    for pointing out an issue with PostgreSQL 19 in #97).
+  - Removed support for Python 3.8 and 3.9. PostgreSQL 12 or newer is still
+    supported.
+
+- Changes that may require adapting existing code:
+
+  - Plain ``bytes`` parameters are now adapted as ``bytea`` instead of text
+    (#94, thanks to Justin Pryzby). Pass ``str`` values for text columns.
+  - ``bytearray`` and ``memoryview`` parameters, and plain dicts passed to
+    ``query_formatted()`` without a type, now raise an error instead of
+    sending their Python representation. Wrap them with ``Bytea()``,
+    ``Json()`` or ``Hstore()``. Support for ``bytearray`` and ``memoryview``
+    is planned for version 6.4 (#153).
+  - All strings are now encoded and decoded with the client encoding, not
+    partly as UTF-8. Text that cannot be encoded, e.g. non-ASCII text with
+    SQL_ASCII, and text containing NUL characters, which was truncated
+    before, now raise an error.
+  - Table names are now always case-sensitive, also when they are
+    qualified with a schema name (#67). For instance, if there are tables
+    ``fruits`` and ``Fruits``, then ``'Fruits'`` and ``'public.Fruits'``
+    both mean ``Fruits``. Before, ``'public.Fruits'`` meant ``fruits``,
+    because names containing a dot were put into the SQL command unquoted.
+    Names are now split at dots and each part is quoted separately; a part
+    in double quotes can contain dots. The same applies to the names of
+    functions and procedures in ``callproc()``.
+  - The remaining support for tables with OIDs has been removed from the
+    ``DB`` wrapper. An ``oid`` column is now a normal column.
+  - The keyword for the values in ``Connection.inserttable()`` is now
+    ``values``, as documented, not ``data``.
+  - ``Bytea()`` values are now sent as parameters of type bytea, so they
+    are no longer taken as text.
+  - Error messages no longer end with a newline.
+  - Deprecated ``Typecasts.dateformat()``, use ``Connection.date_format()``.
+
+- Changes in both modules:
+
+  - A connection that cannot be established now raises the new
+    ``ConnectError``, a subclass of ``OperationalError`` and, for backward
+    compatibility, of ``InternalError``. A lost connection now always
+    raises an ``OperationalError``.
+  - Text that cannot be decoded with the client encoding is returned as
+    ``bytes``, per element in arrays and records. Names and messages are
+    decoded with backslash escapes then. PostgreSQL encodings like WIN1252
+    are now mapped to Python codecs.
+  - Objects of the ``ipaddress`` module can be passed as parameters (#43).
+    New typecast functions ``cast_inet()`` and ``cast_cidr()`` for them.
+  - Infinite intervals are returned as ``timedelta.max`` and
+    ``timedelta.min`` (#132), values of the new ``oid8`` type as ``int``
+    (#135).
+  - Domain types are now handled like their base types.
+  - Typecasts for composite types, domains and arrays are now built from
+    the types of their parts as looked up by OID, so that types with the
+    same name in different schemas or named like built-in types are cast
+    correctly. Looking up unknown types no longer aborts the transaction,
+    and changed typecasts also apply to arrays and fields of records.
+  - Fixed the quoting of keys and values of hstore parameters.
+  - Commands given as ``bytes`` can now be used with parameters.
+  - The documented classes ``DbTypes``, ``DbType``, ``LargeObject`` and
+    ``TypeCache`` are now exported by the ``pg`` or ``pgdb`` module.
 
 - Changes in the ``pg`` module:
 
-  - A connection that cannot be established now raises the new
-    ``ConnectError``, a subclass of ``OperationalError`` as suggested by the
-    DB-API 2 and, for backward compatibility, of ``InternalError``, which was
-    raised before. Catch ``OperationalError`` in new code.
-  - ``Connection.reset()`` and ``DB.reset()`` now raise a ``ConnectError`` if
-    the connection cannot be established again. Before, the failure passed
-    silently. Also, ``Connection.date_format()`` no longer returns the date
-    format of the old session after a reset.
-  - The notification handler now properly escapes the payload and the
-    channel names. Before, they were put into the SQL commands unescaped,
-    so that a payload containing a single quote caused a syntax error and
-    could be used for SQL injection, and channel names could not contain
-    double quotes. Payloads can now also be passed as raw bytes.
-  - Type hints in the stub file: ``get_decimal()`` can return ``None``, and the
-    column names passed to ``inserttable()`` can also be given as bytes.
-  - ``Connection.getlo()`` now accepts OIDs of 2**31 and above, which raised
-    a ``TypeError`` before, and raises a ``ValueError`` for negative numbers,
-    which were converted to such OIDs. OIDs of 2**31 and above are now also
-    returned correctly on Windows (as ``LargeObject.oid``, by ``query()`` and
-    ``oidstatus()``, and as type OIDs by ``fieldinfo()`` and ``listinfo()``).
-  - The messages of the ``OSError`` raised by the COPY methods ``putline()``,
-    ``getline()`` and ``endcopy()``, by ``set_non_blocking()`` and by the
-    methods ``putdata()`` and ``getdata()`` of source objects no longer contain
-    the previous error messages of the connection, which libpq accumulates
-    until the next command is sent, e.g. after the connection was lost.
-  - Error messages from the server or from libpq no longer end with a
-    newline, in the messages of exceptions (also in the ``pgdb`` module) and
-    in the ``error`` attributes of connections and large objects. Multi-line
-    messages keep their inner newlines.
-  - ``Connection.escape_string()`` and ``DB.escape_string()`` now raise a
-    ``DataError`` for bytes with invalid multibyte characters in the client
-    encoding, like ``escape_literal()`` and ``escape_identifier()``. Before,
-    such characters were silently replaced with invalid characters.
-  - ``format_query()`` now also accepts builtin generic types like
-    ``list[int]``.
-  - Table names that are not strings now raise a ``TypeError`` with a proper
-    message in all ``DB`` methods taking a table name. Before, methods like
-    ``DB.insert()`` raised a confusing ``TypeError`` from a string method.
-  - Deprecated the method ``dateformat()`` of ``Typecasts``, which has never
-    been used and always returned the ISO date format. Use the method
-    ``Connection.date_format()`` instead. It will be removed in version 7.0.
-  - The documented classes ``DbTypes``, ``DbType`` and ``LargeObject`` are now
-    exported by the ``pg`` module, and ``TypeCache`` by the ``pgdb`` module.
-    Before, they were only available in submodules.
-  - ``DB.insert()``, ``DB.update()``, ``DB.upsert()``, ``DB.get()`` and
-    ``DB.delete()`` now fetch the column names of a table again if a key of the
-    row (or a key name) is not a cached column name. Before, values for columns
-    added with ``ALTER TABLE`` after the column names had been cached were
-    silently dropped, and ``DB.update()`` returned them as if they had been
-    written, until the cache was flushed with ``DB.get_attnames()``.
-  - ``DB.get_as_dict()`` now raises a ``TypeError`` instead of a ``KeyError``
-    if the keyname is not a column name or a sequence of names, like
-    ``DB.get()`` and similar methods.
-  - ``DB.set_parameter()`` and ``DB.truncate()`` now raise a ``ValueError`` for
-    lists of different lengths instead of silently ignoring extra items.
-  - Empty hstore values (e.g. an empty dict) passed as parameters for hstore
-    columns are no longer adapted as NULL (#96, thanks to D'Arcy Cain for
-    the report).
-  - Plain ``bytes`` parameters are now adapted as ``bytea``, so they do not
-    need to be wrapped with ``Bytea()`` any more (#94, thanks to Justin
-    Pryzby). Before, they were adapted as text, which truncated binary data at
-    NUL bytes and failed for bytes that were not valid in the client encoding.
-    This also applies to inline parameters, which were not properly quoted
-    before and are now passed as typed literals like ``'\x6162'::bytea``,
-    also as elements of arrays. Note that bytes passed for text columns are
-    now stored as an escaped bytea string like ``\x616263``; pass ``str``
-    values for text.
-  - ``bytearray`` and ``memoryview`` objects passed as query parameters, as
-    values for ``inserttable()``, or as elements of arrays, records and hstore
-    values now raise a ``TypeError`` (and an ``InterfaceError`` when passed
-    inline, as before). Before, their ``str()`` representation such as
-    ``bytearray(b'...')`` or ``<memory at 0x...>`` was sent, and could be
-    stored without an error. Wrap binary data with ``Bytea()``. Support for
-    these types is planned for version 6.4 (#153).
-  - Commands given as bytes can now be used with parameters in
-    ``query_formatted()`` and ``format_query()``, and in ``execute()`` and
-    ``executemany()`` in the ``pgdb`` module. The parameters are encoded with
-    the client encoding then. Before, this raised a ``TypeError``, a
-    ``KeyError`` or an ``OperationalError``.
-  - Plain dicts passed as parameters to ``query_formatted()`` without a type,
-    also as elements of arrays and records, now raise an ``InterfaceError``
-    (as they already did when passed inline), since they could be meant as
-    json or hstore values. Before, their Python representation was sent.
-    Wrap them with ``Json()`` or ``Hstore()``, or pass their type. The error
-    message for such dicts now suggests this, also in the ``pgdb`` module.
-  - Backslashes in keys and values of hstore parameters are now escaped.
-    Before, they were dropped or caused a syntax error.
-  - Keys and values of hstore parameters containing tabs, newlines or other
-    whitespace besides spaces are now quoted. Before, they caused a syntax
-    error, or such whitespace at the start or end was silently stripped.
-  - Arrays of hstore, uuid and composite types can now be passed as
-    parameters and inserted or updated in table columns. Before, this
-    raised an ``AttributeError`` or a ``DataError``.
-  - Arrays of types unknown to PyGreSQL, e.g. of enums or of ``inet``, can
-    now be inserted or updated in table columns, and passed as parameters
-    with type names like ``_inet``. Their simple type name, as returned by
-    ``DB.get_attnames()``, is now ``text[]`` instead of ``text``. Before, the
-    list was sent as a Python string, which caused a ``DataError``.
-  - Elements of json arrays wrapped with ``Json()`` can now be adapted.
-    Empty dicts, zero and ``False`` as elements of json arrays are no longer
-    adapted as NULL. Similarly, zero and ``False`` as elements of text arrays
-    are no longer adapted as empty strings.
-  - Type names of arrays like ``int[]`` or ``hstore[]``, as returned by
-    ``DB.get_attnames()``, can now be passed as types to ``format_query()``
-    and ``query_formatted()``. Before, the arrays were sent as Python lists
-    converted to strings.
-  - Tuples passed with the type name ``record`` are now adapted as records,
-    guessing the types of their fields like for tuples passed without a
-    type. Before, the type name was taken as ``text``, so that the Python
-    representation of the tuple was sent. The same applies to the pseudo
-    types ``record`` and ``_record`` from ``DB.dbtypes``, which now have the
-    simple names ``record`` and ``record[]``.
-  - ``UUID`` objects can now also be passed as inline parameters.
-  - Objects of the ``ipaddress`` module can now also be passed as inline
-    parameters, also as elements of arrays and records (#43). Addresses and
-    interfaces are adapted as ``inet``, networks as ``cidr``, as in
-    psycopg 3. Before, this raised an ``InterfaceError``.
-  - The new typecast functions ``cast_inet()`` and ``cast_cidr()`` in
-    ``pg.cast`` cast ``inet`` and ``cidr`` values to objects of the
-    ``ipaddress`` module. They are not used by default, since these values are
-    still returned as strings, but can be set with ``set_typecast()``.
-  - The ``DbType`` objects for array types have a new attribute ``elem``
-    with the type OID of the array elements.
-  - Parameters given as ``bytes`` for a known type other than bytea are now
-    passed unchanged as raw text in the client encoding, also as elements of
-    arrays, fields of records and keys and values of hstore values, also
-    when hstore values are passed for text parameters, or directly to
-    ``Connection.query()`` or ``inserttable()``. This way, text returned as
-    ``bytes`` because it could not be decoded (e.g. with the client encoding
-    SQL_ASCII) can be written back. Before, the Python representation of the
-    bytes was sent, errors were raised, or ``b'f'`` was adapted as true for
-    boolean parameters.
-  - Fields of record parameters containing a closing parenthesis are now
-    quoted. Before, they caused a syntax error.
-  - The new ``Connection.encoding`` attribute contains the Python codec name
-    of the client encoding.
-  - ``Connection.inserttable()`` now writes values wrapped with ``Bytea()`` as
-    binary data, so that any bytes can be inserted into bytea columns.
-    Plain ``bytes`` are still passed unchanged as raw text. Before, binary
-    data had to be escaped by hand, e.g. with ``escape_bytea()``.
-  - Binary data is now sent as parameters of type bytea in binary format
-    (#20). This applies to values wrapped with ``Bytea()`` passed to
-    ``Connection.query()``, ``send_query()`` and ``query_prepared()``, and to
-    binary data for bytea parameters in ``query_formatted()`` and the other
-    methods of the ``DB`` wrapper. Plain ``bytes`` passed to the query methods
-    of the connection are still raw text. Binary data is no longer escaped
-    and doubled in size, may contain NUL bytes, and is no longer corrupted
-    when ``standard_conforming_strings`` is off. Since the parameters now
-    have the type bytea, a ``Bytea()`` value like ``Bytea(b'\\x41')`` is no
-    longer taken as the text representation of ``b'A'``, and comparing it
-    with text now raises an error instead of comparing the escaped string.
-    Binary data in arrays and records is still sent as escaped text.
-  - Asynchronous queries created with ``send_query()`` have been fixed and
-    are now tested thoroughly (#41). The methods returning a whole result
-    move to the next result as before, but getting rows with ``one()``,
-    ``single()`` and their variants, getting rows by index, ``len()`` and
-    iteration now access the current result like for other queries.
-    Before, they moved to the next result, so that rows and results could
-    get lost, and the methods returning named tuples did not move on (thanks
-    to Justin Pryzby for pointing out the inconsistency of indexing). The
-    iterators returned by ``dictiter()``, ``namediter()`` and ``scalariter()``
-    are now bound to the result that was current when they were created.
-  - Results of asynchronous queries that have not been fetched yet are now
-    kept in the query object when another command is executed on the
-    connection. Before, they were discarded, which also happened when
-    ``DB`` needed to look up a type while the results were fetched, and
-    ``send_query()`` raised an error while results were pending. Fetching
-    results after the connection has been closed or reset now raises an
-    error instead of returning None, and a query that returned all its
-    results no longer takes the results of a later query.
-  - ``DB.send_query()`` now accepts the parameters as separate arguments like
-    ``DB.query()``, in addition to a single list or tuple, and it now also
-    prints the query when debugging is enabled.
-  - Using a connection while one of its commands is running now raises an
-    ``InterfaceError`` (#115), e.g. from another thread, a notice receiver or
-    the iterable passed to ``inserttable()``. The same applies to asynchronous
-    queries while their results are fetched or converted, e.g. from a cast
-    hook. Before, this could hang or crash. ``cancel()`` can still be called
-    from another thread, and a notice receiver can still use the methods
-    that only return local information like ``transaction()``, ``parameter()``
-    and the escape methods. On a closed connection, ``Source.putdata()`` and
-    ``Source.getdata()`` now raise an ``OperationalError`` like the other
-    methods instead of an ``IOError``.
-  - ``DB.close()`` and ``DB.reopen()`` keep the cast hook of the connection
-    if it cannot be closed, e.g. because it is busy.
-  - ``Connection.prepare()`` and ``DB.prepare()`` have a new optional parameter
-    *types* with the types of the parameters of the prepared statement, for
-    when they cannot be inferred from the context (#76, thanks to Justin
-    Pryzby for the suggestion). The connection method takes type OIDs,
-    ``DB.prepare()`` also takes type names like ``'int'`` or ``'text[]'``.
-  - The remaining support for tables with OIDs has been removed from the
-    ``DB`` wrapper, since PostgreSQL 12 and newer do not support them any
-    more. ``DB.get()``, ``insert()``, ``update()``, ``upsert()`` and
-    ``delete()`` no longer handle ``oid`` and ``oid(table)`` keys specially; an
-    ``oid`` column, as in the system catalogs, is now a normal column. Before,
-    ``DB.get()`` returned it under the key ``oid(table)``, e.g.
-    ``oid(pg_namespace)``. The *with_oid* parameter of ``DB.get_attnames()``
-    is ignored.
-  - ``DB.update()``, ``DB.delete()`` and ``DB.upsert()`` have a new optional
-    parameter *keyname* like ``DB.get()``, with the name of the key column or
-    a tuple of names, so that these methods can also be used for tables
-    without primary key (#56, thanks to Justin Pryzby for the suggestion).
-    For ``DB.upsert()``, it specifies the conflict target. If another unique
-    key is used as *keyname*, ``DB.update()`` and ``DB.upsert()`` can also
-    update the primary key. Before, this was only possible with OIDs.
-  - Table names qualified with a schema name are now handled the same way
-    in all methods of the ``DB`` wrapper, in ``Connection.inserttable()`` and
-    in the copy methods of the ``pgdb`` cursor (#67): the name is split at
-    dots, parts can be enclosed in double quotes (so that they can contain
-    dots), and all parts are taken literally and escaped separately, e.g.
-    ``'public.User'`` or ``'public."User"'`` for the table ``"User"``.
-    Before, the ``DB`` methods used names containing a dot unchanged in the
-    SQL command, so that ``'public.User'`` meant ``public.user``, and
-    ``Connection.inserttable()`` and the copy methods did not support quoted
-    parts (#47). A name with an empty part or an unterminated quote now
-    raises a ``ValueError``.
-  - Domain types are now handled like their base types, also for arrays of
-    domains and for fields of composite types. ``DB.get_attnames()`` returns
-    the simple type name of the base type (e.g. ``bytea`` or ``int[]``
-    instead of ``text``), and ``DbType`` objects have a new attribute
-    ``base`` with the base type. Before, bytes for domains
-    over bytea were sent as raw text, which corrupted backslashes and raised
-    a ``ValueError`` for NUL bytes, lists for domains over arrays caused a
-    ``DataError``, and elements of arrays and fields of composite types with
-    domain types were returned as strings. A typecast set for a domain is
-    still used for elements of arrays and fields of composite types.
-  - ``DbTypes.reset_typecast()`` now also resets the typecast for arrays of
-    the given type. Before, the arrays were still cast with the old function.
-  - Looking up a type in ``DbTypes`` that does not exist, e.g. with
-    ``DbTypes.get()``, no longer aborts the current transaction. Type names
-    are now taken literally like the parts of table names, also when they
-    are qualified with a schema name or enclosed in double quotes, and can
-    also be passed as bytes. Before, qualified type names were parsed as SQL
-    type names, so that e.g. ``'pg_catalog.int4[]'`` was found and
-    ``'PG_CATALOG.INT4'`` meant ``pg_catalog.int4``, but names in double
-    quotes were not found. Keys that are neither names nor OIDs, like None,
-    now raise a ``TypeError`` instead of returning None.
-  - ``DbTypes.typecast()`` now also casts values when the type is passed as a
-    type object, as returned by ``DB.get_attnames()``. Before, the value was
-    returned unchanged.
-  - ``DbTypes.set_typecast()`` and ``DbTypes.reset_typecast()`` now also affect
-    fields of composite types whose values have already been cast. Before,
-    the casts for these composite types kept the old typecast functions for
-    their fields until they were reset as well.
-  - The typecasts for composite types, domains and arrays are now created
-    from the types of the fields, the base type and the element type as
-    looked up by their OIDs, unless a typecast has been set for the name of
-    the type. Before, these types were looked up by their names, which are
-    ambiguous: values of composite types with the same name in different
-    schemas could be cast with the fields of the wrong type (raising a
-    ``ValueError``), arrays whose type name was not the name of the element
-    type with a leading underscore aborted the current transaction, and
-    composite types whose names start with an underscore were cast like
-    arrays. Types without a typecast, like enums outside the search path,
-    are no longer looked up again for every value. ``DbTypes`` no longer
-    caches types found by OID under their bare names, which could refer to
-    a different type in the search path. ``DbTypes.get_typecast()`` now also
-    accepts type objects and OIDs. Values of composite types whose names or
-    field names cannot be used in named tuples (e.g. ``class``) are now
-    returned as named tuples with the name ``Record`` or with renamed fields
-    (``_0``, ``_1``, ...). Before, they raised a ``ValueError``. Type names
-    passed to ``DbTypes.get_typecast()`` and ``DbTypes.typecast()`` are taken
-    like the keys of ``DbTypes``. Arrays of types with a delimiter other than
-    a comma, like ``box[]``, are now split correctly. ``DB.get_attnames()``
-    with ``flush=True`` now also drops the typecasts for composite types,
-    so that they use the current fields. Before, the old typecasts raised
-    a ``ValueError``. After ``DB.reopen()``, typecasts are now bound to the new
-    connection. Before, typecasts that need the connection raised a
-    ``TypeError``. A ``DB`` object wrapping an existing connection now casts
-    values again after ``DB.close()`` and ``DB.reopen()``. Setting or resetting
-    the typecast for a type name no longer drops the typecast set for the
-    name with a leading underscore, which can be the name of another type.
-  - The built-in default typecasts are now only used for base types, not
-    for composite types, domains, enums and ranges that have the name of a
-    built-in type in another schema, like a composite type ``s.date``.
-    These are now cast like other types of their kind. Before, values of
-    such types raised errors or were cast wrongly (e.g. a composite type
-    ``s.bool`` as ``False``), also as fields and array elements, and values
-    of composite types named like a text type were returned as strings.
-    Typecasts that have been set for a type name, locally or globally,
-    still apply to all types with that name. The simple type names of such
-    types and of their arrays, as returned by ``DB.get_attnames()`` and used
-    for adapting parameters, now also follow the kind of the type (e.g.
-    ``text`` for enums, ``record[]`` for arrays of composite types). Before,
-    they were the names for the built-in type, so that ``DB.insert()`` could
-    fail or store wrong values.
-  - ``DB.delete_prepared()`` now quotes the name of the prepared statement,
-    so that it is taken literally like in ``DB.prepare()`` and
-    ``DB.query_prepared()``, and also accepts the name as bytes (#131).
-    Before, the name was inserted unchanged into the ``DEALLOCATE``
-    command, so that names with capital letters or spaces were not found,
-    the name ``'all'`` deleted all prepared statements, and other SQL could
-    be injected with the name.
-  - The infinite intervals supported since PostgreSQL 17 are now returned
-    as ``timedelta.max`` and ``timedelta.min``, like infinite dates and
-    timestamps (#132). Before, they raised a ``ValueError``.
-  - Values of the ``oid8`` type of PostgreSQL 19 are now returned as ``int``,
-    also as elements of arrays and records (#135). Before, they were
-    returned as strings. Like the other integer types, they are now
-    converted in the C extension, so that custom typecasts for ``oid8``
-    only apply to fields of records.
-  - New connection attributes ``full_protocol_version`` with the full version
-    of the protocol (e.g. 30002 for version 3.2, which PostgreSQL 18 can use
-    when requested with the connection parameter ``max_protocol_version``),
-    and ``hostaddr`` with the IP address of the server (#138).
-  - ``DB.get_tables()`` now also returns partitioned tables, like ``\dt`` in
-    psql (#136). Before, only their partitions were returned. The type
-    letters for ``DB.get_relations()`` are now documented completely.
-  - ``DB.get_relations()`` now escapes the given kinds of relations and raises
-    a ``ValueError`` for kinds that are not single letters. Before, the kinds
-    were inserted unchanged into the SQL command, so that a kind containing
-    a quote caused a syntax error or could inject other SQL, and kinds with
-    more than one letter were silently truncated to their first letter.
-  - ``DB.upsert()`` with no columns to update now uses ``ON CONFLICT DO
-    SELECT`` with PostgreSQL 19 or newer (#134), so that an existing row
-    is returned by the same statement. Before, it was read with a separate
-    query, and could have been changed or deleted by another session in
-    between.
-  - New connection methods ``encrypt_password()`` and ``change_password()``
-    (#139), also available in the ``DB`` wrapper. They encrypt a password on
-    the client, so that it is not sent to the server in clear text, where
-    it could appear in the server log. ``change_password()`` uses
-    ``PQchangePassword()`` with libpq 17 or newer and does the same itself
-    with older versions of libpq.
-  - The typecast function ``cast_money()`` in ``pg.cast`` now also removes
-    thousands separators when the decimal point is not a period. Before,
-    a value like ``1.234,50 €`` raised an error.
+  - New parameter *types* for ``prepare()`` (#76) and *keyname* for
+    ``DB.update()``, ``DB.delete()`` and ``DB.upsert()`` (#56).
+  - New methods ``encrypt_password()`` and ``change_password()`` (#139).
+  - New connection attributes ``encoding``, ``full_protocol_version`` and
+    ``hostaddr`` (#138).
+  - Binary data is now sent in binary format (#20), also by
+    ``inserttable()`` for ``Bytea()`` values.
+  - ``inserttable()`` now converts values with ``str()``, not ``repr()``
+    (#120), and has been made more robust.
+  - ``DB.upsert()`` uses ``ON CONFLICT DO SELECT`` with PostgreSQL 19 (#134).
+  - ``DB.get_tables()`` now also returns partitioned tables (#136).
+  - Fixed and improved asynchronous queries (#41, thanks to Justin Pryzby).
+  - Using a connection while it is busy now raises an ``InterfaceError``
+    instead of hanging or crashing (#115).
+  - ``cancel()`` is now thread-safe and, with libpq 17, encrypted (#133).
+  - Notices can now be kept after the notice receiver has returned.
+  - Fixed SQL injections in the notification handler, ``DB.get_relations()``
+    and ``DB.delete_prepared()`` (#131).
+  - Fixed adapting parameters, e.g. arrays of many types and empty hstore
+    values (#96, thanks to D'Arcy Cain for the report). Bytes for types
+    other than bytea are passed as raw text, so that text returned as bytes
+    can be written back.
+  - The ``DB`` methods now notice columns that have been added to a table.
+  - Fixed many crashes and memory leaks in the C extension, e.g. in the COPY
+    methods (#95, thanks to FairyFar for the report).
 
 - Changes in the ``pgdb`` module:
 
-  - A connection that cannot be established now raises the new
-    ``ConnectError``, a subclass of ``OperationalError`` as suggested by the
-    DB-API 2 and, for backward compatibility, of ``InternalError``, which was
-    raised before. Catch ``OperationalError`` in new code.
-  - The type hints of ``execute()`` and ``executemany()`` of cursors and
-    connections now allow parameters passed as mappings.
-  - Fixed the error messages of ``Cursor.copy_to()`` for a missing table and
-    of ``Cursor.copy_from()`` for an invalid format option.
-  - The type code of anonymous records (e.g. the result of ``row(1, 'a')``)
-    in the cursor description is now equal to the type object ``RECORD``.
-    Before, only the string ``'record'`` was.
-  - When a parameter could not be adapted, the error message named the
-    previous command (e.g. ``BEGIN``) instead of the operation.
-  - Like in the ``pg`` module, the connection is now passed to typecast
-    functions that take a parameter named ``connection``, as documented.
-    Before, only a parameter named ``cnx`` was recognized, which is still
-    supported.
-  - ``Connection.commit()`` and ``Connection.rollback()`` no longer mark the
-    transaction as ended when the command could not be sent, e.g. because
-    the connection is busy.
-  - The items of ``Cursor.description`` and the results of
-    ``TypeCache.get_fields()`` are now typed named tuples.
-  - Plain ``bytes`` parameters are now adapted as ``bytea``, like values
-    wrapped with ``Binary()``. They are passed as typed literals like
-    ``'\x6162'::bytea``, also as elements of arrays. Before, they were not
-    properly quoted.
-  - ``bytearray`` and ``memoryview`` objects as keys or values of ``Hstore``
-    parameters now raise an ``InterfaceError``, like these objects in other
-    parameters. Before, their ``str()`` representation was sent.
-  - Objects of the ``ipaddress`` module can now be passed as parameters, also
-    as elements of lists and tuples (#43). Addresses and interfaces are
-    adapted as ``inet``, networks as ``cidr``, as in psycopg 3. Before, this
-    raised an ``InterfaceError``.
-  - The typecast functions ``cast_inet()`` and ``cast_cidr()``, which cast
-    ``inet`` and ``cidr`` values to objects of the ``ipaddress`` module, are
-    also available in ``pgdb.cast``, to be set with ``set_typecast()``.
-  - Keys and values of hstore parameters containing tabs, newlines or other
-    whitespace besides spaces are now quoted. Before, they caused a syntax
-    error, or such whitespace at the start or end was silently stripped.
-  - Keys and values of hstore parameters given as ``bytes`` are now passed
-    unchanged as raw text in the client encoding, so that hstore values with
-    text that could not be decoded can be written back. Before, the Python
-    representation of the bytes was sent.
-  - Text parameters and queries containing NUL characters, which PostgreSQL
-    does not support, now raise a ``DataError``. Before, the text was silently
-    truncated at the NUL character. Queries and parameters that cannot be
-    encoded with the client encoding now also raise a ``DataError`` instead
-    of an ``OperationalError`` ("Internal error").
-  - When ``connect()`` is called with additional keyword arguments, the
-    database name and the other values are now always quoted. Before,
-    values with quotes or backslashes but without spaces broke the
-    connection info string (#77, thanks to Zhenghua Lyu for the report).
-  - Elements of arrays and fields of composite types with domain types are
-    now cast like their base types, unless a typecast has been set for the
-    domain. Before, they were returned as strings. The type codes in the
-    ``TypeCache`` have a new attribute ``base`` with the base type of domains.
-  - Looking up a type in the ``TypeCache`` that does not exist no longer
-    aborts the current transaction. Type names
-    are now taken literally like in the ``pg`` module, also when they are
-    qualified with a schema name or enclosed in double quotes, and can also
-    be passed as bytes. Before, such type names were parsed as SQL type
-    names, and invalid names could raise an error. Keys that are neither
-    names nor OIDs, like None, now raise a ``TypeError``.
-  - ``TypeCache.set_typecast()`` and ``TypeCache.reset_typecast()`` now also
-    affect fields of composite types whose values have already been cast.
-    Before, the casts for these composite types kept the old typecast
-    functions for their fields until they were reset as well.
-  - The infinite intervals supported since PostgreSQL 17 are now returned
-    as ``timedelta.max`` and ``timedelta.min``, like infinite dates and
-    timestamps (#132). Before, they raised a ``ValueError``.
-  - Values of the ``oid8`` type of PostgreSQL 19 are now returned as ``int``,
-    also as elements of arrays and records (#135). Before, they were
-    returned as strings.
-  - ``Cursor.callproc()`` now supports procedures (#137). They are called
-    with ``CALL``, and a copy of the parameters is returned where the
-    output and input/output parameters are replaced with the values
-    returned by the procedure. Before, procedures could not be called.
-    The name is now split into its parts like table names, so that
-    schema-qualified names work. Before, it was put in double quotes as a
-    whole, and a double quote or a percent sign in the name could break the
-    query. Names written like ``'schema"."func'`` to work around this now
-    raise a ``ValueError``; write ``'schema.func'`` instead.
-  - The typecasts for composite types, domains and arrays are now created
-    from the types of the fields, the base type and the element type as
-    looked up by their OIDs, unless a typecast has been set for the name of
-    the type, like in the ``pg`` module. Before, these types were looked up by
-    their names, which are ambiguous: arrays of composite types and domains
-    that are not in the search path aborted the current transaction, values
-    of composite types with the same name in different schemas could be
-    cast with the fields of the wrong type (raising a ``ValueError``), and
-    composite types whose names start with an underscore were cast like
-    arrays. The ``TypeCache`` no longer caches types found by OID under their
-    bare names. The type codes have a new attribute ``elem`` with the OID
-    of the element type of arrays. ``TypeCache.get_typecast()`` and
-    ``TypeCache.typecast()`` now also accept OIDs. Values of composite types
-    whose names or field names cannot be used in named tuples are now
-    returned as named tuples with the name ``Record`` or with renamed
-    fields, like in the ``pg`` module. Before, they raised a ``ValueError``.
-    Type names passed to ``TypeCache.get_typecast()`` and
-    ``TypeCache.typecast()`` are taken like the keys of the ``TypeCache``.
-    Arrays of types with a delimiter other than a comma, like ``box[]``,
-    are now split correctly. ``TypeCache.reset_typecast()`` no longer stores
-    array casts derived from the name of the type, which were then also
-    used for other types with such a name, and when called without
-    arguments, typecasts that need the connection, like the one for dates,
-    no longer raise a ``TypeError``. Global typecasts set for array types
-    with ``set_typecast()`` are now used, like in the ``pg`` module. Setting or
-    resetting the typecast for a type name no longer drops the typecast set
-    for the name with a leading underscore, which can be the name of
-    another type.
-  - The built-in default typecasts are now only used for base types, not
-    for composite types, domains, enums and ranges that have the name of a
-    built-in type in another schema, like in the ``pg`` module. Before,
-    values of such types raised errors or were cast wrongly, also as fields
-    and array elements. Typecasts that have been set for a type name,
-    locally or globally, still apply to all types with that name.
-  - The type objects like ``DATE`` or ``JSON`` are now only equal to type codes
-    of base types and arrays of base types with that name, and ``ARRAY`` and
-    ``RECORD`` check the type codes instead of their names. Before, the type
-    code of a composite type ``s.date`` was equal to ``DATE``, and a composite
-    type named ``_q`` was equal to ``ARRAY``. Plain strings and type codes
-    without type information are still compared by name.
-  - Creating a ``Connection`` from an invalid ``pg`` connection now raises
-    the intended ``OperationalError`` instead of a ``TypeError`` from the type
-    cache, and the connection specific typecasts raise a ``TypeError`` for
-    types that are not strings like the global ones.
+  - ``Cursor.callproc()`` now supports procedures (#137).
+  - Fixed quoting of values passed to ``connect()`` as keywords (#77,
+    thanks to Zhenghua Lyu for the report).
+  - The items of ``Cursor.description`` are now typed named tuples. The type
+    objects like ``DATE`` now check the kind of type, not only its name.
 
-- Fixes in the C extension:
+- Documentation and build:
 
-  - The ``putdata()`` and ``getdata()`` methods of the source object leaked the
-    final result of every COPY operation (#95, thanks to FairyFar for the
-    report). ``putdata()`` also read freed memory when an exception was passed
-    to abort the COPY, garbling the error message, and crashed when the
-    exception could not be converted to a string.
-  - After a COPY with ``putdata()`` or ``getdata()``, the connection is now
-    idle again, so that ``send_query()`` can be used without running another
-    query first. It previously failed with "another command is already in
-    progress". If the query has more statements after the COPY, an error in
-    these is now reported, and a further COPY can be run with ``putdata()`` or
-    ``getdata()``.
-  - Fixed several problems with custom notice receivers: notice objects were
-    leaked, and reading their attributes after the receiver had returned
-    accessed freed memory. The notice fields are now copied, so notices can
-    be kept and used later, except for the ``pgcnx`` attribute, which is only
-    available inside the receiver. The fields are now decoded with the client
-    encoding instead of UTF-8, and ``str(notice)`` works again. Exceptions
-    raised in the receiver are now reported as unraisable exceptions instead
-    of causing a ``SystemError`` in the query that produced the notice.
-    Setting the notice receiver to ``None`` now restores the default receiver
-    of libpq, which prints notices to stderr, instead of ignoring notices.
-  - Connections now support the cyclic garbage collector, so that they are
-    freed when their notice receiver or cast hook refers back to them, e.g.
-    as a bound method of an object holding the connection. Closing the
-    connection also releases the notice receiver.
-  - Fixed several problems in the ``inserttable()`` method: values whose
-    conversion to a string failed, e.g. because of an exception in their
-    ``__str__()`` or ``__repr__()`` method, and invalid bytes in column names
-    caused crashes, as did rows that were changed while being converted.
-    Strings that could not be encoded in the client encoding released a
-    reference too much. Values containing NUL characters were silently
-    truncated and now raise a ``ValueError``, as do table and column names
-    containing NUL characters. The table name and the string representation
-    of other objects are now encoded with the client encoding instead of
-    UTF-8, like the column names and string values. With the client
-    encoding SQL_ASCII, non-ASCII characters in these now raise a
-    ``UnicodeEncodeError``. The table name can now also be passed as bytes,
-    like the column names. Error messages are now decoded with the client
-    encoding instead of UTF-8. After an error, the COPY operation is now
-    always aborted (also when the iteration raised an error), and the
-    connection is idle again after the method returns, so that ``send_query()``
-    can be used directly afterwards.
-  - The ``inserttable()`` method now converts all values other than strings,
-    bytes and ``Bytea()`` with ``str()``, like query parameters (#120). Before,
-    only integers, dates and times were converted with ``str()``, and all
-    other objects with ``repr()``, which is not a valid literal for objects
-    like ``Decimal``, ``UUID``, those of the ``ipaddress`` module, ``Json()``
-    and ``Hstore()``. The server rejected such values, or stored their Python
-    representation in text columns. Floats and booleans are not affected,
-    since their ``str()`` and ``repr()`` are the same.
-  - Values wrapped with ``Hstore()`` that are passed as query parameters or to
-    ``inserttable()`` are now converted to their literal with the client
-    encoding, so that keys and values given as ``bytes`` are passed unchanged
-    as raw text, like in ``DB`` methods. A ``__str__()`` method of a subclass
-    is not used for this, since it creates a human readable representation.
-  - Errors raised when converting a query parameter to a string are now
-    passed on, like in ``inserttable()``. Before, all errors, including
-    ``KeyboardInterrupt`` and ``MemoryError``, were replaced with a generic
-    ``TypeError`` saying that the parameter has no string representation.
-  - The ``escape_literal()`` and ``escape_identifier()`` methods crashed for
-    bytes containing invalid multibyte characters, they now raise a
-    ``DataError``. The escape methods of a connection that had been closed
-    after the method was looked up now raise a ``TypeError`` instead of
-    crashing or returning an empty string.
-  - Text that cannot be decoded with the client encoding, e.g. non-ASCII
-    text with the client encoding SQL_ASCII, is returned as bytes again
-    instead of raising a ``SystemError``, also when fetched with the source
-    object (used by ``pgdb``). In arrays and records, only the elements that
-    cannot be decoded are returned as bytes, so that the other elements are
-    still cast properly. Accordingly, ``cast_array()`` and ``cast_record()``
-    now decode the elements of a bytes string as ASCII where possible. Such
-    JSON values are passed to the JSON decoder as bytes, which the default
-    decoder ``json.loads()`` decodes as UTF-8. Error messages that cannot be
-    decoded also raised a ``SystemError``, they are now decoded as UTF-8 with
-    backslash escapes, like notices.
-  - Field names were always decoded as UTF-8 instead of the client encoding,
-    which caused errors or crashes with non-ASCII field names, as did
-    ``str()`` of a query or source object. Field names that cannot be decoded
-    with the client encoding are now decoded as UTF-8 with backslash escapes.
-    ``Query.fieldnum()`` now encodes the name with the client encoding instead
-    of UTF-8, falling back to UTF-8 like the decoding of field names, and it
-    also accepts bytes. The name is now first compared with the field names
-    as returned by ``Query.listfields()``, so that these can always be used,
-    even if they are in mixed case or contain backslash escapes, and only
-    then looked up like in SQL (in lower case unless quoted). Before, a name
-    like ``A`` found the field ``a`` instead of ``"A"``. This also applies to
-    ``Query.fieldinfo()`` and to the source object. Names containing NUL
-    characters now raise a ``ValueError`` instead of being truncated.
-    ``Query.fieldname()`` crashed with a negative field number.
-  - The ``fieldinfo()`` and ``field()`` methods of the source object can now
-    look up fields by name (passed as str or bytes), which always failed.
-    ``field()`` crashed when there was no current row, it now raises an
-    ``IndexError``. It now returns ``None`` for NULL values instead of an empty
-    string, and decodes values with the client encoding instead of UTF-8.
-  - Fetching the results of ``send_query()`` crashed when an error was
-    followed by more than one further result. After an error, the field
-    methods of the query used the fields of the previous result, which
-    could also crash. The column types of every further result were leaked.
-  - Casting records with a sequence of cast functions leaked references to
-    these functions.
-  - Client encodings whose PostgreSQL names are not known to Python, such as
-    WIN1252, KOI8R or SJIS, caused a ``LookupError`` for every query passed as
-    str. The PostgreSQL encodings are now mapped to the corresponding Python
-    codecs. Encodings that are not supported by Python are handled like
-    SQL_ASCII, and a ``UnicodeWarning`` is issued when such an encoding is
-    used on a connection.
-  - After the connection to the server was lost, queries and other methods
-    of the connection raised a ``LookupError`` ("unknown encoding"), they now
-    raise an ``OperationalError``. Also, a query that failed because the
-    connection was lost now raises an ``OperationalError`` instead of a
-    ``ProgrammingError``, also in the ``pgdb`` module.
-  - Other strings from the server were also decoded as UTF-8 instead of the
-    client encoding, so that non-ASCII characters in other encodings raised a
-    ``UnicodeDecodeError``, also instead of the intended exception: the channel
-    and payload of notifications returned by ``getnotify()``, the ``error``
-    attributes of connections and large objects, the lines returned by
-    ``getline()``, the values returned by ``parameter()``, and the messages of
-    the exceptions raised by many other methods. Like text values, payloads
-    and lines that cannot be decoded are now returned as bytes, also by the
-    ``getdata()`` method of the source object, which raised a
-    ``UnicodeDecodeError``. When ``getnotify()`` failed, it leaked memory.
-    ``getline()`` leaked the final result of every COPY operation.
-  - Some strings sent to the server were encoded as UTF-8 instead of the
-    client encoding: the name and the command passed to ``prepare()``, the name
-    passed to ``describe_prepared()`` (so that statements with non-ASCII names
-    could not be used with ``query_prepared()``), lines passed to
-    ``putline()``, and query parameters that are converted with ``str()``. Like
-    queries, these now raise a ``UnicodeEncodeError`` if they cannot be
-    encoded, e.g. non-ASCII text with the client encoding SQL_ASCII, where it
-    was sent as UTF-8. Strings written to large objects are still encoded as
-    UTF-8, since the server does not convert large objects; this is now
-    documented.
-  - Queries, parameters and names of prepared statements containing NUL
-    characters were silently truncated, as were strings passed to the
-    escape methods and ``escape_string()``, which also affected inline
-    parameters. These now raise a ``ValueError``. The error message of an
-    exception passed to ``putdata()`` is now always sent, characters that
-    cannot be encoded and NUL characters are escaped. Before, such messages
-    were truncated or raised a ``UnicodeEncodeError`` without aborting the
-    COPY.
-  - The name passed to ``parameter()`` can now also be bytes. The file names
-    passed to ``loimport()`` and ``LargeObject.export()`` are now encoded with
-    the file system encoding, and path-like objects are accepted.
-  - ``query()`` crashed when the parameters were passed as an iterator yielding
-    a list, or when the conversion of a parameter to a string changed the
-    list of parameters. ``connect()`` raised a ``SystemError`` when default
-    values had been set with ``set_defhost()`` and similar functions.
-  - The string parameters of ``connect()`` and the values set with
-    ``set_defhost()`` and similar functions can now also be bytes, which are
-    passed unchanged. ``None`` can now be passed as port to ``connect()`` and
-    ``set_defport()``, so that the previous value returned by ``set_defport()``
-    can always be restored. Invalid ports now raise a ``ValueError`` instead
-    of a ``TypeError``, or of being silently truncated. ``set_defpasswd()``
-    leaked the previous password. A ``get_defpasswd()`` function never
-    existed, it has been removed from the documentation.
-  - The keyword for the second parameter of ``Connection.inserttable()`` is
-    now ``values``, as documented and as in ``DB.inserttable()``. Since
-    version 6.2.1, it had been named ``data`` by mistake; this keyword is
-    no longer accepted. Like in ``Connection.inserttable()``, ``freeze`` is
-    now a keyword-only parameter in ``DB.inserttable()`` as well.
-    ``None`` is now accepted for ``columns``. When
-    there is nothing to insert, the method now returns 0 instead of ``None``,
-    and the type of ``columns`` is checked in this case as well.
-  - Calling ``dir()`` on connections, large objects and source objects
-    leaked references.
-  - After a COPY with ``putline()`` and ``endcopy()``, errors of the COPY such
-    as invalid data or duplicate keys are now raised by ``endcopy()``. Before,
-    they were silently discarded by the next query. After ``getline()`` or
-    ``endcopy()``, the connection is now idle, so that e.g. ``send_query()``
-    can be used again. ``getline()`` now raises an ``OSError`` instead of a
-    ``MemoryError`` when no COPY is in progress.
-  - The query object returned by ``describe_prepared()`` had an uninitialized
-    flag for asynchronous queries, so that it could be handled like one.
-    Query objects also released the reference to the connection twice
-    when running out of memory.
-  - ``Connection.cancel()`` used the deprecated ``PQrequestCancel()`` function
-    of libpq, which is not thread-safe, although the method is meant to be
-    called by another thread while a command is running (#133). It sent the
-    request unencrypted, blocked all other threads while sending it, and
-    when the request could not be sent, it returned 0 and overwrote the
-    error message of the connection. Now the request is sent without
-    blocking other threads and, when PyGreSQL has been built with libpq 17
-    or newer, encrypted like the connection and limited by its
-    ``connect_timeout``. If the request cannot be sent, an
-    ``OperationalError`` with the reason given by libpq is now raised instead
-    of returning 0. On success, the method still returns 1, as documented
-    now, and ``DB.cancel()`` now returns this value as well. Note that the
-    libpq used at runtime must not be older than the one PyGreSQL has been
-    built with.
-  - Fixes in the source object (found by measuring the test coverage):
-    deleting the ``arraysize`` attribute crashed, setting it to a number
-    that is too large and getting ``pgcnx`` of a closed source object
-    caused a ``SystemError`` later, the ``resulttype``, ``ntuples`` and
-    ``nfields`` attributes and ``str()`` of a new source object read
-    undefined values, ``movelast()`` on an empty result made ``fetch()``
-    return a row of ``None`` values, and the command status shown by ``str()``
-    is now decoded with the client encoding.
-  - Field numbers that do not fit into a C int, e.g. 2**32, given to
-    ``fieldinfo()`` and ``field()`` of source objects and to
-    ``Query.fieldinfo()`` now raise an error instead of being truncated,
-    which returned another field.
-  - Each command that was refused because the COPY of a pending
-    asynchronous query had not been completed added another COPY result to
-    that query, so that its ``getresult()`` returned empty strings instead of
-    the row count of the COPY.
-  - ``cast_hstore()`` now raises a ``ValueError`` for a trailing backslash in
-    an unquoted key or value, like PostgreSQL. Before, it was kept in a value,
-    and together with other escapes an undefined byte was read. A leak when
-    a quoted value was not terminated has also been fixed. ``cast_array()``
-    and ``cast_record()`` now raise a ``ValueError`` for a NUL character as
-    delimiter, which was taken as a comma.
-  - Money values in arrays were not cast correctly when ``set_decimal(None)``
-    was set, the conversion read beyond the digits and failed.
-  - ``set_query_helpers()`` did not keep references to the helper functions.
-  - The ``ssl_attributes`` of a connection could crash when an attribute
-    could not be converted. Values that are not valid UTF-8 now contain
-    backslash escapes.
-  - The methods ``source()``, ``locreate()``, ``getlo()`` and ``loimport()`` of
-    a closed connection, when bound before closing it, raised an
-    ``OperationalError`` instead of the documented ``TypeError``.
-  - ``LargeObject.close()`` now also marks the large object as closed if
-    closing fails, e.g. because the transaction has ended, so that it can be
-    opened again or unlinked. Before, it stayed open and unusable.
-
-- Documentation:
-
-  - Explained how to pass values that need to be adapted, such as lists
-    for arrays, to ``query()`` and ``query_prepared()``, which pass parameters
-    as text (#28).
-  - Reviewed the whole documentation and corrected it where it no longer
-    matched the code, including broken examples in the tutorial and the
-    PostgreSQL examples, and outdated installation instructions.
-
-- Modernization and build:
-
-  - Fixed the type hints for the C extension in ``pg/_pg.pyi``: parameters
-    that can only be passed by position, wrong and missing parameters,
-    return types and methods, and the ``Notice`` type passed to notice
-    receivers. The hints are now checked with mypy's stubtest.
-
+  - Reviewed and corrected the whole documentation (#28).
   - Modernized the code using Python 3.10 features and the Python 3.10 C API.
-    The C extension now checks all errors during initialization.
-  - All project metadata is now defined in ``pyproject.toml``. Building
-    requires setuptools 77 or newer. New build option ``--pedantic`` for extra
-    compiler warnings. The installation instructions have been updated.
+  - All project metadata is now in ``pyproject.toml``, building requires
+    setuptools 77 or newer. New build option ``--pedantic``.
+  - Fixed the type hints for the C extension, they are now checked with
+    mypy's stubtest.
 
 Version 6.2.3 (2026-01-25)
 --------------------------
@@ -736,7 +134,7 @@ Version 6.2.1 (2025-12-27)
 --------------------------
 - Made setup cleaner and work with a wider range of setuptools versions (#90).
 - The ``inserttable()`` method in the ``pg`` module now supports an optional
-  ``freeze`` parameter to optimize initial bulk loading (#81).
+  *freeze* parameter to optimize initial bulk loading (#81).
 
 Version 6.2.0 (2025-12-21)
 --------------------------
@@ -747,21 +145,15 @@ Version 6.2.0 (2025-12-21)
 
 Version 6.1.0 (2024-12-05)
 --------------------------
-- Support Python 3.13 and PostgreSQL 17.
+- Added support for Python 3.13 and PostgreSQL 17.
 
 Version 6.0.1 (2024-04-19)
 --------------------------
-- Properly adapt falsy JSON values (#86)
+- Properly adapt falsy JSON values (#86).
 
 Version 6.0 (2023-10-03)
 ------------------------
-- Tested with the recent releases of Python 3.12 and PostgreSQL 16.
-- Make pyproject.toml the only source of truth for the version number.
-- Please also note the changes already made in version 6.0b1.
-
-Version 6.0b1 (2023-09-06)
---------------------------
-- Officially support Python 3.12 and PostgreSQL 16 (tested with rc versions).
+- Added support for Python 3.12 and PostgreSQL 16.
 - Removed support for Python versions older than 3.7 (released June 2017)
   and PostgreSQL older than version 10 (released October 2017).
 - Converted the standalone modules ``pg`` and ``pgdb`` to packages with
@@ -774,10 +166,11 @@ Version 6.0b1 (2023-09-06)
 - Renamed ``pgdb.Type`` to ``pgdb.DbType`` to avoid confusion with
   ``typing.Type``.
 - ``pg`` and ``pgdb`` now use a shared row factory cache.
-- The function  ``set_row_factory_size()`` has been removed. The row cache is
+  The function ``set_row_factory_size()`` has been removed. The row cache is
   now available as a ``RowCache`` class with methods ``change_size()`` and
   ``clear()``.
 - Modernized code and tools for development, testing, linting and building.
+  ``pyproject.toml`` is now the only source of truth for the version number.
 
 Version 5.2.5 (2023-08-28)
 --------------------------
@@ -785,23 +178,29 @@ Version 5.2.5 (2023-08-28)
 - Two more improvements in the ``inserttable()`` method of the ``pg`` module
   (thanks to Justin Pryzby for this contribution):
 
-  - error handling has been improved (#72)
-  - the method now returns the number of inserted rows (#73)
+  - Error handling has been improved (#72).
+  - The method now returns the number of inserted rows (#73).
+
 - Another improvement in the ``pg`` module (#83):
 
-  - generated columns can be requested with the ``get_generated()`` method
-  - generated columns are ignored by the insert, update and upsert method
-- Avoid internal query and error when casting the ``sql_identifier`` type (#82)
-- Fix issue with multiple calls of ``getresult()`` after ``send_query()`` (#80)
+  - Generated columns can be requested with the ``get_generated()`` method.
+  - Generated columns are ignored by the ``insert()``, ``update()`` and
+    ``upsert()`` methods.
+
+- Avoid internal query and error when casting the ``sql_identifier``
+  type (#82).
+- Fixed issue with multiple calls of ``getresult()`` after
+  ``send_query()`` (#80).
 
 Version 5.2.4 (2022-03-26)
 --------------------------
 - Three more fixes in the ``inserttable()`` method of the ``pg`` module:
 
-  - ``inserttable()`` failed to escape carriage return (#68)
-  - Allow larger row sizes up to 64 KB (#69)
-  - Fix use after free issue in ``inserttable()`` (#71)
-- Replace obsolete functions for copy used internally (#59).
+  - ``inserttable()`` failed to escape carriage return (#68).
+  - Allow larger row sizes up to 64 KB (#69).
+  - Fixed use after free issue in ``inserttable()`` (#71).
+
+- Replaced obsolete functions for copy used internally (#59).
   Therefore, ``getline()`` now does not return ``\.`` at the end any more.
 
 Version 5.2.3 (2022-01-30)
@@ -810,121 +209,131 @@ Version 5.2.3 (2022-01-30)
 - Some improvements and fixes in the ``inserttable()`` method of the ``pg``
   module:
 
-  - Sync with ``PQendcopy()`` when there was an error (#60)
-  - Allow specifying a schema in the table name (#61)
-  - Improved check for internal result (#62)
-  - Catch buffer overflows when building the copy command
-  - Data can now be passed as an iterable, not just list or tuple (#66)
+  - Sync with ``PQendcopy()`` when there was an error (#60).
+  - Allow specifying a schema in the table name (#61).
+  - Improved check for internal result (#62).
+  - Catch buffer overflows when building the copy command.
+  - Data can now be passed as an iterable, not just list or tuple (#66).
+
 - Some more fixes in the ``pg`` module:
 
-  - Fix upsert with limited number of columns (#58).
-  - Fix argument handling of ``is/set_non_blocking()``.
-  - Add missing ``get/set_typecasts`` in list of exports.
+  - Fixed upsert with limited number of columns (#58).
+  - Fixed argument handling of ``is_non_blocking()`` and
+    ``set_non_blocking()``.
+  - Added missing ``get_typecast()`` and ``set_typecast()`` in list of
+    exports.
+
 - Fixed a reference counting issue when casting JSON columns (#57).
 
 Version 5.2.2 (2020-12-09)
 --------------------------
 - Added a missing adapter method for UUIDs in the classic ``pg`` module.
 - Performance optimizations for ``fetchmany()`` in the ``pgdb`` module (#51).
-- Fixed a reference counting issue in the ``cast_array/record`` methods (#52).
-- Ignore incompatible libpq.dll in Windows PATH for Python >= 3.8 (#53).
+- Fixed a reference counting issue in the ``cast_array()`` and
+  ``cast_record()`` functions (#52).
+- Ignore incompatible ``libpq.dll`` in Windows PATH for Python >= 3.8 (#53).
 
 Version 5.2.1 (2020-09-25)
 --------------------------
 - This version officially supports the new Python 3.9 and PostgreSQL 13.
-- The ``copy_to()`` and ``copy_from()`` methods in the pgdb module now also
-  work with table names containing schema qualifiers (#47).
+- The ``copy_to()`` and ``copy_from()`` methods in the ``pgdb`` module now
+  also work with table names containing schema qualifiers (#47).
 
 Version 5.2 (2020-06-21)
 ------------------------
 - We now require Python version 2.7 or 3.5 and newer.
 - All Python code is now tested with flake8 and made PEP8 compliant.
-- Changes to the classic PyGreSQL module (pg):
+- Changes to the classic PyGreSQL module (``pg``):
 
   - New module level function ``get_pqlib_version()`` that gets the version
-    of the pqlib used by PyGreSQL (needs PostgreSQL >= 9.1 on the client).
+    of the libpq used by PyGreSQL (needs PostgreSQL >= 9.1 on the client).
   - New query method ``memsize()`` that gets the memory size allocated by
     the query (needs PostgreSQL >= 12 on the client).
   - New query method ``fieldinfo()`` that gets name and type information for
     one or all field(s) of the query. Contributed by Justin Pryzby (#39).
   - Experimental support for asynchronous command processing.
-    Additional connection parameter ``nowait``, and connection methods
+    Additional connection parameter *nowait*, and connection methods
     ``send_query()``, ``poll()``, ``set_non_blocking()``,
     ``is_non_blocking()``. Generously contributed by Patrick TJ McPhee (#19).
-  - The ``types`` parameter of ``format_query`` can now be passed as a string
-    that will be split on whitespace when values are passed as a sequence,
-    and the types can now also be specified using actual Python types
-    instead of type names. Suggested by Justin Pryzby (#38).
+  - The *types* parameter of ``format_query()`` can now be passed as a
+    string that will be split on whitespace when values are passed as a
+    sequence, and the types can now also be specified using actual Python
+    types instead of type names. Suggested by Justin Pryzby (#38).
   - The ``inserttable()`` method now accepts an optional column list that
     will be passed on to the COPY command. Contributed by Justin Pryzby
     (#24).
-  - The ``DBTypes`` class now also includes the ``typlen`` attribute with
+  - The ``DbTypes`` class now also includes the ``typlen`` attribute with
     information about the size of the type (contributed by Justin Pryzby).
   - Large objects on the server are not closed any more when they are
     deallocated as Python objects, since this could cause several problems.
     Bug report and analysis by Justin Pryzby (#30).
-- Changes to the DB-API 2 module (pgdb):
 
-  - When using Python 2, errors are now derived from StandardError
-    instead of Exception, as required by the DB-API 2 compliance test.
+- Changes to the DB-API 2 module (``pgdb``):
+
+  - When using Python 2, errors are now derived from ``StandardError``
+    instead of ``Exception``, as required by the DB-API 2 compliance test.
   - Connection arguments containing single quotes caused problems
     (reported and fixed by Tyler Ramer and Jamie McAtamney).
 
 Version 5.1.2 (2020-04-19)
 --------------------------
-- Improved handling of build_ext options for disabling certain features.
+- Improved handling of ``build_ext`` options for disabling certain features.
 - Avoid compiler warnings with proper casts. This should solve problems
-  when building PyGreSQL on MaCOS.
-- Export only the public API on wildcard imports
+  when building PyGreSQL on macOS.
+- Export only the public API on wildcard imports.
 
 Version 5.1.1 (2020-03-05)
 --------------------------
 - This version officially supports the new Python 3.8 and PostgreSQL 12.
 - This version changes internal queries so that they cannot be exploited using
   a PostgreSQL security vulnerability described as CVE-2018-1058.
-- Removed NO_PQSOCKET switch which is not needed any longer.
+- Removed ``NO_PQSOCKET`` switch which is not needed any longer.
 - Fixed documentation for other compilation options which had been renamed.
 - Started using GitHub as development platform.
 
 Version 5.1 (2019-05-17)
 ------------------------
-- Changes to the classic PyGreSQL module (pg):
+- Changes to the classic PyGreSQL module (``pg``):
 
   - Support for prepared statements (following a suggestion and first
     implementation by Justin Pryzby on the mailing list).
   - DB wrapper objects based on existing connections can now be closed and
     reopened properly (but the underlying connection will not be affected).
   - The query object can now be used as an iterator similar to
-    query.getresult() and will then yield the rows as tuples.
+    ``query.getresult()`` and will then yield the rows as tuples.
     Thanks to Justin Pryzby for the proposal and most of the implementation.
-  - Deprecated query.ntuples() in the classic API, since len(query) can now
-    be used and returns the same number.
+  - Deprecated ``query.ntuples()`` in the classic API, since ``len(query)``
+    can now be used and returns the same number.
   - The i-th row of the result can now be accessed as ``query[i]``.
-  - New method query.scalarresult() that gets only the first field of each
-    row as a list of scalar values.
-  - New methods query.one(), query.onenamed(), query.onedict() and
-    query.onescalar() that fetch only one row from the result or None
-    if there are no more rows, similar to the cursor.fetchone()
-    method in DB-API 2.
-  - New methods query.single(), query.singlenamed(), query.singledict() and
-    query.singlescalar() that fetch only one row from the result, and raise
-    an error if the result does not have exactly one row.
-  - New methods query.dictiter(), query.namediter() and query.scalariter()
-    returning the same values as query.dictresult(), query.namedresult()
-    and query.scalarresult(), but as iterables instead of lists. This avoids
+  - New method ``query.scalarresult()`` that gets only the first field of
+    each row as a list of scalar values.
+  - New methods ``query.one()``, ``query.onenamed()``, ``query.onedict()``
+    and ``query.onescalar()`` that fetch only one row from the result or
+    ``None`` if there are no more rows, similar to the
+    ``cursor.fetchone()`` method in DB-API 2.
+  - New methods ``query.single()``, ``query.singlenamed()``,
+    ``query.singledict()`` and ``query.singlescalar()`` that fetch only one
+    row from the result, and raise an error if the result does not have
+    exactly one row.
+  - New methods ``query.dictiter()``, ``query.namediter()`` and
+    ``query.scalariter()`` returning the same values as
+    ``query.dictresult()``, ``query.namedresult()`` and
+    ``query.scalarresult()``, but as iterables instead of lists. This avoids
     creating a Python list of all results and can be slightly more efficient.
-  - Removed pg.get/set_namedresult. You can configure the named tuples
-    factory with the pg.set_row_factory_size() function and change the
-    implementation with pg.set_query_helpers(), but this is not recommended
-    and this function is not part of the official API.
+  - Removed ``pg.get_namedresult()`` and ``pg.set_namedresult()``. You can
+    configure the named tuples factory with the ``pg.set_row_factory_size()``
+    function and change the implementation with ``pg.set_query_helpers()``,
+    but this is not recommended and this function is not part of the
+    official API.
   - Added new connection attributes ``socket``, ``backend_pid``,
     ``ssl_in_use`` and ``ssl_attributes`` (the latter need PostgreSQL >= 9.5
     on the client).
-- Changes to the DB-API 2 module (pgdb):
+
+- Changes to the DB-API 2 module (``pgdb``):
 
   - Connections now have an ``autocommit`` attribute which is set to
     ``False`` by default but can be set to ``True`` to switch to autocommit
-    mode where no transactions are started and calling commit() is not
+    mode where no transactions are started and calling ``commit()`` is not
     required. Note that this is not part of the DB-API 2 standard.
 
 Version 5.0.7 (2019-05-17)
@@ -942,98 +351,105 @@ Version 5.0.6 (2018-07-29)
 Version 5.0.5 (2018-04-25)
 --------------------------
 - This version officially supports the new PostgreSQL 10.
-- The memory for the string with the number of rows affected by a classic pg
-  module query() was already freed (bug report and fix by Peifeng Qiu).
+- The memory for the string with the number of rows affected by a classic
+  ``pg`` module ``query()`` was already freed (bug report and fix by
+  Peifeng Qiu).
 
 Version 5.0.4 (2017-07-23)
 --------------------------
 - This version officially supports the new Python 3.6 and PostgreSQL 9.6.
-- query_formatted() can now be used without parameters.
+- ``query_formatted()`` can now be used without parameters.
 - The automatic renaming of columns that are invalid as field names of
   named tuples now works more accurately in Python 2.6 and 3.0.
-- Fixed error checks for unlink() and export() methods of large objects
-  (bug report by Justin Pryzby).
+- Fixed error checks for ``unlink()`` and ``export()`` methods of large
+  objects (bug report by Justin Pryzby).
 - Fixed a compilation issue under OS X (bug report by Josh Johnston).
 
 Version 5.0.3 (2016-12-10)
 --------------------------
 - It is now possible to use a custom array cast function by changing
-  the type caster for the 'anyarray' type. For instance, by calling
-  set_typecast('anyarray', lambda v, c: v) you can have arrays returned
-  as strings instead of lists. Note that in the pg module, you can also
-  call set_array(False) in order to return arrays as strings.
-- The namedtuple classes used for the rows of query results are now cached
-  and reused internally, since creating namedtuples classes in Python is a
+  the type caster for the ``anyarray`` type. For instance, by calling
+  ``set_typecast('anyarray', lambda v, c: v)`` you can have arrays returned
+  as strings instead of lists. Note that in the ``pg`` module, you can also
+  call ``set_array(False)`` in order to return arrays as strings.
+- The named tuple classes used for the rows of query results are now cached
+  and reused internally, since creating named tuple classes in Python is a
   somewhat expensive operation. By default the cache has a size of 1024
-  entries, but this can be changed with the set_row_factory_size() function.
-  In certain cases this change can notably improve the performance.
-- The namedresult() method in the classic API now also tries to rename
+  entries, but this can be changed with the ``set_row_factory_size()``
+  function. In certain cases this change can notably improve the
+  performance.
+- The ``namedresult()`` method in the classic API now also tries to rename
   columns that would result in invalid field names.
 
 Version 5.0.2 (2016-09-13)
 --------------------------
 - Fixed an infinite recursion problem in the DB wrapper class of the classic
-  module that could occur when the underlying connection could not be properly
-  opened (bug report by Justin Pryzby).
+  module that could occur when the underlying connection could not be
+  properly opened (bug report by Justin Pryzby).
 
 Version 5.0.1 (2016-08-18)
 --------------------------
-- The update() and delete() methods of the DB wrapper now use the OID instead
-  of the primary key if both are provided. This restores backward compatibility
-  with PyGreSQL 4.x and allows updating the primary key itself if an OID
-  exists.
-- The connect() function of the DB API 2.0 module now accepts additional
-  keyword parameters such as "application_name" which will be passed on to
+- The ``update()`` and ``delete()`` methods of the DB wrapper now use the
+  OID instead of the primary key if both are provided. This restores
+  backward compatibility with PyGreSQL 4.x and allows updating the primary
+  key itself if an OID exists.
+- The ``connect()`` function of the DB-API 2.0 module now accepts additional
+  keyword parameters such as *application_name* which will be passed on to
   PostgreSQL.
 - PyGreSQL now adapts some queries to be able to access older PostgreSQL 8.x
-  databases (as suggested on the mailing list by Andres Mejia). However, these
-  old versions of PostgreSQL are not officially supported and tested any more.
-- Fixed an issue with Postgres types that have an OID >= 0x80000000 (reported
-  on the mailing list by Justin Pryzby).
+  databases (as suggested on the mailing list by Andres Mejia). However,
+  these old versions of PostgreSQL are not officially supported and tested
+  any more.
+- Fixed an issue with Postgres types that have an OID >= 0x80000000
+  (reported on the mailing list by Justin Pryzby).
 - Allow extra values that are not used in the command in the parameter dict
-  passed to the query_formatted() method (as suggested by Justin Pryzby).
+  passed to the ``query_formatted()`` method (as suggested by Justin Pryzby).
 - Improved handling of empty arrays in the classic module.
 - Unused classic connections were not properly garbage collected which could
   cause memory leaks (reported by Justin Pryzby).
-- Made C extension compatible with MSVC 9 again (this was needed to compile for
-  Python 2 on Windows).
+- Made C extension compatible with MSVC 9 again (this was needed to compile
+  for Python 2 on Windows).
 
 Version 5.0 (2016-03-20)
 ------------------------
 - This version now runs on both Python 2 and Python 3.
 - The supported versions are Python 2.6 to 2.7, and 3.3 to 3.5.
 - PostgreSQL is supported in all versions from 9.0 to 9.5.
-- Changes in the classic PyGreSQL module (pg):
+- Changes in the classic PyGreSQL module (``pg``):
 
-  - The classic interface got two new methods get_as_list() and get_as_dict()
-    returning a database table as a Python list or dict. The amount of data
-    returned can be controlled with various parameters.
-  - A method upsert() has been added to the DB wrapper class that utilizes
-    the "upsert" feature that is new in PostgreSQL 9.5. The new method nicely
-    complements the existing get/insert/update/delete() methods.
-  - When using insert/update/upsert(), you can now pass PostgreSQL arrays as
-    lists and PostgreSQL records as tuples in the classic module.
+  - The classic interface got two new methods ``get_as_list()`` and
+    ``get_as_dict()`` returning a database table as a Python list or dict.
+    The amount of data returned can be controlled with various parameters.
+  - A method ``upsert()`` has been added to the DB wrapper class that
+    utilizes the "upsert" feature that is new in PostgreSQL 9.5. The new
+    method nicely complements the existing ``get()``, ``insert()``,
+    ``update()`` and ``delete()`` methods.
+  - When using ``insert()``, ``update()`` or ``upsert()``, you can now pass
+    PostgreSQL arrays as lists and PostgreSQL records as tuples in the
+    classic module.
   - Conversely, when the query method returns a PostgreSQL array, it is
     passed to Python as a list. PostgreSQL records are converted to named
-    tuples as well, but only if you use one of the get/insert/update/delete()
-    methods. PyGreSQL uses a new fast built-in parser to achieve this. The
-    automatic conversion of arrays to lists can be disabled with
-    set_array(False).
-  - The pkey() method of the classic interface now returns tuples instead of
-    frozensets, with the same order of columns as the primary key index.
+    tuples as well, but only if you use one of the ``get()``, ``insert()``,
+    ``update()`` or ``delete()`` methods. PyGreSQL uses a new fast built-in
+    parser to achieve this. The automatic conversion of arrays to lists can
+    be disabled with ``set_array(False)``.
+  - The ``pkey()`` method of the classic interface now returns tuples
+    instead of frozensets, with the same order of columns as the primary
+    key index.
   - Like the DB-API 2 module, the classic module now also returns bool values
     from the database as Python bool objects instead of strings. You can
-    still restore the old behavior by calling set_bool(False).
+    still restore the old behavior by calling ``set_bool(False)``.
   - Like the DB-API 2 module, the classic module now also returns bytea
     data fetched from the database as byte strings, so you don't need to
-    call unescape_bytea() any more. This has been made configurable though,
-    and you can restore the old behavior by calling set_bytea_escaped(True).
-  - A method set_jsondecode() has been added for changing or removing the
+    call ``unescape_bytea()`` any more. This has been made configurable
+    though, and you can restore the old behavior by calling
+    ``set_bytea_escaped(True)``.
+  - A method ``set_jsondecode()`` has been added for changing or removing the
     function that automatically decodes JSON data coming from the database.
     By default, decoding JSON is now enabled and uses the decoder function
     in the standard library with its default parameters.
   - The table name that is affixed to the name of the OID column returned
-    by the get() method of the classic interface will not automatically
+    by the ``get()`` method of the classic interface will not automatically
     be fully qualified any more. This reduces overhead from the interface,
     but it means you must always write the table name in the same way when
     you are using tables with OIDs and call methods that make use of these.
@@ -1052,13 +468,14 @@ Version 5.0 (2016-03-20)
     simplicity and backward compatibility by augmenting the type name string
     objects with all the necessary information under the cover. To switch
     registered type names on or off (this is the default), call the DB
-    wrapper method use_regtypes().
-  - A new method query_formatted() has been added to the DB wrapper class
-    that allows using the format specifications from Python. A flag "inline"
+    wrapper method ``use_regtypes()``.
+  - A new method ``query_formatted()`` has been added to the DB wrapper class
+    that allows using the format specifications from Python. A flag *inline*
     can be set to specify whether parameters should be sent to the database
     separately or formatted into the SQL.
-  - A new type helper Bytea() has been added.
-- Changes in the DB-API 2 module (pgdb):
+  - A new type helper ``Bytea()`` has been added.
+
+- Changes in the DB-API 2 module (``pgdb``):
 
   - The DB-API 2 module now always returns result rows as named tuples
     instead of simply lists as before. The documentation explains how
@@ -1068,21 +485,22 @@ Version 5.0 (2016-03-20)
     used in the DB-API 2 documentation. Since the API provides objects of
     these types only through constructor functions, this should not cause
     any incompatibilities.
-  - The DB-API 2 module now supports the callproc() cursor method. Note
+  - The DB-API 2 module now supports the ``callproc()`` cursor method. Note
     that output parameters are currently not replaced in the return value.
   - The DB-API 2 module now supports copy operations between data streams
     on the client and database tables via the COPY command of PostgreSQL.
-    The cursor method copy_from() can be used to copy data from the database
-    to the client, and the cursor method copy_to() can be used to copy data
-    from the client to the database.
-  - The 7-tuples returned by the description attribute of a pgdb cursor
-    are now named tuples, i.e. their elements can be also accessed by name.
-    The column names and types can now also be requested through the
-    colnames and coltypes attributes, which are not part of DB-API 2 though.
-    The type_code provided by the description attribute is still equal to
-    the PostgreSQL internal type name, but now carries some more information
-    in additional attributes. The size, precision and scale information that
-    is part of the description is now properly set for numeric types.
+    The cursor method ``copy_from()`` can be used to copy data from the
+    client to the database, and the cursor method ``copy_to()`` can be used
+    to copy data from the database to the client.
+  - The 7-tuples returned by the ``description`` attribute of a ``pgdb``
+    cursor are now named tuples, i.e. their elements can be also accessed
+    by name. The column names and types can now also be requested through
+    the ``colnames`` and ``coltypes`` attributes, which are not part of
+    DB-API 2 though. The ``type_code`` provided by the ``description``
+    attribute is still equal to the PostgreSQL internal type name, but now
+    carries some more information in additional attributes. The size,
+    precision and scale information that is part of the description is now
+    properly set for numeric types.
   - If you pass a Python list as one of the parameters to a DB-API 2 cursor,
     it is now automatically bound using an ARRAY constructor. If you pass a
     Python tuple, it is bound using a ROW constructor. This is useful for
@@ -1092,52 +510,53 @@ Version 5.0 (2016-03-20)
     composite type, it is passed to Python as a named tuple. PyGreSQL uses
     a new fast built-in parser to achieve this. Anonymous composite types are
     also supported, but yield only an ordinary tuple containing text strings.
-  - New type helpers Interval() and Uuid() have been added.
-  - The connection has a new attribute "closed" that can be used to check
+  - New type helpers ``Interval()`` and ``Uuid()`` have been added.
+  - The connection has a new attribute ``closed`` that can be used to check
     whether the connection is closed or broken.
   - SQL commands are always handled as if they include parameters, i.e.
     literal percent signs must always be doubled. This consistent behavior
-    is necessary for using pgdb with wrappers like SQLAlchemy.
+    is necessary for using ``pgdb`` with wrappers like SQLAlchemy.
   - PyGreSQL 5.0 will be supported as a database driver by SQLAlchemy 1.1.
+
 - Changes concerning both modules:
 
   - PyGreSQL now tries to raise more specific and appropriate subclasses of
-    DatabaseError than just ProgrammingError. Particularly, when database
-    constraints are violated, it raises an IntegrityError now.
-  - The modules now provide get_typecast() and set_typecast() methods
+    ``DatabaseError`` than just ``ProgrammingError``. Particularly, when
+    database constraints are violated, it raises an ``IntegrityError`` now.
+  - The modules now provide ``get_typecast()`` and ``set_typecast()`` methods
     allowing to control the typecasting on the global level. The connection
     objects have type caches with the same methods which give control over
     the typecasting on the level of the current connection.
     See the documentation for details about the type cache and the typecast
     mechanisms provided by PyGreSQL.
   - Dates, times, timestamps and time intervals are now returned as the
-    corresponding Python objects from the datetime module of the standard
+    corresponding Python objects from the ``datetime`` module of the standard
     library. In earlier versions of PyGreSQL they had been returned as
     strings. You can restore the old behavior by deactivating the respective
-    typecast functions, e.g. set_typecast('date', str).
-  - PyGreSQL now supports the "uuid" data type, converting such columns
-    automatically to and from Python uuid.UUID objects.
-  - PyGreSQL now supports the "hstore" data type, converting such columns
+    typecast functions, e.g. ``set_typecast('date', str)``.
+  - PyGreSQL now supports the ``uuid`` data type, converting such columns
+    automatically to and from Python ``uuid.UUID`` objects.
+  - PyGreSQL now supports the ``hstore`` data type, converting such columns
     automatically to and from Python dictionaries. If you want to insert
-    Python objects as JSON data using DB-API 2, you should wrap them in the
-    new HStore() type constructor as a hint to PyGreSQL.
-  - PyGreSQL now supports the "json" and "jsonb" data types, converting such
-    columns automatically to and from Python objects. If you want to insert
-    Python objects as JSON data using DB-API 2, you should wrap them in the
-    new Json() type constructor as a hint to PyGreSQL.
-  - A new type helper Literal() for inserting parameters literally as SQL
+    Python dicts as hstore data using DB-API 2, you should wrap them in the
+    new ``Hstore()`` type constructor as a hint to PyGreSQL.
+  - PyGreSQL now supports the ``json`` and ``jsonb`` data types, converting
+    such columns automatically to and from Python objects. If you want to
+    insert Python objects as JSON data using DB-API 2, you should wrap them
+    in the new ``Json()`` type constructor as a hint to PyGreSQL.
+  - A new type helper ``Literal()`` for inserting parameters literally as SQL
     has been added. This is useful for table names, for instance.
-  - Fast parsers cast_array(), cast_record() and cast_hstore for the input
-    and output syntax for PostgreSQL arrays, composite types and the hstore
-    type have been added to the C extension module. The array parser also
-    allows using multi-dimensional arrays with PyGreSQL.
-  - The tty parameter and attribute of database connections has been
+  - Fast parsers ``cast_array()``, ``cast_record()`` and ``cast_hstore()``
+    for the input and output syntax for PostgreSQL arrays, composite types
+    and the hstore type have been added to the C extension module. The array
+    parser also allows using multi-dimensional arrays with PyGreSQL.
+  - The *tty* parameter and attribute of database connections has been
     removed since it is not supported by PostgreSQL versions newer than 7.4.
 
 Version 4.2.2 (2016-03-18)
 --------------------------
-- The get_relations() and get_tables() methods now also return system views
-  and tables if you set the optional "system" parameter to True.
+- The ``get_relations()`` and ``get_tables()`` methods now also return system
+  views and tables if you set the optional *system* parameter to ``True``.
 - Fixed a regression when using temporary tables with DB wrapper methods
   (thanks to Patrick TJ McPhee for reporting).
 
@@ -1150,190 +569,193 @@ Version 4.2 (2016-01-21)
 ------------------------
 - The supported Python versions are 2.4 to 2.7.
 - PostgreSQL is supported in all versions from 8.3 to 9.5.
-- Set a better default for the user option "escaping-funcs".
+- Set a better default for the user option ``escaping-funcs``.
 - Force build to compile with no errors.
-- New methods get_parameters() and set_parameters() in the classic interface
-  which can be used to get or set run-time parameters.
-- New method truncate() in the classic interface that can be used to quickly
-  empty a table or a set of tables.
-- Fix decimal point handling.
-- Add option to return boolean values as bool objects.
-- Add option to return money values as string.
-- get_tables() does not list information schema tables any more.
-- Fix notification handler (Thanks Patrick TJ McPhee).
-- Fix a small issue with large objects.
-- Minor improvements of the NotificationHandler.
+- New methods ``get_parameters()`` and ``set_parameters()`` in the classic
+  interface which can be used to get or set run-time parameters.
+- New method ``truncate()`` in the classic interface that can be used to
+  quickly empty a table or a set of tables.
+- Fixed decimal point handling.
+- Added option to return boolean values as bool objects.
+- Added option to return money values as string.
+- ``get_tables()`` does not list information schema tables any more.
+- Fixed notification handler (thanks to Patrick TJ McPhee).
+- Fixed a small issue with large objects.
+- Minor improvements of the ``NotificationHandler``.
 - Converted documentation to Sphinx and added many missing parts.
 - The tutorial files have become a chapter in the documentation.
 - Greatly improved unit testing, tests run with Python 2.4 to 2.7 again.
 
 Version 4.1.1 (2013-01-08)
 --------------------------
-- Add NotificationHandler class and method. Replaces need for pgnotify.
-- Sharpen test for inserting current_timestamp.
-- Add more quote tests. False and 0 should evaluate to NULL.
-- More tests - Any number other than 0 is True.
+- Added ``NotificationHandler`` class and method. Replaces need for
+  ``pgnotify``.
+- Sharpened test for inserting ``current_timestamp``.
+- Added more quote tests. ``False`` and 0 should evaluate to NULL.
+- More tests: any number other than 0 is ``True``.
 - Do not use positional parameters internally.
   This restores backward compatibility with version 4.0.
-- Add methods for changing the decimal point.
+- Added methods for changing the decimal point.
 
 Version 4.1 (2013-01-01)
 ------------------------
 - Dropped support for Python below 2.5 and PostgreSQL below 8.3.
 - Added support for Python up to 2.7 and PostgreSQL up to 9.2.
-- Particularly, support PQescapeLiteral() and PQescapeIdentifier().
+- Particularly, support ``PQescapeLiteral()`` and ``PQescapeIdentifier()``.
 - The query method of the classic API now supports positional parameters.
   This an effective way to pass arbitrary or unknown data without worrying
   about SQL injection or syntax errors (contribution by Patrick TJ McPhee).
-- The classic API now supports a method namedresult() in addition to
-  getresult() and dictresult(), which returns the rows of the result
+- The classic API now supports a method ``namedresult()`` in addition to
+  ``getresult()`` and ``dictresult()``, which returns the rows of the result
   as named tuples if these are supported (Python 2.6 or higher).
-- The classic API has got the new methods begin(), commit(), rollback(),
-  savepoint() and release() for handling transactions.
-- Both classic and DBAPI 2 connections can now be used as context
+- The classic API has got the new methods ``begin()``, ``commit()``,
+  ``rollback()``, ``savepoint()`` and ``release()`` for handling
+  transactions.
+- Both classic and DB-API 2 connections can now be used as context
   managers for encapsulating transactions.
-- The execute() and executemany() methods now return the cursor object,
-  so you can now write statements like "for row in cursor.execute(...)"
-  (as suggested by Adam Frederick).
+- The ``execute()`` and ``executemany()`` methods now return the cursor
+  object, so you can now write statements like
+  ``for row in cursor.execute(...)`` (as suggested by Adam Frederick).
 - Binary objects are now automatically escaped and unescaped.
 - Bug in money quoting fixed. Amounts of $0.00 handled correctly.
 - Proper handling of date and time objects as input.
-- Proper handling of floats with 'nan' or 'inf' values as input.
-- Fixed the set_decimal() function.
-- All DatabaseError instances now have a sqlstate attribute.
-- The getnotify() method can now also return payload strings (#15).
+- Proper handling of floats with ``'nan'`` or ``'inf'`` values as input.
+- Fixed the ``set_decimal()`` function.
+- All ``DatabaseError`` instances now have a ``sqlstate`` attribute.
+- The ``getnotify()`` method can now also return payload strings (#15).
 - Better support for notice processing with the new methods
-  set_notice_receiver() and get_notice_receiver()
+  ``set_notice_receiver()`` and ``get_notice_receiver()``
   (as suggested by Michael Filonenko, see #37).
-- Open transactions are rolled back when pgdb connections are closed
+- Open transactions are rolled back when ``pgdb`` connections are closed
   (as suggested by Peter Harris, see #46).
-- Connections and cursors can now be used with the "with" statement
+- Connections and cursors can now be used with the ``with`` statement
   (as suggested by Peter Harris, see #46).
-- New method use_regtypes() that can be called to let getattnames()
+- New method ``use_regtypes()`` that can be called to let ``get_attnames()``
   return registered type names instead of the simplified classic types (#44).
 
 Version 4.0 (2009-01-01)
 ------------------------
 - Dropped support for Python below 2.3 and PostgreSQL below 7.4.
-- Improved performance of fetchall() for large result sets
+- Improved performance of ``fetchall()`` for large result sets
   by speeding up the type casts (as suggested by Peter Schuller).
 - Exposed exceptions as attributes of the connection object.
 - Exposed connection as attribute of the cursor object.
 - Cursors now support the iteration protocol.
 - Added new method to get parameter settings.
-- Added customizable row_factory as suggested by Simon Pamies.
+- Added customizable ``row_factory`` as suggested by Simon Pamies.
 - Separated between mandatory and additional type objects.
-- Added keyword args to insert, update and delete methods.
+- Added keyword args to ``insert()``, ``update()`` and ``delete()`` methods.
 - Added exception handling for direct copy.
-- Start transactions only when necessary, not after every commit().
+- Start transactions only when necessary, not after every ``commit()``.
 - Release the GIL while making a connection
   (as suggested by Peter Schuller).
-- If available, use decimal.Decimal for numeric types.
+- If available, use ``decimal.Decimal`` for numeric types.
 - Allow DB wrapper to be used with DB-API 2 connections
   (as suggested by Chris Hilton).
 - Made private attributes of DB wrapper accessible.
-- Dropped dependence on mx.DateTime module.
-- Support for PQescapeStringConn() and PQescapeByteaConn();
-  these are now also used by the internal _quote() functions.
-- Added 'int8' to INTEGER types. New SMALLINT type.
-- Added a way to find the number of rows affected by a query()
-  with the classic pg module by returning it as a string.
-  For single inserts, query() still returns the oid as an integer.
-  The pgdb module already provides the "rowcount" cursor attribute
+- Dropped dependence on ``mx.DateTime`` module.
+- Support for ``PQescapeStringConn()`` and ``PQescapeByteaConn()``;
+  these are now also used by the internal ``_quote()`` functions.
+- Added ``int8`` to ``INTEGER`` types. New ``SMALLINT`` type.
+- Added a way to find the number of rows affected by a ``query()``
+  with the classic ``pg`` module by returning it as a string.
+  For single inserts, ``query()`` still returns the OID as an integer.
+  The ``pgdb`` module already provides the ``rowcount`` cursor attribute
   for the same purpose.
-- Improved getnotify() by calling PQconsumeInput() instead of
+- Improved ``getnotify()`` by calling ``PQconsumeInput()`` instead of
   submitting an empty command.
 - Removed compatibility code for old OID munging style.
-- The insert() and update() methods now use the "returning" clause
+- The ``insert()`` and ``update()`` methods now use the RETURNING clause
   if possible to get all changed values, and they also check in advance
   whether a subsequent select is possible, so that ongoing transactions
   won't break if there is no select privilege.
-- Added "protocol_version" and "server_version" attributes.
-- Revived the "user" attribute.
-- The pg module now works correctly with composite primary keys;
+- Added ``protocol_version`` and ``server_version`` attributes.
+- Revived the ``user`` attribute.
+- The ``pg`` module now works correctly with composite primary keys;
   these are represented as frozensets.
-- Removed the undocumented and actually unnecessary "view" parameter
-  from the get() method.
-- get() raises a nicer ProgrammingError instead of a KeyError
+- Removed the undocumented and actually unnecessary *view* parameter
+  from the ``get()`` method.
+- ``get()`` raises a nicer ``ProgrammingError`` instead of a ``KeyError``
   if no primary key was found.
-- delete() now also works based on the primary key if no oid available
-  and returns whether the row existed or not.
+- ``delete()`` now also works based on the primary key if no OID is
+  available and returns whether the row existed or not.
 
 Version 3.8.1 (2006-06-05)
 --------------------------
 - Use string methods instead of deprecated string functions.
 - Only use SQL-standard way of escaping quotes.
-- Added the functions escape_string() and escape/unescape_bytea()
-  (as suggested by Charlie Dyson and Kavous Bojnourdi a long time ago).
-- Reverted code in clear() method that set date to current.
+- Added the functions ``escape_string()``, ``escape_bytea()`` and
+  ``unescape_bytea()`` (as suggested by Charlie Dyson and Kavous Bojnourdi
+  a long time ago).
+- Reverted code in ``clear()`` method that set date to current.
 - Added code for backwards compatibility in OID munging code.
-- Reorder attnames tests so that "interval" is checked for before "int."
+- Reordered ``get_attnames()`` tests so that ``interval`` is checked for
+  before ``int``.
 - If caller supplies key dictionary, make sure that all has a namespace.
 
 Version 3.8 (2006-02-17)
 ------------------------
-- Installed new favicon.ico from Matthew Sporleder <mspo@mspo.com>
-- Replaced snprintf by PyOS_snprintf
-- Removed NO_SNPRINTF switch which is not needed any longer
-- Clean up some variable names and namespace
-- Add get_relations() method to get any type of relation
-- Rewrite get_tables() to use get_relations()
-- Use new method in get_attnames method to get attributes of views as well
-- Add Binary type
-- Number of rows is now -1 after executing no-result statements
-- Fix some number handling
-- Non-simple types do not raise an error any more
-- Improvements to documentation framework
-- Take into account that nowadays not every table must have an oid column
-- Simplification and improvement of the inserttable() function
-- Fix up unit tests
-- The usual assortment of minor fixes and enhancements
+- Installed new ``favicon.ico`` from Matthew Sporleder.
+- Replaced ``snprintf()`` by ``PyOS_snprintf()``.
+- Removed ``NO_SNPRINTF`` switch which is not needed any longer.
+- Cleaned up some variable names and namespace.
+- Added ``get_relations()`` method to get any type of relation.
+- Rewrote ``get_tables()`` to use ``get_relations()``.
+- Use new method in ``get_attnames()`` method to get attributes of views
+  as well.
+- Added ``Binary`` type.
+- Number of rows is now -1 after executing no-result statements.
+- Fixed some number handling.
+- Non-simple types do not raise an error any more.
+- Improvements to documentation framework.
+- Take into account that nowadays not every table must have an OID column.
+- Simplification and improvement of the ``inserttable()`` function.
+- Fixed up unit tests.
+- The usual assortment of minor fixes and enhancements.
 
 Version 3.7 (2005-09-07)
 ------------------------
-Improvement of pgdb module:
+- Improvement of the ``pgdb`` module:
 
-- Use Python standard ``datetime`` if ``mxDateTime`` is not available
+  - Use Python standard ``datetime`` if ``mxDateTime`` is not available.
 
-Major improvements and clean-up in classic pg module:
+- Major improvements and clean-up in the classic ``pg`` module:
 
-- All members of the underlying connection directly available in ``DB``
-- Fixes to quoting function
-- Add checks for valid database connection to methods
-- Improved namespace support, handle ``search_path`` correctly
-- Removed old dust and unnecessary imports, added docstrings
-- Internal sql statements as one-liners, smoothed out ugly code
+  - All members of the underlying connection directly available in ``DB``.
+  - Fixes to quoting function.
+  - Added checks for valid database connection to methods.
+  - Improved namespace support, handle ``search_path`` correctly.
+  - Removed old dust and unnecessary imports, added docstrings.
+  - Internal SQL statements as one-liners, smoothed out ugly code.
 
 Version 3.6.2 (2005-02-23)
 --------------------------
-- Further fixes to namespace handling
+- Further fixes to namespace handling.
 
 Version 3.6.1 (2005-01-11)
 --------------------------
-- Fixes to namespace handling
+- Fixes to namespace handling.
 
 Version 3.6 (2004-12-17)
 ------------------------
-- Better DB-API 2.0 compliance
-- Exception hierarchy moved into C module and made available to both APIs
-- Fix error in update method that caused false exceptions
-- Moved to standard exception hierarchy in classic API
-- Added new method to get transaction state
-- Use proper Python constants where appropriate
-- Use Python versions of strtol, etc. Allows Win32 build.
-- Bug fixes and cleanups
+- Better DB-API 2.0 compliance.
+- Exception hierarchy moved into C module and made available to both APIs.
+- Fixed error in update method that caused false exceptions.
+- Moved to standard exception hierarchy in classic API.
+- Added new method to get transaction state.
+- Use proper Python constants where appropriate.
+- Use Python versions of ``strtol()``, etc. Allows Win32 build.
+- Bug fixes and cleanups.
 
 Version 3.5 (2004-08-29)
 ------------------------
-Fixes and enhancements:
-
-- Add interval to list of data types
-- fix up method wrapping especially close()
-- retry pkeys once if table missing in case it was just added
-- wrap query method separately to handle debug better
-- use isinstance instead of type
-- fix free/PQfreemem issue - finally
-- miscellaneous cleanups and formatting
+- Added interval to list of data types.
+- Fixed up method wrapping, especially ``close()``.
+- Retry ``pkeys()`` once if table missing in case it was just added.
+- Wrap query method separately to handle debug better.
+- Use ``isinstance()`` instead of ``type()``.
+- Fixed ``free()``/``PQfreemem()`` issue - finally.
+- Miscellaneous cleanups and formatting.
 
 Version 3.4 (2004-06-02)
 ------------------------
@@ -1342,154 +764,155 @@ This is the first version where PyGreSQL is moved back out of the
 PostgreSQL tree. A lot of the changes mentioned below were actually
 made while in the PostgreSQL tree since their last release.
 
-- Allow for larger integer returns
-- Return proper strings for true and false
-- Cleanup convenience method creation
-- Enhance debugging method
-- Add reopen method
-- Allow programs to preload field names for speedup
-- Move OID handling so that it returns long instead of int
-- Miscellaneous cleanups and formatting
+- Allow for larger integer returns.
+- Return proper strings for true and false.
+- Cleanup convenience method creation.
+- Enhanced debugging method.
+- Added ``reopen()`` method.
+- Allow programs to preload field names for speedup.
+- Moved OID handling so that it returns long instead of int.
+- Miscellaneous cleanups and formatting.
 
 Version 3.3 (2001-12-03)
 ------------------------
 A few cleanups. Mostly there was some confusion about the latest version
 and so I am bumping the number to keep it straight.
 
-- Added NUMERICOID to list of returned types. This fixes a bug when
+- Added ``NUMERICOID`` to list of returned types. This fixes a bug when
   returning aggregates in the latest version of PostgreSQL.
 
 Version 3.2 (2001-06-20)
 ------------------------
 Note that there are very few changes to PyGreSQL between 3.1 and 3.2.
 The main reason for the release is the move into the PostgreSQL
-development tree. Even the WIN32 changes are pretty minor.
+development tree. Even the Win32 changes are pretty minor.
 
-- Add Win32 support (gerhard@bigfoot.de)
-- Fix some DB-API quoting problems (niall.smart@ebeon.com)
+- Added Win32 support (gerhard@bigfoot.de).
+- Fixed some DB-API quoting problems (niall.smart@ebeon.com).
 - Moved development into PostgreSQL development tree.
 
 Version 3.1 (2000-11-06)
 ------------------------
-- Fix some quoting functions. In particular handle NULLs better.
+- Fixed some quoting functions. In particular handle NULLs better.
 - Use a method to add primary key information rather than direct
-  manipulation of the class structures
-- Break decimal out in ``_quote`` (in pg.py) and treat it as float
-- Treat timestamp like date for quoting purposes
-- Remove a redundant SELECT from the ``get`` method speeding it,
-  and ``insert`` (since it calls ``get``) up a little.
-- Add test for BOOL type in typecast method to ``pgdbTypeCache`` class
-  (tv@beamnet.de)
-- Fix pgdb.py to send port as integer to lower level function
-  (dildog@l0pht.com)
-- Change pg.py to speed up some operations
-- Allow updates on tables with no primary keys
+  manipulation of the class structures.
+- Break decimal out in ``_quote()`` (in ``pg.py``) and treat it as float.
+- Treat timestamp like date for quoting purposes.
+- Removed a redundant SELECT from the ``get()`` method speeding it,
+  and ``insert()`` (since it calls ``get()``) up a little.
+- Added test for BOOL type in typecast method to ``pgdbTypeCache`` class
+  (tv@beamnet.de).
+- Fixed ``pgdb.py`` to send port as integer to lower level function
+  (dildog@l0pht.com).
+- Changed ``pg.py`` to speed up some operations.
+- Allow updates on tables with no primary keys.
 
 Version 3.0 (2000-05-30)
 ------------------------
-- Remove strlen() call from pglarge_write() and get size from object
-  (Richard@Bouska.cz)
-- Add a little more error checking to the quote function in the wrapper
-- Add extra checking in ``_quote`` function
-- Wrap query in pg.py for debugging
-- Add DB-API 2.0 support to pgmodule.c (andre@via.ecp.fr)
-- Add DB-API 2.0 wrapper pgdb.py (andre@via.ecp.fr)
-- Correct keyword clash (temp) in tutorial
-- Clean up layout of tutorial
-- Return NULL values as None (rlawrence@lastfoot.com)
-  (WARNING: This will cause backwards compatibility issues)
-- Change None to NULL in insert and update
-- Change hash-bang lines to use /usr/bin/env
-- Clearing date should be blank (NULL) not TODAY
-- Quote backslashes in strings in ``_quote`` (brian@CSUA.Berkeley.EDU)
-- Expanded and clarified build instructions (tbryan@starship.python.net)
-- Make code thread safe (Jerome.Alet@unice.fr)
-- Add README.distutils (mwa@gate.net & jeremy@cnri.reston.va.us)
+- Removed ``strlen()`` call from ``pglarge_write()`` and get size from object
+  (Richard@Bouska.cz).
+- Added a little more error checking to the quote function in the wrapper.
+- Added extra checking in ``_quote()`` function.
+- Wrapped query in ``pg.py`` for debugging.
+- Added DB-API 2.0 support to ``pgmodule.c`` (andre@via.ecp.fr).
+- Added DB-API 2.0 wrapper ``pgdb.py`` (andre@via.ecp.fr).
+- Corrected keyword clash (temp) in tutorial.
+- Cleaned up layout of tutorial.
+- Return NULL values as ``None`` (rlawrence@lastfoot.com).
+  Warning: This will cause backwards compatibility issues.
+- Changed ``None`` to NULL in insert and update.
+- Changed hash-bang lines to use ``/usr/bin/env``.
+- Clearing date should be blank (NULL) not TODAY.
+- Quote backslashes in strings in ``_quote()`` (brian@CSUA.Berkeley.EDU).
+- Expanded and clarified build instructions (tbryan@starship.python.net).
+- Made code thread safe (Jerome.Alet@unice.fr).
+- Added ``README.distutils`` (mwa@gate.net & jeremy@cnri.reston.va.us).
 - Many fixes and increased DB-API compliance by chifungfan@yahoo.com,
   tony@printra.net, jeremy@alum.mit.edu and others to get the final
   version ready to release.
 
 Version 2.4 (1999-06-15)
 ------------------------
-- Insert returns None if the user doesn't have select permissions
+- Insert returns ``None`` if the user doesn't have select permissions
   on the table. It can (and does) happen that one has insert but
   not select permissions on a table.
-- Added ntuples() method to query object (brit@druid.net)
-- Corrected a bug related to getresult() and the money type
-- Corrected a bug related to negative money amounts
-- Allow update based on primary key if munged oid not available and
-  table has a primary key
-- Add many __doc__ strings (andre@via.ecp.fr)
-- Get method works with views if key specified
+- Added ``ntuples()`` method to query object (brit@druid.net).
+- Corrected a bug related to ``getresult()`` and the money type.
+- Corrected a bug related to negative money amounts.
+- Allow update based on primary key if munged OID not available and
+  table has a primary key.
+- Added many ``__doc__`` strings (andre@via.ecp.fr).
+- Get method works with views if key specified.
 
 Version 2.3 (1999-04-17)
 ------------------------
-- connect.host returns "localhost" when connected to Unix socket
-  (torppa@tuhnu.cutery.fi)
-- Use ``PyArg_ParseTupleAndKeywords`` in connect() (torppa@tuhnu.cutery.fi)
-- fixes and cleanups (torppa@tuhnu.cutery.fi)
-- Fixed memory leak in dictresult() (terekhov@emc.com)
-- Deprecated pgext.py - functionality now in pg.py
-- More cleanups to the tutorial
-- Added fileno() method - terekhov@emc.com (Mikhail Terekhov)
-- added money type to quoting function
-- Compiles cleanly with more warnings turned on
-- Returns PostgreSQL error message on error
-- Init accepts keywords (Jarkko Torppa)
-- Convenience functions can be overridden (Jarkko Torppa)
-- added close() method
+- ``connect.host`` returns ``"localhost"`` when connected to Unix socket
+  (torppa@tuhnu.cutery.fi).
+- Use ``PyArg_ParseTupleAndKeywords()`` in ``connect()``
+  (torppa@tuhnu.cutery.fi).
+- Fixes and cleanups (torppa@tuhnu.cutery.fi).
+- Fixed memory leak in ``dictresult()`` (terekhov@emc.com).
+- Deprecated ``pgext.py``, functionality now in ``pg.py``.
+- More cleanups to the tutorial.
+- Added ``fileno()`` method (Mikhail Terekhov, terekhov@emc.com).
+- Added money type to quoting function.
+- Compiles cleanly with more warnings turned on.
+- Returns PostgreSQL error message on error.
+- Init accepts keywords (Jarkko Torppa).
+- Convenience functions can be overridden (Jarkko Torppa).
+- Added ``close()`` method.
 
 Version 2.2 (1998-12-21)
 ------------------------
-- Added user and password support thanks to Ng Pheng Siong (ngps@post1.com)
-- Insert queries return the inserted oid
-- Add new ``pg`` wrapper (C module renamed to _pg)
-- Wrapped database connection in a class
-- Cleaned up some of the tutorial. (More work needed.)
+- Added user and password support thanks to Ng Pheng Siong (ngps@post1.com).
+- Insert queries return the inserted OID.
+- Added new ``pg`` wrapper (C module renamed to ``_pg``).
+- Wrapped database connection in a class.
+- Cleaned up some of the tutorial (more work needed).
 - Added ``version`` and ``__version__``.
   Thanks to thilo@eevolute.com for the suggestion.
 
 Version 2.1 (1998-03-07)
 ------------------------
-- return fields as proper Python objects for field type
-- Cleaned up pgext.py
-- Added dictresult method
+- Return fields as proper Python objects for field type.
+- Cleaned up ``pgext.py``.
+- Added ``dictresult()`` method.
 
 Version 2.0 (1997-12-23)
 ------------------------
-- Updated code for PostgreSQL 6.2.1 and Python 1.5
-- Reformatted code and converted to use full ANSI style prototypes
-- Changed name to PyGreSQL (from PyGres95)
-- Changed order of arguments to connect function
-- Created new type ``pgqueryobject`` and moved certain methods to it
-- Added a print function for pgqueryobject
-- Various code changes - mostly stylistic
+- Updated code for PostgreSQL 6.2.1 and Python 1.5.
+- Reformatted code and converted to use full ANSI style prototypes.
+- Changed name to PyGreSQL (from PyGres95).
+- Changed order of arguments to connect function.
+- Created new type ``pgqueryobject`` and moved certain methods to it.
+- Added a print function for ``pgqueryobject``.
+- Various code changes, mostly stylistic.
 
 Version 1.0b (1995-11-04)
 -------------------------
 - Keyword support for connect function moved from library file to C code
-  and taken away from library
-- Rewrote documentation
-- Bug fix in connect function
-- Enhancements in large objects interface methods
+  and taken away from library.
+- Rewrote documentation.
+- Bug fix in connect function.
+- Enhancements in large objects interface methods.
 
 Version 1.0a (1995-10-30)
 -------------------------
 A limited release.
 
-- Module adapted to standard Python syntax
-- Keyword support for connect function in library file
-- Rewrote default parameters interface (internal use of strings)
-- Fixed minor bugs in module interface
-- Redefinition of error messages
+- Module adapted to standard Python syntax.
+- Keyword support for connect function in library file.
+- Rewrote default parameters interface (internal use of strings).
+- Fixed minor bugs in module interface.
+- Redefinition of error messages.
 
 Version 0.9b (1995-10-10)
 -------------------------
 The first public release.
 
-- Large objects implementation
+- Large objects implementation.
 - Many bug fixes, enhancements, ...
 
 Version 0.1a (1995-10-07)
 -------------------------
-- Basic libpq functions (SQL access)
+- Basic libpq functions (SQL access).
