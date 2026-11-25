@@ -2643,15 +2643,14 @@ conn_get_notify(connObject *self, PyObject *Py_UNUSED(noargs))
     }
     else {
         int encoding = PQclientEncoding(self->cnx);
-        PyObject *notify_result = NULL, *channel, *pid, *payload;
+        PyObject *notify_result = NULL, *channel, *pid, *payload = NULL;
 
         /* the channel is a name, the payload is decoded like text values */
         channel = get_decoded_text(notify->relname, encoding);
         pid = channel ? PyLong_FromLong(notify->be_pid) : NULL;
-        payload = pid ? get_decoded_string_or_bytes(
-                            notify->extra, (Py_ssize_t)strlen(notify->extra),
-                            encoding)
-                      : NULL;
+        if (pid)
+            payload = get_decoded_string_or_bytes(
+                notify->extra, (Py_ssize_t)strlen(notify->extra), encoding);
         PQfreemem(notify);
 
         if (payload)

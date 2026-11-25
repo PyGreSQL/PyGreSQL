@@ -5315,6 +5315,29 @@ class TestCopyData(unittest.TestCase):
             source.getdata()
         self.assertIn('no COPY in progress', str(cm.exception))
 
+    def test_getdata_with_client_encoding_without_codec(self):
+        # the client encoding can change in the same execute() call
+        source = self.source
+        try:
+            source.execute("set client_encoding to euc_tw;"
+                           " copy (select generate_series(1, 3)) to stdout")
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support euc_tw")
+        self.assertEqual(source.getdata(), b'1\n')  # not decoded
+        if self.c.server_version < 140000:
+            # the server reports the new encoding immediately,
+            # so the warning is issued when the data is decoded
+            with warnings.catch_warnings():
+                warnings.simplefilter('error')
+                self.assertRaises(UnicodeWarning, source.getdata, True)
+            with self.assertWarns(UnicodeWarning):
+                self.assertEqual(source.getdata(True), '3\n')
+        else:
+            # newer servers report it only after all statements
+            self.assertEqual(source.getdata(True), '2\n')
+            self.assertEqual(source.getdata(True), '3\n')
+        self.assertEqual(source.getdata(), 3)
+
     def test_putdata_with_characters_that_cannot_be_encoded(self):
         # this client encoding is possible with all databases
         self.c.query("set client_encoding to sql_ascii")
