@@ -739,7 +739,7 @@ pg_set_jsondecode(PyObject *Py_UNUSED(self), PyObject *func)
     }
     else {
         PyErr_SetString(PyExc_TypeError,
-                        "Function jsondecode() expects"
+                        "Function set_jsondecode() expects"
                         " a callable or None as argument");
     }
 
@@ -899,7 +899,7 @@ pg_set_defport(PyObject *Py_UNUSED(self), PyObject *args)
 
 /* Cast a string with a text representation of an array to a list. */
 static char pg_cast_array__doc__[] =
-    "cast_array(string, cast=None, delim=',') -- cast a string as an array";
+    "cast_array(string, cast=None, delim=b',') -- cast a string as an array";
 
 static PyObject *
 pg_cast_array(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
@@ -953,7 +953,8 @@ pg_cast_array(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
 
 /* Cast a string with a text representation of a record to a tuple. */
 static char pg_cast_record__doc__[] =
-    "cast_record(string, cast=None, delim=',') -- cast a string as a record";
+    "cast_record(string, cast=None, delim=b',') -- cast a string as a "
+    "record";
 
 static PyObject *
 pg_cast_record(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)

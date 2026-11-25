@@ -1058,7 +1058,7 @@ conn_endcopy(connObject *self, PyObject *Py_UNUSED(noargs))
 
 /* Direct access function: set blocking status. */
 static char conn_set_non_blocking__doc__[] =
-    "set_non_blocking() -- set the non-blocking status of the connection";
+    "set_non_blocking(nb) -- set the non-blocking status of the connection";
 
 static PyObject *
 conn_set_non_blocking(connObject *self, PyObject *args)
@@ -2255,8 +2255,8 @@ conn_loimport(connObject *self, PyObject *args)
 /* Reset connection. */
 static char conn_reset__doc__[] =
     "reset() -- reset connection with current parameters\n\n"
-    "All derived queries and large objects derived from this connection\n"
-    "will not be usable after this call.\n";
+    "Large objects and pending results of asynchronous queries derived\n"
+    "from this connection will not be usable after this call.\n";
 
 static PyObject *
 conn_reset(connObject *self, PyObject *Py_UNUSED(noargs))
@@ -2415,7 +2415,7 @@ conn_get_cast_hook(connObject *self, PyObject *Py_UNUSED(noargs))
 
 /* Get asynchronous connection state. */
 static char conn_poll__doc__[] =
-    "poll() -- Completes an asynchronous connection";
+    "poll() -- complete an asynchronous connection";
 
 static PyObject *
 conn_poll(connObject *self, PyObject *Py_UNUSED(noargs))
@@ -2493,8 +2493,8 @@ conn_get_notice_receiver(connObject *self, PyObject *Py_UNUSED(noargs))
 /* Close without deleting. */
 static char conn_close__doc__[] =
     "close() -- close connection\n\n"
-    "All instances of the connection object and derived objects\n"
-    "(queries and large objects) can no longer be used after this call.\n";
+    "The connection, its large objects and pending results of asynchronous\n"
+    "queries can no longer be used after this call.\n";
 
 static PyObject *
 conn_close(connObject *self, PyObject *Py_UNUSED(noargs))

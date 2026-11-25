@@ -250,7 +250,7 @@ large_read(largeObject *self, PyObject *args)
 /* Write to large object. */
 static char large_write__doc__[] =
     "write(string) -- write sized string to large object\n\n"
-    "Object must be opened in read mode before calling this method.\n";
+    "Object must be opened in write mode before calling this method.\n";
 
 static PyObject *
 large_write(largeObject *self, PyObject *args)
@@ -298,7 +298,7 @@ large_seek(largeObject *self, PyObject *args)
     /* gets arguments */
     if (!PyArg_ParseTuple(args, "ii", &offset, &whence)) {
         PyErr_SetString(PyExc_TypeError,
-                        "Method lseek() expects two integer arguments");
+                        "Method seek() expects two integer arguments");
         return NULL;
     }
 

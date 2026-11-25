@@ -167,7 +167,7 @@ class Source:
         ...
 
     def getdata(self, decode: bool = False, /) -> str | bytes | int:
-        """Receive data to server during copy to stdout."""
+        """Receive data from server during copy to stdout."""
         ...
 
     def close(self) -> None:
@@ -179,8 +179,8 @@ class Source:
 class LargeObject:
     """Large object."""
 
-    oid: int
-    pgcnx: Connection
+    oid: int | None
+    pgcnx: Connection | None
     error: str
 
     def open(self, mode: int, /) -> None:
@@ -244,7 +244,7 @@ class Connection:
     options: str
     error: str
     status: int
-    user : str
+    user: str
     protocol_version: int
     full_protocol_version: int
     server_version: int
@@ -331,7 +331,7 @@ class Connection:
         ...
 
     def inserttable(self, table: str | bytes,
-                    values: Sequence[list|tuple],
+                    values: Iterable[list | tuple],
                     columns: list[str] | tuple[str, ...] | None = None,
                     *, freeze: bool = False) -> int:
         """Insert a Python iterable into a database table."""
@@ -434,7 +434,7 @@ class Query:
     def __len__(self) -> int:
         ...
 
-    def __getitem__(self, key: int, /) -> object:
+    def __getitem__(self, key: int, /) -> tuple:
         ...
 
     def __iter__(self) -> Query:
@@ -570,14 +570,14 @@ def cast_record(string: str | bytes,
 
 @overload
 def cast_hstore(string: str, /) -> dict[str, str | None]:
-    """Cast a string as a hstore."""
+    """Cast a string as an hstore."""
     ...
 
 
 @overload
 def cast_hstore(string: bytes, /
                 ) -> dict[str | bytes, str | bytes | None]:
-    """Cast bytes as a hstore (non-ASCII text is returned as bytes)."""
+    """Cast bytes as an hstore (non-ASCII text is returned as bytes)."""
     ...
 
 

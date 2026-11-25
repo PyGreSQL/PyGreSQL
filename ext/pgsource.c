@@ -146,9 +146,9 @@ source_close(sourceObject *self, PyObject *Py_UNUSED(noargs))
 /* Database query. */
 static char source_execute__doc__[] =
     "execute(sql) -- execute a SQL statement (string)\n\n"
-    "On success, this call returns the number of affected rows, or None\n"
-    "for DQL (SELECT, ...) statements.  The fetch (fetch(), fetchone()\n"
-    "and fetchall()) methods can be used to get result rows.\n";
+    "On success, this call returns the number of affected rows, None\n"
+    "for DQL (SELECT, ...) statements, or -1 for other statements.\n"
+    "The fetch() method can be used to get result rows.\n";
 
 static PyObject *
 source_execute(sourceObject *self, PyObject *sql)
@@ -605,7 +605,7 @@ source_putdata(sourceObject *self, PyObject *buffer)
 
 /* Get copy data. */
 static char source_getdata__doc__[] =
-    "getdata(decode) -- receive data to server during copy to stdout";
+    "getdata(decode) -- receive data from server during copy to stdout";
 
 static PyObject *
 source_getdata(sourceObject *self, PyObject *args)

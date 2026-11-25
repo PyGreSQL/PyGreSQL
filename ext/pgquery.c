@@ -954,7 +954,7 @@ query_dictresult(queryObject *self, PyObject *Py_UNUSED(noargs))
 /* Retrieve last result as iterator of dictionaries. */
 static char query_dictiter__doc__[] =
     "dictiter() -- Get the result of a query\n\n"
-    "The result is returned as an iterator of rows, each one a a dictionary\n"
+    "The result is returned as an iterator of rows, each one a dictionary\n"
     "with the field names used as the keys.\n";
 
 static PyObject *
@@ -1231,7 +1231,7 @@ query_onescalar(queryObject *self, PyObject *Py_UNUSED(noargs))
 /* Retrieves the single row from the result as a tuple. */
 static char query_singlescalar__doc__[] =
     "singlescalar() -- Get scalar value from single result of a query\n\n"
-    "Returns the first field of the next row from the result as a scalar "
+    "Returns the first field of the single row from the result as a scalar "
     "value.\n"
     "This method returns the same single row when called multiple times.\n"
     "It raises an InvalidResultError if the result doesn't have exactly one "
