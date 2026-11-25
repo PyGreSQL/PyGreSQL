@@ -72,5 +72,10 @@ html_static_path = ['_static']
 
 html_title = f'PyGreSQL {version}'
 
+# the canonical location of the documentation (latest final release),
+# also used by the copies of the main branch at pygresql.github.io and
+# pygresql.readthedocs.io
+html_baseurl = 'https://pygresql.org/'
+
 html_logo = '_static/pygresql.png'
 html_favicon = '_static/favicon.ico'
