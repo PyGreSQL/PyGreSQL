@@ -209,9 +209,12 @@ class TestCopyFrom(TestCopy):
         self.assertRaises(TypeError, call, None, None)
         self.assertRaises(TypeError, call, '0\t')
         self.assertRaises(TypeError, call, '0\t', None)
-        self.assertRaises(TypeError, call, '0\t', 42)
+        self.assertRaisesRegex(
+            TypeError, '^Need a table to copy to$', call, '0\t', 42)
         self.assertRaises(TypeError, call, '0\t', ['copytest'])
-        self.assertRaises(TypeError, call, '0\t', 'copytest', format=42)
+        self.assertRaisesRegex(
+            TypeError, '^The format option must be a string$',
+            call, '0\t', 'copytest', format=42)
         self.assertRaises(ValueError, call, '0\t', 'copytest', format='bad')
         self.assertRaises(TypeError, call, '0\t', 'copytest', sep=42)
         self.assertRaises(ValueError, call, '0\t', 'copytest', sep='bad')
@@ -413,10 +416,14 @@ class TestCopyTo(TestCopy):
              format='text', sep='\t', null='', columns=['id', 'name'])
         self.assertRaises(TypeError, call)
         self.assertRaises(TypeError, call, None)
-        self.assertRaises(TypeError, call, None, 42)
+        self.assertRaisesRegex(
+            TypeError, '^Need a table or query to copy from$',
+            call, None, 42)
         self.assertRaises(TypeError, call, None, ['copytest'])
         self.assertRaises(TypeError, call, 'bad', 'copytest')
-        self.assertRaises(TypeError, call, None, 'copytest', format=42)
+        self.assertRaisesRegex(
+            TypeError, '^The format option must be a string$',
+            call, None, 'copytest', format=42)
         self.assertRaises(ValueError, call, None, 'copytest', format='bad')
         self.assertRaises(TypeError, call, None, 'copytest', sep=42)
         self.assertRaises(ValueError, call, None, 'copytest', sep='bad')

@@ -309,6 +309,8 @@ Version 6.3.0 (unreleased)
     `ConnectError`, a subclass of `OperationalError` as suggested by the
     DB-API 2 and, for backward compatibility, of `InternalError`, which was
     raised before. Catch `OperationalError` in new code.
+  - Fixed the error messages of `Cursor.copy_to()` for a missing table and
+    of `Cursor.copy_from()` for an invalid format option.
   - The type code of anonymous records (e.g. the result of ``row(1, 'a')``)
     in the cursor description is now equal to the type object `RECORD`.
     Before, only the string ``'record'`` was.

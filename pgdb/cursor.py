@@ -227,7 +227,7 @@ class Cursor:
             size = precision
         else:
             if not size:
-                size = type_code.size
+                size = type_code.len
             if size == -1:
                 size = mod
             precision = scale = None
@@ -612,7 +612,7 @@ class Cursor:
         parameters = []
         if format is not None:
             if not isinstance(format, str):
-                raise TypeError("The format option must be be a string")
+                raise TypeError("The format option must be a string")
             if format not in ('text', 'csv', 'binary'):
                 raise ValueError("Invalid format")
             options.append(f'format {format}')
@@ -691,7 +691,7 @@ class Cursor:
             except AttributeError as e:
                 raise TypeError("Need an output stream to copy to") from e
         if not table or not isinstance(table, str):
-            raise TypeError("Need a table to copy to")
+            raise TypeError("Need a table or query to copy from")
         cnx = self._cnx
         if table.lower().startswith('select '):
             if columns:

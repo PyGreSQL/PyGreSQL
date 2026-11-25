@@ -542,6 +542,18 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
                 self.assertIsNone(d.scale)
             self.assertIsNone(d.null_ok)
 
+    def test_description_size_from_type_cache(self):
+        # if no size is reported, it is taken from the type cache
+        # (this raised an AttributeError before)
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            d = cur._make_description((0, 'col', 20, 0, -1))
+            self.assertEqual(d.type_code, 'int8')
+            self.assertEqual(d.internal_size, 8)
+        finally:
+            con.close()
+
     def test_type_cache_info(self):
         con = self._connect()
         try:
