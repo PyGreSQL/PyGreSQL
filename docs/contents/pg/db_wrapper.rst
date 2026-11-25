@@ -1110,11 +1110,16 @@ whose case should be preserved.
     :param str string: the string that is to be escaped
     :returns: the escaped string
     :rtype: str
+    :raises DataError: a bytes string with invalid multibyte characters
     :raises ValueError: the string contains NUL characters
 
 Similar to the module function :func:`pg.escape_string` with the same name,
 but the behavior of this method is adjusted depending on the connection
 properties (such as character encoding).
+
+.. versionchanged:: 6.3
+    Invalid multibyte characters raise a :exc:`DataError` instead of being
+    replaced silently with invalid characters.
 
 .. method:: DB.escape_bytea(datastring)
 

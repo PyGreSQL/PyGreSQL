@@ -1788,6 +1788,7 @@ conn_escape_string(connObject *self, PyObject *string)
     Py_ssize_t from_length;   /* length of string */
     size_t to_length;         /* length of result */
     int encoding = -1;        /* client encoding */
+    int error = 0;            /* error flag of libpq */
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -1818,20 +1819,28 @@ conn_escape_string(connObject *self, PyObject *string)
         return NULL;
     }
 
-    to_length = 2 * (size_t)from_length + 1;
-    if ((Py_ssize_t)to_length < from_length) { /* overflow */
-        to_length = (size_t)from_length;
-        from_length = (from_length - 1) / 2;
+    /* the result can be twice as long, do not truncate on overflow */
+    if (from_length > (PY_SSIZE_T_MAX - 1) / 2) {
+        Py_XDECREF(tmp_obj);
+        return PyErr_NoMemory();
     }
+    to_length = 2 * (size_t)from_length + 1;
     to = (char *)PyMem_Malloc(to_length);
     if (!to) {
         Py_XDECREF(tmp_obj);
         return PyErr_NoMemory();
     }
     to_length =
-        PQescapeStringConn(self->cnx, to, from, (size_t)from_length, NULL);
+        PQescapeStringConn(self->cnx, to, from, (size_t)from_length, &error);
 
     Py_XDECREF(tmp_obj);
+
+    /* invalid multibyte characters would be replaced silently */
+    if (error) {
+        PyMem_Free(to);
+        set_error(DataError, "Cannot escape string", self->cnx, NULL);
+        return NULL;
+    }
 
     if (encoding == -1)
         to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t)to_length);

@@ -1501,6 +1501,19 @@ class TestStringsSentToServer(unittest.TestCase):
             ValueError, db.query_formatted, 'select %s', ['a\0b'],
             inline=True)
 
+    def test_escape_with_invalid_multibyte_chars(self):
+        # escape_string replaced these silently before
+        try:
+            self.c.query('set client_encoding=utf8')
+        except (pg.DataError, pg.NotSupportedError):
+            self.skipTest("database does not support utf8")
+        for value in (b'a\xff\xfeb', b'a\xc3'):
+            for escape in (self.c.escape_string, self.c.escape_literal,
+                           self.c.escape_identifier):
+                self.assertRaises(pg.DataError, escape, value)
+        self.assertEqual(self.c.escape_string(b"\xc3\xa4'"), b"\xc3\xa4''")
+        self.assertEqual(self.c.escape_string("\xe4'"), "\xe4''")
+
     def test_query_with_params_changed_by_str(self):
         params: list = []
 

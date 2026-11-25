@@ -21,6 +21,10 @@ Version 6.3.0 (unreleased)
     so that a payload containing a single quote caused a syntax error and
     could be used for SQL injection, and channel names could not contain
     double quotes. Payloads can now also be passed as raw bytes.
+  - `Connection.escape_string()` and `DB.escape_string()` now raise a
+    `DataError` for bytes with invalid multibyte characters in the client
+    encoding, like `escape_literal()` and `escape_identifier()`. Before,
+    such characters were silently replaced with invalid characters.
   - `format_query()` now also accepts builtin generic types like `list[int]`.
   - `DB.set_parameter()` and `DB.truncate()` now raise a `ValueError` for
     lists of different lengths instead of silently ignoring extra items.
