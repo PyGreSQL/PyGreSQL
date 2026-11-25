@@ -1,0 +1,100 @@
+name: Set up PostgreSQL
+description: >-
+  Install PostgreSQL with libpq and pg_config on a Windows or macOS runner,
+  put its bin directory on the PATH, and start a server on localhost:5432
+  with SSL and a UTF8 database "test" owned by the superuser "test"
+  (password "test"), like the service containers of the Linux jobs.
+
+# The Linux jobs use service containers with the postgres images instead,
+# which only work on Linux runners. The usual setup actions do not support
+# PostgreSQL 19 yet, so we install it ourselves: on Windows from the binary
+# zip of EDB (the same build that the EDB installer contains), on macOS
+# with Homebrew.
+
+runs:
+  using: composite
+  steps:
+    - name: Check the operating system
+      if: runner.os != 'Windows' && runner.os != 'macOS'
+      shell: bash
+      run: |
+        echo "::error::This action is only for Windows and macOS runners," \
+          "use a service container on Linux."
+        exit 1
+
+    - name: Cache the PostgreSQL binaries (Windows)
+      if: runner.os == 'Windows'
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/postgresql-19.0-2-windows-x64-binaries.zip
+        key: postgresql-19.0-2-windows-x64-binaries
+
+    - name: Install PostgreSQL (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      env:
+        PG_ZIP: postgresql-19.0-2-windows-x64-binaries.zip
+        PG_SHA256: a8f9cf38f72c403f31bf3ef9db0c441924fae0cada0d61850afa590d5eca55a1
+      run: |
+        cd "$RUNNER_TEMP"
+        if [ ! -f "$PG_ZIP" ]; then
+          curl -fsSL --retry 3 -o "$PG_ZIP" \
+            "https://get.enterprisedb.com/postgresql/$PG_ZIP"
+        fi
+        echo "$PG_SHA256  $PG_ZIP" | sha256sum -c -
+        # pgAdmin and the docs are not needed
+        7z x -y -bd -bso0 "$PG_ZIP" '-xr!pgAdmin 4' '-xr!doc' \
+          '-xr!StackBuilder'
+        bin=$(cygpath -w "$RUNNER_TEMP/pgsql/bin")
+        echo "$bin" >> "$GITHUB_PATH"
+        # the runner image has an older PostgreSQL (stopped), whose
+        # environment variables must not get in the way
+        {
+          echo "PGBIN=$bin"
+          echo "PGROOT=$(cygpath -w "$RUNNER_TEMP/pgsql")"
+          echo "PGDATA=$(cygpath -w "$RUNNER_TEMP/pgdata")"
+        } >> "$GITHUB_ENV"
+
+    - name: Install PostgreSQL (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      env:
+        HOMEBREW_NO_INSTALL_CLEANUP: 1
+        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+      run: |
+        # the formulae of the runner image may be older than PostgreSQL 19
+        brew update --quiet
+        brew install --quiet postgresql@19
+        # the formula is keg-only, so its bin directory is not linked
+        echo "$(brew --prefix postgresql@19)/bin" >> "$GITHUB_PATH"
+        {
+          echo "PGDATA=$RUNNER_TEMP/pgdata"
+          # libpq is built for this architecture only, so do not build
+          # the extension for both architectures of a universal2 Python
+          echo "ARCHFLAGS=-arch $(uname -m)"
+        } >> "$GITHUB_ENV"
+
+    - name: Create and start the database cluster
+      shell: bash
+      env:
+        # keep the subject of the certificate from being taken as a path
+        MSYS_NO_PATHCONV: 1
+        PGPASSWORD: test
+      run: |
+        pg_config --version
+        cd "$RUNNER_TEMP"
+        echo test > pwfile
+        initdb -D pgdata -U test --pwfile=pwfile -E UTF8 --no-locale \
+          --auth-local=trust --auth-host=scram-sha-256 --no-instructions
+        rm pwfile
+        # SSL with a self-signed certificate, like in the Linux jobs
+        openssl req -new -x509 -days 7 -nodes -subj /CN=localhost \
+          -keyout pgdata/server.key -out pgdata/server.crt 2> /dev/null
+        chmod 600 pgdata/server.key
+        echo "ssl = on" >> pgdata/postgresql.conf
+        pg_ctl -D pgdata -l pgdata/server.log -w start || {
+          cat pgdata/server.log; exit 1; }
+        createdb -h localhost -U test test
+        psql -h localhost -U test -d test -Atc \
+          "select version(), pg_encoding_to_char(encoding), \
+            current_setting('ssl') from pg_database where datname = 'test'"

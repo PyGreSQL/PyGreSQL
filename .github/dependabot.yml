@@ -2,6 +2,9 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    # the workflows and the local composite actions
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: monthly

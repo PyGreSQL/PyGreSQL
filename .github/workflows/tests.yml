@@ -99,6 +99,57 @@ jobs:
         run: tox -e py${MATRIX_PYTHON/./}
         timeout-minutes: 5
 
+  platforms:
+    name: Unit tests on other platforms
+    runs-on: ${{ matrix.os }}
+    # installing PostgreSQL takes longer than on Linux
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # the newest server and libpq, with the oldest and the newest
+        # Python on Windows (the range of the Windows wheels)
+        include:
+          - { os: windows-2025, python: "3.10" }
+          - { os: windows-2025, python: "3.15" }
+          - { os: macos-15, python: "3.15" }
+
+    env:
+      PYGRESQL_DB: test
+      PYGRESQL_HOST: 127.0.0.1
+      PYGRESQL_USER: test
+      PYGRESQL_PASSWD: test
+      # connecting takes longer on Windows, where the server starts a new
+      # process for every connection, so the tests take about 90 seconds
+      PYGRESQL_TEST_TIMEOUT: 300
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up PostgreSQL
+        uses: ./.github/actions/setup-postgres
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install tox
+        run: pip install tox
+      - name: Run tests
+        env:
+          MATRIX_PYTHON: ${{ matrix.python }}
+        run: tox -e py${MATRIX_PYTHON/./}
+        timeout-minutes: 10
+      - name: Show the server log
+        if: failure()
+        run: |
+          log="$PGDATA/server.log"
+          if [ -n "$PGDATA" ] && [ -f "$log" ]; then cat "$log"; fi
+
   coverage:
     name: Test coverage
     runs-on: ubuntu-24.04
