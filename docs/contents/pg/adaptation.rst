@@ -156,7 +156,8 @@ When you use the higher level methods of the classic :mod:`pg` module like
 :meth:`DB.insert()` or :meth:`DB.update()`, you don't need to care about
 adaptation of parameters, since all of this is happening automatically behind
 the scenes.  You only need to consider this issue when creating SQL commands
-manually and sending them to the database using the :meth:`DB.query` method.
+manually and sending them to the database using the :meth:`DB.query` method
+or similar methods.
 
 Imagine you have created a user login form that stores the login name as
 *login* and the password as *passwd* and you now want to get the user
@@ -227,31 +228,31 @@ Here is another example::
     >>> sql = "SELECT 'Hello, ' || %s || '!'"
     >>> db.query_formatted(sql, (login,)).getresult()[0]
 
-You would think that the following even simpler example should work, too:
+You would think that the following similar example should work, too::
 
-    >>> sql = "SELECT %s"
+    >>> sql = "SELECT %s IS NULL"
     >>> db.query_formatted(sql, (login,)).getresult()[0]
-    ProgrammingError: Could not determine data type of parameter $1
+    ProgrammingError: ERROR:  could not determine data type of parameter $1
 
 The issue here is that :meth:`DB.query_formatted` by default still uses
 PostgreSQL parameters, transforming the Python style ``%s`` placeholder
 into a ``$1`` placeholder, and sending the login name separately from
 the query.  In the query we looked at before, the concatenation with other
-strings made it clear that it should be interpreted as a string. This simple
-query however does not give PostgreSQL a clue what data type the ``$1``
-placeholder stands for.
+strings made it clear that it should be interpreted as a string. This query
+however does not give PostgreSQL a clue what data type the ``$1``
+placeholder stands for, since any value can be checked for being NULL.
 
 This is different when you are embedding the login name directly into the
 query instead of passing it as parameter to PostgreSQL.  You can achieve this
 by setting the *inline* parameter of :meth:`DB.query_formatted`, like so::
 
-    >>> sql = "SELECT %s"
+    >>> sql = "SELECT %s IS NULL"
     >>> db.query_formatted(sql, (login,), inline=True).getresult()[0]
 
 Another way of making this query work while still sending the parameters
 separately is to simply cast the parameter values::
 
-    >>> sql = "SELECT %s::text"
+    >>> sql = "SELECT %s::text IS NULL"
     >>> db.query_formatted(sql, (login,), inline=False).getresult()[0]
 
 In real world examples you will rarely have to cast your parameters like that,
@@ -291,9 +292,11 @@ which may be able to handle such objects.
     escaped text. Objects of the types :class:`bytearray` and
     :class:`memoryview` were adapted with ``str()``.
 
-When binding the parameters to a query, PyGreSQL not only adapts the basic
-types like ``int``, ``float``, ``bool`` and ``str``, but also tries to make
-sense of Python lists and tuples.
+When adapting the parameters for :meth:`DB.query_formatted` and the higher
+level methods, PyGreSQL not only adapts the basic types like ``int``,
+``float``, ``bool`` and ``str``, but also tries to make sense of Python lists
+and tuples.  Note that :meth:`DB.query` and :meth:`DB.query_prepared` do not
+adapt parameters in this way, see :ref:`query_parameters` below.
 
 Lists are adapted as PostgreSQL arrays::
 
@@ -306,9 +309,10 @@ only because this simple query does not provide enough context.
 Also note that the query gives the value back as Python lists again.  This
 is achieved by the typecasting mechanism explained in the next section.
 
-The elements of the lists are adapted like single values, so they can
-also be values wrapped with :func:`Json`, UUIDs, IP addresses, or tuples
-for arrays of composite types.
+The elements of the lists are adapted like single values (except that their
+``__pg_str__`` methods are not called, see below), so they can also be values
+wrapped with :func:`Json`, UUIDs, IP addresses, or tuples for arrays of
+composite types.
 
 Tuples are adapted as PostgreSQL composite types.  If you use inline
 parameters, they can also be used with the ``IN`` syntax.
@@ -343,15 +347,14 @@ inserted into the database and then read back as follows::
     >>> db.query_formatted("INSERT INTO on_hand VALUES (%(item)s, %(count)s)",
     ...     dict(item=inventory_item('fuzzy dice', 42, 1.99), count=1000))
     >>> db.query("SELECT * FROM on_hand").getresult()[0][0]
-    Row(item=inventory_item(name='fuzzy dice', supplier_id=42,
-            price=Decimal('1.99')), count=1000)
+    inventory_item(name='fuzzy dice', supplier_id=42, price=Decimal('1.99'))
 
 The :meth:`DB.insert` method provides a simpler way to achieve the same::
 
     >>> row = dict(item=inventory_item('fuzzy dice', 42, 1.99), count=1000)
     >>> db.insert('on_hand', row)
-    {'count': 1000,  'item': inventory_item(name='fuzzy dice',
-            supplier_id=42, price=Decimal('1.99'))}
+    {'item': inventory_item(name='fuzzy dice', supplier_id=42,
+            price=Decimal('1.99')), 'count': 1000}
 
 Perhaps we want to use custom Python classes instead of named tuples to hold
 our values::
@@ -395,15 +398,19 @@ You can even make these objects adapt to different types in different ways::
     ...     def __pg_str__(self, typ):
     ...         if typ == 'text':
     ...             return str(self)
-    ...        return (self.name, self.supplier_id, self.price)
+    ...         return (self.name, self.supplier_id, self.price)
     ...
     >>> db.query("ALTER TABLE on_hand ADD COLUMN remark varchar")
-    >>> item=InventoryItem('fuzzy dice', 42, 1.99)
+    >>> names = db.get_attnames('on_hand', flush=True)  # columns changed
+    >>> item = InventoryItem('fuzzy dice', 42, 1.99)
     >>> row = dict(item=item, remark=item, count=1000)
     >>> db.insert('on_hand', row)
-    {'count': 1000, 'item': inventory_item(name='fuzzy dice',
-        supplier_id=42, price=Decimal('1.99')),
-        'remark': 'fuzzy dice (from 42, at $1.99)'}
+    {'item': inventory_item(name='fuzzy dice', supplier_id=42,
+        price=Decimal('1.99')), 'remark': 'fuzzy dice (from 42, at $1.99)',
+        'count': 1000}
+
+Note that we had to flush the cache of the column names of the table after
+adding the column, otherwise the new column would have been ignored.
 
 There is also another "magic" method ``__pg_repr__`` which does not take the
 *typ* parameter.  That method is used instead of ``__pg_str__`` when passing
@@ -411,6 +418,72 @@ parameters inline.  You must be more careful when using ``__pg_repr__``,
 because it must return a properly escaped string that can be put literally
 inside the SQL.  The only exception is when you return a tuple or list,
 because these will be adapted and properly escaped by PyGreSQL again.
+
+.. _query_parameters:
+
+Parameters of query() and query_prepared()
+------------------------------------------
+
+The adaptation described above is done by :meth:`DB.query_formatted` and
+by the higher level methods like :meth:`DB.insert`.  The lower level methods
+:meth:`DB.query` and :meth:`DB.query_prepared`, like the methods with the
+same names of the :class:`Connection`, do not adapt the parameters to their
+types, which makes them faster.  They pass ``None`` as NULL, ``str`` encoded
+with the client encoding, ``bytes`` unchanged as text, values wrapped with
+:func:`Bytea` as binary data, values wrapped with :func:`Hstore` as hstore
+literals, and all other values as their string representation as returned
+by ``str()`` (see :meth:`Connection.query` for details).
+
+This is sufficient for all values whose string representation is accepted
+by PostgreSQL as input for the type of the parameter.  This is the case for
+``str``, ``int``, ``float``, :class:`~decimal.Decimal` and ``bool`` values,
+for objects of the types of the :mod:`datetime` module, for
+:class:`~uuid.UUID` objects and for objects of the :mod:`ipaddress` module.
+Other values must be adapted before you pass them:
+
+- Wrap binary data with :func:`Bytea`, and values for parameters of the
+  types ``hstore``, ``json`` and ``jsonb`` with :func:`Hstore` and
+  :func:`Json`.  Otherwise, binary data is passed as text, and dictionaries
+  and lists are passed as their Python representation, which is not valid
+  input for these types.
+
+- Adapt lists for arrays and tuples for composite types with the method
+  ``adapt(value, typ)`` of the :attr:`DB.adapter`.  It takes the value and
+  the type of the parameter, given like the *types* of
+  :meth:`DB.query_formatted`, and returns the value in the text form that
+  PostgreSQL expects.  For a composite type, pass the type object from
+  :attr:`DB.dbtypes`, so that the types of the fields are known.  This
+  method can also be used to adapt the values of all other types.
+
+For instance, this is how you pass a list as an array to a prepared
+statement::
+
+    >>> db.prepare('get_items', 'SELECT * FROM on_hand WHERE count = ANY($1)')
+    >>> counts = db.adapter.adapt([1000, 2000], 'int[]')
+    >>> counts
+    '{1000,2000}'
+    >>> db.query_prepared('get_items', counts).getresult()
+
+And this is how you pass a value of the composite type ``inventory_item``
+from the example above::
+
+    >>> item = inventory_item('fuzzy dice', 42, 1.99)
+    >>> item = db.adapter.adapt(item, db.dbtypes['inventory_item'])
+    >>> item
+    '(fuzzy dice,42,1.99)'
+    >>> db.query("INSERT INTO on_hand VALUES ($1, $2)", item, 1000)
+
+Note that when you pass a single list or tuple to :meth:`DB.query` or
+:meth:`DB.query_prepared`, it is regarded as the sequence of all parameter
+values.  A list that has not been adapted would therefore be passed as
+several parameters, which fails with an error like ``bind message supplies
+2 parameters, but prepared statement "get_items" requires 1``.  This cannot
+happen with adapted values, since they are strings.
+
+If you don't need a prepared statement, you can also use
+:meth:`DB.query_formatted` instead of :meth:`DB.query`.  It adapts the
+parameters automatically and, unless you set *inline*, also sends them to
+the database separately from the SQL command.
 
 Typecasting to Python
 ---------------------
@@ -430,7 +503,7 @@ For instance, you will find that PyGreSQL uses the normal ``int`` function
 to cast PostgreSQL ``int4`` type values to Python::
 
     >>> pg.get_typecast('int4')
-    int
+    <class 'int'>
 
 In the classic PyGreSQL module, the typecasting for these basic types is
 always done internally by the C extension module for performance reasons.
@@ -475,7 +548,7 @@ Also note that after changing global typecast functions with
 to make these changes effective on connections that were already open.
 
 As one last example, let us try to typecast the geometric data type ``circle``
-of PostgreSQL into a `SymPy <http://www.sympy.org>`_ ``Circle`` object.  Let's
+of PostgreSQL into a `SymPy <https://www.sympy.org>`_ ``Circle`` object.  Let's
 assume we have created and populated a table with two circles, like so:
 
 .. code-block:: sql
@@ -501,7 +574,7 @@ PostgreSQL to SymPy, we create and register the following typecast function::
     >>> from sympy import Point, Circle
     >>>
     >>> def cast_circle(s):
-    ...     p, r = s[1:-1].split(',')
+    ...     p, r = s[1:-1].rsplit(',', 1)
     ...     p = p[1:-1].split(',')
     ...     return Circle(Point(float(p[0]), float(p[1])), float(r))
     ...

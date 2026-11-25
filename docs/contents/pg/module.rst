@@ -3,7 +3,7 @@ Module functions and constants
 
 .. currentmodule:: pg
 
-The :mod:`pg` module defines a few functions that allow to connect
+The :mod:`pg` module defines a few functions that allow you to connect
 to a database and to define "default variables" that override
 the environment variables used by PostgreSQL.
 
@@ -43,9 +43,8 @@ connect -- Open a PostgreSQL connection
     :raises ValueError: parameters containing NUL characters, or a port
         that is not between 1 and 65535 (other than -1)
     :raises UnicodeEncodeError: parameters that cannot be encoded as UTF-8
-    :raises SyntaxError: duplicate argument definition
-    :raises pg.InternalError: some error occurred during pg connection definition
-    :raises Exception: (all exceptions relative to object allocation)
+    :raises pg.InternalError: the connection could not be established
+    :raises MemoryError: the connection object could not be allocated
 
 This function opens a connection to a specified database on a given
 PostgreSQL server. You can use keywords here, as described in the
@@ -90,9 +89,9 @@ get_pqlib_version -- get the version of libpq
     :rtype: int
     :raises TypeError: too many arguments
 
-The number is formed by converting the major, minor, and revision numbers of
-the libpq version into two-decimal-digit numbers and appending them together.
-For example, version 15.4 will be returned as 150400.
+The number is formed by multiplying the major version of libpq by 10000
+and adding the minor version. For example, version 15.4 will be returned
+as 150004.
 
 .. versionadded:: 5.2
 
@@ -277,19 +276,27 @@ escape_string -- escape a string for use within SQL
 
     Escape a string for use within SQL
 
-    :param str string: the string that is to be escaped
+    :param string: the string that is to be escaped
+    :type string: str or bytes
     :returns: the escaped string
-    :rtype: str
+    :rtype: str or bytes
     :raises TypeError: bad argument type, or too many arguments
     :raises ValueError: the string contains NUL characters
+    :raises UnicodeEncodeError: a str that is not plain ASCII
 
 This function escapes a string for use within an SQL command.
 This is useful when inserting data values as literal constants
 in SQL commands. Certain characters (such as quotes and backslashes)
 must be escaped to prevent them from being interpreted specially
 by the SQL parser. :func:`escape_string` performs this operation.
-Note that there is also a :class:`Connection` method with the same name
-which takes connection properties into account.
+The return value has the same type as the given *string*. Since there is
+no connection and therefore no client encoding, a ``str`` must be plain
+ASCII, otherwise a :exc:`UnicodeEncodeError` is raised, while ``bytes``
+are escaped without encoding. Note that there is also a :class:`Connection`
+method with the same name which takes connection properties such as the
+client encoding into account (it is documented with the :class:`DB`
+wrapper, see :meth:`DB.escape_string`), so you should normally use that
+method.
 
 .. note::
 
@@ -298,11 +305,12 @@ which takes connection properties into account.
     Otherwise there is a security risk: you are vulnerable to "SQL injection"
     attacks wherein unwanted SQL commands are fed to your database.
 
-Example::
+Example (using the connection method, which also handles non-ASCII text)::
 
     name = input("Name? ")
     phone = con.query("select phone from employees"
-                      f" where name='{escape_string(name)}'").singlescalar()
+                      f" where name='{con.escape_string(name)}'"
+                      ).singlescalar()
 
 escape_bytea -- escape binary data for use within SQL
 -----------------------------------------------------
@@ -311,23 +319,27 @@ escape_bytea -- escape binary data for use within SQL
 
     escape binary data for use within SQL as type ``bytea``
 
-    :param bytes/str datastring: the binary data that is to be escaped
+    :param datastring: the binary data that is to be escaped
+    :type datastring: bytes or str
     :returns: the escaped string
-    :rtype: bytes/str
+    :rtype: bytes or str
     :raises TypeError: bad argument type, or too many arguments
+    :raises UnicodeEncodeError: a str that is not plain ASCII
 
 Escapes binary data for use within an SQL command with the type ``bytea``.
 The return value will have the same type as the given *datastring*.
+A *datastring* given as ``str`` must be plain ASCII.
 As with :func:`escape_string`, this is only used when inserting data directly
 into an SQL command string.
 
 Note that there is also a :class:`Connection` method with the same name
-which takes connection properties into account.
+which takes connection properties into account (see :meth:`DB.escape_bytea`).
 
 Example::
 
     picture = open('garfield.gif', 'rb').read()
-    con.query(f"update pictures set img='{escape_bytea(picture)}'"
+    escaped = escape_bytea(picture).decode('ascii')
+    con.query(f"update pictures set img='{escaped}'"
               " where name='Garfield'")
 
 unescape_bytea -- unescape data that has been retrieved as text
@@ -337,10 +349,12 @@ unescape_bytea -- unescape data that has been retrieved as text
 
     Unescape ``bytea`` data that has been retrieved as text
 
-    :param str string: the ``bytea`` string that has been retrieved as text
+    :param string: the ``bytea`` string that has been retrieved as text
+    :type string: str or bytes
     :returns: byte string containing the binary data
     :rtype: bytes
     :raises TypeError: bad argument type, or too many arguments
+    :raises UnicodeEncodeError: a str that is not plain ASCII
 
 Converts an escaped string representation of binary data stored as ``bytea``
 into the raw byte string representing the binary data  -- this is the reverse
@@ -358,10 +372,11 @@ get/set_decimal -- decimal type to be used for numeric values
     Get the decimal type to be used for numeric values
 
     :returns: the Python class used for PostgreSQL numeric values
-    :rtype: class
+    :rtype: class or None
 
 This function returns the Python class that is used by PyGreSQL to hold
 PostgreSQL numeric values. The default class is :class:`decimal.Decimal`.
+If ``None`` is returned, numeric values are returned as :class:`float`.
 
 .. function:: set_decimal(cls)
 
@@ -369,12 +384,14 @@ PostgreSQL numeric values. The default class is :class:`decimal.Decimal`.
 
     :param cls: the Python class to be used for PostgreSQL numeric values
     :type cls: class or None
+    :raises TypeError: the argument is neither callable nor None
 
 This function can be used to specify the Python class that shall
-be used by PyGreSQL to hold PostgreSQL numeric values.
-The default class is :class:`decimal.Decimal`. If ``None`` is passed,
-numeric values are returned as :class:`float`, and :func:`get_decimal`
-returns ``None``.
+be used by PyGreSQL to hold PostgreSQL numeric values. Instead of a class,
+you can also pass any callable taking the text representation of the
+value as argument. The default class is :class:`decimal.Decimal`.
+If ``None`` is passed, numeric values are returned as :class:`float`,
+and :func:`get_decimal` returns ``None``.
 
 get/set_decimal_point -- decimal mark used for monetary values
 --------------------------------------------------------------
@@ -384,13 +401,13 @@ get/set_decimal_point -- decimal mark used for monetary values
     Get the decimal mark used for monetary values
 
     :returns: string with one character representing the decimal mark
-    :rtype: str
+    :rtype: str or None
 
 This function returns the decimal mark used by PyGreSQL to interpret
 PostgreSQL monetary values when converting them to decimal numbers.
 The default setting is ``'.'`` as a decimal point. This setting is not
 adapted automatically to the locale used by PostgreSQL, but you can use
-:func:`set_decimal()` to set a different decimal mark manually.  A return
+:func:`set_decimal_point()` to set a different decimal mark manually.  A return
 value of ``None`` means monetary values are not interpreted as decimal
 numbers, but returned as strings including the formatting and currency.
 
@@ -400,18 +417,22 @@ numbers, but returned as strings including the formatting and currency.
 
     Specify which decimal mark is used for interpreting monetary values
 
-    :param str string: string with one character representing the decimal mark
+    :param string: string with one character representing the decimal mark
+    :type string: str or None
+    :raises TypeError: the argument is not a supported decimal mark
 
 This function can be used to specify the decimal mark used by PyGreSQL
 to interpret PostgreSQL monetary values. The default value is '.' as
 a decimal point. This value is not adapted automatically to the locale
 used by PostgreSQL, so if you are dealing with a database set to a
 locale that uses a ``','`` instead of ``'.'`` as the decimal point,
-then you need to call ``set_decimal(',')`` to have PyGreSQL interpret
+then you need to call ``set_decimal_point(',')`` to have PyGreSQL interpret
 monetary values correctly. If you don't want money values to be converted
-to decimal numbers, then you can call ``set_decimal(None)``, which will
+to decimal numbers, then you can call ``set_decimal_point(None)``, which will
 cause PyGreSQL to return monetary values as strings including their
-formatting and currency.
+formatting and currency. Supported decimal marks are the characters
+``.``, ``,``, ``;``, ``:``, ``'``, ``*``, ``/``, ``_``, ``|``, the backtick
+and the space character.
 
 .. versionadded:: 4.1.1
 
@@ -443,7 +464,7 @@ This function can be used to specify whether PyGreSQL shall return
 PostgreSQL boolean values converted to Python bool objects, or as
 ``'f'`` and ``'t'`` strings which are the values used internally by
 PostgreSQL.  By default, conversion to bool objects is activated,
-but you can disable this by calling ``set_bool(True)``.
+but you can disable this by calling ``set_bool(False)``.
 
 .. versionadded:: 4.2
 
@@ -494,7 +515,7 @@ get/set_bytea_escaped -- whether bytea data is returned escaped
     :rtype: bool
 
 This function checks whether PyGreSQL returns PostgreSQL ``bytea`` values in
-escaped form or in unescaped from as byte strings.  By default, bytea values
+escaped form or in unescaped form as byte strings.  By default, bytea values
 will be returned unescaped as byte strings, but you can change this with the
 :func:`set_bytea_escaped` function.
 
@@ -507,14 +528,15 @@ will be returned unescaped as byte strings, but you can change this with the
     :param on: whether or not bytea objects shall be returned escaped
 
 This function can be used to specify whether PyGreSQL shall return
-PostgreSQL ``bytea`` values in escaped form or in unescaped from as byte
+PostgreSQL ``bytea`` values in escaped form or in unescaped form as byte
 strings.  By default, bytea values will be returned unescaped as byte
 strings, but you can change this by calling ``set_bytea_escaped(True)``.
 
 .. versionadded:: 5.0
 
 .. versionchanged:: 5.0
-    Bytea data had been returned in escaped form by default in earlier versions.
+    Bytea data had been returned in escaped form by default in earlier
+    versions.
 
 get/set_jsondecode -- decoding JSON format
 ------------------------------------------
@@ -531,12 +553,17 @@ from JSON formatted strings.
     Set a function that will deserialize JSON formatted strings
 
     :param func: the function to be used for deserializing JSON strings
+    :raises TypeError: the argument is neither callable nor None
 
 You can use this if you do not want to deserialize JSON strings coming
-in from the database, or if want to use a different function than the
+in from the database, or if you want to use a different function than the
 standard function :func:`json.loads` or if you want to use it with parameters
 different from the default ones.  If you set this function to *None*, then
 the automatic deserialization of JSON strings will be deactivated.
+The function gets passed ``bytes`` instead of a ``str`` if the JSON text
+cannot be decoded with the client encoding (e.g. non-ASCII text with
+the client encoding ``SQL_ASCII``), so it should accept both types
+like :func:`json.loads` does.
 
 .. versionadded:: 5.0
 
@@ -566,16 +593,17 @@ to the current date style by calling :meth:`Connection.date_format`.
     Set a fixed date style that shall be assumed when typecasting
 
     :param str datestyle: the date style that shall be assumed,
-      or *None* if no fixed dat style shall be assumed
+      or *None* if no fixed date style shall be assumed
 
 PyGreSQL is able to automatically pick up the right date style for typecasting
 date values from the database, even if you change it for the current session
-with a ``SET DateStyle`` command.  This is happens very effectively without
+with a ``SET DateStyle`` command.  This happens very efficiently without
 an additional database request being involved.  If you still want to have
 PyGreSQL always assume a fixed date style instead, then you can set one with
 this function.  Note that calling this function will *not* alter the date
 style of the database or the current session.  You can do that by calling
-the method :meth:`DB.set_parameter` instead.
+the method :meth:`DB.set_parameter` instead.  Date styles that are not
+recognized are handled like the ISO date style.
 
 .. versionadded:: 5.0
 
@@ -585,7 +613,7 @@ get/set_typecast -- custom typecasting
 PyGreSQL uses typecast functions to cast the raw data coming from the
 database to Python objects suitable for the particular database type.
 These functions take a single string argument that represents the data
-to be casted and must return the casted value.
+to be cast and must return the cast value.
 
 PyGreSQL provides through its C extension module basic typecast functions
 for the common database types, but if you want to add more typecast functions,
@@ -607,11 +635,13 @@ you can set these using the following functions.
 
     :param typ: PostgreSQL type name or list of type names
     :type typ: str or list
-    :param cast: the typecast function to be set for the specified type(s)
-    :type typ: str or int
+    :param cast: the typecast function to be set for the specified type(s),
+        or ``None`` to remove the typecast function for the type(s)
+    :type cast: callable or None
+    :raises TypeError: the typecast function is not callable
 
 The typecast function must take one string object as argument and return a
-Python object into which the PostgreSQL type shall be casted.  If the function
+Python object into which the PostgreSQL type shall be cast.  If the function
 takes another parameter named *connection*, then the current database
 connection will also be passed to the typecast function.  This may sometimes
 be necessary to look up certain database settings.
@@ -644,7 +674,7 @@ converted to Python lists, and records to Python tuples.  These fast parsers
 are used automatically by PyGreSQL in order to return arrays and records from
 database queries as lists and tuples, so you normally don't need to call them
 directly.  You may only need them for typecasting arrays of data types that
-are not supported by default in PostgreSQL.
+are not supported by default by PyGreSQL.
 
 .. function::  cast_array(string, [cast], [delim])
 
@@ -654,8 +684,9 @@ are not supported by default in PostgreSQL.
     :type string: str or bytes
     :param cast: a typecast function for the elements of the array
     :type cast: callable or None
-    :param bytes delim: delimiter character between adjacent elements
-    :type str: byte string with a single character
+    :param delim: delimiter character between adjacent elements
+        (a single byte)
+    :type delim: bytes
     :returns: a list representing the PostgreSQL array in Python
     :rtype: list
     :raises TypeError: invalid argument types
@@ -671,7 +702,8 @@ argument which will be the text representation of the element and must output
 the corresponding Python object that shall be put into the list.  If you don't
 pass a cast function or set it to *None*, then unprocessed text strings will
 be returned as elements of the array.  If you don't pass a delimiter character,
-then a comma will be used by default.  If *string* is passed as ``bytes``,
+then a comma will be used by default.  The delimiter must be passed as
+``bytes``, e.g. ``b';'``.  If *string* is passed as ``bytes``,
 the elements are decoded as ASCII where possible and passed as ``bytes``
 otherwise.
 
@@ -685,12 +717,13 @@ otherwise.
     :type string: str or bytes
     :param cast: typecast function(s) for the elements of the record
     :type cast: callable, list or tuple of callables, or None
-    :param bytes delim: delimiter character between adjacent elements
-    :type str: byte string with a single character
+    :param delim: delimiter character between adjacent elements
+        (a single byte)
+    :type delim: bytes
     :returns: a tuple representing the PostgreSQL record in Python
     :rtype: tuple
     :raises TypeError: invalid argument types
-    :raises ValueError: error in the syntax of the given array
+    :raises ValueError: error in the syntax of the given record
 
 This function takes a *string* containing the text representation of a
 PostgreSQL record (which may look like ``'(1,a,2,b)'`` for a record composed
@@ -703,8 +736,9 @@ single argument which will be the text representation of the element and must
 output the corresponding Python object that shall be put into the tuple.  If
 you don't pass cast function(s) or pass *None* instead, then unprocessed text
 strings will be returned as elements of the tuple.  If you don't pass a
-delimiter character, then a comma will be used by default.  If *string* is
-passed as ``bytes``, the elements are decoded as ASCII where possible and
+delimiter character, then a comma will be used by default.  The delimiter
+must be passed as ``bytes``, e.g. ``b';'``.  If *string* is passed as
+``bytes``, the elements are decoded as ASCII where possible and
 passed as ``bytes`` otherwise.
 
 .. versionadded:: 5.0
@@ -713,6 +747,26 @@ Note that besides using parentheses instead of braces, there are other subtle
 differences in escaping special characters and NULL values between the syntax
 used for arrays and the one used for composite types, which these functions
 take into account.
+
+.. function::  cast_hstore(string)
+
+    Cast a string representing a PostgreSQL hstore to a Python dictionary
+
+    :param string: the string with the text representation of the hstore
+    :type string: str or bytes
+    :returns: a dictionary representing the PostgreSQL hstore in Python
+    :rtype: dict
+    :raises TypeError: invalid argument type
+    :raises ValueError: error in the syntax of the given hstore
+
+This function takes a *string* containing the text representation of a
+PostgreSQL hstore (which may look like ``'a=>1, b=>NULL'``) and returns
+a Python dictionary with the keys and values as strings and NULL values
+as ``None`` (``{'a': '1', 'b': None}`` in this example).  If *string* is
+passed as ``bytes``, the keys and values are decoded as ASCII where possible
+and passed as ``bytes`` otherwise.
+
+.. versionadded:: 5.0
 
 Type helpers
 ------------
@@ -765,7 +819,8 @@ Module constants
 ----------------
 
 Some constants are defined in the module dictionary.
-They are intended to be used as parameters for methods calls.
+They are intended to be used as parameters for method calls
+or to check return values.
 You should refer to the libpq description in the PostgreSQL user manual
 for more information about them. These constants are:
 
@@ -799,4 +854,96 @@ for more information about them. These constants are:
 .. data:: TRANS_INERROR
 .. data:: TRANS_UNKNOWN
 
-    transaction states, used by :meth:`Connection.transaction`
+    transaction states, returned by :meth:`Connection.transaction`
+
+.. data:: RESULT_EMPTY
+.. data:: RESULT_DML
+.. data:: RESULT_DDL
+.. data:: RESULT_DQL
+
+    result types of the source object used internally by :mod:`pgdb`
+
+Exceptions
+----------
+
+The :mod:`pg` module defines the exceptions required by the DB-API 2.0
+standard (see :pep:`249`) and a few more specific ones. They are the same
+classes that are used by the :mod:`pgdb` module.
+
+.. exception:: Warning
+
+    Exception for important warnings, defined for compatibility with the
+    DB-API 2.0. It is currently not raised by the :mod:`pg` module.
+
+.. exception:: Error
+
+    Exception that is the base class of all other error exceptions. You can
+    use this to catch all errors with one single except statement.
+    Warnings are not considered errors and thus do not use this class as base.
+
+.. exception:: InterfaceError
+
+    Exception raised for errors that are related to the database interface
+    rather than the database itself, e.g. when a connection is used while it
+    is busy with another command.
+
+.. exception:: DatabaseError
+
+    Exception raised for errors that are related to the database.
+    This is the base class of the following exceptions.
+
+    .. attribute:: sqlstate
+
+        The ``SQLSTATE`` error code of the error as a string, or ``None``
+        if the error was not reported by the server.
+
+    When the server reports an error, the class of the exception raised
+    is determined by its ``SQLSTATE`` error code.
+
+.. exception:: DataError
+
+    Exception raised for errors that are due to problems with the processed
+    data like division by zero or numeric value out of range.
+
+.. exception:: OperationalError
+
+    Exception raised for errors that are related to the database's operation
+    and not necessarily under the control of the programmer, e.g. when the
+    connection has been lost or closed, or a prepared statement does not exist.
+
+.. exception:: InternalError
+
+    Exception raised when the database encounters an internal error, or
+    when a connection could not be established.
+
+.. exception:: IntegrityError
+
+    Exception raised when the relational integrity of the database is affected,
+    e.g. a foreign key check fails.
+
+.. exception:: ProgrammingError
+
+    Exception raised for programming errors, e.g. table not found or already
+    exists, or syntax error in the SQL statement.
+
+.. exception:: NotSupportedError
+
+    Exception raised in case a method or database API was used which is not
+    supported by the database.
+
+.. exception:: InvalidResultError
+
+    Subclass of :exc:`DataError` raised when a database operation produced
+    an invalid result, e.g. by the methods :meth:`Query.single`,
+    :meth:`Query.singledict`, :meth:`Query.singlenamed` and
+    :meth:`Query.singlescalar` if the result does not have exactly one row.
+
+.. exception:: NoResultError
+
+    Subclass of :exc:`InvalidResultError` raised by these methods if the
+    result does not have any rows.
+
+.. exception:: MultipleResultsError
+
+    Subclass of :exc:`InvalidResultError` raised by these methods if the
+    result has multiple rows.

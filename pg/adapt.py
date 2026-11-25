@@ -793,7 +793,7 @@ class Adapter:
 
     @staticmethod
     def simple_type(name: str) -> DbType:
-        """Create a simple database type with given attribute names."""
+        """Create a simple database type object with the given name."""
         typ = DbType(name)
         typ.simple = name
         return typ

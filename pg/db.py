@@ -252,7 +252,11 @@ class DB:
         return jsonencode(d)
 
     def close(self) -> None:
-        """Close the database connection."""
+        """Close the database connection.
+
+        If an existing connection has been passed when creating the DB
+        instance, that connection is not closed, but only detached.
+        """
         # Wraps shared library function so we can track state.
         db = self._valid_db
         try:
@@ -487,20 +491,18 @@ class DB:
         """Execute a SQL command string.
 
         This method simply sends a SQL query to the database.  If the query is
-        an insert statement that inserted exactly one row into a table that
-        has OIDs, the return value is the OID of the newly inserted row.
-        If the query is an update or delete statement, or an insert statement
-        that did not insert exactly one row in a table with OIDs, then the
-        number of rows affected is returned as a string.  If it is a statement
-        that returns rows as a result (usually a select statement, but maybe
-        also an "insert/update ... returning" statement), this method returns
-        a Query object that can be accessed via getresult() or dictresult()
-        or simply printed.  Otherwise, it returns `None`.
+        an insert, update or delete statement, the number of rows affected is
+        returned as a string.  If it is a statement that returns rows as a
+        result (usually a select statement, but maybe also an "insert/update
+        ... returning" statement), this method returns a Query object that can
+        be accessed via getresult() or dictresult() or simply printed.
+        Otherwise, it returns None.
 
         The query can contain numbered parameters of the form $1 in place
         of any data constant.  Arguments given after the query string will
         be substituted for the corresponding numbered parameter.  Parameter
-        values can also be given as a single list or tuple argument.
+        values can also be given as a single list or tuple argument.  They
+        are not adapted like in query_formatted(), but passed as text.
         """
         # Wraps shared library function for debugging.
         db = self._valid_db
@@ -528,7 +530,8 @@ class DB:
         return self.query(*self.adapter.format_query(
             command, parameters, types, inline))
 
-    def query_prepared(self, name: str | bytes, *args: Any) -> Query:
+    def query_prepared(self, name: str | bytes | None,
+                       *args: Any) -> Query:
         """Execute a prepared SQL statement.
 
         This works like the query() method, except that instead of passing
@@ -544,7 +547,7 @@ class DB:
         self._do_debug('EXECUTE', name)
         return db.query_prepared(name)
 
-    def prepare(self, name: str | bytes, command: str | bytes,
+    def prepare(self, name: str | bytes | None, command: str | bytes,
                 types: Sequence[int | str | bytes | None] | None = None
                 ) -> None:
         """Create a prepared SQL statement.
@@ -990,8 +993,8 @@ class DB:
                ) -> dict[str, Any]:
         """Insert a row into a database table with conflict resolution.
 
-        This method inserts a row into a table, but instead of raising a
-        ProgrammingError exception in case a row with the same primary key
+        This method inserts a row into a table, but instead of raising an
+        IntegrityError exception in case a row with the same primary key
         already exists, an update will be executed instead.  This will be
         performed as a single atomic operation on the database, so race
         conditions can be avoided.
@@ -1003,7 +1006,7 @@ class DB:
         table and the second parameter can be used to pass the values to
         be inserted as a dictionary.
 
-        Unlike the insert und update statement, keyword parameters are not
+        Unlike the insert and update methods, keyword parameters are not
         used to modify the dictionary, but to specify which columns shall
         be updated in case of a conflict, and in which way:
 
@@ -1026,7 +1029,7 @@ class DB:
         expressions you can refer to the value that already exists in
         the table by prefixing the column name with "included.", and to
         the value that has been proposed for insertion by prefixing the
-        column name with the "excluded."
+        column name with "excluded.".
 
         The dictionary is modified in any case to reflect the values in
         the database after the operation has completed.
@@ -1120,7 +1123,7 @@ class DB:
         did not exist and 1 if the row was deleted).
 
         Note that if the row cannot be deleted because e.g. it is still
-        referenced by another table, this method raises a ProgrammingError.
+        referenced by another table, this method raises an IntegrityError.
         """
         if table.endswith('*'):  # hint for descendant tables can be ignored
             table = table[:-1].rstrip()
@@ -1228,8 +1231,9 @@ class DB:
 
         The parameter 'order' specifies the ordering of the rows.  It can
         also be a string, list or a tuple.  If no ordering is specified,
-        the result will be ordered by the primary key(s) or all columns if
-        no primary key exists.  You can set 'order' to False if you don't
+        the result will be ordered by the columns in 'what', or if 'what'
+        is not specified, by the primary key(s) or all columns if no
+        primary key exists.  You can set 'order' to False if you don't
         care about the ordering.  The parameters 'limit' and 'offset' can be
         integers specifying the maximum number of rows returned and a number
         of rows skipped over.
@@ -1296,7 +1300,8 @@ class DB:
         be set as a string, list or a tuple.
 
         The dictionary will be ordered using the order specified with the
-        'order' parameter or the key column(s) if not specified.  You can
+        'order' parameter, or if not specified, by the columns in 'what' or
+        the key column(s) if 'what' is not specified either.  You can
         set 'order' to False if you don't care about the ordering.
         """
         if not table:

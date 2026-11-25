@@ -100,7 +100,6 @@ namedresult/namediter -- get query values as named tuples
     :returns: result values as a list of named tuples
     :rtype: list
     :raises TypeError: too many (any) parameters
-    :raises TypeError: named tuples not supported
     :raises MemoryError: internal memory error
 
 This method returns query results as a list of named tuples with
@@ -122,7 +121,6 @@ type columns as Python lists.
     :returns: result values as an iterable of named tuples
     :rtype: iterable
     :raises TypeError: too many (any) parameters
-    :raises TypeError: named tuples not supported
     :raises MemoryError: internal memory error
 
 This method returns query results as an iterable of named tuples with
@@ -149,6 +147,7 @@ scalarresult/scalariter -- get query values as scalars
     :returns: first fields from result as a list of scalar values
     :rtype: list
     :raises TypeError: too many (any) parameters
+    :raises pg.ProgrammingError: the result has no fields
     :raises MemoryError: internal memory error
 
 This method returns the first fields from the query results as a list of
@@ -161,8 +160,9 @@ scalar values in the order returned by the server.
     Get first fields from query result as iterable of scalar values
 
     :returns: first fields from result as an iterable of scalar values
-    :rtype: list
+    :rtype: iterable
     :raises TypeError: too many (any) parameters
+    :raises pg.ProgrammingError: the result has no fields
     :raises MemoryError: internal memory error
 
 This method returns the first fields from the query results as an iterable
@@ -236,6 +236,7 @@ It returns None if the result does not contain one more row.
     :returns: next row from the query results as a scalar value
     :rtype: type of first field or None
     :raises TypeError: too many (any) parameters
+    :raises pg.ProgrammingError: the result has no fields
     :raises MemoryError: internal memory error
 
 Returns the first field of the next row from the result as a scalar value.
@@ -318,6 +319,7 @@ is empty and of type :exc:`pg.MultipleResultsError` if it has multiple rows.
     :rtype: type of first field
     :raises pg.InvalidResultError: result does not have exactly one row
     :raises TypeError: too many (any) parameters
+    :raises pg.ProgrammingError: the result has no fields
     :raises MemoryError: internal memory error
 
 Returns the first field of a single row from the result as a scalar value.
@@ -353,10 +355,11 @@ fieldname, fieldnum -- field name/number conversion
     :param int num: field number
     :returns: field name
     :rtype: str
-    :raises TypeError: invalid connection, bad parameter type, or too many parameters
+    :raises TypeError: invalid connection, bad parameter type, or too many
+        parameters
     :raises ValueError: invalid field number
 
-This method allows to find a field name from its rank number. It can be
+This method allows you to find a field name from its rank number. It can be
 useful for displaying a result. The fields are in the same order as the
 result values.
 
@@ -368,7 +371,8 @@ result values.
     :type name: str or bytes
     :returns: field number
     :rtype: int
-    :raises TypeError: invalid connection, bad parameter type, or too many parameters
+    :raises TypeError: invalid connection, bad parameter type, or too many
+        parameters
     :raises ValueError: unknown field name
 
 This method returns a field number given its name. It can be used to
@@ -405,7 +409,7 @@ fieldinfo -- detailed info about query result fields
 If the ``field`` is specified by passing either a column number or a field
 name, a four-tuple with information for the specified field of the query
 result will be returned. If no ``field`` is specified, a tuple of four-tuples
-for every field of the previous query result will be returned, in the same
+for every field of the query result will be returned, in the same
 order as they appear in the query result.
 
 The four-tuples contain the following information: The field name, the
@@ -423,8 +427,12 @@ memsize -- return number of bytes allocated by query result
 
     :returns: number of bytes allocated for the query result
     :rtype: int
-    :raises TypeError: Too many arguments.
+    :raises TypeError: too many arguments
+    :raises pg.NotSupportedError: PyGreSQL has been built without support
+        for this method
 
 This method returns the number of bytes allocated for the query result.
+It is only available if PyGreSQL has been built with support for it,
+which is the default (see the build options in :doc:`../install`).
 
-.. versionadded:: 5.2 (needs PostgreSQL >= 12)
+.. versionadded:: 5.2

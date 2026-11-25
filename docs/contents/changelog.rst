@@ -561,6 +561,12 @@ Version 6.3.0 (unreleased)
     libpq used at runtime must not be older than the one PyGreSQL has been
     built with.
 
+- Documentation:
+
+  - Explained how to pass values that need to be adapted, such as lists
+    for arrays, to `query()` and `query_prepared()`, which pass parameters
+    as text (#28).
+
 - Modernization and build:
 
   - Fixed the type hints for the C extension in `pg/_pg.pyi`: parameters

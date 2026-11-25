@@ -7,16 +7,20 @@ The DB wrapper class
 
 The :class:`Connection` methods are wrapped in the class :class:`DB`
 which also adds convenient higher level methods for working with the
-database.  It also serves as a context manager for the connection.
-The preferred way to use this module is as follows::
+database.  It also serves as a context manager for a transaction: entering
+the context begins a transaction, and leaving it commits the transaction, or
+rolls it back if an exception has been raised.  The connection is not closed
+when leaving the context.  This class can be used as follows::
 
     import pg
 
-    with pg.DB(...) as db:  # for parameters, see below
+    db = pg.DB(...)  # for parameters, see below
+    with db:  # run the following in a transaction
         for r in db.query(  # just for example
                 "SELECT foo, bar FROM foo_bar_table WHERE foo !~ bar"
                 ).dictresult():
             print('{foo} {bar}'.format(**r))
+    db.close()
 
 This class can be subclassed as in this example::
 
@@ -28,27 +32,28 @@ This class can be subclassed as in this example::
         This class encapsulates the database functions and the specific
         methods for the ride database."""
 
-    def __init__(self):
-        """Open a database connection to the rides database"""
-        pg.DB.__init__(self, dbname='ride')
-        self.query("SET DATESTYLE TO 'ISO'")
+        def __init__(self):
+            """Open a database connection to the rides database"""
+            super().__init__(dbname='ride')
+            self.query("SET DATESTYLE TO 'ISO'")
 
-    [Add or override methods here]
+        [Add or override methods here]
 
 The following describes the methods and variables of this class.
 
 Initialization
 --------------
 The :class:`DB` class is initialized with the same arguments as the
-:func:`connect` function described above. It also initializes a few
+:func:`connect` function of the module. It also initializes a few
 internal variables. The statement ``db = DB()`` will open the local
 database with the name of the user just like ``connect()`` does.
 
 You can also initialize the DB class with an existing :mod:`pg` or :mod:`pgdb`
 connection. Pass this connection as a single unnamed parameter, or as a
 single parameter named ``db``. This allows you to use all of the methods
-of the DB class with a DB-API 2 compliant connection. Note that the
-:meth:`DB.close` and :meth:`DB.reopen` methods are inoperative in this case.
+of the DB class with a DB-API 2 compliant connection. Note that in this
+case, :meth:`DB.close` does not close the connection, but only detaches it
+from the :class:`DB` instance, and :meth:`DB.reopen` attaches it again.
 
 .. _table_names:
 
@@ -69,8 +74,12 @@ For instance, ``'User'`` and ``'public.User'`` both refer to the table
 ``"User"``, and ``'"my.schema"."my.table"'`` refers to the table
 ``"my.table"`` in the schema ``"my.schema"``. The qualified names returned
 by :meth:`DB.get_tables` and :meth:`DB.get_relations` can be passed back
-to these methods. A name with an empty part or an unterminated quote
-raises a :exc:`ValueError`.
+to these methods. A name with an empty part, an unterminated quote or text
+after a closing quote raises a :exc:`ValueError`.
+
+These rules do not apply to :meth:`DB.get_as_list` and :meth:`DB.get_as_dict`,
+which also accept other SQL expressions returning rows and insert the table
+name unchanged into the SQL command, so it must be quoted as in SQL.
 
 .. versionchanged:: 6.3
     Before, names containing a dot were used unchanged in the SQL command
@@ -78,22 +87,67 @@ raises a :exc:`ValueError`.
     lower case, while :meth:`Connection.inserttable` and the copy methods
     split the name at dots and did not support quoted parts.
 
+close/reopen/reset -- close, reopen or reset the connection
+-----------------------------------------------------------
+
+.. method:: DB.close()
+
+    Close the database connection
+
+    :raises pg.InternalError: the connection has already been closed
+
+This closes the connection to the database.  Afterwards, the methods of the
+:class:`DB` instance raise a :exc:`pg.InternalError`, until the connection
+is opened again with :meth:`DB.reopen`.  If the :class:`DB` instance has been
+created with an existing connection, that connection is not closed, but only
+detached from the :class:`DB` instance.
+
+.. method:: DB.reopen()
+
+    Reopen the connection to the database
+
+This opens a new connection with the same parameters that have been used to
+create the :class:`DB` instance, and closes the current connection, if it has
+not already been closed.  This can also be used after :meth:`DB.close`.
+The typecasts that have been set for the connection are kept.  If the
+:class:`DB` instance has been created with an existing connection, that
+connection is attached to the instance again instead.
+
+.. method:: DB.reset()
+
+    Reset the connection
+
+    :raises pg.InternalError: the connection has been closed
+
+This resets the connection to the database with the same parameters, like
+:meth:`Connection.reset`.  Large objects and pending results of asynchronous
+queries cannot be used after this call.
+
 pkey -- return the primary key of a table
 -----------------------------------------
 
-.. method:: DB.pkey(table)
+.. method:: DB.pkey(table, [composite], [flush])
 
     Return the primary key of a table
 
     :param str table: name of table
-    :returns: Name of the field that is the primary key of the table
-    :rtype: str
+    :param bool composite: whether a single primary key shall also be
+        returned as a tuple
+    :param bool flush: whether the internal cache for primary keys shall
+        be flushed
+    :returns: Name of the field that is the primary key of the table,
+        or a tuple of names for composite primary keys
+    :rtype: str or tuple
     :raises KeyError: the table does not have a primary key
 
 This method returns the primary key of a table.  Single primary keys are
-returned as strings unless you set the composite flag.  Composite primary
+returned as strings unless you set the *composite* flag.  Composite primary
 keys are always represented as tuples.  Note that this raises a KeyError
 if the table does not have a primary key.
+
+The primary keys are cached.  If *flush* is set, the internal cache for
+primary keys will be flushed.  This may be necessary after the database
+schema or the search path has been changed.
 
 pkeys -- return the primary keys of a table
 -------------------------------------------
@@ -178,11 +232,13 @@ the partitions of partitioned tables, which are ordinary tables themselves.
 get_attnames -- get the attribute names of a table
 --------------------------------------------------
 
-.. method:: DB.get_attnames(table)
+.. method:: DB.get_attnames(table, [flush])
 
     Get the attribute names of a table
 
     :param str table: name of table
+    :param bool flush: whether the internal cache for attribute names shall
+        be flushed
     :returns: an ordered dictionary mapping attribute names to type names
 
 Given the name of a table, digs out the set of attribute names.
@@ -195,45 +251,57 @@ By default, only a limited number of simple types will be returned.
 You can get the registered types instead, if enabled by calling the
 :meth:`DB.use_regtypes` method.
 
+The attribute names are cached.  If *flush* is set, the internal cache for
+attribute names will be flushed.  This may be necessary after the database
+schema or the search path has been changed.
+
 get_generated -- get the generated columns of a table
 -----------------------------------------------------
 
-.. method:: DB.get_generated(table)
+.. method:: DB.get_generated(table, [flush])
 
     Get the generated columns of a table
 
     :param str table: name of table
-    :returns: an frozenset of column names
+    :param bool flush: whether the internal cache for generated columns
+        shall be flushed
+    :returns: a frozenset of column names
 
-Given the name of a table, digs out the set of generated columns.
+Given the name of a table, digs out the set of generated columns.  If *flush*
+is set, the internal cache for generated columns will be flushed.
 
 .. versionadded:: 5.2.5
 
 has_table_privilege -- check table privilege
 --------------------------------------------
 
-.. method:: DB.has_table_privilege(table, privilege)
+.. method:: DB.has_table_privilege(table, [privilege], [flush])
 
     Check whether current user has specified table privilege
 
     :param str table: the name of the table
     :param str privilege: privilege to be checked -- default is 'select'
+    :param bool flush: whether the internal cache for table privileges
+        shall be flushed
     :returns: whether current user has specified table privilege
     :rtype: bool
 
 Returns True if the current user has the specified privilege for the table.
+The results are cached.  If *flush* is set, the internal cache for table
+privileges will be flushed.  This may be necessary after privileges have
+been changed.
 
 .. versionadded:: 4.0
 
-get/set_parameter -- get or set  run-time parameters
-----------------------------------------------------
+get/set_parameter -- get or set run-time parameters
+---------------------------------------------------
 
 .. method:: DB.get_parameter(parameter)
 
     Get the value of run-time parameters
 
     :param parameter: the run-time parameter(s) to get
-    :type param: str, tuple, list or dict
+    :type parameter: str, tuple, list, set or dict
     :returns: the current value(s) of the run-time parameter(s)
     :rtype: str, list or dict
     :raises TypeError: Invalid parameter type(s)
@@ -264,9 +332,11 @@ unlike :meth:`DB.get_parameter` and :meth:`DB.set_parameter`.
     Set the value of run-time parameters
 
     :param parameter: the run-time parameter(s) to set
-    :type param: string, tuple, list or dict
-    :param value: the value to set
-    :type param: str or None
+    :type parameter: str, tuple, list, set or dict
+    :param value: the value(s) to set
+    :type value: str, tuple, list or None
+    :param bool local: whether the setting shall only apply to the current
+        transaction
     :raises TypeError: Invalid parameter type(s)
     :raises ValueError: Invalid value argument(s)
     :raises pg.ProgrammingError: Invalid parameter name(s) or values
@@ -374,6 +444,7 @@ get -- get a row from a database table or view
       the values are the row values.
     :raises pg.ProgrammingError: table has no primary key or missing privilege
     :raises KeyError: missing key value for the row
+    :raises pg.DatabaseError: no row with the given key values exists
 
 This method is the basic mechanism to get a single row.  It assumes
 that the *keyname* specifies a unique row.  It must be the name of a
@@ -401,7 +472,10 @@ insert -- insert a row into a database table
     :param col: optional keyword arguments for updating the dictionary
     :returns: the inserted values in the database
     :rtype: dict
-    :raises pg.ProgrammingError: missing privilege or conflict
+    :raises pg.ProgrammingError: missing privilege, or no column that can
+        be inserted
+    :raises pg.IntegrityError: the row violates a constraint
+        (e.g. a row with the same key already exists)
 
 This method inserts a row into a table.  If the optional dictionary is
 not supplied then the required values must be included as keyword/value
@@ -472,10 +546,11 @@ upsert -- insert a row with conflict resolution
     :raises pg.ProgrammingError: table has no primary key, no unique index
         matches the keyname, or missing privilege
 
-This method inserts a row into a table, but instead of raising a
-ProgrammingError exception in case of violating a constraint or unique index,
-an update will be executed instead.  This will be performed as a
-single atomic operation on the database, so race conditions can be avoided.
+This method inserts a row into a table, but instead of raising an
+IntegrityError exception when a row with the same key (the primary key or
+the given *keyname*) already exists, the existing row is updated.  This will
+be performed as a single atomic operation on the database, so race conditions
+can be avoided.  Violations of other constraints still raise an exception.
 
 Like the insert method, the first parameter is the name of the table and the
 second parameter can be used to pass the values to be inserted as a dictionary.
@@ -488,7 +563,7 @@ exists.  This way, you can also use tables without primary key.  The columns
 in *keyname* are not updated, but all other columns can be updated, including
 the primary key.
 
-Unlike the insert und update statement, keyword parameters are not used to
+Unlike the insert and update methods, keyword parameters are not used to
 modify the dictionary, but to specify which columns shall be updated in case
 of a conflict, and in which way:
 
@@ -500,7 +575,7 @@ in the dictionary are also updated like in the case keywords had been passed
 with the value `True`.
 
 So if in the case of a conflict you want to update every column that has been
-passed in the dictionary `d` , you would call ``upsert(table, d)``.  If you
+passed in the dictionary `d`, you would call ``upsert(table, d)``.  If you
 don't want to do anything in case of a conflict, i.e. leave the existing row
 as it is, call ``upsert(table, d, **dict.fromkeys(d))``.
 
@@ -543,17 +618,21 @@ query -- execute a SQL command string
     :param str command: SQL command
     :param arg*: optional positional arguments
     :returns: result values
-    :rtype: :class:`Query`, None
+    :rtype: :class:`Query`, str or None
     :raises TypeError: bad argument type, or too many arguments
-    :raises TypeError: invalid connection
-    :raises ValueError: empty SQL query or lost connection
-    :raises pg.ProgrammingError: error in query
-    :raises pg.InternalError: error during query processing
+    :raises ValueError: empty SQL query
+    :raises pg.DatabaseError: error in query (a subclass depending on the
+        ``SQLSTATE``, e.g. :exc:`pg.ProgrammingError`)
+    :raises pg.OperationalError: the connection has been lost
+    :raises pg.InternalError: the connection has been closed
 
 Similar to the :class:`Connection` function with the same name, except that
 positional arguments can be passed either as a single list or tuple, or as
 individual positional arguments.  These arguments will then be used as
-parameter values of parameterized queries.
+parameter values of parameterized queries.  Unlike the parameters of
+:meth:`DB.query_formatted`, they are not adapted to the types of the
+parameters, see :ref:`query_parameters` for how to pass values like lists
+and dictionaries.
 
 Example::
 
@@ -576,20 +655,26 @@ query_formatted -- execute a formatted SQL command string
     :param parameters: the values of the parameters for the SQL command
     :type parameters: tuple, list or dict
     :param types: optionally, the types of the parameters
-    :type types: tuple, list or dict
+    :type types: tuple, list, str or dict
     :param bool inline: whether the parameters should be passed in the SQL
-    :rtype: :class:`Query`, None
+    :rtype: :class:`Query`, str or None
     :raises TypeError: bad argument type, or too many arguments
-    :raises TypeError: invalid connection
-    :raises ValueError: empty SQL query or lost connection
-    :raises pg.ProgrammingError: error in query
-    :raises pg.InternalError: error during query processing
+    :raises ValueError: empty SQL query,
+        or *types* passed together with *inline*
+    :raises pg.DatabaseError: error in query (a subclass depending on the
+        ``SQLSTATE``, e.g. :exc:`pg.ProgrammingError`)
+    :raises pg.OperationalError: the connection has been lost
+    :raises pg.InternalError: the connection has been closed
 
 Similar to :meth:`DB.query`, but using Python format placeholders of the form
 ``%s`` or ``%(names)s`` instead of PostgreSQL placeholders of the form ``$1``.
 The parameters must be passed as a tuple, list or dict.  You can also pass a
 corresponding tuple, list or dict of database types in order to format the
-parameters properly in case there is ambiguity.
+parameters properly in case there is ambiguity.  If the parameters are passed
+as a tuple or list, the types can also be passed as a single string with the
+type names separated by whitespace, like ``'json int'``.  The types can only
+be passed if the parameters are not sent *inline*, otherwise a
+:exc:`ValueError` is raised.
 
 The types can be given as simple PyGreSQL type names like ``'int'``,
 ``'bytea'`` or ``'int[]'``, as PostgreSQL type names like ``'int4'`` or
@@ -611,7 +696,8 @@ performance overhead. Depending on the type of values, the overhead can be
 smaller for *inline* queries or if you pass the types of the parameters,
 so that they don't need to be guessed from the values. For best performance,
 we recommend using a raw :meth:`DB.query` or :meth:`DB.query_prepared` if you
-are executing many of the same operations with different parameters.
+are executing many of the same operations with different parameters, see
+:ref:`query_parameters` for how to adapt the parameters for these methods.
 
 
 Example::
@@ -630,13 +716,13 @@ Example with specification of types::
 
     db.query_formatted(
         "update orders set info=%s where id=%s",
-        ({'customer': 'Joe', 'product': 'beer'}, 'id': 7),
+        ({'customer': 'Joe', 'product': 'beer'}, 7),
         types=('json', 'int'))
     # or
     db.query_formatted(
         "update orders set info=%s where id=%s",
-        ({'customer': 'Joe', 'product': 'beer'}, 'id': 7),
-        types=('json int'))
+        ({'customer': 'Joe', 'product': 'beer'}, 7),
+        types='json int')
     # or
     db.query_formatted(
         "update orders set info=%(info)s where id=%(id)s",
@@ -654,17 +740,20 @@ query_prepared -- execute a prepared statement
     :param str name: name of the prepared statement
     :param arg*: optional positional arguments
     :returns: result values
-    :rtype: :class:`Query`, None
+    :rtype: :class:`Query`, str or None
     :raises TypeError: bad argument type, or too many arguments
-    :raises TypeError: invalid connection
-    :raises ValueError: empty SQL query or lost connection
-    :raises pg.ProgrammingError: error in query
-    :raises pg.InternalError: error during query processing
+    :raises ValueError: empty SQL query
+    :raises pg.DatabaseError: error in query (a subclass depending on the
+        ``SQLSTATE``, e.g. :exc:`pg.ProgrammingError`)
+    :raises pg.OperationalError: the connection has been lost
+    :raises pg.InternalError: the connection has been closed
     :raises pg.OperationalError: prepared statement does not exist
 
-This methods works like the :meth:`DB.query` method, except that instead of
+This method works like the :meth:`DB.query` method, except that instead of
 passing the SQL command, you pass the name of a prepared statement
-created previously using the :meth:`DB.prepare` method.
+created previously using the :meth:`DB.prepare` method.  Like with
+:meth:`DB.query`, the parameters are not adapted to their types, see
+:ref:`query_parameters`.
 
 Passing an empty string or *None* as the name will execute the unnamed
 statement (see warning about the limited lifetime of the unnamed statement
@@ -689,7 +778,7 @@ prepare -- create a prepared statement
     :type types: list or tuple of str, int or None
     :rtype: None
     :raises TypeError: bad argument types, or wrong number of arguments
-    :raises TypeError: invalid connection
+    :raises pg.InternalError: the connection has been closed
     :raises ValueError: invalid type OID
     :raises pg.ProgrammingError: error in query or duplicate query,
         or unknown type name
@@ -705,7 +794,7 @@ in the current database session, a :exc:`pg.ProgrammingError` is raised.
 
 The SQL command may optionally contain positional parameters of the form
 ``$1``, ``$2``, etc instead of literal data.  The corresponding values
-must then be passed to the :meth:`Connection.query_prepared` method
+must then be passed to the :meth:`DB.query_prepared` method
 as positional arguments.
 
 The server infers the types of the parameters from the context. If this
@@ -762,7 +851,7 @@ describe_prepared -- describe a prepared statement
     :param str name: name of the prepared statement
     :rtype: :class:`Query`
     :raises TypeError: bad argument type, or too many arguments
-    :raises TypeError: invalid connection
+    :raises pg.InternalError: the connection has been closed
     :raises pg.OperationalError: prepared statement does not exist
 
 This method returns a :class:`Query` object describing the prepared
@@ -783,7 +872,7 @@ delete_prepared -- delete a prepared statement
     :param str name: name of the prepared statement
     :rtype: None
     :raises TypeError: bad argument type, or too many arguments
-    :raises TypeError: invalid connection
+    :raises pg.InternalError: the connection has been closed
     :raises ValueError: the name contains a NUL character
     :raises pg.OperationalError: prepared statement does not exist
 
@@ -832,9 +921,10 @@ delete -- delete a row from a database table
     :param keyname: name of the key column, or a tuple of names (optional)
     :type keyname: str or tuple
     :param col: optional keyword arguments for updating the dictionary
-    :rtype: None
-    :raises pg.ProgrammingError: table has no primary key,
-        row is still referenced or missing privilege
+    :returns: the number of deleted rows
+    :rtype: int
+    :raises pg.ProgrammingError: table has no primary key or missing privilege
+    :raises pg.IntegrityError: the row is still referenced
     :raises KeyError: missing key value for the row
 
 This method deletes the row from a table.  The row to be deleted is
@@ -849,7 +939,7 @@ The return value is the number of deleted rows (i.e. 0 if the row did not
 exist and 1 if the row was deleted).
 
 Note that if the row cannot be deleted because e.g. it is still referenced
-by another table, this method will raise a ProgrammingError.
+by another table, this method will raise an IntegrityError.
 
 .. versionchanged:: 6.3
     The optional *keyname* argument has been added.
@@ -895,7 +985,7 @@ get_as_list/dict -- read a table as a list or dictionary
     :param str table: the name of the table (the FROM clause)
     :param what: column(s) to be returned (the SELECT clause)
     :type what: str, list, tuple or None
-    :param where: conditions(s) to be fulfilled (the WHERE clause)
+    :param where: condition(s) to be fulfilled (the WHERE clause)
     :type where: str, list, tuple or None
     :param order: column(s) to sort by (the ORDER BY clause)
     :type order: str, list, tuple, False or None
@@ -917,7 +1007,8 @@ table columns.  The parameter *where* can restrict the query to only return a
 subset of the table rows.  The specified SQL expressions all need to be
 fulfilled for a row to get into the result.  The parameter *order* specifies
 the ordering of the rows.  If no ordering is specified, the result will be
-ordered by the primary key(s) or all columns if no primary key exists.
+ordered by the columns given in *what*, or if *what* is not specified, by the
+primary key(s) or all columns if no primary key exists.
 You can set *order* to *False* if you don't care about the ordering.
 The parameters *limit* and *offset* specify the maximum number of rows
 returned and a number of rows skipped over.
@@ -937,14 +1028,14 @@ has only one column anyway.
     :type keyname: str, list, tuple or None
     :param what: column(s) to be returned (the SELECT clause)
     :type what: str, list, tuple or None
-    :param where: conditions(s) to be fulfilled (the WHERE clause)
+    :param where: condition(s) to be fulfilled (the WHERE clause)
     :type where: str, list, tuple or None
     :param order: column(s) to sort by (the ORDER BY clause)
     :type order: str, list, tuple, False or None
     :param int limit: maximum number of rows returned (the LIMIT clause)
     :param int offset: number of rows to be skipped (the OFFSET clause)
     :param bool scalar: whether only the first column shall be returned
-    :returns: the content of the table as a list
+    :returns: the content of the table as a dictionary
     :rtype: dict
     :raises TypeError: the table name has not been specified
     :raises KeyError: keyname(s) are invalid or not part of the result
@@ -960,7 +1051,8 @@ to *True*.  With the optional parameter *keyname* you can specify a different
 set of columns to be used as the keys of the dictionary.
 
 The dictionary will be ordered using the order specified with the *order*
-parameter or the key column(s) if not specified.  You can set *order* to
+parameter, or if not specified, by the columns given in *what* or the key
+column(s) if *what* is not specified either.  You can set *order* to
 *False* if you don't care about the ordering.
 
 .. versionadded:: 5.0
@@ -1053,8 +1145,8 @@ return unescaped byte strings, you normally don't have to use this method.
 encode/decode_json -- encode and decode JSON data
 -------------------------------------------------
 
-The following methods can be used to encode end decode data in
-`JSON <http://www.json.org/>`_ format.
+The following methods can be used to encode and decode data in
+`JSON <https://www.json.org/>`_ format.
 
 .. method:: DB.encode_json(obj)
 
@@ -1077,7 +1169,7 @@ as the :func:`json.dumps` function from the standard library.
 
     Decode ``json`` or ``jsonb`` data that has been retrieved as text
 
-    :param string: JSON formatted string shall be decoded into a Python object
+    :param string: JSON formatted string that shall be decoded
     :type string: str
     :returns: Python object representing the JSON formatted string
     :rtype: dict, list or None
@@ -1105,7 +1197,7 @@ use_regtypes -- choose usage of registered type names
 The :meth:`DB.get_attnames` method can return either simplified "classic"
 type names (the default) or more fine-grained "registered" type names.
 Which kind of type names is used can be changed by calling
-:meth:`DB.get_regtypes`. If you pass a boolean, it sets whether registered
+:meth:`DB.use_regtypes`. If you pass a boolean, it sets whether registered
 type names shall be used. The method can also be used to check through its
 return value whether registered type names are currently used.
 
@@ -1156,9 +1248,25 @@ description of the :class:`DbTypes` class for details.
 
 .. attribute:: DB.adapter
 
-    A class with some helper functions for adapting parameters
+    An object with some helper methods for adapting parameters
 
 This can be used for building queries with parameters.  You normally will
-not need this, as you can use the :class:`DB.query_formatted` method.
+not need this, as you can use the :meth:`DB.query_formatted` method.
+Its method ``adapt(value, [typ])`` adapts a single value for a parameter of
+the given type, so that it can be passed to :meth:`DB.query` or
+:meth:`DB.query_prepared` (see :ref:`query_parameters`).
 
 .. versionadded:: 5.0
+
+.. attribute:: DB.debug
+
+    Setting for printing debug messages
+
+If this is set to a true value, the :class:`DB` methods print the SQL
+commands that they send to the database, together with their parameters,
+and some other messages, e.g. when caches have been flushed.
+It can be set to a format string with a ``%s`` placeholder for the message
+(e.g. ``'DEBUG: %s'``), to a file-like object with a ``write()`` method,
+or to a callable that takes the message as its only argument.  Any other
+true value prints the messages to the standard output.  The default value
+is *None*, which disables the debug messages.

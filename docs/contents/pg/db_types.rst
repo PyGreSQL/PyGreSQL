@@ -38,7 +38,7 @@ type that can be inspected using the following attributes:
         - *simple* -- the more coarse-grained PyGreSQL type name
         - *typlen* -- internal size of the type, negative if variable
         - *typtype* -- `b` = base type, `c` = composite type etc.
-        - *category* -- `A` = Array, `b` =Boolean, `C` = Composite etc.
+        - *category* -- `A` = Array, `b` = Boolean, `C` = Composite etc.
         - *delim* -- delimiter for array types
         - *relid* -- corresponding table for composite types
         - *elem* -- the type OID of the elements for array types
@@ -67,25 +67,29 @@ their values must be passed as PostgreSQL array literals in strings.
     ``text``.
 
 For details, see the PostgreSQL documentation on `pg_type
-<http://www.postgresql.org/docs/current/static/catalog-pg-type.html>`_.
+<https://www.postgresql.org/docs/current/catalog-pg-type.html>`_.
 
 In addition to the dictionary methods, the :class:`DbTypes` class also
-provides the following methods:
+provides the following methods.  Note that the ``get()`` method and item
+access look up types in the database if they are not yet cached.  If the
+type does not exist, ``get()`` returns the given default value (*None* if
+not specified), while item access raises a :exc:`KeyError`.
 
 .. method:: DbTypes.get_attnames(typ)
 
     Get the names and types of the fields of composite types
 
-    :param typ: PostgreSQL type name or OID of a composite type
-    :type typ: str or int
-    :returns: an ordered dictionary mapping field names to type names
+    :param typ: PostgreSQL type name, type object or OID of a composite type
+    :type typ: str, int or DbType
+    :returns: an ordered dictionary mapping field names to type names,
+        or *None* if the type is not a composite type
 
 .. method:: DbTypes.get_typecast(typ)
 
     Get the cast function for the given database type
 
     :param typ: PostgreSQL type name, type object or OID
-    :type typ: str or int
+    :type typ: str, int or DbType
     :returns: the typecast function for the specified type
     :rtype: function or None
 
@@ -95,11 +99,12 @@ provides the following methods:
 
     :param typ: PostgreSQL type name or list of type names
     :type typ: str or list
-    :param cast: the typecast function to be set for the specified type(s)
-    :type typ: str or int
+    :param cast: the typecast function to be set for the specified type(s),
+        or *None* to remove the typecast set for the type(s)
+    :type cast: callable or None
 
 The typecast function must take one string object as argument and return a
-Python object into which the PostgreSQL type shall be casted.  If the function
+Python object into which the PostgreSQL type shall be cast.  If the function
 takes another parameter named *connection*, then the current database
 connection will also be passed to the typecast function.  This may sometimes
 be necessary to look up certain database settings.
@@ -117,10 +122,11 @@ created from the types of the fields, the base type or the element type. These
 are looked up by their OIDs, so that this also works for types that are not in
 the search path and for types with the same name in different schemas. The
 typecasts for composite types are cached with their fields. After changing the
-fields, call :meth:`DB.get_attnames` with *flush* set. Types that have been
-looked up by name stay cached under that name. After changing the search path,
-call the ``clear()`` method. This only affects lookups by name, values in query
-results are always cast according to the OIDs of their types.
+fields, call :meth:`DB.get_attnames` for any table with ``flush=True``. Types
+that have been looked up by name stay cached under that name. After changing
+the search path, call the ``clear()`` method. This only affects lookups by
+name, values in query results are always cast according to the OIDs of their
+types.
 
 .. method:: DbTypes.reset_typecast([typ])
 
@@ -134,20 +140,21 @@ results are always cast according to the OIDs of their types.
 
     Cast the given value according to the given database type
 
+    :param str value: the value as returned by the database
     :param typ: PostgreSQL type name, type object or OID
-    :type typ: str or int
-    :returns: the casted value
+    :type typ: str, int or DbType
+    :returns: the cast value
 
 .. note::
 
-    Note that :class:`DbTypes` object is always bound to a database connection.
-    You can also get and set typecast functions on a global level using the
-    functions :func:`pg.get_typecast` and :func:`pg.set_typecast`. If you do
-    this, running connections may continue to use typecast functions they have
-    already cached, particularly for type names they have already used. To be
-    sure that a global change is picked up, call :meth:`DbTypes.reset_typecast`
-    for these types on the :attr:`DB.dbtypes` objects of the running
-    connections.
+    Note that a :class:`DbTypes` object is always bound to a database
+    connection. You can also get and set typecast functions on a global level
+    using the functions :func:`pg.get_typecast` and :func:`pg.set_typecast`. If
+    you do this, running connections may continue to use typecast functions
+    they have already cached, particularly for type names they have already
+    used. To be sure that a global change is picked up, call
+    :meth:`DbTypes.reset_typecast` for these types on the :attr:`DB.dbtypes`
+    objects of the running connections.
 
     Also note that the typecasting for all of the basic types happens already
     in the C low-level extension module.  The typecast functions that can be

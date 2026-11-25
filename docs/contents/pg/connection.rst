@@ -38,25 +38,24 @@ query -- execute a SQL command string
 
     Execute a SQL command string
 
-    :param str command: SQL command
+    :param command: SQL command
+    :type command: str or bytes
     :param args: optional parameter values
     :returns: result values
-    :rtype: :class:`Query`, None
+    :rtype: :class:`Query`, str or None
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
-    :raises ValueError: empty SQL query or lost connection
-    :raises pg.ProgrammingError: error in query
-    :raises pg.InternalError: error during query processing
+    :raises ValueError: empty SQL query
+    :raises pg.DatabaseError: error in query (a subclass depending on the
+        ``SQLSTATE``, e.g. :exc:`pg.ProgrammingError`)
+    :raises pg.OperationalError: the connection has been lost
 
 This method simply sends a SQL query to the database. If the query is an
-insert statement that inserted exactly one row into a table that has OIDs,
-the return value is the OID of the newly inserted row as an integer.
-If the query is an update or delete statement, or an insert statement that
-did not insert exactly one row, or on a table without OIDs, then the number
-of rows affected is returned as a string. If it is a statement that returns
-rows as a result (usually a select statement, but maybe also an
-``"insert/update ... returning"`` statement), this method returns
-a :class:`Query`. Otherwise, it returns ``None``.
+insert, update or delete statement, the number of rows affected is returned
+as a string. If it is a statement that returns rows as a result (usually a
+select statement, but maybe also an ``"insert/update ... returning"``
+statement), this method returns a :class:`Query`. Otherwise, it returns
+``None``.
 
 You can use the :class:`Query` object as an iterator that yields all results
 as tuples, or call :meth:`Query.getresult` to get the result as a list
@@ -83,6 +82,8 @@ since their string representation is not their content.
 Binary data must be wrapped with :func:`Bytea`. It is then sent unchanged
 in binary format as a parameter of type ``bytea`` and may contain any
 bytes, including NUL bytes, which are not allowed in the other parameters.
+Other values like lists and dictionaries are not adapted to PostgreSQL
+types, see :ref:`query_parameters` for how to pass such values.
 
 .. versionchanged:: 6.3
     Values wrapped with :func:`Bytea` are sent as binary data. Before, they
@@ -94,8 +95,11 @@ If you don't pass any parameters, the command string can also include
 multiple SQL commands (separated by semicolons). You will only get the
 return value for the last command in this case.
 
-When the database could not process the query, a :exc:`pg.ProgrammingError` or
-a :exc:`pg.InternalError` is raised. You can check the ``SQLSTATE`` error code
+When the database could not process the query, a subclass of
+:exc:`pg.DatabaseError` corresponding to the ``SQLSTATE`` error code is
+raised, e.g. a :exc:`pg.ProgrammingError` for a syntax error, a
+:exc:`pg.DataError` for a division by zero or a :exc:`pg.IntegrityError`
+for a unique constraint violation. You can check the ``SQLSTATE`` error code
 of this error by reading its :attr:`sqlstate` attribute.
 
 Example::
@@ -105,20 +109,21 @@ Example::
         (name,)).getresult()
 
 
-send_query - executes a SQL command string asynchronously
----------------------------------------------------------
+send_query -- executes a SQL command string asynchronously
+----------------------------------------------------------
 
 .. method:: Connection.send_query(command, [args])
 
     Submits a command to the server without waiting for the result(s).
 
-    :param str command: SQL command
+    :param command: SQL command
+    :type command: str or bytes
     :param args: optional parameter values
     :returns: a query object, as described below
     :rtype: :class:`Query`
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
-    :raises ValueError: lost connection
+    :raises pg.OperationalError: the connection has been lost
 
 This method is much the same as :meth:`Connection.query`, except that it
 returns without waiting for the query to complete. The application can do
@@ -234,16 +239,18 @@ query_prepared -- execute a prepared statement
 
     Execute a prepared statement
 
-    :param str name: name of the prepared statement
+    :param name: name of the prepared statement
+    :type name: str or bytes
     :param args: optional parameter values
     :returns: result values
-    :rtype: :class:`Query`, None
+    :rtype: :class:`Query`, str or None
     :raises TypeError: bad argument type, or too many arguments
     :raises TypeError: invalid connection
-    :raises ValueError: empty SQL query or lost connection
-    :raises pg.ProgrammingError: error in query
-    :raises pg.InternalError: error during query processing
-    :raises pg.OperationalError: prepared statement does not exist
+    :raises ValueError: empty SQL query
+    :raises pg.DatabaseError: error in query (a subclass depending on the
+        ``SQLSTATE``, e.g. :exc:`pg.ProgrammingError`)
+    :raises pg.OperationalError: prepared statement does not exist,
+        or the connection has been lost
 
 This method works exactly like :meth:`Connection.query` except that instead
 of passing the command itself, you pass the name of a prepared statement.
@@ -297,7 +304,8 @@ as a list or tuple of type OIDs with the *types* argument, which can also be
 passed as a keyword argument. Types given as ``None`` or 0, and types of
 parameters beyond the length of the list, are still inferred by the server.
 If you pass more types than the command has parameters, the statement
-expects that many values when it is executed. For instance, the following statement adds two integers::
+expects that many values when it is executed. For instance, the following
+statement adds two integers::
 
     con.prepare('add', "select $1 + $2", [23, 23])
 
@@ -329,7 +337,8 @@ This method returns a :class:`Query` object describing the prepared
 statement with the given name.  You can also pass an empty name in order
 to describe the unnamed statement.  Information on the fields of the
 corresponding query can be obtained through the :meth:`Query.listfields`,
-:meth:`Query.fieldname` and :meth:`Query.fieldnum` methods.
+:meth:`Query.fieldname`, :meth:`Query.fieldnum` and :meth:`Query.fieldinfo`
+methods.
 
 .. versionadded:: 5.1
 
@@ -343,11 +352,17 @@ reset -- reset the connection
     :rtype: None
     :raises TypeError: too many (any) arguments
     :raises TypeError: invalid connection
+    :raises pg.InterfaceError: the connection is busy
 
-This method resets the current database connection.
+This method resets the current database connection, i.e. it closes the
+connection to the server and opens a new one with the same parameters.
+The state of the session on the server, such as open transactions, prepared
+statements, temporary tables and open large objects, is lost. Results of an
+asynchronous query that have not yet been fetched are discarded, but the
+results of other queries remain available.
 
-poll - completes an asynchronous connection
--------------------------------------------
+poll -- completes an asynchronous connection
+--------------------------------------------
 
 .. method:: Connection.poll()
 
@@ -401,6 +416,8 @@ cancel -- abandon processing of current SQL command
 
 .. method:: Connection.cancel()
 
+    Abandon processing of the current SQL command
+
     :returns: 1 (the request has been sent)
     :rtype: int
     :raises TypeError: too many (any) arguments
@@ -438,11 +455,16 @@ close -- close the database connection
 
     :rtype: None
     :raises TypeError: too many (any) arguments
+    :raises pg.InternalError: the connection has already been closed
+    :raises pg.InterfaceError: the connection is busy
 
 This method closes the database connection. The connection will
 be closed in any case when the connection is deleted but this
-allows you to explicitly close it. It is mainly here to allow
-the DB-SIG API wrapper to implement a close function.
+allows you to explicitly close it. After the connection has been closed,
+its other methods and its attributes cannot be used any more and raise a
+:exc:`TypeError`, and large objects of the connection cannot be used
+either. Results of an asynchronous query that have not yet been fetched
+are discarded, but the results of other queries remain available.
 
 transaction -- get the current transaction state
 ------------------------------------------------
@@ -474,7 +496,7 @@ parameter -- get a current server parameter setting
     :type name: str or bytes
     :returns: the current setting of the specified parameter
     :rtype: str or None
-    :raises TypeError: too many (any) arguments
+    :raises TypeError: bad argument type, or wrong number of arguments
     :raises TypeError: invalid connection
 
 Certain parameter values are reported by the server automatically at
@@ -514,6 +536,17 @@ such as :meth:`datetime.strptime <datetime.datetime.strptime>`.  It is
 derived from the current setting of the database parameter ``DateStyle``.
 
 .. versionadded:: 5.0
+
+escape_literal/identifier/string/bytea -- escape for SQL
+--------------------------------------------------------
+
+The connection also has the methods ``escape_literal()``,
+``escape_identifier()``, ``escape_string()`` and ``escape_bytea()``,
+which escape strings for direct use in SQL commands, taking the properties
+of the connection such as the client encoding into account. They work
+exactly like the methods of the same name of the :class:`DB` wrapper,
+see :meth:`DB.escape_literal`, :meth:`DB.escape_identifier`,
+:meth:`DB.escape_string` and :meth:`DB.escape_bytea`.
 
 encrypt_password -- encrypt a password
 --------------------------------------
@@ -625,8 +658,8 @@ fileno -- get the socket used to connect to the database
 This method returns the underlying socket id used to connect
 to the database. This is useful for use in select calls, etc.
 
-set_non_blocking - set the non-blocking status of the connection
-----------------------------------------------------------------
+set_non_blocking -- set the non-blocking status of the connection
+-----------------------------------------------------------------
 
 .. method:: set_non_blocking(nb)
 
@@ -642,8 +675,8 @@ This affects copy commands and large object operations, but not queries.
 
 .. versionadded:: 5.2
 
-is_non_blocking - report the blocking status of the connection
---------------------------------------------------------------
+is_non_blocking -- report the blocking status of the connection
+---------------------------------------------------------------
 
 .. method:: is_non_blocking()
 
@@ -672,10 +705,10 @@ getnotify -- get the last notify from the server
     :raises TypeError: invalid connection
 
 This method tries to get a notify from the server (from the SQL statement
-NOTIFY). If the server returns no notify, the methods returns None.
+NOTIFY). If the server returns no notify, the method returns None.
 Otherwise, it returns a tuple (triplet) *(relname, pid, extra)*, where
-*relname* is the name of the notify, *pid* is the process id of the
-connection that triggered the notify, and *extra* is a payload string
+*relname* is the name of the notification channel, *pid* is the process id
+of the connection that triggered the notify, and *extra* is a payload string
 that has been sent with the notification. Remember to do a listen query
 first, otherwise :meth:`Connection.getnotify` will always return ``None``.
 
@@ -702,7 +735,8 @@ inserttable -- insert an iterable into a table
     :param list columns: list or tuple of column names (*None* = all columns)
     :param bool freeze: if True, immediately freeze the inserted rows
     :rtype: int
-    :raises TypeError: invalid connection, bad argument type, or too many arguments
+    :raises TypeError: invalid connection, bad argument type, or too many
+        arguments
     :raises MemoryError: insert buffer could not be allocated
     :raises ValueError: unsupported values, values or names containing NUL
         characters, or an error reported by the server
@@ -710,7 +744,7 @@ inserttable -- insert an iterable into a table
         client encoding
     :raises OSError: the data could not be sent to the server
 
-This method allows to *quickly* insert large blocks of data in a table.
+This method allows you to *quickly* insert large blocks of data in a table.
 Internally, it uses the COPY command of the PostgreSQL database.
 The method takes an iterable of row values which must be tuples or lists
 of the same size, containing the values for each inserted row.
@@ -740,8 +774,9 @@ The number of rows affected is returned.
 
 .. warning::
 
-    This method doesn't type check the fields according to the table definition;
-    it just looks whether or not it knows how to handle such types.
+    This method doesn't type check the fields according to the table
+    definition; it just looks whether or not it knows how to handle such
+    types.
 
 get/set_cast_hook -- fallback typecast function
 -----------------------------------------------
@@ -765,9 +800,9 @@ Python typecast functions for the connection.
 
     :param func: the function to be used as a callback
     :rtype: None
-    :raises TypeError: the specified notice receiver is not callable
+    :raises TypeError: the specified function is neither callable nor None
 
-This methods allows setting a custom fallback function for providing
+This method allows setting a custom fallback function for providing
 Python typecast functions for the connection to supplement the C
 extension module.  If you set this function to *None*, then only the typecast
 functions implemented in the C extension module are enabled.  You normally
@@ -790,7 +825,7 @@ get/set_notice_receiver -- custom notice receiver
 This method gets the custom notice receiver callback function that has
 been set with :meth:`Connection.set_notice_receiver`, or ``None`` if no
 custom notice receiver has been set on the connection, or if it has been
-reset or the connection has been closed.
+reset to ``None``.
 
 .. versionadded:: 4.1
 
@@ -800,7 +835,8 @@ reset or the connection has been closed.
 
     :param func: the custom notice receiver callback function or ``None``
     :rtype: None
-    :raises TypeError: the specified notice receiver is not callable
+    :raises TypeError: the specified notice receiver is neither callable
+        nor None
 
 This method allows setting a custom notice receiver callback function.
 When a notice or warning message is received from the server,
@@ -869,9 +905,11 @@ putline -- write a line to the server socket
     :param line: line to be written
     :type line: str or bytes
     :rtype: None
-    :raises TypeError: invalid connection, bad parameter type, or too many parameters
+    :raises TypeError: invalid connection, bad parameter type, or too many
+        parameters
+    :raises OSError: no COPY in progress or other error sending the line
 
-This method allows to directly write a string to the server socket.
+This method allows you to directly write a string to the server socket.
 A string is encoded with the client encoding, bytes are sent unchanged
 (including NUL bytes, e.g. for the binary COPY format).
 
@@ -892,7 +930,7 @@ getline -- get a line from server socket
     :raises OSError: no COPY in progress or other error reading the line
     :raises pg.DatabaseError: the COPY failed (at the end)
 
-This method allows to directly read a string from the server socket.
+This method allows you to directly read a string from the server socket.
 The line is decoded with the client encoding. Like text values, a line that
 cannot be decoded is returned as ``bytes``. A final newline is removed, so
 this method is only suited for the text and CSV formats of COPY. Use the
@@ -922,7 +960,7 @@ endcopy -- synchronize client and server
     :raises pg.DatabaseError: the COPY failed
 
 The use of direct access methods may desynchronize client and server.
-This method ensure that client and server will be synchronized.
+This method ensures that client and server will be synchronized.
 
 After the data has been sent with :meth:`Connection.putline`, this method
 ends the COPY and fetches the final result of the command, so that the
@@ -944,7 +982,8 @@ locreate -- create a large object in the database
     :param int mode: large object create mode
     :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
-    :raises TypeError: invalid connection, bad parameter type, or too many parameters
+    :raises TypeError: invalid connection, bad parameter type, or too many
+        parameters
     :raises pg.OperationalError: creation error
 
 This method creates a large object in the database. The mode can be defined
@@ -957,12 +996,13 @@ getlo -- build a large object from given oid
 
 .. method:: Connection.getlo(oid)
 
-    Create a large object in the database
+    Build a large object from the given OID
 
     :param int oid: OID of the existing large object
     :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
-    :raises TypeError: invalid connection, bad parameter type, or too many parameters
+    :raises TypeError: invalid connection, bad parameter type, or too many
+        parameters
     :raises ValueError: bad OID value (0 is invalid_oid)
 
 This method allows reusing a previously created large object through the
@@ -979,10 +1019,11 @@ loimport -- import a file to a large object
     :type name: str, bytes or path-like object
     :returns: object handling the PostgreSQL large object
     :rtype: :class:`LargeObject`
-    :raises TypeError: invalid connection, bad argument type, or too many arguments
+    :raises TypeError: invalid connection, bad argument type, or too many
+        arguments
     :raises pg.OperationalError: error during file import
 
-This methods allows to create large objects in a very simple way. You just
+This method allows you to create large objects in a very simple way. You just
 give the name of a file containing the data to be used. The file is read on
 the host running the PyGreSQL interface, so the name is encoded with the
 file system encoding like :func:`os.fsencode` does.
@@ -998,6 +1039,8 @@ the connection and its status. These attributes are:
 .. attribute:: Connection.host
 
     the host name of the server (str)
+
+This is ``'localhost'`` if the connection uses a Unix-domain socket.
 
 .. attribute:: Connection.hostaddr
 
@@ -1045,7 +1088,7 @@ cannot be determined and is returned as 0.
 
 .. attribute:: Connection.server_version
 
-    the backend version (int, e.g. 150400 for 15.4)
+    the backend version (int, e.g. 150004 for 15.4)
 
 .. versionadded:: 4.0
 

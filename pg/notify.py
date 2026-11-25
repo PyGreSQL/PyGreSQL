@@ -32,9 +32,10 @@ class NotificationHandler:
         the single argument to the callback function, and a timeout value
         in seconds (a floating point number denotes fractions of seconds).
         If it is absent or None, the callers will never time out.  If the
-        timeout is reached, the callback function will be called with a
-        single argument that is None.  If you set the timeout to zero,
-        the handler will poll notifications synchronously and return.
+        timeout is reached, the handler stops listening and the callback
+        function will be called with a single argument that is None.  If
+        you set the timeout to zero, the handler will poll notifications
+        synchronously and return.
 
         You can specify the name of the event that will be used to signal
         the handler to stop listening as stop_event. By default, it will
@@ -86,6 +87,9 @@ class NotificationHandler:
         If you set the stop flag, a stop notification will be sent that
         will cause the handler to stop listening.
 
+        The notification is only sent while the handler is listening,
+        otherwise this method does nothing and returns None.
+
         Note: If the notification handler is running in another thread, you
         must pass a different database connection since PyGreSQL database
         connections are not thread-safe.
@@ -106,16 +110,16 @@ class NotificationHandler:
         """Invoke the notification handler.
 
         The handler is a loop that listens for notifications on the event
-        and stop event channels.  When either of these notifications are
+        and stop event channels.  When either of these notifications is
         received, its associated 'pid', 'event' and 'extra' (the payload
         passed with the notification) are inserted into its arg_dict
         dictionary and the callback is invoked with this dictionary as
         a single argument.  When the handler receives a stop event, it
-        stops listening to both events and return.
+        stops listening to both events and returns.
 
         In the special case that the timeout of the handler has been set
         to zero, the handler will poll all events synchronously and return.
-        If will keep listening until it receives a stop event.
+        It will keep listening until it receives a stop event.
 
         Note: If you run this loop in another thread, don't use the same
         database connection for database operations in the main thread.

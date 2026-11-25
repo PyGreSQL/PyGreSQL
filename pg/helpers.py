@@ -76,7 +76,8 @@ def split_qualified_name(name: str) -> list[str]:
     The name is split at dots. A part can be enclosed in double quotes,
     with a double quote inside written twice; it can then contain dots.
     All parts are taken literally (case is preserved), so that they can
-    be escaped individually. Empty parts raise a ValueError.
+    be escaped individually. Empty parts, unterminated quotes and text
+    after a closing quote raise a ValueError.
     """
     parts: list[str] = []
     end = len(name)

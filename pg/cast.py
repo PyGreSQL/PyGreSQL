@@ -466,10 +466,7 @@ class Typecasts(dict):
 
     # noinspection PyMethodMayBeStatic
     def dateformat(self) -> str:
-        """Return the current date format.
-
-        This method will be replaced with the dateformat() method of DbTypes.
-        """
+        """Return the current date format."""
         return '%Y-%m-%d'
 
     def create_array_cast(self, basecast: Callable | None,
@@ -532,6 +529,6 @@ def set_typecast(typ: str | Sequence[str], cast: Callable | None) -> None:
     """Set a global typecast function for the given database type(s).
 
     Note that connections cache cast functions. To be sure a global change
-    is picked up by a running connection, call db.db_types.reset_typecast().
+    is picked up by a running connection, call db.dbtypes.reset_typecast().
     """
     Typecasts.set_default(typ, cast)

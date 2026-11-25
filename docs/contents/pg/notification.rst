@@ -15,8 +15,8 @@ Instantiating the notification handler
 
     Create an instance of the notification handler
 
-    :param int db: the database connection
-    :type db: :class:`Connection`
+    :param db: the database connection
+    :type db: :class:`DB` or :class:`Connection`
     :param str event: the name of an event to listen for
     :param callback: a callback function
     :param dict arg_dict: an optional dictionary for passing arguments
@@ -27,7 +27,7 @@ Instantiating the notification handler
 You can also create an instance of the NotificationHandler using the
 :meth:`DB.connection_handler` method.  In this case you don't need to
 pass a database connection because the :class:`DB` connection itself
-will be used as the datebase connection for the notification handler.
+will be used as the database connection for the notification handler.
 
 You must always pass the name of an *event* (notification channel) to listen
 for and a *callback* function.
@@ -36,7 +36,8 @@ You can also specify a dictionary *arg_dict* that will be passed as the
 single argument to the callback function, and a *timeout* value in seconds
 (a floating point number denotes fractions of seconds).  If it is absent
 or *None*, the callers will never time out.  If the time-out is reached,
-the callback function will be called with a single argument that is *None*.
+the handler stops listening and the callback function will be called with
+a single argument that is *None*.
 If you set the *timeout* to ``0``, the handler will poll notifications
 synchronously and return.
 
@@ -54,14 +55,14 @@ To invoke the notification handler, just call the instance without passing
 any parameters.
 
 The handler is a loop that listens for notifications on the event and stop
-event channels.  When either of these notifications are received, its
+event channels.  When either of these notifications is received, its
 associated *pid*, *event* and *extra* (the payload passed with the
 notification) are inserted into its *arg_dict* dictionary and the callback
 is invoked with this dictionary as a single argument.  When the handler
-receives a stop event, it stops listening to both events and return.
+receives a stop event, it stops listening to both events and returns.
 
 In the special case that the timeout of the handler has been set to ``0``,
-the handler will poll all events synchronously and return.  If will keep
+the handler will poll all events synchronously and return.  It will keep
 listening until it receives a stop event.
 
 .. warning::
@@ -79,14 +80,16 @@ database directly, or using the following method:
 
     Generate a notification
 
-    :param int db: the database connection for sending the notification
-    :type db: :class:`Connection`
+    :param db: the database connection for sending the notification
+    :type db: :class:`DB` or :class:`Connection`
     :param bool stop: whether to produce a normal event or a stop event
     :param str payload: an optional payload to be sent with the notification
 
 This method sends a notification event together with an optional *payload*.
 If you set the *stop* flag, a stop notification will be sent instead of
 a normal notification.  This will cause the handler to stop listening.
+Note that the notification is only sent while the handler is listening,
+otherwise this method does nothing and returns ``None``.
 
 .. warning::
 
