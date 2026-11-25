@@ -22,6 +22,7 @@ from keyword import iskeyword
 from re import compile as regex
 from typing import Any, ClassVar
 from uuid import UUID
+from warnings import warn
 
 from .attrs import AttrDict
 from .core import (
@@ -466,7 +467,15 @@ class Typecasts(dict):
 
     # noinspection PyMethodMayBeStatic
     def dateformat(self) -> str:
-        """Return the current date format."""
+        """Return the ISO date format (deprecated).
+
+        This method has never been used and does not consider the DateStyle
+        of the connection. Use Connection.date_format() instead. It will be
+        removed in version 7.0.
+        """
+        warn('Typecasts.dateformat() is deprecated,'
+             ' use Connection.date_format() instead',
+             DeprecationWarning, stacklevel=2)
         return '%Y-%m-%d'
 
     def create_array_cast(self, basecast: Callable | None,

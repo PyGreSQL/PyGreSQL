@@ -211,6 +211,13 @@ class TestHasConnect(unittest.TestCase):
         self.assertGreater(v, 120000)  # >= 12.0
         self.assertLess(v, 200000)  # < 20.0
 
+    def test_typecasts_dateformat_is_deprecated(self):
+        typecasts = pg.Typecasts()
+        with self.assertWarns(DeprecationWarning) as cm:
+            self.assertEqual(typecasts.dateformat(), '%Y-%m-%d')
+        self.assertIn('Connection.date_format()', str(cm.warning))
+        self.assertEqual(cm.filename, __file__)
+
 
 class TestParseArray(unittest.TestCase):
     """Test the array parser."""

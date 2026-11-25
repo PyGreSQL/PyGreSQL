@@ -33,6 +33,9 @@ Version 6.3.0 (unreleased)
   - Table names that are not strings now raise a `TypeError` with a proper
     message in all `DB` methods taking a table name. Before, methods like
     `DB.insert()` raised a confusing `TypeError` from a string method.
+  - Deprecated the method `dateformat()` of `Typecasts`, which has never
+    been used and always returned the ISO date format. Use the method
+    `Connection.date_format()` instead. It will be removed in version 7.0.
   - `DB.get_as_dict()` now raises a `TypeError` instead of a `KeyError` if
     the keyname is not a column name or a sequence of names, like `DB.get()`
     and similar methods.
