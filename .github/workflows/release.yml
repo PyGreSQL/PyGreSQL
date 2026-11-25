@@ -1,0 +1,234 @@
+name: Build and test the release files
+
+# Builds the sdist and the Windows wheels, from the sdist, and tests each
+# wheel against a PostgreSQL server. All files are uploaded as the workflow
+# artifact "dist". On a version tag, the files are published (not yet).
+
+on:
+  push:
+    tags:
+      - "[0-9]*"
+  pull_request:
+    paths:
+      - setup.py
+      - pyproject.toml
+      - MANIFEST.in
+      - ext/**
+      - .github/workflows/release.yml
+      - .github/actions/setup-postgres/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    name: Check the version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+      - name: Check the version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        # the version must be in normalized form, since the indexes and the
+        # file names use that form; on a tag, it must equal the tag, and
+        # the changelog must have a dated entry for it (except dev versions)
+        run: |
+          pip install -q packaging
+          python - << "EOF"
+          import os
+          import re
+          import sys
+          import tomllib
+
+          from packaging.version import Version
+
+          with open("pyproject.toml", "rb") as f:
+              version = tomllib.load(f)["project"]["version"]
+          print("Version:", version)
+          errors = []
+          if str(Version(version)) != version:
+              errors.append(f"Version {version} is not in normalized form"
+                            f" {Version(version)}")
+          if os.environ["REF_TYPE"] == "tag":
+              tag = os.environ["REF_NAME"]
+              if tag != version:
+                  errors.append(f"Tag {tag} does not match version {version}")
+              if not Version(version).is_devrelease:
+                  with open("docs/contents/changelog.rst") as f:
+                      changelog = f.read()
+                  heading = rf"^Version {re.escape(version)} \(\d{{4}}-\d\d-\d\d\)$"
+                  if not re.search(heading, changelog, re.MULTILINE):
+                      errors.append(f"No dated changelog entry for {version}")
+          for error in errors:
+              print(f"::error::{error}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              print(f"version={version}", file=f)
+          sys.exit(1 if errors else 0)
+          EOF
+
+  sdist:
+    name: Build the sdist
+    needs: check-version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install libpq
+        # setup.py needs pg_config, also for building the sdist
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+      - name: Install build tools
+        run: pip install build twine
+      - name: Build the sdist
+        run: python -m build --sdist
+      - name: Check the sdist
+        run: |
+          twine check --strict dist/*
+          tar -tzf dist/*.tar.gz
+      - name: Upload the sdist
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  wheels:
+    name: Build and test the wheel for ${{ matrix.python }}
+    needs: sdist
+    runs-on: windows-2025
+    # installing PostgreSQL and running the tests take a few minutes
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # the wheels of the build option in pyproject.toml, one job each,
+        # since the tests take about 90 seconds on Windows
+        python: [cp310, cp311, cp312, cp313, cp314, cp315]
+
+    env:
+      # the server of the setup-postgres action
+      PYGRESQL_DB: test
+      PYGRESQL_HOST: 127.0.0.1
+      PYGRESQL_USER: test
+      PYGRESQL_PASSWD: test
+      # connecting takes longer on Windows (see tests.yml)
+      PYGRESQL_TEST_TIMEOUT: 300
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        # only for the setup-postgres action, the wheel is built from the sdist
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Download the sdist
+        uses: actions/download-artifact@v8
+        with:
+          name: sdist
+          path: sdist
+      - name: Find the sdist
+        id: sdist
+        run: echo "path=$(ls sdist/*.tar.gz)" >> "$GITHUB_OUTPUT"
+      - name: Set up PostgreSQL
+        # with libpq and pg_config for the build and libpq.dll for the tests
+        uses: ./.github/actions/setup-postgres
+      - name: Build and test the wheel
+        uses: pypa/cibuildwheel@v4.3.5
+        with:
+          package-dir: ${{ steps.sdist.outputs.path }}
+          output-dir: wheelhouse
+          only: ${{ matrix.python }}-win_amd64
+        timeout-minutes: 15
+      - name: Show the server log
+        if: failure()
+        run: |
+          log="$PGDATA/server.log"
+          if [ -n "$PGDATA" ] && [ -f "$log" ]; then cat "$log"; fi
+      - name: Upload the wheel
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.python }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  dist:
+    name: Collect the release files
+    needs: [check-version, sdist, wheels]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Download the sdist
+        uses: actions/download-artifact@v8
+        with:
+          name: sdist
+          path: dist
+      - name: Download the wheels
+        uses: actions/download-artifact@v8
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+      - name: Check the release files
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        # the sdist and one wheel for each Python version, all with the
+        # version that was checked
+        run: |
+          pip install -q twine
+          ls -l dist
+          twine check --strict dist/*
+          for file in dist/*; do
+            case "${file#dist/}" in
+              "pygresql-$VERSION.tar.gz" | "pygresql-$VERSION-"*.whl) ;;
+              *) echo "::error::Unexpected file $file"; exit 1 ;;
+            esac
+          done
+          if [ "$(ls dist | wc -l)" != 7 ]; then
+            echo "::error::Expected the sdist and 6 wheels"
+            exit 1
+          fi
+          # libpq is not bundled yet (users need libpq.dll on the PATH)
+          for wheel in dist/*.whl; do
+            if python -m zipfile -l "$wheel" | grep -i "\.dll "; then
+              echo "::error::$wheel contains DLLs"
+              exit 1
+            fi
+          done
+      - name: Upload the release files
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error

@@ -114,6 +114,34 @@ exclude_also = [
 [tool.coverage.html]
 directory = "htmlcov/python"
 
+[tool.cibuildwheel]
+# The wheels are built with .github/workflows/release.yml, from the sdist,
+# against the libpq of the PostgreSQL installation that has pg_config on
+# the PATH. They do not bundle libpq: pg/core.py finds libpq.dll on the PATH.
+build = [
+    "cp310-win_amd64",
+    "cp311-win_amd64",
+    "cp312-win_amd64",
+    "cp313-win_amd64",
+    "cp314-win_amd64",
+    "cp315-win_amd64",
+]
+build-verbosity = 1
+# treat compiler warnings as errors (see setup.py)
+config-settings = {"--build-option" = ["build_ext", "--strict"]}
+# run the test suite against the installed wheel, from a temporary directory
+# with a copy of the tests, so that pg and pgdb are not imported from the
+# source tree; needs a database server, configured like for tox
+test-sources = ["tests"]
+test-command = [
+    "python -c \"import pg; print(pg.__file__, pg.version, pg.get_pqlib_version())\"",
+    "python -X dev -W error -m unittest discover -v -s tests -t .",
+]
+
+[tool.cibuildwheel.windows]
+# do not bundle libpq and its dependencies with delvewheel (the default)
+repair-wheel-command = ""
+
 [tool.setuptools]
 packages = ["pg", "pgdb"]
 
