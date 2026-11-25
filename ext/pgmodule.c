@@ -229,9 +229,11 @@ pg_connect(PyObject *Py_UNUSED(self), PyObject *args, PyObject *dict)
     }
 
     if (!(conn_obj = PyObject_GC_New(connObject, &connType))) {
+        /* GCOVR_EXCL_START: out of memory */
         while (ndef) Py_DECREF(defaults[--ndef]);
         set_error_msg(InternalError, "Can't create new connection object");
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     conn_obj->valid = 1;
@@ -339,13 +341,17 @@ pg_escape_string(PyObject *Py_UNUSED(self), PyObject *string)
 
     to_length = 2 * (size_t)from_length + 1;
     if ((Py_ssize_t)to_length < from_length) { /* overflow */
+        /* GCOVR_EXCL_START: too large to test */
         to_length = (size_t)from_length;
         from_length = (from_length - 1) / 2;
+        /* GCOVR_EXCL_STOP */
     }
     to = (char *)PyMem_Malloc(to_length);
     if (!to) {
+        /* GCOVR_EXCL_START: out of memory */
         Py_XDECREF(tmp_obj);
         return PyErr_NoMemory();
+        /* GCOVR_EXCL_STOP */
     }
     to_length = (size_t)PQescapeString(to, from, (size_t)from_length);
 
@@ -440,7 +446,7 @@ pg_unescape_bytea(PyObject *Py_UNUSED(self), PyObject *data)
     Py_XDECREF(tmp_obj);
 
     if (!to)
-        return PyErr_NoMemory();
+        return PyErr_NoMemory(); /* GCOVR_EXCL_LINE: out of memory */
 
     to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t)to_length);
     PQfreemem(to);
@@ -889,7 +895,7 @@ pg_set_defport(PyObject *Py_UNUSED(self), PyObject *args)
         port_obj = Py_NewRef(Py_None);
     }
     else if (!(port_obj = PyLong_FromLong(port))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     old = pg_default_port;
@@ -1129,7 +1135,7 @@ add_exception(PyObject *mod, const char *name, PyObject *base)
     PyObject *exc = PyErr_NewException(name, base, NULL);
 
     if (exc && PyModule_AddObjectRef(mod, strrchr(name, '.') + 1, exc) < 0)
-        Py_CLEAR(exc);
+        Py_CLEAR(exc); /* GCOVR_EXCL_LINE: out of memory */
     return exc;
 }
 
@@ -1177,7 +1183,7 @@ PyInit__pg(void)
     /* Create the module and add the functions */
     mod = PyModule_Create(&moduleDef);
     if (!mod)
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
 
     /* Exceptions as defined by DB-API 2.0 */
     if (!(Error = add_exception(mod, "pg.Error", PyExc_Exception)) ||
@@ -1201,7 +1207,7 @@ PyInit__pg(void)
               add_exception(mod, "pg.NoResultError", InvalidResultError)) ||
         !(MultipleResultsError = add_exception(mod, "pg.MultipleResultsError",
                                                InvalidResultError))) {
-        goto error;
+        goto error; /* GCOVR_EXCL_LINE: out of memory */
     }
     /* Connection failures are operational errors as suggested by DB-API 2.0,
        but also internal errors for backward compatibility */
@@ -1212,7 +1218,7 @@ PyInit__pg(void)
             bases ? add_exception(mod, "pg.ConnectError", bases) : NULL;
         Py_XDECREF(bases);
         if (!ConnectError)
-            goto error;
+            goto error; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     /* Types (only some of them are exposed in the module) */
@@ -1220,20 +1226,20 @@ PyInit__pg(void)
         PyModule_AddType(mod, &queryType) < 0 ||
         PyModule_AddType(mod, &largeType) < 0 ||
         PyType_Ready(&noticeType) < 0 || PyType_Ready(&sourceType) < 0) {
-        goto error;
+        goto error; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     /* Make the version available */
     if (PyModule_AddStringConstant(mod, "version", PyPgVersion) < 0 ||
         PyModule_AddStringConstant(mod, "__version__", PyPgVersion) < 0) {
-        goto error;
+        goto error; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     /* Integer constants */
     for (i = 0; int_constants[i].name; ++i) {
         if (PyModule_AddIntConstant(mod, int_constants[i].name,
                                     int_constants[i].value) < 0)
-            goto error;
+            goto error; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     /* Prepare default values */
@@ -1252,7 +1258,9 @@ PyInit__pg(void)
 
     return mod;
 
+/* GCOVR_EXCL_START: out of memory */
 error:
     Py_DECREF(mod);
     return NULL;
+    /* GCOVR_EXCL_STOP */
 }

@@ -168,7 +168,7 @@ class RowCache:
         """Get a namedtuple factory for row results with the given names."""
         try:
             return namedtuple('Row', names, rename=True)._make  # type: ignore[attr-defined]
-        except ValueError:  # there is still a problem with the field names
+        except ValueError:  # pragma: no cover (not with rename=True)
             names = [f'column_{n}' for n in range(len(names))]
             return namedtuple('Row', names)._make  # type: ignore[attr-defined]
 

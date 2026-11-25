@@ -223,7 +223,7 @@ conn_source(connObject *self, PyObject *Py_UNUSED(noargs))
 
     /* allocates new query object */
     if (!(source_obj = PyObject_New(sourceObject, &sourceType))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     /* initializes internal parameters */
@@ -265,15 +265,19 @@ _conn_non_query_result(int status, PGresult *result, PGconn *cnx)
                 Py_RETURN_NONE;
             }
             /* for a single insert, return the oid */
+            /* GCOVR_EXCL_START: no table OIDs since PostgreSQL 12 */
             PQclear(result);
             return PyLong_FromUnsignedLong((unsigned long)oid);
+            /* GCOVR_EXCL_STOP */
         }
         case PGRES_COPY_OUT: /* no data will be received */
         case PGRES_COPY_IN:
             PQclear(result);
             Py_RETURN_NONE;
+        /* GCOVR_EXCL_START: unreachable */
         default:
             set_error_msg(InternalError, "Unknown result status");
+            /* GCOVR_EXCL_STOP */
     }
 
     PQclear(result);
@@ -328,9 +332,11 @@ _conn_new_query(connObject *self, PGresult *result, int encoding, int async)
     queryObject *query_obj = PyObject_New(queryObject, &queryType);
 
     if (!query_obj) {
+        /* GCOVR_EXCL_START: out of memory */
         if (result)
             PQclear(result);
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     query_obj->pgcnx = (connObject *)Py_NewRef(self);
@@ -355,7 +361,7 @@ _conn_new_query(connObject *self, PGresult *result, int encoding, int async)
         if (!query_obj->col_types) {
             /* this also clears the result and releases the connection */
             Py_DECREF(query_obj);
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
     }
     if (async)
@@ -434,8 +440,10 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
                 seq_obj = PySequence_Tuple(first_obj);
                 Py_DECREF(param_obj);
                 if (!(param_obj = seq_obj)) {
+                    /* GCOVR_EXCL_START: out of memory */
                     Py_DECREF(query_str_obj);
                     return NULL;
+                    /* GCOVR_EXCL_STOP */
                 }
                 nparms = (int)PyTuple_GET_SIZE(param_obj);
             }
@@ -473,10 +481,12 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
         }
         s = str;
         if (!str || !parms || (binary && (!types || !lengths || !formats))) {
+            /* GCOVR_EXCL_START: out of memory */
             PyErr_NoMemory();
             status = -1;
             result = NULL;
             goto cleanup;
+            /* GCOVR_EXCL_STOP */
         }
 
         /* convert optional args to a list of strings -- this allows
@@ -497,16 +507,20 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
 
                 /* binary data is sent unchanged, NUL bytes are allowed */
                 if (PyBytes_AsStringAndSize(obj, &data, &size) < 0) {
+                    /* GCOVR_EXCL_START: cannot fail */
                     status = -1;
                     result = NULL;
                     goto cleanup;
+                    /* GCOVR_EXCL_STOP */
                 }
                 if (size > INT_MAX) {
+                    /* GCOVR_EXCL_START: too large to test */
                     PyErr_SetString(PyExc_ValueError,
                                     "Bytea parameter is too large");
                     status = -1;
                     result = NULL;
                     goto cleanup;
+                    /* GCOVR_EXCL_STOP */
                 }
                 *s++ = Py_NewRef(obj);
                 parms[i] = data;
@@ -693,13 +707,17 @@ _conn_get_param_types(PyObject *types_obj, Oid **types, int *ntypes)
     }
     if (n > INT_MAX) {
         Py_DECREF(seq_obj);
+        /* GCOVR_EXCL_START: too large to test */
         PyErr_SetString(PyExc_ValueError, "Too many parameter types");
         return -1;
+        /* GCOVR_EXCL_STOP */
     }
     if (!(oids = (Oid *)PyMem_Malloc((size_t)n * sizeof(*oids)))) {
         Py_DECREF(seq_obj);
+        /* GCOVR_EXCL_START: out of memory */
         PyErr_NoMemory();
         return -1;
+        /* GCOVR_EXCL_STOP */
     }
     for (i = 0; i < n; ++i) {
         PyObject *obj = PyTuple_GET_ITEM(seq_obj, i);
@@ -722,7 +740,7 @@ _conn_get_param_types(PyObject *types_obj, Oid **types, int *ntypes)
             value = PyLong_AsLongLongAndOverflow(int_obj, &overflow);
             Py_DECREF(int_obj);
             if (value == -1 && PyErr_Occurred())
-                goto error;
+                goto error; /* GCOVR_EXCL_LINE: cannot fail */
             if (overflow || value < 0 || value > (long long)UINT_MAX) {
                 PyErr_Format(PyExc_ValueError,
                              "Invalid parameter type OID: %R", obj);
@@ -1114,8 +1132,10 @@ conn_is_non_blocking(connObject *self, PyObject *Py_UNUSED(noargs))
 
     rc = PQisnonblocking(self->cnx);
     if (rc < 0) {
+        /* GCOVR_EXCL_START: cannot fail */
         set_error_text(PyExc_IOError, NULL, self->cnx);
         return NULL;
+        /* GCOVR_EXCL_STOP */
     }
 
     return PyBool_FromLong((long)rc);
@@ -1152,7 +1172,7 @@ _inserttable_append_identifier(connObject *self, struct CharBuffer *buf,
     }
 
     if (PyBytes_AsStringAndSize(bytes_obj, &s, &len) < 0)
-        goto done;
+        goto done; /* GCOVR_EXCL_LINE: cannot fail */
     if (memchr(s, '\0', (size_t)len)) {
         PyErr_SetString(PyExc_ValueError,
                         "Table and column names must not contain NUL");
@@ -1162,8 +1182,10 @@ _inserttable_append_identifier(connObject *self, struct CharBuffer *buf,
         /* buffer for the contents of quoted parts */
         scratch = PyMem_Malloc((size_t)len + 1);
         if (!scratch) {
+            /* GCOVR_EXCL_START: out of memory */
             PyErr_NoMemory();
             goto done;
+            /* GCOVR_EXCL_STOP */
         }
     }
 
@@ -1233,7 +1255,7 @@ _inserttable_append_bytea(struct CharBuffer *buf, PyObject *item)
     Py_ssize_t len;
 
     if (PyBytes_AsStringAndSize(item, &s, &len) < 0)
-        return -1;
+        return -1; /* GCOVR_EXCL_LINE: cannot fail */
     /* the backslash of the hex format must be escaped in COPY text */
     ext_char_buffer_s(buf, "\\\\x");
     for (end = s + len; s < end; ++s) {
@@ -1271,7 +1293,7 @@ _inserttable_append_value(struct CharBuffer *buf, PyObject *item, int encoding)
 
     if (PyBytes_AsStringAndSize(bytes_obj, &s, &len) < 0) {
         Py_DECREF(bytes_obj);
-        return -1;
+        return -1; /* GCOVR_EXCL_LINE: cannot fail */
     }
     for (end = s + len; s < end; ++s) {
         char c = *s;
@@ -1402,7 +1424,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         cols = PyList_Check(columns) ? PyList_AsTuple(columns)
                                      : Py_NewRef(columns);
         if (!cols)
-            goto cleanup;
+            goto cleanup; /* GCOVR_EXCL_LINE: out of memory */
         n = PyTuple_GET_SIZE(cols);
         if (!n) {
             /* no columns specified, nothing to do */
@@ -1419,8 +1441,10 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
 
     /* pre-allocate some memory for the query buffer */
     if (!init_char_buffer(&buffer, 4096)) {
+        /* GCOVR_EXCL_START: out of memory */
         PyErr_NoMemory();
         goto cleanup;
+        /* GCOVR_EXCL_STOP */
     }
 
     /* starts query */
@@ -1448,8 +1472,10 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
     ext_char_buffer_c(&buffer, '\0');
 
     if (buffer.error) {
+        /* GCOVR_EXCL_START: out of memory */
         PyErr_NoMemory();
         goto cleanup;
+        /* GCOVR_EXCL_STOP */
     }
 
     /* the connection stays busy until the end of the copy operation,
@@ -1492,7 +1518,7 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
                since converting the items may run arbitrary Python code */
             Py_SETREF(row, PyList_AsTuple(row));
             if (!row)
-                goto cleanup;
+                goto cleanup; /* GCOVR_EXCL_LINE: out of memory */
         }
         else if (!PyTuple_Check(row)) {
             PyErr_SetString(
@@ -1528,9 +1554,11 @@ conn_inserttable(connObject *self, PyObject *args, PyObject *kwds)
         /* terminate line */
         ext_char_buffer_c(&buffer, '\n');
         if (buffer.error) {
+            /* GCOVR_EXCL_START: out of memory */
             PyErr_NoMemory();
             errormsg = "Memory error";
             goto cleanup;
+            /* GCOVR_EXCL_STOP */
         }
 
         if (buffer.size > 128 * 1024) {
@@ -1830,14 +1858,18 @@ conn_escape_string(connObject *self, PyObject *string)
 
     /* the result can be twice as long, do not truncate on overflow */
     if (from_length > (PY_SSIZE_T_MAX - 1) / 2) {
+        /* GCOVR_EXCL_START: too large to test */
         Py_XDECREF(tmp_obj);
         return PyErr_NoMemory();
+        /* GCOVR_EXCL_STOP */
     }
     to_length = 2 * (size_t)from_length + 1;
     to = (char *)PyMem_Malloc(to_length);
     if (!to) {
+        /* GCOVR_EXCL_START: out of memory */
         Py_XDECREF(tmp_obj);
         return PyErr_NoMemory();
+        /* GCOVR_EXCL_STOP */
     }
     to_length =
         PQescapeStringConn(self->cnx, to, from, (size_t)from_length, &error);
@@ -1903,7 +1935,7 @@ conn_escape_bytea(connObject *self, PyObject *data)
     Py_XDECREF(tmp_obj);
 
     if (!to)
-        return PyErr_NoMemory();
+        return PyErr_NoMemory(); /* GCOVR_EXCL_LINE: out of memory */
 
     if (encoding == -1)
         to_obj = PyBytes_FromStringAndSize(to, (Py_ssize_t)to_length - 1);
@@ -2146,7 +2178,7 @@ large_new(connObject *pgcnx, Oid oid)
     largeObject *large_obj;
 
     if (!(large_obj = PyObject_New(largeObject, &largeType))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     Py_XINCREF(pgcnx);
@@ -2226,7 +2258,7 @@ conn_getlo(connObject *self, PyObject *args)
     value = PyLong_AsLongLongAndOverflow(int_obj, &overflow);
     Py_DECREF(int_obj);
     if (value == -1 && PyErr_Occurred())
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: cannot fail */
     if (overflow || value < 0 || value > (long long)UINT_MAX) {
         PyErr_Format(PyExc_ValueError, "Invalid large object OID: %R",
                      oid_obj);
@@ -2352,7 +2384,7 @@ conn_cancel(connObject *self, PyObject *Py_UNUSED(noargs))
         PGcancelConn *cancel_conn = PQcancelCreate(self->cnx);
 
         if (!cancel_conn)
-            return PyErr_NoMemory();
+            return PyErr_NoMemory(); /* GCOVR_EXCL_LINE: out of memory */
         Py_BEGIN_ALLOW_THREADS
         ret = PQcancelBlocking(cancel_conn);
         Py_END_ALLOW_THREADS
@@ -2621,7 +2653,7 @@ conn_dir(connObject *self, PyObject *Py_UNUSED(noargs))
 
     /* the type is a borrowed reference, the result of extend() a new one */
     if (!(attrs = PyObject_Dir((PyObject *)Py_TYPE(self))))
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     ret = PyObject_CallMethod(
         attrs, "extend", "[ssssssssssssssss]", "host", "hostaddr", "port",
         "db", "options", "error", "status", "user", "protocol_version",
@@ -2629,7 +2661,7 @@ conn_dir(connObject *self, PyObject *Py_UNUSED(noargs))
         "backend_pid", "ssl_in_use", "ssl_attributes");
     if (!ret) {
         Py_DECREF(attrs);
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
     Py_DECREF(ret);
 

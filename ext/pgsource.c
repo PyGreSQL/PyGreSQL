@@ -246,9 +246,11 @@ source_execute(sourceObject *self, PyObject *sql)
             set_error(ProgrammingError, "Cannot execute command",
                       self->pgcnx->cnx, self->result);
             break;
+        /* GCOVR_EXCL_START: unreachable */
         default:
             set_error_msg(InternalError,
                           "Internal error: unknown result status");
+            /* GCOVR_EXCL_STOP */
     }
 
     /* frees result and returns error */
@@ -277,7 +279,9 @@ source_oidstatus(sourceObject *self, PyObject *Py_UNUSED(noargs))
         Py_RETURN_NONE;
     }
 
+    /* GCOVR_EXCL_START: no table OIDs since PostgreSQL 12 */
     return PyLong_FromUnsignedLong((unsigned long)oid);
+    /* GCOVR_EXCL_STOP */
 }
 
 /* Fetch rows from last result. */
@@ -315,7 +319,7 @@ source_fetch(sourceObject *self, PyObject *args)
 
     /* allocate list for result */
     if (!(res_list = PyList_New(0)))
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
 
     encoding = self->encoding;
 
@@ -326,7 +330,7 @@ source_fetch(sourceObject *self, PyObject *args)
 
         if (!(rowtuple = PyTuple_New(self->num_fields))) {
             Py_DECREF(res_list);
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
 
         for (j = 0; j < self->num_fields; ++j) {
@@ -347,7 +351,7 @@ source_fetch(sourceObject *self, PyObject *args)
                 if (!str) {
                     Py_DECREF(rowtuple);
                     Py_DECREF(res_list);
-                    return NULL;
+                    return NULL; /* GCOVR_EXCL_LINE: out of memory */
                 }
             }
             PyTuple_SET_ITEM(rowtuple, j, str);
@@ -356,7 +360,7 @@ source_fetch(sourceObject *self, PyObject *args)
         if (PyList_Append(res_list, rowtuple)) {
             Py_DECREF(rowtuple);
             Py_DECREF(res_list);
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
         Py_DECREF(rowtuple);
     }
@@ -708,14 +712,14 @@ _source_buildinfo(sourceObject *self, int num)
 
     if (!(name =
               get_decoded_text(PQfname(self->result, num), self->encoding))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     /* allocates tuple */
     result = PyTuple_New(5);
     if (!result) {
         Py_DECREF(name);
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     /* affects field information */
@@ -748,14 +752,14 @@ source_listInfo(sourceObject *self, PyObject *Py_UNUSED(noargs))
 
     /* builds result */
     if (!(result = PyTuple_New(self->num_fields))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     for (i = 0; i < self->num_fields; ++i) {
         info = _source_buildinfo(self, i);
         if (!info) {
             Py_DECREF(result);
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
         PyTuple_SET_ITEM(result, i, info);
     }
@@ -822,12 +826,12 @@ source_dir(sourceObject *self, PyObject *Py_UNUSED(noargs))
 
     /* the type is a borrowed reference, the result of extend() a new one */
     if (!(attrs = PyObject_Dir((PyObject *)Py_TYPE(self))))
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     ret = PyObject_CallMethod(attrs, "extend", "[sssss]", "pgcnx", "arraysize",
                               "resulttype", "ntuples", "nfields");
     if (!ret) {
         Py_DECREF(attrs);
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
     Py_DECREF(ret);
 

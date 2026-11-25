@@ -213,7 +213,7 @@ get_decoded_message(const char *msg, int encoding)
     Py_ssize_t size, len;
 
     if (!obj)
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     size = len = PyUnicode_GET_LENGTH(obj);
     while (len && Py_UNICODE_ISSPACE(PyUnicode_READ_CHAR(obj, len - 1))) --len;
     if (len == size)
@@ -294,7 +294,7 @@ get_encoded_text(PyObject *text, int encoding)
     Py_ssize_t pos = PyUnicode_FindChar(text, 0, 0, PY_SSIZE_T_MAX, 1);
 
     if (pos == -2)
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: cannot fail */
     if (pos >= 0) {
         PyObject *nul = PyUnicode_FromOrdinal(0), *esc, *tmp = NULL;
 
@@ -304,7 +304,7 @@ get_encoded_text(PyObject *text, int encoding)
         Py_XDECREF(nul);
         Py_XDECREF(esc);
         if (!tmp)
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         bytes = get_encoded_text(tmp, encoding);
         Py_DECREF(tmp);
         return bytes;
@@ -351,7 +351,7 @@ get_field_number(const PGresult *res, PyObject *name, int encoding,
 
             if (!field) {
                 Py_DECREF(bytes);
-                return -2;
+                return -2; /* GCOVR_EXCL_LINE: out of memory */
             }
             equal = PyObject_RichCompareBool(field, name, Py_EQ);
             Py_DECREF(field);
@@ -558,7 +558,7 @@ get_col_types(PGresult *result, int nfields)
     int *types, *t, j;
 
     if (!(types = PyMem_Malloc(sizeof(int) * (size_t)nfields))) {
-        return (int *)PyErr_NoMemory();
+        return (int *)PyErr_NoMemory(); /* GCOVR_EXCL_LINE: out of memory */
     }
 
     for (j = 0, t = types; j < nfields; ++j) {
@@ -602,7 +602,7 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
             /* we need to add a null byte */
             tmp_str = (char *)PyMem_Malloc((size_t)size + 1);
             if (!tmp_str) {
-                return PyErr_NoMemory();
+                return PyErr_NoMemory(); /* GCOVR_EXCL_LINE: out of memory */
             }
             memcpy(tmp_str, s, (size_t)size);
             s = tmp_str;
@@ -610,7 +610,7 @@ cast_sized_text(char *s, Py_ssize_t size, int encoding, int type)
             tmp_str = (char *)PQunescapeBytea((unsigned char *)s, &str_len);
             PyMem_Free(s);
             if (!tmp_str)
-                return PyErr_NoMemory();
+                return PyErr_NoMemory(); /* GCOVR_EXCL_LINE: out of memory */
             obj = PyBytes_FromStringAndSize(tmp_str, (Py_ssize_t)str_len);
             if (tmp_str) {
                 PQfreemem(tmp_str);
@@ -737,9 +737,11 @@ cast_sized_simple(char *s, Py_ssize_t size, int type)
             }
             break;
 
+        /* GCOVR_EXCL_START: unreachable */
         default:
             /* other types should never be passed, use cast_sized_text */
             obj = PyUnicode_FromStringAndSize(s, size);
+            /* GCOVR_EXCL_STOP */
     }
 
     return obj;
@@ -806,9 +808,11 @@ cast_unsized_simple(char *s, int type)
             }
             break;
 
+        /* GCOVR_EXCL_START: unreachable */
         default:
             /* other types should never be passed, use cast_sized_text */
             obj = PyUnicode_FromString(s);
+            /* GCOVR_EXCL_STOP */
     }
 
     return obj;
@@ -903,7 +907,7 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
     depth--; /* next level of parsing */
     result = PyList_New(0);
     if (!result)
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     do ++s;
     while (s != end && *s == ' ');
     /* everything is set up, start parsing the array */
@@ -935,7 +939,7 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
             result = stack[--level];
             if (PyList_Append(result, subresult)) {
                 Py_DECREF(result);
-                return NULL;
+                return NULL; /* GCOVR_EXCL_LINE: out of memory */
             }
         }
         else if (level == depth) { /* we expect elements at this level */
@@ -999,7 +1003,9 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
                     estr = (char *)PyMem_Malloc((size_t)esize);
                     if (!estr) {
                         Py_DECREF(result);
+                        /* GCOVR_EXCL_START: out of memory */
                         return PyErr_NoMemory();
+                        /* GCOVR_EXCL_STOP */
                     }
                     for (i = 0, r = estr; i < esize; ++i) {
                         if (*t == '\\')
@@ -1038,7 +1044,7 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
             if (PyList_Append(result, element)) {
                 Py_DECREF(element);
                 Py_DECREF(result);
-                return NULL;
+                return NULL; /* GCOVR_EXCL_LINE: out of memory */
             }
             Py_DECREF(element);
             if (*s == delim) {
@@ -1063,7 +1069,7 @@ cast_array(char *s, Py_ssize_t size, int encoding, int type, PyObject *cast,
                 break; /* error */
             stack[level++] = result;
             if (!(result = PyList_New(0)))
-                return NULL;
+                return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
     }
     if (s == end || *s != '}') {
@@ -1113,7 +1119,7 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
     }
     result = PyList_New(0);
     if (!result)
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     i = 0;
     /* everything is set up, start parsing the record */
     while (++s != end) {
@@ -1162,7 +1168,9 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
                 estr = (char *)PyMem_Malloc((size_t)esize);
                 if (!estr) {
                     Py_DECREF(result);
+                    /* GCOVR_EXCL_START: out of memory */
                     return PyErr_NoMemory();
+                    /* GCOVR_EXCL_STOP */
                 }
                 quoted = 0;
                 r = estr;
@@ -1229,7 +1237,7 @@ cast_record(char *s, Py_ssize_t size, int encoding, int *type, PyObject *cast,
         if (PyList_Append(result, element)) {
             Py_DECREF(element);
             Py_DECREF(result);
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
         Py_DECREF(element);
         if (len)
@@ -1329,7 +1337,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             key = (char *)PyMem_Malloc((size_t)item_size);
             if (!key) {
                 Py_DECREF(result);
-                return PyErr_NoMemory();
+                return PyErr_NoMemory(); /* GCOVR_EXCL_LINE: out of memory */
             }
             t = key;
             while (r != s) {
@@ -1346,7 +1354,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             PyMem_Free(key);
         if (!key_obj) {
             Py_DECREF(result);
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
         if (quoted)
             ++s;
@@ -1406,7 +1414,9 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
                 if (!val) {
                     Py_DECREF(key_obj);
                     Py_DECREF(result);
+                    /* GCOVR_EXCL_START: out of memory */
                     return PyErr_NoMemory();
+                    /* GCOVR_EXCL_STOP */
                 }
                 t = val;
                 while (r != s) {
@@ -1424,7 +1434,7 @@ cast_hstore(char *s, Py_ssize_t size, int encoding)
             if (!val_obj) {
                 Py_DECREF(key_obj);
                 Py_DECREF(result);
-                return NULL;
+                return NULL; /* GCOVR_EXCL_LINE: out of memory */
             }
         }
         else {
@@ -1532,13 +1542,13 @@ set_error_msg_and_state(PyObject *type, const char *msg, int encoding,
     PyObject *err_obj, *msg_obj, *sql_obj;
 
     if (!(msg_obj = get_decoded_message(msg, encoding)))
-        return;
+        return; /* GCOVR_EXCL_LINE: out of memory */
 
     sql_obj = sqlstate ? PyUnicode_FromStringAndSize(sqlstate, 5)
                        : Py_NewRef(Py_None);
     if (!sql_obj) {
         Py_DECREF(msg_obj);
-        return;
+        return; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     err_obj = PyObject_CallFunctionObjArgs(type, msg_obj, NULL);
@@ -1651,7 +1661,7 @@ get_ssl_attributes(PGconn *cnx)
     const char *const *s;
 
     if (!(attr_dict = PyDict_New())) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     for (s = PQsslAttributeNames(cnx); *s; ++s) {
@@ -1808,15 +1818,19 @@ format_result(const PGresult *res, int encoding)
                 return result;
             }
             else {
+                /* GCOVR_EXCL_START: out of memory */
                 PyMem_Free(aligns);
                 PyMem_Free(sizes);
                 return PyErr_NoMemory();
+                /* GCOVR_EXCL_STOP */
             }
         }
         else {
+            /* GCOVR_EXCL_START: out of memory */
             PyMem_Free(aligns);
             PyMem_Free(sizes);
             return PyErr_NoMemory();
+            /* GCOVR_EXCL_STOP */
         }
     }
     else
@@ -1913,7 +1927,7 @@ _notice_new(connObject *cnx, const PGresult *res)
     int encoding = PQclientEncoding(cnx->cnx);
 
     if (!notice)
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     notice->pgcnx = cnx;
     notice->message = _notice_field(res, 0, encoding);
     notice->severity = _notice_field(res, PG_DIAG_SEVERITY, encoding);
@@ -1923,7 +1937,7 @@ _notice_new(connObject *cnx, const PGresult *res)
     if (!notice->message || !notice->severity || !notice->primary ||
         !notice->detail || !notice->hint) {
         Py_DECREF(notice);
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
     return notice;
 }
@@ -1984,8 +1998,10 @@ init_char_buffer(struct CharBuffer *buf, size_t initial_size)
         buf->error = 0;
     }
     else {
+        /* GCOVR_EXCL_START: out of memory */
         buf->max_size = 0;
         buf->error = 1;
+        /* GCOVR_EXCL_STOP */
     }
     return !buf->error;
 }
@@ -2005,8 +2021,10 @@ grow_char_buffer(struct CharBuffer *buf, size_t need)
 
     tmp = PyMem_Realloc(buf->data, need);
     if (!tmp) {
+        /* GCOVR_EXCL_START: out of memory */
         buf->error = 1;
         return 0;
+        /* GCOVR_EXCL_STOP */
     }
 
     buf->data = tmp;
@@ -2026,7 +2044,7 @@ ext_char_buffer_s(struct CharBuffer *buf, const char *s)
 
     need = buf->size + len;
     if (need >= buf->max_size && !grow_char_buffer(buf, need))
-        return;
+        return; /* GCOVR_EXCL_LINE: out of memory */
 
     memcpy(buf->data + buf->size, s, len);
     buf->size += len;
@@ -2040,7 +2058,7 @@ ext_char_buffer_c(struct CharBuffer *buf, char c)
         return;
 
     if (buf->size >= buf->max_size && !grow_char_buffer(buf, buf->size + 1))
-        return;
+        return; /* GCOVR_EXCL_LINE: out of memory */
 
     buf->data[buf->size++] = c;
 }

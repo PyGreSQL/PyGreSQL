@@ -2,7 +2,7 @@
 
 try:
     from ._pg import version
-except ImportError as e:  # noqa: F841
+except ImportError as e:  # noqa: F841  # pragma: no cover
     import os
     libpq = 'libpq.'
     if os.name == 'nt':

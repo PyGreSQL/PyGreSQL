@@ -117,9 +117,11 @@ _query_detach(queryObject *self)
                 PyMem_Realloc(self->pending, (size_t)(self->num_pending + 4) *
                                                  sizeof(*pending));
             if (!pending) {
+                /* GCOVR_EXCL_START: out of memory */
                 PQclear(result);
                 PyErr_NoMemory();
                 return -1;
+                /* GCOVR_EXCL_STOP */
             }
             self->pending = pending;
         }
@@ -252,8 +254,10 @@ _query_fetch(queryObject *self)
         self->num_fields = PQnfields(result);
         self->col_types = get_col_types(result, self->num_fields);
         if (!self->col_types) {
+            /* GCOVR_EXCL_START: out of memory */
             _query_clear_result(self);
             return NULL;
+            /* GCOVR_EXCL_STOP */
         }
         return (PyObject *)self;
     }
@@ -410,7 +414,7 @@ _query_row_as_tuple(queryObject *self, int row)
     int j;
 
     if (!(row_tuple = PyTuple_New(self->num_fields))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     ++self->in_use;
@@ -519,7 +523,7 @@ query_listfields(queryObject *self, PyObject *Py_UNUSED(noargs))
             str = get_decoded_text(PQfname(self->result, i), self->encoding);
             if (!str) {
                 Py_DECREF(fieldstuple);
-                return NULL;
+                return NULL; /* GCOVR_EXCL_LINE: out of memory */
             }
             PyTuple_SET_ITEM(fieldstuple, i, str);
         }
@@ -594,7 +598,7 @@ _query_build_field_info(PGresult *res, int col_num, int encoding)
     PyObject *info, *name;
 
     if (!(name = get_decoded_text(PQfname(res, col_num), encoding)))
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     info = PyTuple_New(4);
     if (!info) {
         Py_DECREF(name);
@@ -651,14 +655,14 @@ query_fieldinfo(queryObject *self, PyObject *args)
     }
 
     if (!(result = PyTuple_New(self->num_fields))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
     for (num = 0; num < self->num_fields; ++num) {
         PyObject *info =
             _query_build_field_info(self->result, num, self->encoding);
         if (!info) {
             Py_DECREF(result);
-            return NULL;
+            return NULL; /* GCOVR_EXCL_LINE: out of memory */
         }
         PyTuple_SET_ITEM(result, num, info);
     }
@@ -739,7 +743,7 @@ _query_tuple_list(queryObject *self)
     int i;
 
     if (!(result_list = PyList_New(self->max_row))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     ++self->in_use;
@@ -796,7 +800,7 @@ _query_row_as_dict(queryObject *self, int row)
     int j;
 
     if (!(row_dict = PyDict_New())) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     ++self->in_use;
@@ -811,15 +815,19 @@ _query_row_as_dict(queryObject *self, int row)
         if (!(key = get_decoded_text(PQfname(self->result, j),
                                      self->encoding))) {
             Py_DECREF(val);
+            /* GCOVR_EXCL_START: out of memory */
             Py_CLEAR(row_dict);
             break;
+            /* GCOVR_EXCL_STOP */
         }
         ret = PyDict_SetItem(row_dict, key, val);
         Py_DECREF(key);
         Py_DECREF(val);
         if (ret) {
+            /* GCOVR_EXCL_START: out of memory */
             Py_CLEAR(row_dict);
             break;
+            /* GCOVR_EXCL_STOP */
         }
     }
     --self->in_use;
@@ -916,7 +924,7 @@ _query_dict_list(queryObject *self)
     int i;
 
     if (!(result_list = PyList_New(self->max_row))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     ++self->in_use;
@@ -1126,7 +1134,7 @@ _query_scalar_list(queryObject *self)
     }
 
     if (!(result_list = PyList_New(self->max_row))) {
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
 
     ++self->in_use;

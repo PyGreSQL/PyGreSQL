@@ -124,12 +124,12 @@ large_dir(largeObject *self, PyObject *Py_UNUSED(noargs))
 
     /* the type is a borrowed reference, the result of extend() a new one */
     if (!(attrs = PyObject_Dir((PyObject *)Py_TYPE(self))))
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     ret =
         PyObject_CallMethod(attrs, "extend", "[sss]", "oid", "pgcnx", "error");
     if (!ret) {
         Py_DECREF(attrs);
-        return NULL;
+        return NULL; /* GCOVR_EXCL_LINE: out of memory */
     }
     Py_DECREF(ret);
 
