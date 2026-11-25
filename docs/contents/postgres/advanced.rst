@@ -19,29 +19,34 @@ Inheritance
 A table can inherit from zero or more tables. A query can reference either
 all rows of a table or all rows of a table plus all of its descendants.
 
-For example, the capitals table inherits from cities table (it inherits
+For example, the capitals table inherits from the cities table (it inherits
 all data fields from cities)::
+
+    >>> query("""CREATE TABLE cities (
+    ...     name        text,
+    ...     population  float8,
+    ...     altitude    int)""")
+    >>> query("""CREATE TABLE capitals (
+    ...     state       varchar(2)) INHERITS (cities)""")
+
+Now, let's populate the tables::
 
     >>> data = [('cities', [
     ...         "'San Francisco', 7.24E+5, 63",
     ...         "'Las Vegas', 2.583E+5, 2174",
     ...         "'Mariposa', 1200, 1953"]),
     ...     ('capitals', [
-    ...         "'Sacramento', 3.694E+5,30, 'CA'",
+    ...         "'Sacramento', 3.694E+5, 30, 'CA'",
     ...         "'Madison', 1.913E+5, 845, 'WI'"])]
-
-Now, let's populate the tables::
-
-    >>> data = ['cities', [
-    ...         "'San Francisco', 7.24E+5, 63"
-    ...         "'Las Vegas', 2.583E+5, 2174"
-    ...         "'Mariposa', 1200, 1953"],
-    ...     'capitals', [
-    ...         "'Sacramento', 3.694E+5,30, 'CA'",
-    ...         "'Madison', 1.913E+5, 845, 'WI'"]]
     >>> for table, rows in data:
     ...     for row in rows:
-    ...         query(f"INSERT INTO {table} VALUES (row)")
+    ...         query(f"INSERT INTO {table} VALUES ({row})")
+    ...
+    '1'
+    '1'
+    '1'
+    '1'
+    '1'
     >>> print(query("SELECT * FROM cities"))
         name     |population|altitude
     -------------+----------+--------
@@ -62,7 +67,7 @@ You can find all cities, including capitals, that are located at an altitude
 of 500 feet or higher by::
 
     >>> print(query("""SELECT c.name, c.altitude
-    ...     FROM cities
+    ...     FROM cities c
     ...     WHERE altitude > 500"""))
       name   |altitude
     ---------+--------
@@ -102,16 +107,18 @@ Insert instances with array attributes. Note the use of braces::
     ...     'Bill', '{10000,10000,10000,10000}',
     ...     '{9223372036854775800,9223372036854775800,9223372036854775800}',
     ...     '{{"meeting", "lunch"}, {"training", "presentation"}}')""")
+    '1'
     >>> query("""INSERT INTO sal_emp VALUES (
     ...     'Carol', '{20000,25000,25000,25000}',
     ...      '{9223372036854775807,9223372036854775807,9223372036854775807}',
     ...      '{{"breakfast", "consulting"}, {"meeting", "lunch"}}')""")
+    '1'
 
 
 Queries on array attributes::
 
-    >>> query("""SELECT name FROM sal_emp WHERE
-    ...     sal_emp.pay_by_quarter[1] != sal_emp.pay_by_quarter[2]""")
+    >>> print(query("""SELECT name FROM sal_emp WHERE
+    ...     sal_emp.pay_by_quarter[1] != sal_emp.pay_by_quarter[2]"""))
     name
     -----
     Carol
@@ -119,7 +126,7 @@ Queries on array attributes::
 
 Retrieve third quarter pay of all employees::
 
-    >>> query("SELECT sal_emp.pay_by_quarter[3] FROM sal_emp")
+    >>> print(query("SELECT sal_emp.pay_by_quarter[3] FROM sal_emp"))
     pay_by_quarter
     --------------
              10000
@@ -128,7 +135,7 @@ Retrieve third quarter pay of all employees::
 
 Retrieve third quarter extra pay of all employees::
 
-    >>> query("SELECT sal_emp.pay_by_extra_quarter[3] FROM sal_emp")
+    >>> print(query("SELECT sal_emp.pay_by_extra_quarter[3] FROM sal_emp"))
     pay_by_extra_quarter
     --------------------
      9223372036854775800
@@ -137,7 +144,7 @@ Retrieve third quarter extra pay of all employees::
 
 Retrieve first two quarters of extra quarter pay of all employees::
 
-    >>> query("SELECT sal_emp.pay_by_extra_quarter[1:2] FROM sal_emp")
+    >>> print(query("SELECT sal_emp.pay_by_extra_quarter[1:2] FROM sal_emp"))
               pay_by_extra_quarter
     -----------------------------------------
     {9223372036854775800,9223372036854775800}
@@ -146,8 +153,8 @@ Retrieve first two quarters of extra quarter pay of all employees::
 
 Select subarrays::
 
-    >>> query("""SELECT sal_emp.schedule[1:2][1:1] FROM sal_emp
-    ...     WHERE sal_emp.name = 'Bill'""")
+    >>> print(query("""SELECT sal_emp.schedule[1:2][1:1] FROM sal_emp
+    ...     WHERE sal_emp.name = 'Bill'"""))
            schedule
     ----------------------
     {{meeting},{training}}

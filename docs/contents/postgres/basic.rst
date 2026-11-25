@@ -15,6 +15,7 @@ We start by creating a **connection** to the PostgreSQL database::
     >>> db = DB()
 
 If you pass no parameters when creating the :class:`DB` instance, then
+libpq will use the ``PG*`` environment variables if they are set. Otherwise,
 PyGreSQL will try to connect to the database on the local host that has
 the same name as the current user, and also use that name for login.
 
@@ -68,15 +69,18 @@ CREATE TABLE command::
 
     >>> db.query("""INSERT INTO weather
     ...     VALUES ('San Francisco', 46, 50, 0.25, '11/27/1994')""")
+    '1'
     >>> db.query("""INSERT INTO cities
     ...     VALUES ('San Francisco', '(-194.0, 53.0)')""")
+    '1'
 
-You can also specify the columns to which the values correspond. The columns can
-be specified in any order. You may also omit any number of columns,
+You can also specify the columns to which the values correspond. The columns
+can be specified in any order. You may also omit any number of columns,
 such as with unknown precipitation, below::
 
     >>> db.query("""INSERT INTO weather (date, city, temp_hi, temp_lo)
     ...     VALUES ('11/29/1994', 'Hayward', 54, 37)""")
+    '1'
 
 
 If you get errors regarding the format of the date values, your database
@@ -87,10 +91,17 @@ the date style like this::
 
 Instead of explicitly writing the INSERT statement and sending it to the
 database with the :meth:`DB.query` method, you can also use the more
-convenient :meth:`DB.insert` method that does the same under the hood::
+convenient :meth:`DB.insert` method that does the same under the hood.
+For instance, instead of the last INSERT statement above, you could also
+have written the following (but do not run both, or you will get the row
+for Hayward twice)::
 
     >>> db.insert('weather',
     ...     date='11/29/1994', city='Hayward', temp_hi=54, temp_lo=37)
+    {'date': datetime.date(1994, 11, 29), 'city': 'Hayward',
+     'temp_hi': 54, 'temp_lo': 37, 'prcp': None}
+
+The :meth:`DB.insert` method returns the inserted row as a dictionary.
 
 And instead of using keyword parameters, you can also pass the values
 to the :meth:`DB.insert` method in a single Python dictionary.
@@ -132,7 +143,7 @@ You may also specify expressions in the target list.
     Hayward      |      45|1994-11-29
     (2 rows)
 
-If you want to retrieve rows that satisfy certain condition (i.e. a
+If you want to retrieve rows that satisfy a certain condition (i.e. a
 restriction), specify the condition in a WHERE clause. The following
 retrieves the weather of San Francisco on rainy days::
 
@@ -164,8 +175,8 @@ results as a list of tuples, by using the :meth:`Query.getresult` method::
     >>> from pprint import pprint
     >>> q = db.query("SELECT * FROM weather")
     >>> pprint(q.getresult())
-    [('San Francisco', 46, 50, 0.25, '1994-11-27'),
-     ('Hayward', 37, 54, None, '1994-11-29')]
+    [('San Francisco', 46, 50, 0.25, datetime.date(1994, 11, 27)),
+     ('Hayward', 37, 54, None, datetime.date(1994, 11, 29))]
 
 Here we used pprint to print out the returned list in a nicely formatted way.
 
@@ -174,12 +185,12 @@ tuples, use the :meth:`Query.dictresult` method instead::
 
     >>> pprint(q.dictresult())
     [{'city': 'San Francisco',
-      'date': '1994-11-27',
+      'date': datetime.date(1994, 11, 27),
       'prcp': 0.25,
       'temp_hi': 50,
       'temp_lo': 46},
      {'city': 'Hayward',
-      'date': '1994-11-29',
+      'date': datetime.date(1994, 11, 29),
       'prcp': None,
       'temp_hi': 54,
       'temp_lo': 37}]
@@ -198,10 +209,10 @@ If you only want to retrieve a single row of data, you can use the more
 convenient :meth:`DB.get` method that does the same under the hood::
 
     >>> d = dict(city='Hayward')
-    >>> db.get('weather', d, 'city')
+    >>> d = db.get('weather', d, 'city')
     >>> pprint(d)
     {'city': 'Hayward',
-     'date': '1994-11-29',
+     'date': datetime.date(1994, 11, 29),
      'prcp': None,
      'temp_hi': 54,
      'temp_lo': 37}
@@ -219,6 +230,7 @@ A SELECT ... INTO statement can be used to retrieve data into another table::
 
     >>> db.query("""SELECT * INTO TEMPORARY TABLE temptab FROM weather
     ...     WHERE city = 'San Francisco' and prcp > 0.0""")
+    '1'
 
 This fills a temporary table "temptab" with a subset of the data in the
 original "weather" table. It can be listed with::
@@ -292,11 +304,11 @@ results, of course::
 Updating data
 -------------
 
-It you want to change the data that has already been inserted into a database
+If you want to change the data that has already been inserted into a database
 table, you will need the **UPDATE** statement.
 
 Suppose you discover the temperature readings are all off by 2 degrees as of
-Nov 28, you may update the data as follow::
+Nov 28, you may update the data as follows::
 
     >>> db.query("""UPDATE weather
     ...     SET temp_hi = temp_hi - 2,  temp_lo = temp_lo - 2
@@ -331,7 +343,7 @@ one row of data has been deleted.
 
 You can also delete all the rows in a table by doing the following.
 This is different from DROP TABLE which removes the table itself in addition
-to the removing the rows, as explained in the next section.
+to removing the rows, as explained in the next section.
 
 ::
 
@@ -356,5 +368,9 @@ you can no longer use those tables::
 
     >>> db.query("DROP TABLE weather, cities")
     >>> db.query("select * from weather")
-    pg.ProgrammingError: Error:  Relation "weather" does not exist
+    Traceback (most recent call last):
+    ...
+    pg.ProgrammingError: ERROR:  relation "weather" does not exist
+    LINE 1: select * from weather
+                          ^
 

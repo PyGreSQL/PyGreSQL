@@ -22,7 +22,7 @@ Let's create a simple SQL function that takes no arguments and returns 1::
     >>> query("""CREATE FUNCTION one() RETURNS int4
     ...     AS 'SELECT 1 as ONE' LANGUAGE SQL""")
 
-Functions can be used in any expressions (eg. in the target list or
+Functions can be used in any expressions (e.g. in the target list or
 qualifications)::
 
     >>> print(db.query("SELECT one() AS answer"))
@@ -54,7 +54,7 @@ Before we create more sophisticated functions, let's populate an EMP table::
     >>> query("""CREATE TABLE EMP (
     ...     name   text,
     ...     salary int4,
-    ...     age f   int4,
+    ...     age    int4,
     ...     dept   varchar(16))""")
     >>> emps = ["'Sam', 1200, 16, 'toy'",
     ...     "'Claire', 5000, 32, 'shoe'",
@@ -63,6 +63,12 @@ Before we create more sophisticated functions, let's populate an EMP table::
     ...     "'Ginger', 4800, 30, 'candy'"]
     >>> for emp in emps:
     ...     query(f"INSERT INTO EMP VALUES ({emp})")
+    ...
+    '1'
+    '1'
+    '1'
+    '1'
+    '1'
 
 Every INSERT statement will return a '1' indicating that it has inserted
 one row into the EMP table.
@@ -104,7 +110,7 @@ Let's try one more function that returns tuples::
     >>> query("""CREATE FUNCTION high_pay() RETURNS setof EMP
     ...         AS 'SELECT * FROM EMP where salary > 1500'
     ...     LANGUAGE SQL""")
-    >>> query("SELECT name(high_pay()) AS overpaid")
+    >>> print(query("SELECT name(high_pay()) AS overpaid"))
     overpaid
     --------
     Claire
@@ -121,7 +127,7 @@ You can also create functions that do more than just a SELECT.
 You may have noticed that Andy has a negative salary. We'll create a function
 that removes employees with negative salaries::
 
-    >>> query("SELECT * FROM EMP")
+    >>> print(query("SELECT * FROM EMP"))
      name |salary|age|dept
     ------+------+---+-----
     Sam   |  1200| 16|toy
@@ -134,12 +140,12 @@ that removes employees with negative salaries::
     ...         'DELETE FROM EMP WHERE EMP.salary < 0;
     ...          SELECT 1 AS ignore_this'
     ...     LANGUAGE SQL""")
-    >>> query("SELECT clean_EMP()")
+    >>> print(query("SELECT clean_EMP()"))
     clean_emp
     ---------
             1
     (1 row)
-    >>> query("SELECT * FROM EMP")
+    >>> print(query("SELECT * FROM EMP"))
      name |salary|age|dept
     ------+------+---+-----
     Sam   |  1200| 16|toy
@@ -154,9 +160,10 @@ Remove functions that were created in this example
 We can remove the functions that we have created in this example and the
 table EMP, by using the DROP command::
 
-    query("DROP FUNCTION clean_EMP()")
-    query("DROP FUNCTION high_pay()")
-    query("DROP FUNCTION new_emp()")
-    query("DROP FUNCTION add_em(int4, int4)")
-    query("DROP FUNCTION one()")
-    query("DROP TABLE EMP CASCADE")
+    >>> query("DROP FUNCTION clean_EMP()")
+    >>> query("DROP FUNCTION high_pay()")
+    >>> query("DROP FUNCTION new_emp()")
+    >>> query("DROP FUNCTION double_salary(EMP)")
+    >>> query("DROP FUNCTION add_em(int4, int4)")
+    >>> query("DROP FUNCTION one()")
+    >>> query("DROP TABLE EMP CASCADE")

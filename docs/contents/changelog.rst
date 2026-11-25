@@ -566,6 +566,9 @@ Version 6.3.0 (unreleased)
   - Explained how to pass values that need to be adapted, such as lists
     for arrays, to `query()` and `query_prepared()`, which pass parameters
     as text (#28).
+  - Reviewed the whole documentation and corrected it where it no longer
+    matched the code, including broken examples in the tutorial and the
+    PostgreSQL examples, and outdated installation instructions.
 
 - Modernization and build:
 

@@ -12,9 +12,10 @@ For development, you can build the C extension in place like this:
     python setup.py build_ext --inplace --strict --pedantic
 
 The custom build_ext options are --strict (treat compiler warnings as
-errors), --pedantic (enable extra compiler warnings) and --memory-size
-or --no-memory-size (enabled by default if supported). Note that build
-frontends do not pass these options through as simple config settings.
+errors), --pedantic (enable extra compiler warnings), --analyze (run the
+static analyzer of gcc, slow) and --memory-size or --no-memory-size
+(enabled by default if supported). Note that build frontends do not
+pass these options through as simple config settings.
 You need to pass them as build options instead, like this:
 
     python -m build -C--build-option=build_ext -C--build-option=--strict

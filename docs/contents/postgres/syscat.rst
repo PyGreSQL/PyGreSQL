@@ -11,7 +11,7 @@ should not change the system catalogs by hand: there are SQL commands
 to make all supported changes.  For example, CREATE DATABASE inserts a row
 into the *pg_database* catalog — and actually creates the database on disk.
 
-It this section we want to show examples for how to parse some of the system
+In this section we want to show examples for how to parse some of the system
 catalogs, making queries with the classic PyGreSQL interface.
 
 We assume that you have already created a connection to the PostgreSQL
@@ -22,8 +22,8 @@ database, as explained in the :doc:`basic`::
     >>> query = db.query
 
 
-Lists indices
--------------
+List indices
+------------
 
 This query lists all simple indices in the database::
 
@@ -59,29 +59,20 @@ List user defined base types
 This query lists all user defined base types::
 
     print(query("""SELECT r.rolname, t.typname
-        FROM pg_type t, pg_authid r
-        WHERE r.oid = t.typowner
-            AND t.typrelid = '0'::oid and t.typelem = '0'::oid
-            AND r.rolname != 'postgres'
+        FROM pg_type t, pg_roles r
+        WHERE r.oid = t.typowner AND t.typtype = 'b'
+            AND t.typelem = '0'::oid
+            AND t.typnamespace != ALL(ARRAY[
+                'pg_catalog', 'information_schema']::regnamespace[])
         ORDER BY rolname, typname"""))
 
 
 List operators
 --------------
 
-This query lists all right-unary operators::
+This query lists all prefix (left-unary) operators::
 
-    print(query("""SELECT o.oprname AS right_unary,
-            lt.typname AS operand, result.typname AS return_type
-        FROM pg_operator o, pg_type lt, pg_type result
-        WHERE o.oprkind='r' and o.oprleft = lt.oid
-            AND o.oprresult = result.oid
-        ORDER BY operand"""))
-
-
-This query lists all left-unary operators::
-
-    print(query("""SELECT o.oprname AS left_unary,
+    print(query("""SELECT o.oprname AS prefix_op,
             rt.typname AS operand, result.typname AS return_type
         FROM pg_operator o, pg_type rt, pg_type result
         WHERE o.oprkind='l' AND o.oprright = rt.oid

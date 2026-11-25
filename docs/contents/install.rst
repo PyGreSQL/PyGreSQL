@@ -23,21 +23,28 @@ be older than the libpq that PyGreSQL has been built with.
 
 PyGreSQL will be installed as two packages named ``pg`` (for the classic
 interface) and ``pgdb`` (for the DB API 2 compliant interface). The former
-also contains a shared library called ``_pg.so`` (on Linux) or a DLL called
-``_pg.pyd`` (on Windows) and a stub file ``_pg.pyi`` for this library.
+also contains a shared library called ``_pg.*.so`` (on Linux) or a DLL called
+``_pg.*.pyd`` (on Windows) and a stub file ``_pg.pyi`` for this library.
 
 
 Installing with Pip
 -------------------
 
-This is the most easy way to install PyGreSQL if you have "pip" installed.
+This is the easiest way to install PyGreSQL if you have "pip" installed.
 Just run the following command in your terminal::
 
   pip install PyGreSQL
 
 This will automatically try to find and download a distribution on the
-`Python Package Index <https://pypi.python.org/>`_ that matches your operating
+`Python Package Index <https://pypi.org/>`_ that matches your operating
 system and Python version and install it.
+
+Pre-compiled wheels are currently only available for Windows. On other
+platforms, pip downloads the source distribution and builds PyGreSQL from
+source, which needs a C compiler, the Python header files and the libpq
+header files including the ``pg_config`` tool (see "Installing from Source"
+below). On Debian or Ubuntu, for instance, these are provided by the
+packages "python3-dev" and "libpq-dev".
 
 Note that you still need to have the libpq interface installed on your system
 (see the general remarks above).
@@ -56,9 +63,10 @@ If you don't want to install a C compiler or avoid possible problems
 with the compilation, you can search for a pre-compiled binary distribution
 of PyGreSQL on the Python Package Index or the PyGreSQL homepage.
 
-You can currently download PyGreSQL as Linux RPM, NetBSD package and Windows
-installer. Make sure the required Python version of the binary package matches
-the Python version you have installed.
+Pre-compiled wheels for 64-bit Windows are available on the Python Package
+Index. Some Linux and BSD distributions also provide PyGreSQL packages (see
+the download page). Make sure the required Python version of the binary
+package matches the Python version you have installed.
 
 Install the package as usual on your system.
 
@@ -68,16 +76,16 @@ Note that the documentation is currently only included in the source package.
 Installing from Source
 ----------------------
 
-If you want to install PyGreSQL from Source, or there is no binary
+If you want to install PyGreSQL from source, or there is no binary
 package available for your platform, follow these instructions.
 
-Make sure the Python header files and PostgreSQL client and server header
-files are installed. These come usually with the "devel" packages on Unix
-systems and the installer executables on Windows systems.
+Make sure the Python header files and the PostgreSQL client (libpq) header
+files are installed. These usually come with the "devel" or "dev" packages on
+Unix systems and the installer executables on Windows systems.
 
-If you are using a precompiled PostgreSQL, you will also need the pg_config
-tool. This is usually also part of the "devel" package on Unix, and will be
-installed as part of the database server feature on Windows systems.
+You will also need the pg_config tool. This is usually also part of the
+"devel" or "dev" package on Unix, and will be installed as part of the
+database server feature on Windows systems.
 
 Building and installing with pip
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -96,11 +104,10 @@ system. The wheel will be created in the ``dist`` directory::
     pip install build
     python -m build --wheel
 
-By default, PyGreSQL is compiled with support for all features available in the
-installed PostgreSQL version, and you will get warnings for the features that
-are not supported in this version. You can also explicitly enable or disable
-certain features by passing options to the ``build_ext`` command. For instance,
-in order to build PyGreSQL without support for the memory size functions, run::
+By default, PyGreSQL is compiled with support for all features available in
+the installed libpq version. You can explicitly enable or disable the memory
+size function by passing options to the ``build_ext`` command. For instance,
+in order to build PyGreSQL without support for the memory size function, run::
 
     pip install . -C--build-option=build_ext -C--build-option=--no-memory-size
 
@@ -115,10 +122,10 @@ You can find out all possible build options with::
 Alternatively, you can also use the corresponding C preprocessor macros like
 ``MEMORY_SIZE`` directly (see the next section).
 
-Note that if you build PyGreSQL with support for newer features that are not
-available in the PQLib installed on the runtime system, you may get an error
-when importing PyGreSQL, since these features are missing in the shared library
-which will prevent Python from loading it.
+Note that if you build PyGreSQL with a newer libpq than the one installed on
+the runtime system, you may get an error when importing PyGreSQL, since the
+features it uses are missing in the shared library, which will prevent Python
+from loading it.
 
 Compiling Manually
 ~~~~~~~~~~~~~~~~~~

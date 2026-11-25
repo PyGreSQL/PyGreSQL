@@ -19,5 +19,5 @@ Support
   not for questions about usage of PyGreSQL.
 
   Please note that messages to individual developers will generally not be
-  answered directly.  All questions, comments and code changes must be
-  submitted to the mailing list for peer review and archiving purposes.
+  answered directly. Please ask questions on the mailing list, and use
+  GitHub for bug reports and pull requests.

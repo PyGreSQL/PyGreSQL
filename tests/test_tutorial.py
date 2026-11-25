@@ -124,6 +124,7 @@ class TestDbApi20Tutorial(unittest.TestCase):
         con = self.con
         cur = con.cursor()
         cur.execute("drop table fruits")
+        con.commit()
         cur.close()
         con.close()
 

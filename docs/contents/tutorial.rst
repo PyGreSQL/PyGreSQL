@@ -23,9 +23,10 @@ instance of it, passing the necessary connection parameters, like this::
     ...     user='scott', passwd='tiger')
 
 You can omit one or even all parameters if you want to use their default
-values. PostgreSQL will use the name of the current operating system user
-as the login and the database name, and will try to connect to the local
-host on port 5432 if nothing else is specified.
+values. Then libpq will use the ``PG*`` environment variables if they are
+set. Otherwise, it uses the name of the current operating system user as
+the login and the database name, and connects via the local Unix-domain
+socket (or to localhost on Windows) on port 5432.
 
 The `db` object has all methods of the lower-level :class:`Connection` class
 plus some more convenience methods provided by the :class:`DB` wrapper.
@@ -72,6 +73,7 @@ faster than sending many individual INSERT commands::
     >>> more_fruits = 'cherimaya durian eggfruit fig grapefruit'.split()
     >>> data = list(enumerate(more_fruits, start=3))
     >>> db.inserttable('fruits', data)
+    5
 
 We can now query the database for all rows that have been inserted into
 the *fruits* table::
@@ -93,7 +95,7 @@ by this query, we can also request the data as list of tuples::
 
     >>> q = db.query('select * from fruits')
     >>> q.getresult()
-    ... [(1, 'apple'), ..., (7, 'grapefruit')]
+    [(1, 'apple'), ..., (7, 'grapefruit')]
 
 Instead of a list of tuples, we can also request a list of dicts::
 
@@ -118,13 +120,13 @@ into a Python dictionary mapping the primary key *id* to the *name*::
 
     >>> db.get_as_dict('fruits', scalar=True)
     {1: 'apple', 2: 'banana', 3: 'cherimaya', 4: 'durian', 5: 'eggfruit',
-     6: 'fig', 7: 'grapefruit', 8: 'apple', 9: 'banana'}
+     6: 'fig', 7: 'grapefruit'}
 
 To change a single row in the database, you can use the :meth:`DB.update`
 method. For instance, if you want to capitalize the name 'banana'::
 
     >>> db.update('fruits', banana, name=banana['name'].capitalize())
-    {'id': 2, 'name': 'Banana'}
+    {'name': 'Banana', 'id': 2}
     >>> print(db.query('select * from fruits where id between 1 and 3'))
     id|  name
     --+---------
@@ -138,9 +140,7 @@ Let's also capitalize the other names in the database::
     >>> db.query('update fruits set name=initcap(name)')
     '7'
 
-The returned string `'7'` tells us the number of updated rows. It is returned
-as a string to discern it from an OID which will be returned as an integer,
-if a new row has been inserted into a table with an OID column.
+The returned string `'7'` tells us the number of updated rows.
 
 To delete a single row from the database, use the :meth:`DB.delete` method::
 
@@ -157,20 +157,20 @@ can only return 0 or 1::
 Of course, we can insert the row back again::
 
     >>> db.insert('fruits', banana)
-    {'id': 2, 'name': 'Banana'}
+    {'name': 'Banana', 'id': 2}
 
 If we want to change a different row, we can get its current state with::
 
     >>> apple = db.get('fruits', 1)
     >>> apple
-    {'name': 'Apple', 'id': 1}
+    {'id': 1, 'name': 'Apple'}
 
 We can duplicate the row like this::
 
     >>> db.insert('fruits', apple, id=8)
     {'id': 8, 'name': 'Apple'}
 
- To remove the duplicated row, we can do::
+To remove the duplicated row, we can do::
 
     >>> db.delete('fruits', id=8)
     1
@@ -229,9 +229,10 @@ method to quickly dump large amounts of data from the database, using the
 PostgreSQL COPY command. Note however, that these methods are an extension
 provided by PyGreSQL, they are not part of the DB-API 2 standard.
 
-Also note that the DB API 2.0 interface does not have an autocommit as you
-may be used from PostgreSQL. So in order to make these inserts permanent,
-you need to commit them to the database::
+Also note that the DB API 2.0 interface does not use autocommit by default,
+as you may be used to from PostgreSQL (see :attr:`Connection.autocommit`).
+So in order to make these inserts permanent, you need to commit them to the
+database::
 
    >>> con.commit()
 
@@ -270,8 +271,9 @@ If you want to fetch only a limited number of rows from the query::
 
 Finally, to remove the table from the database and close the connection::
 
-    >>> db.execute("drop table fruits")
-    >>> cur.close()
+    >>> cursor.execute("drop table fruits")
+    >>> con.commit()
+    >>> cursor.close()
     >>> con.close()
 
 For more advanced features and details, see the reference: :doc:`pgdb/index`

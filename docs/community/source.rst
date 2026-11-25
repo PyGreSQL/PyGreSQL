@@ -16,4 +16,4 @@ Contributions can be proposed as
 Before starting to work on larger contributions,
 please discuss with the core developers using the
 `mailing list <https://mail.vex.net/mailman/listinfo/pygresql>`_
-or in a `GitHub issues <https://github.com/PyGreSQL/PyGreSQL/issues/>`_.
+or in a `GitHub issue <https://github.com/PyGreSQL/PyGreSQL/issues/>`_.
