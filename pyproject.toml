@@ -106,6 +106,9 @@ exclude_also = [
     "@overload",
     "raise NotImplementedError",
     "\\.\\.\\.$",
+    # Windows-specific code (not measured in CI and dev container)
+    "if os\\.name == .nt.:",
+    "if sys\\.platform == .win32.:",
 ]
 
 [tool.coverage.html]
