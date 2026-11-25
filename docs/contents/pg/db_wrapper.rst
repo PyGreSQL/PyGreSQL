@@ -205,13 +205,13 @@ get_relations -- get list of relations in connected database
 This method returns the list of relations in the connected database.  Although
 you can do this with a simple select, it is added here for convenience.  You
 can select which kinds of relations you are interested in by passing type
-letters in the `kinds` parameter, as in the ``relkind`` column of the
+letters in the *kinds* parameter, as in the ``relkind`` column of the
 ``pg_class`` system catalog: ``r`` = ordinary table, ``i`` = index,
 ``S`` = sequence, ``t`` = TOAST table, ``v`` = view, ``m`` = materialized
 view, ``c`` = composite type, ``f`` = foreign table, ``p`` = partitioned
-table, ``I`` = partitioned index.  If `kinds` is None or an empty string,
-all relations are returned (this is also the default).  If `system` is set to
-`True`, then system tables and views (temporary tables, toast tables, catalog
+table, ``I`` = partitioned index.  If *kinds* is None or an empty string,
+all relations are returned (this is also the default).  If *system* is set to
+``True``, then system tables and views (temporary tables, toast tables, catalog
 views and tables) will be returned as well, otherwise they will be ignored.
 
 .. versionchanged:: 6.3
@@ -298,7 +298,7 @@ has_table_privilege -- check table privilege
     Check whether current user has specified table privilege
 
     :param str table: the name of the table
-    :param str privilege: privilege to be checked -- default is 'select'
+    :param str privilege: privilege to be checked -- default is ``'select'``
     :param bool flush: whether the internal cache for table privileges
         shall be flushed
     :returns: whether current user has specified table privilege
@@ -340,7 +340,7 @@ By passing the special name ``'all'`` as the parameter, you can get a dict
 of all existing configuration parameters.
 
 Note that you can request most of the important parameters also using
-:meth:`Connection.parameter()` which does not involve a database query,
+:meth:`Connection.parameter` which does not involve a database query,
 unlike :meth:`DB.get_parameter` and :meth:`DB.set_parameter`.
 
 .. versionadded:: 4.2
@@ -374,9 +374,9 @@ will be taken from the dict.
 By passing the special name ``'all'`` as the parameter, you can reset
 all existing settable run-time parameters to their default values.
 
-If you set *local* to `True`, then the command takes effect for only the
+If you set *local* to ``True``, then the command takes effect for only the
 current transaction.  After :meth:`DB.commit` or :meth:`DB.rollback`,
-the session-level setting takes effect again.  Setting *local* to `True`
+the session-level setting takes effect again.  Setting *local* to ``True``
 will appear to have no effect if it is executed outside a transaction,
 since the transaction will end immediately.
 
@@ -389,7 +389,7 @@ begin/commit/rollback/savepoint/release -- transaction handling
 
     Begin a transaction
 
-    :param str mode: an optional transaction mode such as 'READ ONLY'
+    :param str mode: an optional transaction mode such as ``'READ ONLY'``
 
     This initiates a transaction block, that is, all following queries
     will be executed in a single transaction until :meth:`DB.commit`
@@ -585,15 +585,15 @@ Unlike the insert and update methods, keyword parameters are not used to
 modify the dictionary, but to specify which columns shall be updated in case
 of a conflict, and in which way:
 
-A value of `False` or `None` means the column shall not be updated,
-a value of `True` means the column shall be updated with the value that
+A value of ``False`` or ``None`` means the column shall not be updated,
+a value of ``True`` means the column shall be updated with the value that
 has been proposed for insertion, i.e. has been passed as value in the
 dictionary.  Columns that are not specified by keywords but appear as keys
 in the dictionary are also updated like in the case keywords had been passed
-with the value `True`.
+with the value ``True``.
 
 So if in the case of a conflict you want to update every column that has been
-passed in the dictionary `d`, you would call ``upsert(table, d)``.  If you
+passed in the dictionary *d*, you would call ``upsert(table, d)``.  If you
 don't want to do anything in case of a conflict, i.e. leave the existing row
 as it is, call ``upsert(table, d, **dict.fromkeys(d))``.
 
@@ -992,10 +992,10 @@ table, but since it does not actually scan the tables it is faster.
 Furthermore, it reclaims disk space immediately, rather than requiring
 a subsequent VACUUM operation. This is most useful on large tables.
 
-If *restart* is set to `True`, sequences owned by columns of the truncated
-table(s) are automatically restarted.  If *cascade* is set to `True`, it
+If *restart* is set to ``True``, sequences owned by columns of the truncated
+table(s) are automatically restarted.  If *cascade* is set to ``True``, it
 also truncates all tables that have foreign-key references to any of
-the named tables.  If the parameter *only* is not set to `True`, all the
+the named tables.  If the parameter *only* is not set to ``True``, all the
 descendant tables (if any) will also be truncated. Optionally, a ``*``
 can be specified after the table name to explicitly indicate that
 descendant tables are included.  If the parameter *table* is a list,
@@ -1225,7 +1225,8 @@ use_regtypes -- choose usage of registered type names
 
     Determine whether registered type names shall be used
 
-    :param bool regtypes: if passed, set whether registered type names shall be used
+    :param bool regtypes: if passed, set whether registered type names
+        shall be used
     :returns: whether registered type names are used
 
 The :meth:`DB.get_attnames` method can return either simplified "classic"

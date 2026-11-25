@@ -13,7 +13,7 @@ docs/          the documentation directory
 
                The documentation has been created with Sphinx.
                All text files are in ReST format; an HTML version of
-               the documentation can be created with "make html".
+               the documentation can be created with ``make html``.
 
 tests/         a suite of unit tests for PyGreSQL
 

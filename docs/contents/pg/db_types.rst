@@ -41,8 +41,8 @@ following subclass of :class:`str`:
         - *regtype* -- the registered PostgreSQL data type name
         - *simple* -- the more coarse-grained PyGreSQL type name
         - *typlen* -- internal size of the type, negative if variable
-        - *typtype* -- `b` = base type, `c` = composite type etc.
-        - *category* -- `A` = Array, `b` = Boolean, `C` = Composite etc.
+        - *typtype* -- ``b`` = base type, ``c`` = composite type etc.
+        - *category* -- ``A`` = Array, ``b`` = Boolean, ``C`` = Composite etc.
         - *delim* -- delimiter for array types
         - *relid* -- corresponding table for composite types
         - *elem* -- the type OID of the elements for array types

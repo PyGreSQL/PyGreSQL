@@ -52,7 +52,7 @@ record                             tuple
        array is. The information about the start index of the array (which is
        usually 1 in PostgreSQL, but can also be different from 1) is ignored
        and gets lost in the conversion to the Python list. If you need that
-       information, you can request it separately with the `array_lower()`
+       information, you can request it separately with the ``array_lower()``
        function provided by PostgreSQL.
 
 The special values ``infinity`` and ``-infinity`` of the types ``date``,
@@ -386,7 +386,7 @@ need to use this type name when setting the typecast function::
     >>> pgdb.set_typecast('jsonb', cast_json)
 
 As one last example, let us try to typecast the geometric data type ``circle``
-of PostgreSQL into a `SymPy <http://www.sympy.org>`_ ``Circle`` object.  Let's
+of PostgreSQL into a `SymPy <https://www.sympy.org>`_ ``Circle`` object.  Let's
 assume we have created and populated a table with two circles, like so:
 
 .. code-block:: sql

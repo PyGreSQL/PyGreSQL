@@ -131,7 +131,7 @@ A simple one would be the following query::
     (2 rows)
 
 You may also specify expressions in the target list.
-(The 'AS column' specifies the column name of the result. It is optional.)
+(The ``AS column`` specifies the column name of the result. It is optional.)
 
 ::
 

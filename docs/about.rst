@@ -1,8 +1,8 @@
 About PyGreSQL
 ==============
 
-**PyGreSQL** is an *open-source* `Python <http://www.python.org>`_ module
-that interfaces to a `PostgreSQL <http://www.postgresql.org>`_ database.
+**PyGreSQL** is an *open-source* `Python <https://www.python.org>`_ module
+that interfaces to a `PostgreSQL <https://www.postgresql.org>`_ database.
 It wraps the lower level C API library libpq to allow easy use of the
 powerful PostgreSQL features from Python.
 

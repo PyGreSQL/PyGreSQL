@@ -8,4 +8,4 @@ Project home sites
   https://www.postgresql.org
 
 **PyGreSQL**:
-  http://www.pygresql.org
+  https://www.pygresql.org

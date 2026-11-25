@@ -8,8 +8,8 @@ You must first install Python and PostgreSQL on your system.
 If you want to access remote databases only, you don't need to install
 the full PostgreSQL server, but only the libpq C-interface library.
 On Windows, this library is called ``libpq.dll`` and is for instance contained
-in the PostgreSQL ODBC driver (search for "psqlodbc"). On Linux, it is called
-``libpq.so`` and usually provided in a package called "libpq" or "libpq5".
+in the PostgreSQL ODBC driver (search for ``psqlodbc``). On Linux, it is called
+``libpq.so`` and usually provided in a package called ``libpq`` or ``libpq5``.
 On Windows, you also need to make sure that the directory that contains
 ``libpq.dll`` is part of your ``PATH`` environment variable.
 
@@ -44,7 +44,7 @@ platforms, pip downloads the source distribution and builds PyGreSQL from
 source, which needs a C compiler, the Python header files and the libpq
 header files including the ``pg_config`` tool (see "Installing from Source"
 below). On Debian or Ubuntu, for instance, these are provided by the
-packages "python3-dev" and "libpq-dev".
+packages ``python3-dev`` and ``libpq-dev``.
 
 Note that you still need to have the libpq interface installed on your system
 (see the general remarks above).

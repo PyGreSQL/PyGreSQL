@@ -2,10 +2,10 @@ Support
 -------
 
 **Python**:
-  see http://www.python.org/community/
+  see https://www.python.org/community/
 
 **PostgreSQL**:
-  see http://www.postgresql.org/support/
+  see https://www.postgresql.org/support/
 
 **PyGreSQL**:
   Join `the PyGreSQL mailing list <https://mail.vex.net/mailman/listinfo/pygresql>`_

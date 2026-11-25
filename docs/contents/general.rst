@@ -25,7 +25,7 @@ serves as a wrapper for the "libpq" library, the C API to PostgreSQL.
 This means you must have the libpq library installed as a shared library
 on your client computer, in a version that is supported by PyGreSQL.
 Depending on the client platform, you may have to set environment variables
-like `PATH` or `LD_LIBRARY_PATH` so that PyGreSQL can find the library.
+like ``PATH`` or ``LD_LIBRARY_PATH`` so that PyGreSQL can find the library.
 
 .. warning::
 

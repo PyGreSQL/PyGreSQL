@@ -390,7 +390,7 @@ it's no different from a connection made using blocking calls.
 The required steps are to pass the parameter ``nowait=True`` to  the
 :meth:`pg.connect` call, then call :meth:`Connection.poll` until it either
 returns :const:`POLLING_OK` or raises an exception. To avoid blocking
-in :meth:`Connection.poll`, use `select()` or `poll()` to wait for the
+in :meth:`Connection.poll`, use ``select()`` or ``poll()`` to wait for the
 connection to be readable or writable, depending on the return code of the
 previous call to :meth:`Connection.poll`. The initial state of the connection
 is :const:`POLLING_WRITING`. The possible states are defined as constants in
@@ -513,9 +513,10 @@ to interrogate these settings.  It returns the current value of a parameter
 if known, or *None* if the parameter is not known.
 
 You can use this method to check the settings of important parameters such as
-`server_version`, `server_encoding`, `client_encoding`, `application_name`,
-`is_superuser`, `session_authorization`, `DateStyle`, `IntervalStyle`,
-`TimeZone`, `integer_datetimes`, and `standard_conforming_strings`.
+``server_version``, ``server_encoding``, ``client_encoding``,
+``application_name``, ``is_superuser``, ``session_authorization``,
+``DateStyle``, ``IntervalStyle``, ``TimeZone``, ``integer_datetimes``, and
+``standard_conforming_strings``.
 
 Values that are not reported by this method can be requested using
 :meth:`DB.get_parameter`.
@@ -864,7 +865,7 @@ attributes:
 
     .. attribute:: Notice.severity
 
-        the level of the message, e.g. 'NOTICE' or 'WARNING'
+        the level of the message, e.g. ``'NOTICE'`` or ``'WARNING'``
 
     .. attribute:: Notice.primary
 

@@ -70,7 +70,7 @@ Before we create more sophisticated functions, let's populate an EMP table::
     '1'
     '1'
 
-Every INSERT statement will return a '1' indicating that it has inserted
+Every INSERT statement will return a ``'1'`` indicating that it has inserted
 one row into the EMP table.
 
 The argument of a function can also be a tuple. For instance, *double_salary*

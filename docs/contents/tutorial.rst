@@ -28,7 +28,7 @@ set. Otherwise, it uses the name of the current operating system user as
 the login and the database name, and connects via the local Unix-domain
 socket (or to localhost on Windows) on port 5432.
 
-The `db` object has all methods of the lower-level :class:`Connection` class
+The ``db`` object has all methods of the lower-level :class:`Connection` class
 plus some more convenience methods provided by the :class:`DB` wrapper.
 
 You can now execute database queries using the :meth:`DB.query` method::
@@ -140,16 +140,16 @@ Let's also capitalize the other names in the database::
     >>> db.query('update fruits set name=initcap(name)')
     '7'
 
-The returned string `'7'` tells us the number of updated rows.
+The returned string ``'7'`` tells us the number of updated rows.
 
 To delete a single row from the database, use the :meth:`DB.delete` method::
 
     >>> db.delete('fruits', banana)
     1
 
-The returned integer value `1` tells us that one row has been deleted. If we
-try it again, the method returns the integer value `0`. Naturally, this method
-can only return 0 or 1::
+The returned integer value ``1`` tells us that one row has been deleted. If we
+try it again, the method returns the integer value ``0``. Naturally, this
+method can only return 0 or 1::
 
     >>> db.delete('fruits', banana)
     0

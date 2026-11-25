@@ -52,7 +52,7 @@ record                             tuple
        array is. The information about the start index of the array (which is
        usually 1 in PostgreSQL, but can also be different from 1) is ignored
        and gets lost in the conversion to the Python list. If you need that
-       information, you can request it separately with the `array_lower()`
+       information, you can request it separately with the ``array_lower()``
        function provided by PostgreSQL.
 
 The special values ``infinity`` and ``-infinity`` of the types ``date``,
@@ -153,7 +153,7 @@ and again only after the client encoding has been changed).
 Adaptation of parameters
 ------------------------
 When you use the higher level methods of the classic :mod:`pg` module like
-:meth:`DB.insert()` or :meth:`DB.update()`, you don't need to care about
+:meth:`DB.insert` or :meth:`DB.update`, you don't need to care about
 adaptation of parameters, since all of this is happening automatically behind
 the scenes.  You only need to consider this issue when creating SQL commands
 manually and sending them to the database using the :meth:`DB.query` method
@@ -503,8 +503,8 @@ Typecasting to Python
 ---------------------
 
 As you noticed, PyGreSQL automatically converted the PostgreSQL data to
-suitable Python objects when returning values via the :meth:`DB.get()`,
-:meth:`Query.getresult()` and similar methods.  This is done by the use
+suitable Python objects when returning values via the :meth:`DB.get`,
+:meth:`Query.getresult` and similar methods.  This is done by the use
 of built-in typecast functions.
 
 If you want to use different typecast functions or add your own if no
