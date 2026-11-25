@@ -12,7 +12,9 @@ permissions:
 jobs:
   tests:
     name: Unit tests run
-    runs-on: ubuntu-24.04
+    # the older libpq of Ubuntu 24.04 (16) is the only one in CI without the
+    # features of libpq 17 and 18, so the "distro" jobs keep that release
+    runs-on: ${{ matrix.libpq == 'distro' && 'ubuntu-24.04' || 'ubuntu-26.04' }}
     # the whole job usually takes less than 2 minutes
     timeout-minutes: 15
 
@@ -20,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         # libpq "pgdg" means the latest libpq from apt.postgresql.org,
-        # "distro" means the older libpq shipped with the Ubuntu runner.
+        # "distro" means the older libpq shipped with Ubuntu 24.04.
         include:
           # Diagonal through the supported Py/PG range
           - { python: "3.10", postgres: "12", libpq: "pgdg" }
@@ -152,7 +154,7 @@ jobs:
 
   coverage:
     name: Test coverage
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # the whole job usually takes less than 2 minutes
     timeout-minutes: 15
 
