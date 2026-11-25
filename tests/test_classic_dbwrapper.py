@@ -5687,6 +5687,41 @@ class TestDBClassAdapter(unittest.TestCase):
         self.assertEqual(sql, 'select $1')
         self.assertEqual(params, ['(0,-3.25,"",f,{0},"{\\"\\"}")'])
 
+    def test_adapt_query_typed_anonymous_record(self):
+        adapter = self.adapter
+        dbtypes = self.db.dbtypes
+        get_simple_name = adapter.get_simple_name
+        self.assertEqual(get_simple_name('record'), 'record')
+        self.assertEqual(get_simple_name('_record'), 'record[]')
+        self.assertEqual(get_simple_name('record[]'), 'record[]')
+        self.assertEqual(dbtypes['record'].simple, 'record')
+        self.assertEqual(dbtypes['_record'].simple, 'record[]')
+        format_query = adapter.format_query
+        value = (1, 'a b', None, [1, 2], True)
+        literal = '(1,a b,,"{1,2}",t)'
+        # the types of the fields are guessed like for untyped tuples
+        self.assertEqual(adapter.adapt(value), literal)
+        for typ in 'record', dbtypes['record']:
+            sql, params = format_query('select %s', (value,), (typ,))
+            self.assertEqual(sql, 'select $1')
+            self.assertEqual(params, [literal])
+        values = [(1, 'a b'), None, ('x',)]
+        literal = '{"(1,a b)",null,(x)}'
+        for typ in '_record', 'record[]', dbtypes['_record']:
+            sql, params = format_query('select %s', (values,), (typ,))
+            self.assertEqual(sql, 'select $1')
+            self.assertEqual(params, [literal])
+        query = self.db.query
+        query('create temporary table test_anonymous_record'
+              ' (i int, t text)')
+        q = self.db.query_formatted(
+            'select %s::test_anonymous_record,'
+            ' %s::test_anonymous_record[]',
+            ((1, 'a b'), [(2, 'c'), (3, None)]), 'record _record')
+        r = q.getresult()[0]
+        self.assertEqual(r[0], (1, 'a b'))
+        self.assertEqual(r[1], [(2, 'c'), (3, None)])
+
     def test_adapt_query_untyped_list(self):
         format_query = self.adapter.format_query
         values: list | tuple = (3, 7.5, 'hello', True)

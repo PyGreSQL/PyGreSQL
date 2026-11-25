@@ -464,8 +464,10 @@ Other values must be adapted before you pass them:
   the type of the parameter, given like the *types* of
   :meth:`DB.query_formatted`, and returns the value in the text form that
   PostgreSQL expects.  For a composite type, pass the type object from
-  :attr:`DB.dbtypes`, so that the types of the fields are known.  This
-  method can also be used to adapt the values of all other types.
+  :attr:`DB.dbtypes`, so that the types of the fields are known.  If you
+  pass ``'record'`` instead, the types of the fields are guessed from their
+  values, like for tuples passed without a type.  This method can also be
+  used to adapt the values of all other types.
 
 For instance, this is how you pass a list as an array to a prepared
 statement::

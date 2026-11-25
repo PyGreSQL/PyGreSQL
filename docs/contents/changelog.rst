@@ -70,6 +70,12 @@ Version 6.3.0 (unreleased)
     `DB.get_attnames()`, can now be passed as types to `format_query()`
     and `query_formatted()`. Before, the arrays were sent as Python lists
     converted to strings.
+  - Tuples passed with the type name ``record`` are now adapted as records,
+    guessing the types of their fields like for tuples passed without a
+    type. Before, the type name was taken as ``text``, so that the Python
+    representation of the tuple was sent. The same applies to the pseudo
+    types ``record`` and ``_record`` from `DB.dbtypes`, which now have the
+    simple names ``record`` and ``record[]``.
   - `UUID` objects can now also be passed as inline parameters.
   - Objects of the `ipaddress` module can now also be passed as inline
     parameters, also as elements of arrays and records (#43). Addresses and

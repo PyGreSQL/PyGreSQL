@@ -148,7 +148,7 @@ class _SimpleTypes(dict):
         'float': ['float4', 'float8', float],
         'int': ['cid', 'int2', 'int4', 'int8', 'oid', 'oid8', 'xid', int],
         'hstore': [Hstore], 'json': ['jsonb', Json], 'uuid': [UUID],
-        'num': ['numeric', Decimal], 'money': [],
+        'num': ['numeric', Decimal], 'money': [], 'record': [],
         'text': ['bpchar', 'char', 'name', 'varchar', str]
     })
 
@@ -306,8 +306,10 @@ class DbTypes(dict):
         else:
             simple = _simpletypes[pgtype]
             if simple.endswith('[]'):
-                if category != 'A' or not elem:
-                    simple = 'text'  # not an array, only named like one
+                if not elem or (category != 'A' and pgtype != '_record'):
+                    # not an array, only named like one (the pseudo type
+                    # for arrays of anonymous records is an exception)
+                    simple = 'text'
                 else:
                     # the element type might not be the type with the name
                     # of the array type without the underscore
@@ -724,8 +726,13 @@ class Adapter:
         return self._adapt_array(v, adapt)
 
     def _adapt_record(self, v: Any, typ: Any) -> str | bytes:
-        """Adapt a record parameter with given type."""
-        typ = self.get_attnames(typ).values()
+        """Adapt a record parameter with given type.
+
+        For anonymous records, the types of the fields are guessed.
+        """
+        attnames = self.get_attnames(typ) or self.get_attnames(
+            self.guess_simple_type(v))
+        typ = attnames.values()
         if len(typ) != len(v):
             raise TypeError(f'Record parameter {v} has wrong size')
         adapt = self.adapt

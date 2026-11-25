@@ -61,7 +61,9 @@ their values must be passed as PostgreSQL array literals in strings.
 
 .. versionchanged:: 6.3
     The *elem* attribute has been added. Arrays of composite types now
-    have the simple PyGreSQL type name ``record[]`` instead of ``text``.
+    have the simple PyGreSQL type name ``record[]`` instead of ``text``,
+    and the pseudo types ``record`` and ``_record`` for anonymous records
+    the simple names ``record`` and ``record[]``.
     The *base* attribute has been added. Domains and arrays of domains now
     have the simple PyGreSQL type name of their base type instead of
     ``text``.
