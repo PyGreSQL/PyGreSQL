@@ -99,7 +99,7 @@ branch = true
 parallel = true
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 92.7
 skip_covered = true
 exclude_also = [
     "if TYPE_CHECKING:",
