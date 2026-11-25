@@ -2920,6 +2920,25 @@ class TestDBClass(unittest.TestCase):
             self.assertEqual(t, ('bart',))
 
     # noinspection PyUnresolvedReferences
+    def test_table_names_must_be_str(self):
+        table = 'test_str_names'
+        self.create_table(table, 'n smallint primary key')
+        db = self.db
+        name = table.encode()
+        # bytes names are only supported by the low-level methods
+        for method, args in (
+                (db.get, (name, 1)), (db.insert, (name, {'n': 1})),
+                (db.update, (name, {'n': 1})), (db.upsert, (name, {'n': 1})),
+                (db.delete, (name, {'n': 1})), (db.truncate, (name,)),
+                (db.truncate, ([name],)), (db.get_attnames, (name,)),
+                (db.pkey, (name,)), (db.pkeys, (name,))):
+            with self.assertRaises(TypeError) as cm:
+                method(*args)
+            self.assertRegex(
+                str(cm.exception), '^The table (name )?must be a string')
+        db.db.inserttable(name, [(1,)], [b'n'])
+        self.assertEqual(db.get(table, 1), {'n': 1})
+
     def test_get_as_dict(self):
         get_as_dict = self.db.get_as_dict
         self.assertRaises(TypeError, get_as_dict)

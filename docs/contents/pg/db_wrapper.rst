@@ -77,6 +77,12 @@ by :meth:`DB.get_tables` and :meth:`DB.get_relations` can be passed back
 to these methods. A name with an empty part, an unterminated quote or text
 after a closing quote raises a :exc:`ValueError`.
 
+The table names must be given as ``str``, otherwise a :exc:`TypeError` is
+raised. Only :meth:`Connection.inserttable` also accepts ``bytes``, as raw
+names in the client encoding. If you need a name that cannot be given as
+``str``, write the SQL command yourself and pass it to :meth:`DB.query`
+as ``bytes``.
+
 These rules do not apply to :meth:`DB.get_as_list` and :meth:`DB.get_as_dict`,
 which also accept other SQL expressions returning rows and insert the table
 name unchanged into the SQL command, so it must be quoted as in SQL.

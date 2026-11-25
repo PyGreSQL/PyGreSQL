@@ -210,6 +210,13 @@ class DB:
         return '.'.join(map(self.escape_identifier,
                             split_qualified_name(table)))
 
+    @staticmethod
+    def _parent_table(table: str) -> str:
+        """Get the table name without the hint for descendant tables."""
+        if not isinstance(table, str):
+            raise TypeError('The table name must be a string')
+        return table[:-1].rstrip() if table.endswith('*') else table
+
     def _relation_key(self, table: str | int) -> str | int:
         """Get the key for a table in the caches and regclass queries.
 
@@ -860,8 +867,7 @@ class DB:
         from the table will be returned as a new dictionary or used to replace
         the existing values when row was passed as a dictionary.
         """
-        if table.endswith('*'):  # hint for descendant tables can be ignored
-            table = table[:-1].rstrip()
+        table = self._parent_table(table)
         attnames = self.get_attnames(table)
         keyname = self._get_keynames(table, keyname)
         if isinstance(row, dict):
@@ -909,8 +915,7 @@ class DB:
         The dictionary is then reloaded with the values actually inserted in
         order to pick up values modified by rules, triggers, etc.
         """
-        if table.endswith('*'):  # hint for descendant tables can be ignored
-            table = table[:-1].rstrip()
+        table = self._parent_table(table)
         if row is None:
             row = {}
         row.update(kw)
@@ -953,8 +958,7 @@ class DB:
         The dictionary is then modified to reflect any changes caused by the
         update due to triggers, rules, default values, etc.
         """
-        if table.endswith('*'):
-            table = table[:-1].rstrip()  # need parent table name
+        table = self._parent_table(table)
         attnames = self.get_attnames(table)
         generated = self.get_generated(table)
         if row is None:
@@ -1039,8 +1043,7 @@ class DB:
         "DO SELECT" with PostgreSQL 19 or newer, so that the existing row
         is returned by the same statement.
         """
-        if table.endswith('*'):  # hint for descendant tables can be ignored
-            table = table[:-1].rstrip()
+        table = self._parent_table(table)
         if row is None:
             row = {}
         attnames = self.get_attnames(table)
@@ -1125,8 +1128,7 @@ class DB:
         Note that if the row cannot be deleted because e.g. it is still
         referenced by another table, this method raises an IntegrityError.
         """
-        if table.endswith('*'):  # hint for descendant tables can be ignored
-            table = table[:-1].rstrip()
+        table = self._parent_table(table)
         attnames = self.get_attnames(table)
         if row is None:
             row = {}
@@ -1188,6 +1190,8 @@ class DB:
             u = table_only.get(t)
             if not (u is None or isinstance(u, (bool, int))):
                 raise TypeError('Invalid type for the only option')
+            if not isinstance(t, str):
+                raise TypeError('The table name must be a string')
             if t.endswith('*'):
                 if u:
                     raise ValueError(

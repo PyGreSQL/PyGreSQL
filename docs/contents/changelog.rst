@@ -30,6 +30,9 @@ Version 6.3.0 (unreleased)
     encoding, like `escape_literal()` and `escape_identifier()`. Before,
     such characters were silently replaced with invalid characters.
   - `format_query()` now also accepts builtin generic types like `list[int]`.
+  - Table names that are not strings now raise a `TypeError` with a proper
+    message in all `DB` methods taking a table name. Before, methods like
+    `DB.insert()` raised a confusing `TypeError` from a string method.
   - `DB.get_as_dict()` now raises a `TypeError` instead of a `KeyError` if
     the keyname is not a column name or a sequence of names, like `DB.get()`
     and similar methods.

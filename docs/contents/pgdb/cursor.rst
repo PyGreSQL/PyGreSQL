@@ -138,6 +138,8 @@ This method calls a stored function or procedure in the PostgreSQL database.
 The name can be schema-qualified. It is split at dots, and its parts are
 taken literally (case is preserved), like table names.  Enclose a part in
 double quotes if it contains a dot, and write a double quote inside it twice.
+Like table names, the name must be given as ``str``; if this is not possible,
+pass the SQL command to :meth:`Cursor.execute` as ``bytes`` instead.
 
 Functions are called with ``SELECT``. The sequence of parameters must contain
 one entry for each input argument that the function expects, and it is
