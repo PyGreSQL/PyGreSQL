@@ -2689,7 +2689,9 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         ids.update(map(id, gc.get_objects()))
         self.test_no_close()
         gc.collect()
-        objs = [obj for obj in gc.get_objects() if id(obj) not in ids]
+        # take the snapshot before the comprehension creates its closure
+        objs = gc.get_objects()
+        objs = [obj for obj in objs if id(obj) not in ids]
         self.assertEqual(objs, [])
 
     def test_cve_2018_1058(self):
