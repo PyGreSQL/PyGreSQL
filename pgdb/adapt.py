@@ -144,7 +144,9 @@ class RecordType:
             type_code = _type_code_with_info(other)
             if type_code is None:
                 return other == 'record'
-            return type_code.type == 'c'
+            # composite types and the pseudo type for anonymous records
+            return type_code.type == 'c' or (
+                type_code.type == 'p' and type_code == 'record')
         return isinstance(other, RecordType)
 
     def __ne__(self, other: Any) -> bool:

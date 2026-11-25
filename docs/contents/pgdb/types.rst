@@ -213,9 +213,13 @@ DB-API 2 standard:
 
 .. object:: RECORD
 
-    Used to describe columns containing PostgreSQL records
+    Used to describe columns containing PostgreSQL records, i.e. values of
+    composite types or anonymous records like ``row(1, 'a')``
 
 .. versionadded:: 5.0
+
+.. versionchanged:: 6.3
+    Type codes of anonymous records are now also equal to ``RECORD``.
 
 Example for using some type objects::
 

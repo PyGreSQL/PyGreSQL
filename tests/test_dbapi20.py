@@ -867,6 +867,25 @@ class TestPgDb(dbapi20.DatabaseAPI20Test):
         finally:
             con.close()
 
+    def test_type_object_for_anonymous_records(self):
+        con = self._connect()
+        try:
+            cur = con.cursor()
+            cur.execute("select row(1, 'a'), array[row(1, 'a')]")
+            r, ra = (desc.type_code for desc in cur.description)
+            self.assertEqual(r, 'record')
+            # this was not equal before, like a string without type info
+            self.assertEqual(r, pgdb.RECORD)
+            self.assertEqual(pgdb.RECORD, r)
+            self.assertNotEqual(r, pgdb.ARRAY)
+            # arrays of records are arrays, like arrays of composite types
+            self.assertEqual(ra, '_record')
+            self.assertEqual(ra, pgdb.ARRAY)
+            self.assertNotEqual(ra, pgdb.RECORD)
+            self.assertEqual(cur.fetchone(), (('1', 'a'), [('1', 'a')]))
+        finally:
+            con.close()
+
     def test_type_cache_global_typecast_for_names_of_builtin_types(self):
         # a global typecast set for the name of a built-in type is used
         # for all types with that name, like in previous versions

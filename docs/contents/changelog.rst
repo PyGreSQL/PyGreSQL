@@ -309,6 +309,9 @@ Version 6.3.0 (unreleased)
     `ConnectError`, a subclass of `OperationalError` as suggested by the
     DB-API 2 and, for backward compatibility, of `InternalError`, which was
     raised before. Catch `OperationalError` in new code.
+  - The type code of anonymous records (e.g. the result of ``row(1, 'a')``)
+    in the cursor description is now equal to the type object `RECORD`.
+    Before, only the string ``'record'`` was.
   - When a parameter could not be adapted, the error message named the
     previous command (e.g. ``BEGIN``) instead of the operation.
   - Like in the `pg` module, the connection is now passed to typecast
