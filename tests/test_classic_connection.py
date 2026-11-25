@@ -5523,8 +5523,12 @@ class TestNotificatons(unittest.TestCase):
         # libpq only reads the notices while it is blocked sending data,
         # and passes them to the receiver when it sends the next data, so
         # make the send buffer small to ensure that this happens
-        with socket.socket(fileno=os.dup(self.c.fileno())) as sock:
+        # (no os.dup(), since sockets are not file descriptors on Windows)
+        sock = socket.socket(fileno=self.c.fileno())
+        try:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+        finally:
+            sock.detach()  # the socket still belongs to the connection
         raised = False  # set when the iterable raises the error
         received_after_error = 0
 
