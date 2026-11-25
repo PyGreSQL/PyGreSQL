@@ -169,7 +169,7 @@ _conn_begin(connObject *self);
 void
 _conn_end(connObject *self);
 PyObject *
-_conn_non_query_result(int status, PGresult *result, PGconn *cnx);
+_conn_non_query_result(ExecStatusType status, PGresult *result, PGconn *cnx);
 int
 _conn_prepare_command(connObject *self);
 PyObject *

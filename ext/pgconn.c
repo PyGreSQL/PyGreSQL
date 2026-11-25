@@ -244,7 +244,7 @@ conn_source(connObject *self, PyObject *Py_UNUSED(noargs))
 /* For a non-query result, set the appropriate error status,
    return the appropriate value, and free the result set. */
 PyObject *
-_conn_non_query_result(int status, PGresult *result, PGconn *cnx)
+_conn_non_query_result(ExecStatusType status, PGresult *result, PGconn *cnx)
 {
     switch (status) {
         case PGRES_EMPTY_QUERY:
@@ -635,8 +635,12 @@ _conn_query(connObject *self, PyObject *args, int prepared, int async)
     self->date_format = date_format; /* this is normally NULL */
 
     /* checks result status */
-    if (result && (status = PQresultStatus(result)) != PGRES_TUPLES_OK)
-        return _conn_non_query_result(status, result, self->cnx);
+    if (result) {
+        ExecStatusType result_status = PQresultStatus(result);
+
+        if (result_status != PGRES_TUPLES_OK)
+            return _conn_non_query_result(result_status, result, self->cnx);
+    }
 
     return _conn_new_query(self, result, encoding, async);
 }
@@ -2505,7 +2509,7 @@ static char conn_poll__doc__[] =
 static PyObject *
 conn_poll(connObject *self, PyObject *Py_UNUSED(noargs))
 {
-    int rc;
+    PostgresPollingStatusType rc;
 
     if (!self->cnx) {
         PyErr_SetString(PyExc_TypeError, "Connection is not valid");
@@ -2525,7 +2529,7 @@ conn_poll(connObject *self, PyObject *Py_UNUSED(noargs))
         return NULL;
     }
 
-    return PyLong_FromLong(rc);
+    return PyLong_FromLong((long)rc);
 }
 
 /* Set notice receiver callback function. */
