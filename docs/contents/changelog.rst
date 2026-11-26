@@ -1,7 +1,7 @@
 ChangeLog
 =========
 
-Version 6.3.0b1 (unreleased)
+Version 6.3.0b1 (2026-11-26)
 ----------------------------
 A beta release with many fixes that were found in a review of the whole code
 and by measuring the test coverage, particularly for client encodings other
